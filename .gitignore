@@ -35,6 +35,7 @@ temp
 tmp
 
 # 文档和资源文件（按需配置）
+test
 *.pdf
 1.md
 2.md

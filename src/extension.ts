@@ -540,7 +540,7 @@ export function activate(context: vscode.ExtensionContext) {
                     const selectionEndLine = selection.end.line;
 
                     // 从本行开始向上查找最近的指定级别标题
-                    let startLine = selectionStartLine - 1;
+                    let startLine = selectionStartLine + 1;
                     while (startLine > 0) {
                         const line = lines[startLine - 1];
                         if (line.startsWith(`${'#'.repeat(parseInt(level))} `)) {
@@ -560,7 +560,7 @@ export function activate(context: vscode.ExtensionContext) {
                     }
 
                     // 提取上下文
-                    contextText = lines.slice(startLine, endLine + 1).join('\n');
+                    contextText = lines.slice(startLine-1, endLine + 1).join('\n');
 
                 }
 
@@ -571,6 +571,9 @@ export function activate(context: vscode.ExtensionContext) {
 
                 // 显示文本信息
                 const haseContext = contextText && contextText.trim() !== targetText.trim();
+                console.log('t',targetText)
+                console.log('c',contextText)
+                console.log('haseContext',haseContext)
                 const progressInfo = `处理 Len ${targetText.length}` +
                     `${haseContext ? ` with context ${contextText.length}` : ''}`+
                     `${referenceText ? ` with reference ${referenceText.length}` : ''}`;
