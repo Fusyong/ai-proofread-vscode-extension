@@ -12,7 +12,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 // 内置的系统提示词
-const DEFAULT_SYSTEM_PROMPT = `
+let DEFAULT_SYSTEM_PROMPT = `
 <proofreader-system-setting version="0.0.1">
 <role-setting>
 
@@ -121,6 +121,13 @@ export class DeepseekClient implements ApiClient {
 
         if (!this.apiKey) {
             throw new Error(`未配置${model === 'deepseek-chat' ? 'Deepseek Chat' : '阿里云 Deepseek V3'} API密钥，请在设置中配置`);
+        }
+
+        // 获取用户配置的提示词
+        const prompt = config.get<string>('prompt', '');
+        if (prompt) {
+            DEFAULT_SYSTEM_PROMPT = prompt;
+            console.log('已使用用户的提示词')
         }
     }
 

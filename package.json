@@ -41,6 +41,11 @@
     "configuration": {
       "title": "AI Proofread",
       "properties": {
+        "ai-proofread.prompt": {
+          "type": "string",
+          "default": "",
+          "description": "AI 校对提示词，必须对“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明"
+        },
         "ai-proofread.defaultSplitLength": {
           "type": "number",
           "default": 600,

@@ -571,9 +571,6 @@ export function activate(context: vscode.ExtensionContext) {
 
                 // 显示文本信息
                 const haseContext = contextText && contextText.trim() !== targetText.trim();
-                console.log('t',targetText)
-                console.log('c',contextText)
-                console.log('haseContext',haseContext)
                 const progressInfo = `处理 Len ${targetText.length}` +
                     `${haseContext ? ` with context ${contextText.length}` : ''}`+
                     `${referenceText ? ` with reference ${referenceText.length}` : ''}`;
