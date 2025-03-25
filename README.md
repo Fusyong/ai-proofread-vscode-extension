@@ -1,8 +1,6 @@
 # AI Proofreader VS Code Extension
 
-这是一个基于AI的文档/图书校对VS Code插件，支持文档切分和AI校对功能；与Python脚本的功能大致相同。
-
-以example/1.md为测试用例。
+这是[一个基于AI的文档/图书校对VS Code插件](https://github.com/Fusyong/ai-proofread-vscode-extension)，支持文档切分和AI校对功能；与[Python脚本](https://github.com/Fusyong/ai-proofread)的功能大致相同。
 
 ## 功能特点
 
