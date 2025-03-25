@@ -1,0 +1,41 @@
+# 环境配置
+.env
+.env.local
+.env.*
+
+# 依赖目录
+node_modules
+.parcel-cache
+
+# 构建输出
+dist
+out
+*.vsix
+
+# 开发工具
+.vscode
+.vscode-test
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+work
+temp
+tmp
+
+# 文档和资源文件（按需配置）
+*.pdf
+1.md
+2.md
