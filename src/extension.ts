@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { splitText } from './splitter';
 import { processJsonFileAsync, GoogleClient, DeepseekClient } from './proofreader';
+import { PromptManager } from './promptManager';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('AI Proofread extension is now active!');
@@ -615,6 +616,16 @@ export function activate(context: vscode.ExtensionContext) {
             } catch (error) {
                 vscode.window.showErrorMessage(`校对过程中出错：${error instanceof Error ? error.message : String(error)}`);
             }
+        }),
+
+        // 注册提示词管理命令
+        vscode.commands.registerCommand('ai-proofread.managePrompts', () => {
+            PromptManager.getInstance().managePrompts();
+        }),
+
+        // 注册切换提示词命令
+        vscode.commands.registerCommand('ai-proofread.switchPrompt', () => {
+            PromptManager.getInstance().switchPrompt();
         })
     ];
 

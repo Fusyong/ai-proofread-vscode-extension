@@ -72,6 +72,29 @@ let DEFAULT_SYSTEM_PROMPT = `
 </proofreader-system-setting>
 `;
 
+// 获取用户配置的提示词
+function getSystemPrompt(): string {
+    const config = vscode.workspace.getConfiguration('ai-proofread');
+    const prompts = config.get<Array<{name: string, content: string}>>('prompts', []);
+    const defaultIndex = config.get<number>('defaultPromptIndex', 0);
+
+    // 如果defaultIndex为-1，使用系统默认提示词
+    if (defaultIndex === -1) {
+        console.log('使用系统默认提示词');
+        return DEFAULT_SYSTEM_PROMPT;
+    }
+
+    // 使用自定义提示词
+    if (prompts.length > 0 && defaultIndex >= 0 && defaultIndex < prompts.length) {
+        console.log(`使用自定义提示词: ${prompts[defaultIndex].name}`);
+        return prompts[defaultIndex].content;
+    }
+
+    // 如果没有有效的自定义提示词，使用系统默认提示词
+    console.log('使用系统默认提示词');
+    return DEFAULT_SYSTEM_PROMPT;
+}
+
 /**
  * 限速器类，用于控制API调用频率
  */
@@ -122,18 +145,11 @@ export class DeepseekClient implements ApiClient {
         if (!this.apiKey) {
             throw new Error(`未配置${model === 'deepseek-chat' ? 'Deepseek Chat' : '阿里云 Deepseek V3'} API密钥，请在设置中配置`);
         }
-
-        // 获取用户配置的提示词
-        const prompt = config.get<string>('prompt', '');
-        if (prompt) {
-            DEFAULT_SYSTEM_PROMPT = prompt;
-            console.log('已使用用户的提示词')
-        }
     }
 
     async proofread(content: string, reference: string = ''): Promise<string | null> {
         const messages = [
-            { role: 'system', content: DEFAULT_SYSTEM_PROMPT }
+            { role: 'system', content: getSystemPrompt() }
         ];
 
         if (reference) {

@@ -1,7 +1,7 @@
 {
   "name": "ai-proofread-vscode-extension",
   "displayName": "AI Proofread",
-  "description": "AI powered proofreading extension for VS Code",
+  "description": "AI powered proofreading tools",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.85.0"
@@ -13,6 +13,14 @@
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
+      {
+        "command": "ai-proofread.managePrompts",
+        "title": "AI Proofreader: set prompts"
+      },
+      {
+        "command": "ai-proofread.switchPrompt",
+        "title": "AI Proofreader: switch prompt"
+      },
       {
         "command": "ai-proofread.splitFileByLength",
         "title": "AI Proofreader: split by length"
@@ -41,10 +49,32 @@
     "configuration": {
       "title": "AI Proofread",
       "properties": {
-        "ai-proofread.prompt": {
-          "type": "string",
-          "default": "",
-          "description": "AI 校对提示词，必须对“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明"
+        "ai-proofread.prompts": {
+          "type": "array",
+          "default": [],
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "提示词名称"
+              },
+              "content": {
+                "type": "string",
+                "description": "提示词内容"
+              }
+            },
+            "required": ["name", "content"]
+          },
+          "description": "自定义AI校对提示词列表，最多5个。每个提示词必须包含名称和内容，内容必须对要校对的“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明"
+        },
+        "ai-proofread.defaultPromptIndex": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 4,
+          "description": "默认使用的提示词索引（0-4）"
         },
         "ai-proofread.defaultSplitLength": {
           "type": "number",
