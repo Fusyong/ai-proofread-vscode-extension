@@ -18,8 +18,8 @@
         "title": "AI Proofreader: set prompts"
       },
       {
-        "command": "ai-proofread.switchPrompt",
-        "title": "AI Proofreader: switch prompt"
+        "command": "ai-proofread.selectPrompt",
+        "title": "AI Proofreader: select prompt"
       },
       {
         "command": "ai-proofread.splitFileByLength",
@@ -140,13 +140,11 @@
           "default": 0,
           "description": "校对选中文本时，默认使用的标题级别作为上下文范围（0表示不使用）"
         },
-        "ai-proofread.defaultPromptIndex": {
+        "ai-proofread.currentPrompt": {
           "order": 31,
-          "type": "number",
-          "default": 0,
-          "minimum": 0,
-          "maximum": 4,
-          "description": "默认使用的提示词索引（0-4）"
+          "type": "string",
+          "default": "",
+          "description": "当前使用的提示词名称（空字符串表示使用系统默认提示词）"
         },
         "ai-proofread.prompts": {
           "order": 32,

@@ -23,17 +23,16 @@ export class PromptManager {
     public async managePrompts(): Promise<void> {
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const prompts = config.get<Prompt[]>('prompts', []);
-        const defaultIndex = config.get<number>('defaultPromptIndex', 0);
 
         // 创建提示词列表
         const items: PromptItem[] = [
             {
-                label: `${defaultIndex === -1 ? '✓ ' : ''}系统默认提示词`,
+                label: '系统默认提示词',
                 description: '使用内置的系统提示词',
                 prompt: undefined
             },
-            ...prompts.map((prompt, index) => ({
-                label: `${index === defaultIndex ? '✓ ' : ''}${prompt.name}`,
+            ...prompts.map((prompt) => ({
+                label: prompt.name,
                 description: prompt.content.slice(0, 50) + '...',
                 prompt
             }))
@@ -60,29 +59,27 @@ export class PromptManager {
             await this.addPrompt(prompts);
         } else if (selection.label.startsWith('$(trash)')) {
             await this.clearPrompts();
-        } else if (selection.label === '系统默认提示词' || selection.label === '✓ 系统默认提示词') {
-            // 切换到系统默认提示词
-            await config.update('defaultPromptIndex', -1, true);
+        } else if (selection.label === '系统默认提示词') {
             vscode.window.showInformationMessage('已切换到系统默认提示词');
         } else if (selection.prompt) {
             await this.editPrompt(prompts, selection.prompt);
         }
     }
 
-    public async switchPrompt(): Promise<void> {
+    public async selectPrompt(): Promise<void> {
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const prompts = config.get<Prompt[]>('prompts', []);
-        const currentIndex = config.get<number>('defaultPromptIndex', 0);
+        const currentPrompt = config.get<string>('currentPrompt', '');
 
         // 创建提示词列表
         const items: PromptItem[] = [
             {
-                label: `${currentIndex === -1 ? '✓ ' : ''}系统默认提示词`,
+                label: `${currentPrompt === '' ? '✓ ' : ''}系统默认提示词`,
                 description: '使用内置的系统提示词',
                 prompt: undefined
             },
-            ...prompts.map((prompt, index) => ({
-                label: `${index === currentIndex ? '✓ ' : ''}${prompt.name}`,
+            ...prompts.map((prompt) => ({
+                label: `${currentPrompt === prompt.name ? '✓ ' : ''}${prompt.name}`,
                 description: prompt.content.slice(0, 50) + '...',
                 prompt
             }))
@@ -98,17 +95,12 @@ export class PromptManager {
             return;
         }
 
-        if (selection.label === '系统默认提示词' || selection.label === '✓ 系统默认提示词') {
-            // 使用系统默认提示词
-            await config.update('defaultPromptIndex', -1, true);
+        if (selection.label.includes('系统默认提示词')) {
+            await config.update('currentPrompt', '', true);
             vscode.window.showInformationMessage('已切换到系统默认提示词');
         } else if (selection.prompt) {
-            // 使用自定义提示词
-            const index = prompts.findIndex(p => p.name === selection.prompt!.name);
-            if (index !== -1) {
-                await config.update('defaultPromptIndex', index, true);
-                vscode.window.showInformationMessage(`已切换到提示词：${selection.prompt!.name}`);
-            }
+            await config.update('currentPrompt', selection.prompt.name, true);
+            vscode.window.showInformationMessage(`已切换到提示词：${selection.prompt.name}`);
         }
     }
 
@@ -129,7 +121,7 @@ export class PromptManager {
 
         const content = await vscode.window.showInputBox({
             prompt: '请输入提示词内容',
-            placeHolder: '请输入完整的提示词内容，内容必须对要校对的“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明'
+            placeHolder: '请输入完整的提示词内容，内容必须对要校对的"目标文本（target）""参考资料（reference）""上下文（context）"进行说明'
         });
 
         if (!content) {
@@ -160,7 +152,7 @@ export class PromptManager {
         const content = await vscode.window.showInputBox({
             prompt: '请输入提示词内容',
             value: prompt.content,
-            placeHolder: '请输入完整的提示词内容，内容必须对要校对的“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明'
+            placeHolder: '请输入完整的提示词内容，内容必须对要校对的"目标文本（target）""参考资料（reference）""上下文（context）"进行说明'
         });
 
         if (!content) {

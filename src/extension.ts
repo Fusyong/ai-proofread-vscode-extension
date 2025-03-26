@@ -623,9 +623,9 @@ export function activate(context: vscode.ExtensionContext) {
             PromptManager.getInstance().managePrompts();
         }),
 
-        // 注册切换提示词命令
-        vscode.commands.registerCommand('ai-proofread.switchPrompt', () => {
-            PromptManager.getInstance().switchPrompt();
+        // 注册选择提示词命令
+        vscode.commands.registerCommand('ai-proofread.selectPrompt', () => {
+            PromptManager.getInstance().selectPrompt();
         })
     ];
 
