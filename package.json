@@ -49,7 +49,107 @@
     "configuration": {
       "title": "AI Proofread",
       "properties": {
+        "ai-proofread.apiKeys.deepseekChat": {
+          "order": 11,
+          "type": "string",
+          "default": "",
+          "description": "Deepseek Chat API密钥"
+        },
+        "ai-proofread.apiKeys.deepseekV3": {
+          "order": 12,
+          "type": "string",
+          "default": "",
+          "description": "阿里云 Deepseek V3 API密钥"
+        },
+        "ai-proofread.apiKeys.google": {
+          "order": 13,
+          "type": "string",
+          "default": "",
+          "description": "Google API密钥"
+        },
+        "ai-proofread.proofread.model": {
+          "order": 14,
+          "type": "string",
+          "enum": [
+            "deepseek-chat",
+            "deepseek-v3",
+            "google"
+          ],
+          "default": "deepseek-chat",
+          "description": "校对使用的模型"
+        },
+        "ai-proofread.proofread.rpm": {
+          "order": 15,
+          "type": "number",
+          "default": 15,
+          "description": "每分钟最大请求数"
+        },
+        "ai-proofread.proofread.maxConcurrent": {
+          "order": 16,
+          "type": "number",
+          "default": 3,
+          "description": "最大并发请求数"
+        },
+        "ai-proofread.defaultSplitLength": {
+          "order": 21,
+          "type": "number",
+          "default": 600,
+          "minimum": 50,
+          "description": "默认的文本切分长度（字符数）"
+        },
+        "ai-proofread.defaultTitleLevels": {
+          "order": 22,
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "default": [
+            2
+          ],
+          "description": "默认的标题切分级别（例如：[1,2] 表示按一级和二级标题切分）"
+        },
+        "ai-proofread.proofread.defaultContextLevel": {
+          "order": 23,
+          "type": "number",
+          "default": 0,
+          "description": "校对选中文本时，默认使用的标题级别作为上下文范围（0表示不使用）"
+        },
+        "ai-proofread.contextSplit.cutBy": {
+          "order": 24,
+          "type": "number",
+          "default": 600,
+          "description": "带上下文切分模式：切分长度"
+        },
+        "ai-proofread.titleAndLengthSplit.threshold": {
+          "order": 25,
+          "type": "number",
+          "default": 1500,
+          "description": "标题加长度切分：段落长度阈值，超过此长度的段落将被切分"
+        },
+        "ai-proofread.titleAndLengthSplit.cutBy": {
+          "order": 26,
+          "type": "number",
+          "default": 800,
+          "description": "标题加长度切分：切分长段落时的目标长度"
+        },
+        "ai-proofread.titleAndLengthSplit.minLength": {
+          "order": 27,
+          "type": "number",
+          "default": 120,
+          "description": "标题加长度切分：最小长度，小于此长度的段落将被合并"
+        },
+        "ai-proofread.defaultPromptIndex": {
+          "order": 31,
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 4,
+          "description": "默认使用的提示词索引（0-4）"
+        },
         "ai-proofread.prompts": {
+          "order": 32,
           "type": "array",
           "default": [],
           "maxItems": 5,
@@ -68,91 +168,6 @@
             "required": ["name", "content"]
           },
           "description": "自定义AI校对提示词列表，最多5个。每个提示词必须包含名称和内容，内容必须对要校对的“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明"
-        },
-        "ai-proofread.defaultPromptIndex": {
-          "type": "number",
-          "default": 0,
-          "minimum": 0,
-          "maximum": 4,
-          "description": "默认使用的提示词索引（0-4）"
-        },
-        "ai-proofread.defaultSplitLength": {
-          "type": "number",
-          "default": 600,
-          "minimum": 50,
-          "description": "默认的文本切分长度（字符数）"
-        },
-        "ai-proofread.defaultTitleLevels": {
-          "type": "array",
-          "items": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 6
-          },
-          "default": [
-            2
-          ],
-          "description": "默认的标题切分级别（例如：[1,2] 表示按一级和二级标题切分）"
-        },
-        "ai-proofread.contextSplit.cutBy": {
-          "type": "number",
-          "default": 600,
-          "description": "带上下文切分模式：切分长度"
-        },
-        "ai-proofread.titleAndLengthSplit.threshold": {
-          "type": "number",
-          "default": 1500,
-          "description": "标题加长度切分：段落长度阈值，超过此长度的段落将被切分"
-        },
-        "ai-proofread.titleAndLengthSplit.cutBy": {
-          "type": "number",
-          "default": 800,
-          "description": "标题加长度切分：切分长段落时的目标长度"
-        },
-        "ai-proofread.titleAndLengthSplit.minLength": {
-          "type": "number",
-          "default": 120,
-          "description": "标题加长度切分：最小长度，小于此长度的段落将被合并"
-        },
-        "ai-proofread.apiKeys.deepseekChat": {
-          "type": "string",
-          "default": "",
-          "description": "Deepseek Chat API密钥"
-        },
-        "ai-proofread.apiKeys.deepseekV3": {
-          "type": "string",
-          "default": "",
-          "description": "阿里云 Deepseek V3 API密钥"
-        },
-        "ai-proofread.apiKeys.google": {
-          "type": "string",
-          "default": "",
-          "description": "Google API密钥"
-        },
-        "ai-proofread.proofread.model": {
-          "type": "string",
-          "enum": [
-            "deepseek-chat",
-            "deepseek-v3",
-            "google"
-          ],
-          "default": "deepseek-chat",
-          "description": "校对使用的模型"
-        },
-        "ai-proofread.proofread.rpm": {
-          "type": "number",
-          "default": 15,
-          "description": "每分钟最大请求数"
-        },
-        "ai-proofread.proofread.maxConcurrent": {
-          "type": "number",
-          "default": 3,
-          "description": "最大并发请求数"
-        },
-        "ai-proofread.proofread.defaultContextLevel": {
-          "type": "number",
-          "default": 0,
-          "description": "校对选中文本时，默认使用的标题级别作为上下文范围（0表示不使用）"
         }
       }
     },
