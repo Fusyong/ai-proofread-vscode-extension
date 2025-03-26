@@ -47,7 +47,7 @@ export class PromptManager {
 
         // 显示选择菜单
         const selection = await vscode.window.showQuickPick(items, {
-            placeHolder: '选择要编辑的提示词或执行操作',
+            placeHolder: '选择要编辑的提示词或执行操作，也可以在设置界面管理',
             ignoreFocusOut: true
         });
 
@@ -129,7 +129,7 @@ export class PromptManager {
 
         const content = await vscode.window.showInputBox({
             prompt: '请输入提示词内容',
-            placeHolder: '请输入完整的提示词内容'
+            placeHolder: '请输入完整的提示词内容，内容必须对要校对的“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明'
         });
 
         if (!content) {
@@ -160,7 +160,7 @@ export class PromptManager {
         const content = await vscode.window.showInputBox({
             prompt: '请输入提示词内容',
             value: prompt.content,
-            placeHolder: '请输入完整的提示词内容'
+            placeHolder: '请输入完整的提示词内容，内容必须对要校对的“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明'
         });
 
         if (!content) {

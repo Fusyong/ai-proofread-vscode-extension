@@ -110,12 +110,6 @@
           ],
           "description": "默认的标题切分级别（例如：[1,2] 表示按一级和二级标题切分）"
         },
-        "ai-proofread.proofread.defaultContextLevel": {
-          "order": 23,
-          "type": "number",
-          "default": 0,
-          "description": "校对选中文本时，默认使用的标题级别作为上下文范围（0表示不使用）"
-        },
         "ai-proofread.contextSplit.cutBy": {
           "order": 24,
           "type": "number",
@@ -139,6 +133,12 @@
           "type": "number",
           "default": 120,
           "description": "标题加长度切分：最小长度，小于此长度的段落将被合并"
+        },
+        "ai-proofread.proofread.defaultContextLevel": {
+          "order": 28,
+          "type": "number",
+          "default": 0,
+          "description": "校对选中文本时，默认使用的标题级别作为上下文范围（0表示不使用）"
         },
         "ai-proofread.defaultPromptIndex": {
           "order": 31,
@@ -167,7 +167,7 @@
             },
             "required": ["name", "content"]
           },
-          "description": "自定义AI校对提示词列表，最多5个。每个提示词必须包含名称和内容，内容必须对要校对的“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明"
+          "description": "自定义AI校对提示词列表，最多5个。每个提示词必须包含名称和内容，内容必须对要校对的“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明。也可以通过命令管理"
         }
       }
     },
