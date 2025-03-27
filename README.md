@@ -1,6 +1,6 @@
 # AI Proofreader VS Code Extension
 
-这是[一个基于AI的文档/图书校对VS Code插件](https://github.com/Fusyong/ai-proofread-vscode-extension)，支持文档切分和AI校对功能；与[Python脚本](https://github.com/Fusyong/ai-proofread)的功能大致相同。
+这是[一个基于AI的文档/图书校对VS Code插件](https://github.com/Fusyong/ai-proofread-vscode-extension)，支持文档切分和AI校对功能；与[相应的Python工具库](https://github.com/Fusyong/ai-proofread)的功能大致相同。
 
 ## 功能特点
 
@@ -51,8 +51,25 @@
    * `ai-proofread.proofread.maxConcurrent`: 设置最大并发请求数（默认3）
    * `ai-proofread.defaultSplitLength`: 设置默认切分长度（默认600字符）
    * `ai-proofread.defaultTitleLevels`: 设置默认标题切分级别（默认[2]）
+   * `ai-proofread.currentPrompt`: 当前使用的提示词名称（空字符串表示使用系统默认提示词）
+   * `ai-proofread.prompts`: 自定义AI校对提示词列表，最多5个。每个提示词必须包含名称和内容，内容必须对要校对的“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明
 
-### 2. 文档切分功能
+### 2. 提示词管理
+
+通过命令面板（Ctrl+Shift+P）可以使用以下命令管理提示词：
+
+1. **管理提示词** (AI Proofreader: set prompts)
+   * 添加新的提示词
+   * 编辑现有提示词
+   * 清空所有提示词
+   * 查看提示词内容预览
+
+2. **选择提示词** (AI Proofreader: select prompt)
+   * 在系统默认提示词和自定义提示词之间切换
+   * 当前使用的提示词会显示勾号（✓）标记
+   * 选择后会自动保存到配置中
+
+### 3. 文档切分功能
 
 右键点击编辑器，可以看到以下切分选项：
 
@@ -74,13 +91,13 @@
 
 所有切分操作都会生成日志文件（`.log`），记录切分统计信息。
 
-### 3. AI 校对功能
+### 4. AI 校对功能
 
 1. **校对 JSON 文件** (Proofread File)
    * 打开已切分的 JSON 文件
    * 右键选择 "Proofread File"
    * 自动使用配置的默认模型进行校对
-   * 支持进度显示和取消操作
+   * 支持进度显示和 TODO 取消操作
    * 结果保存为 `.proofread.json` 文件
 
 2. **校对选中文本** (Proofread Selection)
@@ -90,7 +107,7 @@
    * 可选择是否使用上下文和参考文件
    * 结果在新窗口中显示
 
-### 4. 日志和统计
+### 5. 日志和统计
 
 * 所有操作都会生成详细的日志文件
 * 日志包含：
@@ -99,14 +116,14 @@
   * 切分/校对详情
   * 错误信息（如果有）
 
-### 5. 注意事项
+### 6. 注意事项
 
 1. 确保在使用前已正确配置 API 密钥
 2. 长文本建议先切分后校对
-3. 校对过程可以随时取消，已处理的内容会被保存
+3. TODO 校对过程可以随时取消，已处理的内容会被保存
 4. 注意 API 调用频率限制，可通过配置调整
 
-## 使用方法
+## 开发命令
 
 ```bash
 # 安装依赖
