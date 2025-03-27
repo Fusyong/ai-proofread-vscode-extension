@@ -44,6 +44,10 @@
       {
         "command": "ai-proofread.proofreadSelection",
         "title": "AI Proofreader: proofread selection"
+      },
+      {
+        "command": "ai-proofread.mergeTwoFiles",
+        "title": "AI Proofreader: merge two files"
       }
     ],
     "configuration": {
@@ -192,13 +196,18 @@
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
         },
         {
-          "command": "ai-proofread.proofreadFile",
+          "command": "ai-proofread.mergeTwoFiles",
           "group": "ai-proofread@5",
           "when": "resourceLangId == json"
         },
         {
-          "command": "ai-proofread.proofreadSelection",
+          "command": "ai-proofread.proofreadFile",
           "group": "ai-proofread@6",
+          "when": "resourceLangId == json"
+        },
+        {
+          "command": "ai-proofread.proofreadSelection",
+          "group": "ai-proofread@7",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex)"
         }
       ]

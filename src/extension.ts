@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { splitText } from './splitter';
 import { processJsonFileAsync, GoogleClient, DeepseekClient } from './proofreader';
 import { PromptManager } from './promptManager';
+import { mergeTwoFiles } from './merger';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('AI Proofread extension is now active!');
@@ -627,6 +628,81 @@ export function activate(context: vscode.ExtensionContext) {
         // 注册选择提示词命令
         vscode.commands.registerCommand('ai-proofread.selectPrompt', () => {
             PromptManager.getInstance().selectPrompt();
+        }),
+
+        // 注册合并文件命令
+        vscode.commands.registerCommand('ai-proofread.mergeTwoFiles', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+
+            const document = editor.document;
+
+            // 检查文件是否为JSON
+            if (document.languageId !== 'json') {
+                vscode.window.showErrorMessage('请选择JSON文件进行合并！');
+                return;
+            }
+
+            try {
+                // 让用户选择源文件
+                const sourceFile = await vscode.window.showOpenDialog({
+                    canSelectFiles: true,
+                    canSelectFolders: false,
+                    canSelectMany: false,
+                    filters: {
+                        'JSON files': ['json']
+                    },
+                    title: '选择源JSON文件'
+                });
+
+                if (!sourceFile || sourceFile.length === 0) {
+                    return;
+                }
+
+                // 让用户选择要更新的字段
+                const targetField = await vscode.window.showQuickPick(
+                    ['target', 'reference', 'context'],
+                    {
+                        placeHolder: '选择要更新的字段',
+                        ignoreFocusOut: true
+                    }
+                );
+
+                if (!targetField) {
+                    return;
+                }
+
+                // 让用户选择源文件中的字段
+                const sourceField = await vscode.window.showQuickPick(
+                    ['target', 'reference', 'context'],
+                    {
+                        placeHolder: '选择源文件中的字段',
+                        ignoreFocusOut: true
+                    }
+                );
+
+                if (!sourceField) {
+                    return;
+                }
+
+                // 执行合并
+                const result = await mergeTwoFiles(
+                    document.uri.fsPath,
+                    sourceFile[0].fsPath,
+                    targetField as 'target' | 'reference' | 'context',
+                    sourceField as 'target' | 'reference' | 'context'
+                );
+
+                // 显示结果
+                vscode.window.showInformationMessage(
+                    `合并完成！更新了 ${result.updated}/${result.total} 项`
+                );
+            } catch (error) {
+                vscode.window.showErrorMessage(`合并文件时出错：${error instanceof Error ? error.message : String(error)}`);
+            }
         })
     ];
 
