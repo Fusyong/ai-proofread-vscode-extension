@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import axios from 'axios';
 import * as dotenv from 'dotenv';
+import { RateLimiter } from './rateLimiter';
 
 // 加载环境变量
 dotenv.config();
@@ -93,29 +94,6 @@ function getSystemPrompt(): string {
     // 如果没有有效的自定义提示词，使用系统默认提示词
     console.log('使用系统默认提示词');
     return DEFAULT_SYSTEM_PROMPT;
-}
-
-/**
- * 限速器类，用于控制API调用频率
- */
-class RateLimiter {
-    private interval: number;
-    private lastCallTime: number;
-
-    constructor(rpm: number) {
-        this.interval = 60 / rpm;
-        this.lastCallTime = 0;
-    }
-
-    async wait(): Promise<void> {
-        const currentTime = Date.now() / 1000;
-        const elapsed = currentTime - this.lastCallTime;
-        if (elapsed < this.interval) {
-            const waitTime = this.interval - elapsed;
-            await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
-        }
-        this.lastCallTime = Date.now() / 1000;
-    }
 }
 
 /**
@@ -280,6 +258,7 @@ export async function processJsonFileAsync(
         rpm?: number;
         maxConcurrent?: number;
         onProgress?: (info: string) => void;
+        token?: vscode.CancellationToken;
     } = {}
 ): Promise<ProcessStats> {
     // 设置默认值
@@ -289,7 +268,8 @@ export async function processJsonFileAsync(
         model = 'deepseek-chat',
         rpm = 15,
         maxConcurrent = 3,
-        onProgress
+        onProgress,
+        token
     } = options;
 
     // 读取输入JSON文件
@@ -338,6 +318,11 @@ export async function processJsonFileAsync(
 
     // 处理段落
     const processOne = async (index: number): Promise<void> => {
+        // 检查是否已取消
+        if (token?.isCancellationRequested) {
+            return;
+        }
+
         const paragraph = inputParagraphs[index];
         const targetText = paragraph.target;
         const referenceText = paragraph.reference || '';
@@ -387,6 +372,11 @@ export async function processJsonFileAsync(
     // 并发处理所有段落
     await Promise.all(
         indicesToProcess.map(async (index) => {
+            // 检查是否已取消
+            if (token?.isCancellationRequested) {
+                return;
+            }
+
             const slot = await Promise.race(
                 semaphore.map((_, i) =>
                     Promise.resolve(i)

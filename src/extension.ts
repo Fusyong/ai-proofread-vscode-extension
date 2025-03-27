@@ -363,8 +363,8 @@ export function activate(context: vscode.ExtensionContext) {
                 await vscode.window.withProgress({
                     location: vscode.ProgressLocation.Notification,
                     title: "正在校对文件...",
-                    cancellable: false
-                }, async (progress) => {
+                    cancellable: true
+                }, async (progress, token) => {
                     try {
                         const stats = await processJsonFileAsync(currentFilePath, outputFilePath, {
                             model: selectedModel as 'deepseek-chat' | 'deepseek-v3' | 'google',
@@ -374,7 +374,8 @@ export function activate(context: vscode.ExtensionContext) {
                                 // 将进度信息写入日志
                                 fs.appendFileSync(logFilePath, info + '\n', 'utf8');
                                 progress.report({ message: info });
-                            }
+                            },
+                            token // 传递取消令牌
                         });
 
                         // 写入完成日志
