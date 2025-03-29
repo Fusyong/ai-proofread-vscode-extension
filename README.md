@@ -75,7 +75,7 @@
 
 ### 管理提示词
 
-通过命令面板（Ctrl+Shift+P）可以**管理提示词** (AI Proofread: set prompts)和**选择当前使用的提示词** (AI Proofread: select prompt)
+通过命令面板（Ctrl+Shift+P）可以**管理提示词** (AI Proofreader: set prompts)和**选择当前使用的提示词** (AI Proofreader: select prompt)
 
 在自定义提示词中，必须对要处理的“目标文本（target）”“参考资料（reference）”“上下文（context）”进行说明，如果用不到后两者也可以不说明。
 

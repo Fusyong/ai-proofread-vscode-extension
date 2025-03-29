@@ -58,13 +58,13 @@
           "order": 11,
           "type": "string",
           "default": "",
-          "description": "Deepseek Chat API密钥"
+          "description": "Deepseek API密钥"
         },
         "ai-proofread.apiKeys.deepseekV3": {
           "order": 12,
           "type": "string",
           "default": "",
-          "description": "阿里云 Deepseek V3 API密钥"
+          "description": "阿里云 Deepseek API密钥"
         },
         "ai-proofread.apiKeys.google": {
           "order": 13,
