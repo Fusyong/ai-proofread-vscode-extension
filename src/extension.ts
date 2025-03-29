@@ -622,12 +622,12 @@ export function activate(context: vscode.ExtensionContext) {
 
         // 注册提示词管理命令
         vscode.commands.registerCommand('ai-proofread.managePrompts', () => {
-            PromptManager.getInstance().managePrompts();
+            PromptManager.getInstance(context).managePrompts();
         }),
 
         // 注册选择提示词命令
         vscode.commands.registerCommand('ai-proofread.selectPrompt', () => {
-            PromptManager.getInstance().selectPrompt();
+            PromptManager.getInstance(context).selectPrompt();
         }),
 
         // 注册合并文件命令

@@ -1,10 +1,11 @@
 {
-  "name": "ai-proofread-vscode-extension",
-  "displayName": "AI Proofread",
+  "name": "ai-proofreader",
+  "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.85.0",
+    "node": ">=18.12.1"
   },
   "categories": [
     "Other"
@@ -144,12 +145,6 @@
           "default": 0,
           "description": "校对选中文本时，默认使用的标题级别作为上下文范围（0表示不使用）"
         },
-        "ai-proofread.currentPrompt": {
-          "order": 31,
-          "type": "string",
-          "default": "",
-          "description": "当前使用的提示词名称（空字符串表示使用系统默认提示词）"
-        },
         "ai-proofread.prompts": {
           "order": 32,
           "type": "array",
@@ -227,16 +222,16 @@
     "dotenv": "^16.4.7"
   },
   "devDependencies": {
-    "@eslint/config-array": "latest",
-    "@eslint/object-schema": "latest",
+    "@eslint/config-array": "^0.19.2",
+    "@eslint/object-schema": "^2.1.6",
     "@types/node": "^18.x",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
-    "eslint": "^9.0.0",
-    "glob": "^9.0.0",
+    "eslint": "^8.57.0",
+    "glob": "^10.3.10",
     "parcel": "^2.11.0",
-    "rimraf": "^5.0.0",
+    "rimraf": "^5.0.5",
     "typescript": "^5.3.3",
     "@vscode/vsce": "^2.24.0"
   },

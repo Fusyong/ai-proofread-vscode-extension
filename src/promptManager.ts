@@ -9,13 +9,20 @@ interface PromptItem extends vscode.QuickPickItem {
     prompt?: Prompt;
 }
 
+interface ActionItem extends vscode.QuickPickItem {
+    action: 'add' | 'clear';
+}
+
 export class PromptManager {
     private static instance: PromptManager;
-    private constructor() {}
+    private context: vscode.ExtensionContext;
+    private constructor(context: vscode.ExtensionContext) {
+        this.context = context;
+    }
 
-    public static getInstance(): PromptManager {
-        if (!PromptManager.instance) {
-            PromptManager.instance = new PromptManager();
+    public static getInstance(context?: vscode.ExtensionContext): PromptManager {
+        if (!PromptManager.instance && context) {
+            PromptManager.instance = new PromptManager(context);
         }
         return PromptManager.instance;
     }
@@ -25,13 +32,13 @@ export class PromptManager {
         const prompts = config.get<Prompt[]>('prompts', []);
 
         // 创建提示词列表
-        const items: PromptItem[] = [
+        const items: (PromptItem | ActionItem)[] = [
             {
                 label: '系统默认提示词',
                 description: '使用内置的系统提示词',
                 prompt: undefined
             },
-            ...prompts.map((prompt) => ({
+            ...prompts.map((prompt: Prompt) => ({
                 label: prompt.name,
                 description: prompt.content.slice(0, 50) + '...',
                 prompt
@@ -40,8 +47,8 @@ export class PromptManager {
 
         // 添加操作选项
         items.push(
-            { label: '$(add) 添加新提示词', description: '添加一个新的提示词' },
-            { label: '$(trash) 清空所有提示词', description: '删除所有自定义提示词' }
+            { label: '$(add) 添加新提示词', description: '添加一个新的提示词', action: 'add' },
+            { label: '$(trash) 清空所有提示词', description: '删除所有自定义提示词', action: 'clear' }
         );
 
         // 显示选择菜单
@@ -55,10 +62,12 @@ export class PromptManager {
         }
 
         // 处理选择结果
-        if (selection.label.startsWith('$(add)')) {
-            await this.addPrompt(prompts);
-        } else if (selection.label.startsWith('$(trash)')) {
-            await this.clearPrompts();
+        if ('action' in selection) {
+            if (selection.action === 'add') {
+                await this.addPrompt(prompts);
+            } else if (selection.action === 'clear') {
+                await this.clearPrompts();
+            }
         } else if (selection.label === '系统默认提示词') {
             vscode.window.showInformationMessage('已切换到系统默认提示词');
         } else if (selection.prompt) {
@@ -69,7 +78,7 @@ export class PromptManager {
     public async selectPrompt(): Promise<void> {
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const prompts = config.get<Prompt[]>('prompts', []);
-        const currentPrompt = config.get<string>('currentPrompt', '');
+        const currentPrompt = this.context.globalState.get<string>('currentPrompt', '');
 
         // 创建提示词列表
         const items: PromptItem[] = [
@@ -78,7 +87,7 @@ export class PromptManager {
                 description: '使用内置的系统提示词',
                 prompt: undefined
             },
-            ...prompts.map((prompt) => ({
+            ...prompts.map((prompt: Prompt) => ({
                 label: `${currentPrompt === prompt.name ? '✓ ' : ''}${prompt.name}`,
                 description: prompt.content.slice(0, 50) + '...',
                 prompt
@@ -96,10 +105,10 @@ export class PromptManager {
         }
 
         if (selection.label.includes('系统默认提示词')) {
-            await config.update('currentPrompt', '', true);
+            await this.context.globalState.update('currentPrompt', '');
             vscode.window.showInformationMessage('已切换到系统默认提示词');
         } else if (selection.prompt) {
-            await config.update('currentPrompt', selection.prompt.name, true);
+            await this.context.globalState.update('currentPrompt', selection.prompt.name);
             vscode.window.showInformationMessage(`已切换到提示词：${selection.prompt.name}`);
         }
     }
