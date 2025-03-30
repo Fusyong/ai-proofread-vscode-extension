@@ -20,7 +20,7 @@
 请在vscode的Setting中进行配置。
 
 1. 在 VS Code 设置中配置 API 密钥（**必需**）：
-   * `ai-proofread.apiKeys.deepseekChat`: deepseek API 密钥
+   * `ai-proofread.apiKeys.deepseek`: deepseek API 密钥
    * `ai-proofread.apiKeys.aliyun`: 阿里云百炼平台 API 密钥(**未充分测试**)
    * `ai-proofread.apiKeys.google`: Google Gemini API 密钥(**未充分测试**)
 2. 可选配置略
@@ -39,9 +39,9 @@
 3. **按标题和长度切分** (Split File by Title and Length)
    * 可配置标题级别、阈值（过大则切分）、切分长度和最小长度（过小则合并）
 4. **带上下文切分** (Split File with Context)
-   * 输入标题级别（即上下文范围）和切分长度
+   * 输入标题级别作为上下文范围，输入切分长度
 
-切分后都生成同名的 `.json`（用于校对） 和 `.json.md`（用户查看切分情况） 两个结果文件。
+切分后都生成同名的 `.json`（用于校对） 和 `.json.md`（可查看切分情况） 两个结果文件。
 所有切分操作都会生成日志文件（`.log`），记录切分统计信息。
 
 请注意，文档切分依赖文本中的两种标记：（一）空行（在markdown中表示分段，没有空行的断行在渲染时被忽略）；（二）各级标题（如`## `开头的是二级标题）。没有这些标记的文本就无法切分。
@@ -54,6 +54,8 @@
    * 打开已切分的 JSON 文件
    * 右键选择 "Merge Two Files"，选择要合并的文件
    * 确定要更新的字段和来源字段
+
+假设你校对一本书，这时可以按相同的切分结构准备参考文本，同样切分后，参考文本中target作为reference合并。这样，大模型就会参考reference来校对你书稿中的target。
 
 ### 校对文档和选段
 
