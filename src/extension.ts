@@ -2,7 +2,14 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { splitText } from './splitter';
-import { processJsonFileAsync, GoogleClient, DeepseekClient } from './proofreader';
+import {
+    processJsonFileAsync,
+    ApiClient,
+    ProcessStats,
+    GoogleApiClient,
+    DeepseekApiClient,
+    AliyunApiClient
+} from './proofreader';
 import { PromptManager } from './promptManager';
 import { mergeTwoFiles } from './merger';
 
@@ -587,9 +594,17 @@ export function activate(context: vscode.ExtensionContext) {
                 }, async (progress) => {
                     try {
                         // 调用API进行校对
-                        const client = platform === 'google'
-                            ? new GoogleClient(model)
-                            : new DeepseekClient(model);
+                        const client = (() => {
+                            switch (platform) {
+                                case 'google':
+                                    return new GoogleApiClient(model);
+                                case 'aliyun':
+                                    return new AliyunApiClient(model);
+                                case 'deepseek':
+                                default:
+                                    return new DeepseekApiClient(model);
+                            }
+                        })();
                         const result = await client.proofread(postText, preText);
 
                         if (result) {

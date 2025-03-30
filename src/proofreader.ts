@@ -99,14 +99,28 @@ function getSystemPrompt(): string {
 /**
  * API调用接口
  */
-interface ApiClient {
+export interface ApiClient {
     proofread(content: string, reference?: string): Promise<string | null>;
+}
+
+/**
+ * 处理进度统计
+ */
+export interface ProcessStats {
+    totalCount: number;
+    processedCount: number;
+    totalLength: number;
+    processedLength: number;
+    unprocessedParagraphs: Array<{
+        index: number;
+        preview: string;
+    }>;
 }
 
 /**
  * Deepseek API客户端
  */
-export class DeepseekClient implements ApiClient {
+export class DeepseekApiClient implements ApiClient {
     private apiKey: string;
     private baseUrl: string;
     private model: string;
@@ -114,17 +128,73 @@ export class DeepseekClient implements ApiClient {
     constructor(model: string) {
         const config = vscode.workspace.getConfiguration('ai-proofread');
         this.model = model;
-
-        if (model.startsWith('deepseek-')) {
-            this.apiKey = config.get<string>('apiKeys.deepseek', '');
-            this.baseUrl = 'https://api.deepseek.com/v1';
-        } else {
-            this.apiKey = config.get<string>('apiKeys.aliyun', '');
-            this.baseUrl = 'https://dashscope.aliyuncs.com/api/v1';
-        }
+        this.apiKey = config.get<string>('apiKeys.deepseek', '');
+        this.baseUrl = 'https://api.deepseek.com/v1';
 
         if (!this.apiKey) {
-            throw new Error(`未配置${model.startsWith('deepseek-') ? 'Deepseek 平台' : '阿里云百炼平台'} API密钥，请在设置中配置`);
+            throw new Error('未配置 Deepseek 平台 API密钥，请在设置中配置');
+        }
+    }
+
+    async proofread(content: string, reference: string = ''): Promise<string | null> {
+        const messages = [
+            { role: 'system', content: getSystemPrompt() }
+        ];
+
+        if (reference) {
+            messages.push(
+                { role: 'assistant', content: '' },
+                { role: 'user', content: reference }
+            );
+        }
+
+        messages.push(
+            { role: 'assistant', content: '' },
+            { role: 'user', content: content }
+        );
+
+        try {
+            const response = await axios.post(
+                `${this.baseUrl}/chat/completions`,
+                {
+                    model: this.model,
+                    messages,
+                    temperature: 1,
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'Content-Type': 'application/json',
+                    }
+                }
+            );
+
+            let result = response.data.choices[0].message.content;
+            result = result.replace('\n</target>', '').replace('<target>\n', '');
+            return result;
+        } catch (error) {
+            console.error('API调用出错:', error);
+            return null;
+        }
+    }
+}
+
+/**
+ * 阿里云百炼 API客户端
+ */
+export class AliyunApiClient implements ApiClient {
+    private apiKey: string;
+    private baseUrl: string;
+    private model: string;
+
+    constructor(model: string) {
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        this.model = model;
+        this.apiKey = config.get<string>('apiKeys.aliyun', '');
+        this.baseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+
+        if (!this.apiKey) {
+            throw new Error('未配置阿里云百炼平台 API密钥，请在设置中配置');
         }
     }
 
@@ -174,7 +244,7 @@ export class DeepseekClient implements ApiClient {
 /**
  * Google API客户端
  */
-export class GoogleClient implements ApiClient {
+export class GoogleApiClient implements ApiClient {
     private apiKey: string;
     private model: string;
 
@@ -184,7 +254,7 @@ export class GoogleClient implements ApiClient {
         this.apiKey = config.get<string>('apiKeys.google', '');
 
         if (!this.apiKey) {
-            throw new Error('未配置Google Gemini API密钥，请在设置中配置');
+            throw new Error('未配置 Google Gemini API密钥，请在设置中配置');
         }
     }
 
@@ -234,20 +304,6 @@ export class GoogleClient implements ApiClient {
             return null;
         }
     }
-}
-
-/**
- * 处理进度统计
- */
-interface ProcessStats {
-    totalCount: number;
-    processedCount: number;
-    totalLength: number;
-    processedLength: number;
-    unprocessedParagraphs: Array<{
-        index: number;
-        preview: string;
-    }>;
 }
 
 /**
@@ -315,7 +371,17 @@ export async function processJsonFileAsync(
     }
 
     // 创建API客户端
-    const client: ApiClient = platform === 'google' ? new GoogleClient(model) : new DeepseekClient(model);
+    const client: ApiClient = (() => {
+        switch (platform) {
+            case 'google':
+                return new GoogleApiClient(model);
+            case 'aliyun':
+                return new AliyunApiClient(model);
+            case 'deepseek':
+            default:
+                return new DeepseekApiClient(model);
+        }
+    })();
 
     // 创建限速器
     const rateLimiter = new RateLimiter(rpm);
