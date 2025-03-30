@@ -109,19 +109,22 @@ interface ApiClient {
 export class DeepseekClient implements ApiClient {
     private apiKey: string;
     private baseUrl: string;
+    private model: string;
 
-    constructor(model: 'deepseek-chat' | 'deepseek-v3') {
+    constructor(model: string) {
         const config = vscode.workspace.getConfiguration('ai-proofread');
-        if (model === 'deepseek-chat') {
-            this.apiKey = config.get<string>('apiKeys.deepseekChat', '');
+        this.model = model;
+
+        if (model.startsWith('deepseek-')) {
+            this.apiKey = config.get<string>('apiKeys.deepseek', '');
             this.baseUrl = 'https://api.deepseek.com/v1';
         } else {
-            this.apiKey = config.get<string>('apiKeys.deepseekV3', '');
+            this.apiKey = config.get<string>('apiKeys.aliyun', '');
             this.baseUrl = 'https://dashscope.aliyuncs.com/api/v1';
         }
 
         if (!this.apiKey) {
-            throw new Error(`未配置${model === 'deepseek-chat' ? 'Deepseek Chat' : '阿里云 Deepseek V3'} API密钥，请在设置中配置`);
+            throw new Error(`未配置${model.startsWith('deepseek-') ? 'Deepseek 平台' : '阿里云百炼平台'} API密钥，请在设置中配置`);
         }
     }
 
@@ -146,7 +149,7 @@ export class DeepseekClient implements ApiClient {
             const response = await axios.post(
                 `${this.baseUrl}/chat/completions`,
                 {
-                    model: this.baseUrl.includes('aliyuncs.com') ? 'deepseek-v3' : 'deepseek-chat',
+                    model: this.model,
                     messages,
                     temperature: 1,
                 },
@@ -173,20 +176,22 @@ export class DeepseekClient implements ApiClient {
  */
 export class GoogleClient implements ApiClient {
     private apiKey: string;
+    private model: string;
 
-    constructor() {
+    constructor(model: string) {
         const config = vscode.workspace.getConfiguration('ai-proofread');
+        this.model = model;
         this.apiKey = config.get<string>('apiKeys.google', '');
 
         if (!this.apiKey) {
-            throw new Error('未配置Google API密钥，请在设置中配置');
+            throw new Error('未配置Google Gemini API密钥，请在设置中配置');
         }
     }
 
     async proofread(content: string, reference: string = ''): Promise<string | null> {
         try {
             const response = await axios.post(
-                'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
+                `https://generativelanguage.googleapis.com/v1/models/${this.model}:generateContent`,
                 {
                     contents: [
                         {
@@ -254,7 +259,8 @@ export async function processJsonFileAsync(
     options: {
         startCount?: number | number[];
         stopCount?: number;
-        model?: 'deepseek-chat' | 'deepseek-v3' | 'google';
+        platform?: string;
+        model?: string;
         rpm?: number;
         maxConcurrent?: number;
         onProgress?: (info: string) => void;
@@ -265,6 +271,7 @@ export async function processJsonFileAsync(
     const {
         startCount = 1,
         stopCount,
+        platform = 'deepseek',
         model = 'deepseek-chat',
         rpm = 15,
         maxConcurrent = 3,
@@ -308,7 +315,7 @@ export async function processJsonFileAsync(
     }
 
     // 创建API客户端
-    const client: ApiClient = model === 'google' ? new GoogleClient() : new DeepseekClient(model);
+    const client: ApiClient = platform === 'google' ? new GoogleClient(model) : new DeepseekClient(model);
 
     // 创建限速器
     const rateLimiter = new RateLimiter(rpm);

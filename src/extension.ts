@@ -305,43 +305,30 @@ export function activate(context: vscode.ExtensionContext) {
 
                 // 获取配置
                 const config = vscode.workspace.getConfiguration('ai-proofread');
-                const selectedModel = config.get<string>('proofread.model', 'deepseek-chat');
+                const platform = config.get<string>('proofread.platform', 'deepseek');
+                const model = config.get<string>(`proofread.models.${platform}`, 'deepseek-chat');
                 const rpm = config.get<number>('proofread.rpm', 15);
                 const maxConcurrent = config.get<number>('proofread.maxConcurrent', 3);
 
                 // 写入开始日志
                 const startTime = new Date().toLocaleString();
                 let logMessage = `\n${'='.repeat(50)}\n`;
-                logMessage += `校对开始时间: ${startTime}\n`;
-                logMessage += `使用模型: ${selectedModel}\n`;
-                logMessage += `每分钟请求数: ${rpm}\n`;
+                logMessage += `开始校对时间: ${startTime}\n`;
+                logMessage += `平台: ${platform}\n`;
+                logMessage += `模型: ${model}\n`;
+                logMessage += `RPM: ${rpm}\n`;
                 logMessage += `最大并发数: ${maxConcurrent}\n`;
-
-                // 统计字符数
-                const totalStats = jsonContent.reduce((acc: { target: number, context: number, reference: number }, item: any) => {
-                    acc.target += (item.target || '').length;
-                    acc.context += (item.context || '').length;
-                    acc.reference += (item.reference || '').length;
-                    return acc;
-                }, { target: 0, context: 0, reference: 0 });
-
-                logMessage += `\n字符数统计:\n`;
-                logMessage += `- 目标文本: ${totalStats.target} 字符\n`;
-                logMessage += `- 上下文: ${totalStats.context} 字符\n`;
-                logMessage += `- 参考文献: ${totalStats.reference} 字符\n`;
-                logMessage += `- 总计: ${totalStats.target + totalStats.context + totalStats.reference} 字符\n`;
-
-                logMessage += `${'='.repeat(50)}\n\n`;
-                fs.appendFileSync(logFilePath, logMessage, 'utf8');
+                logMessage += `${'='.repeat(50)}\n`;
+                fs.writeFileSync(logFilePath, logMessage, 'utf8');
 
                 // 检查API密钥是否已配置
                 let apiKey = '';
-                switch (selectedModel) {
-                    case 'deepseek-chat':
-                        apiKey = config.get<string>('apiKeys.deepseekChat', '');
+                switch (platform) {
+                    case 'deepseek':
+                        apiKey = config.get<string>('apiKeys.deepseek', '');
                         break;
-                    case 'deepseek-v3':
-                        apiKey = config.get<string>('apiKeys.deepseekV3', '');
+                    case 'aliyun':
+                        apiKey = config.get<string>('apiKeys.aliyun', '');
                         break;
                     case 'google':
                         apiKey = config.get<string>('apiKeys.google', '');
@@ -350,7 +337,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                 if (!apiKey) {
                     const result = await vscode.window.showErrorMessage(
-                        `未配置${selectedModel}的API密钥，是否现在配置？`,
+                        `未配置${platform}平台的API密钥，是否现在配置？`,
                         '是',
                         '否'
                     );
@@ -368,7 +355,8 @@ export function activate(context: vscode.ExtensionContext) {
                 }, async (progress, token) => {
                     try {
                         const stats = await processJsonFileAsync(currentFilePath, outputFilePath, {
-                            model: selectedModel as 'deepseek-chat' | 'deepseek-v3' | 'google',
+                            platform,
+                            model,
                             rpm,
                             maxConcurrent,
                             onProgress: (info: string) => {
@@ -470,17 +458,18 @@ export function activate(context: vscode.ExtensionContext) {
             try {
                 // 获取配置
                 const config = vscode.workspace.getConfiguration('ai-proofread');
-                const selectedModel = config.get<string>('proofread.model', 'deepseek-chat');
+                const platform = config.get<string>('proofread.platform', 'deepseek');
+                const model = config.get<string>(`proofread.models.${platform}`, 'deepseek-chat');
                 const defaultContextLevel = config.get<number>('proofread.defaultContextLevel', 0);
 
                 // 检查API密钥是否已配置
                 let apiKey = '';
-                switch (selectedModel) {
-                    case 'deepseek-chat':
-                        apiKey = config.get<string>('apiKeys.deepseekChat', '');
+                switch (platform) {
+                    case 'deepseek':
+                        apiKey = config.get<string>('apiKeys.deepseek', '');
                         break;
-                    case 'deepseek-v3':
-                        apiKey = config.get<string>('apiKeys.deepseekV3', '');
+                    case 'aliyun':
+                        apiKey = config.get<string>('apiKeys.aliyun', '');
                         break;
                     case 'google':
                         apiKey = config.get<string>('apiKeys.google', '');
@@ -489,7 +478,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                 if (!apiKey) {
                     const result = await vscode.window.showErrorMessage(
-                        `未配置${selectedModel}的API密钥，是否现在配置？`,
+                        `未配置${platform}平台的API密钥，是否现在配置？`,
                         '是',
                         '否'
                     );
@@ -586,7 +575,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 const postText = `<target>\n${targetText}\n</target>`;
 
-                console.log(selectedModel);
+                console.log(model);
                 console.log(preText);
                 console.log(postText);
 
@@ -598,9 +587,9 @@ export function activate(context: vscode.ExtensionContext) {
                 }, async (progress) => {
                     try {
                         // 调用API进行校对
-                        const client = selectedModel === 'google'
-                            ? new GoogleClient()
-                            : new DeepseekClient(selectedModel as 'deepseek-chat' | 'deepseek-v3');
+                        const client = platform === 'google'
+                            ? new GoogleClient(model)
+                            : new DeepseekClient(model);
                         const result = await client.proofread(postText, preText);
 
                         if (result) {

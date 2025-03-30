@@ -21,8 +21,8 @@
 
 1. 在 VS Code 设置中配置 API 密钥（**必需**）：
    * `ai-proofread.apiKeys.deepseekChat`: deepseek API 密钥
-   * `ai-proofread.apiKeys.aliyun`: 阿里云 aliyun API 密钥(**未充分测试**)
-   * `ai-proofread.apiKeys.google`: Google API 密钥(**未充分测试**)
+   * `ai-proofread.apiKeys.aliyun`: 阿里云百炼平台 API 密钥(**未充分测试**)
+   * `ai-proofread.apiKeys.google`: Google Gemini API 密钥(**未充分测试**)
 2. 可选配置略
 
 
