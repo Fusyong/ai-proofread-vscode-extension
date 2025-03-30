@@ -580,13 +580,15 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage(progressInfo);
 
                 // 构建提示文本
-                if (referenceText) {
-                    referenceText = `<reference>\n${referenceText}\n</reference>`;
+                let preText = referenceText ? `<reference>\n${referenceText}\n</reference>` : '';
+                if (haseContext) {
+                    preText += `\n<context>\n${contextText}\n</context>`;
                 }
-                if (contextText) {
-                    contextText = `<context>\n${contextText}\n</context>`;
-                }
-                targetText = `<target>\n${targetText}\n</target>`;
+                const postText = `<target>\n${targetText}\n</target>`;
+
+                console.log(selectedModel);
+                console.log(preText);
+                console.log(postText);
 
                 // 显示进度
                 await vscode.window.withProgress({
@@ -599,7 +601,7 @@ export function activate(context: vscode.ExtensionContext) {
                         const client = selectedModel === 'google'
                             ? new GoogleClient()
                             : new DeepseekClient(selectedModel as 'deepseek-chat' | 'deepseek-v3');
-                        const result = await client.proofread(targetText, referenceText + '\n\n' + contextText);
+                        const result = await client.proofread(postText, preText);
 
                         if (result) {
                             // 在新的编辑器中显示结果

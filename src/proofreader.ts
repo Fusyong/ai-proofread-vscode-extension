@@ -346,6 +346,10 @@ export async function processJsonFileAsync(
         }
         const postText = `<target>\n${targetText}\n</target>`;
 
+        console.log(model);
+        console.log(preText);
+        console.log(postText);
+
         const startTime = Date.now();
         await rateLimiter.wait();
 
