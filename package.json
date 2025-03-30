@@ -193,7 +193,10 @@
                 "description": "提示词内容"
               }
             },
-            "required": ["name", "content"]
+            "required": [
+              "name",
+              "content"
+            ]
           },
           "description": "自定义AI校对提示词列表，最多5个。每个提示词必须包含名称和内容，内容必须对要校对的目标文本（target）、参考资料（reference）、上下文（context）进行说明。也可以通过命令管理"
         }
@@ -249,6 +252,7 @@
     "publish": "vsce publish"
   },
   "dependencies": {
+    "@google/genai": "^0.7.0",
     "axios": "^1.8.4",
     "dotenv": "^16.4.7"
   },
@@ -259,12 +263,12 @@
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
+    "@vscode/vsce": "^2.24.0",
     "eslint": "^8.57.0",
     "glob": "^10.3.10",
     "parcel": "^2.11.0",
     "rimraf": "^5.0.5",
-    "typescript": "^5.3.3",
-    "@vscode/vsce": "^2.24.0"
+    "typescript": "^5.3.3"
   },
   "targets": {
     "main": {

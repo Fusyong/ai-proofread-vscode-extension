@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import axios from 'axios';
 import * as dotenv from 'dotenv';
 import { RateLimiter } from './rateLimiter';
+import { GoogleGenAI } from "@google/genai";
 
 // 加载环境变量
 dotenv.config();
@@ -247,11 +248,13 @@ export class AliyunApiClient implements ApiClient {
 export class GoogleApiClient implements ApiClient {
     private apiKey: string;
     private model: string;
+    private ai: GoogleGenAI;
 
     constructor(model: string) {
         const config = vscode.workspace.getConfiguration('ai-proofread');
         this.model = model;
         this.apiKey = config.get<string>('apiKeys.google', '');
+        this.ai = new GoogleGenAI({ apiKey: this.apiKey });
 
         if (!this.apiKey) {
             throw new Error('未配置 Google Gemini API密钥，请在设置中配置');
@@ -260,45 +263,20 @@ export class GoogleApiClient implements ApiClient {
 
     async proofread(content: string, reference: string = ''): Promise<string | null> {
         try {
-            const response = await axios.post(
-                `https://generativelanguage.googleapis.com/v1/models/${this.model}:generateContent`,
-                {
-                    contents: [
-                        {
-                            parts: [{ text: content }]
-                        }
-                    ],
-                    generationConfig: {
-                        temperature: 1,
-                    },
-                    safetySettings: [
-                        {
-                            category: 'HARM_CATEGORY_HARASSMENT',
-                            threshold: 'BLOCK_NONE'
-                        },
-                        {
-                            category: 'HARM_CATEGORY_HATE_SPEECH',
-                            threshold: 'BLOCK_NONE'
-                        },
-                        {
-                            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                            threshold: 'BLOCK_NONE'
-                        },
-                        {
-                            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-                            threshold: 'BLOCK_NONE'
-                        }
-                    ]
+            let contents = content;
+            if(reference) {
+                contents = [contents, reference].join('\n\n');
+            }
+            const response = await this.ai.models.generateContent({
+                model: this.model,
+                config: {
+                    systemInstruction: getSystemPrompt(),
+                    temperature: 1,
                 },
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-goog-api-key': this.apiKey,
-                    }
-                }
-            );
+                contents: contents,
+            });
 
-            return response.data.candidates[0].content.parts[0].text;
+            return response.text || null;
         } catch (error) {
             console.error('API调用出错:', error);
             return null;
