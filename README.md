@@ -116,3 +116,10 @@ npm run watch
 # 构建 vsix 扩展安装文件用
 npm run package-vsix
 ```
+
+## 许可 license
+
+两个部分分别许可：
+
+1. 提示词（the prompts）：Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0)
+2. 其余部分(the others)：MIT License
