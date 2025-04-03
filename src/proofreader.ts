@@ -119,6 +119,66 @@ export interface ProcessStats {
 }
 
 /**
+ * 智能重试机制
+ */
+async function retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 5,
+    initialDelay: number = 2000
+): Promise<T | null> {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            return await operation();
+        } catch (error) {
+            lastError = error as Error;
+            // 处理网络相关错误
+            if (axios.isAxiosError(error)) {
+                const status = error.response?.status;
+                const code = error.code;
+
+                // 处理各种需要重试的错误
+                if (status === 429 || // 请求频率过高
+                    status === 500 || // 服务器内部错误
+                    status === 502 || // 网关错误
+                    status === 503 || // 服务不可用
+                    status === 504 || // 网关超时
+                    code === 'ECONNRESET' || // 连接重置
+                    code === 'ETIMEDOUT' || // 连接超时
+                    code === 'ECONNABORTED') { // 连接中止
+
+                    const retryAfter = error.response?.headers['retry-after'];
+                    let delay: number;
+
+                    if (retryAfter) {
+                        delay = parseInt(retryAfter) * 1000;
+                    } else {
+                        delay = initialDelay * Math.pow(2, attempt);
+                    }
+
+                    // 添加随机抖动，避免多个请求同时重试
+                    const jitter = Math.random() * 1000;
+                    delay += jitter;
+
+                    console.log(`请求失败 (${status || code})，等待 ${(delay/1000).toFixed(1)} 秒后重试... (第 ${attempt + 1}/${maxRetries} 次)`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    // 对于其他错误，直接返回null
+                    console.error('API调用出错:', error);
+                    return null;
+                }
+            } else {
+                // 对于非axios错误，直接返回null
+                console.error('API调用出错:', error);
+                return null;
+            }
+        }
+    }
+    console.error(`达到最大重试次数 (${maxRetries}):`, lastError);
+    return null;
+}
+
+/**
  * Deepseek API客户端
  */
 export class DeepseekApiClient implements ApiClient {
@@ -154,7 +214,7 @@ export class DeepseekApiClient implements ApiClient {
             { role: 'user', content: content }
         );
 
-        try {
+        return retryWithBackoff(async () => {
             const response = await axios.post(
                 `${this.baseUrl}/chat/completions`,
                 {
@@ -166,17 +226,18 @@ export class DeepseekApiClient implements ApiClient {
                     headers: {
                         'Authorization': `Bearer ${this.apiKey}`,
                         'Content-Type': 'application/json',
-                    }
+                    },
+                    timeout: 30000, // 设置30秒超时
+                    maxContentLength: Infinity, // 不限制响应大小
+                    maxBodyLength: Infinity, // 不限制请求大小
+                    validateStatus: (status) => status >= 200 && status < 500 // 只对500以上的错误抛出异常
                 }
             );
 
             let result = response.data.choices[0].message.content;
             result = result.replace('\n</target>', '').replace('<target>\n', '');
             return result;
-        } catch (error) {
-            console.error('API调用出错:', error);
-            return null;
-        }
+        });
     }
 }
 
@@ -216,7 +277,7 @@ export class AliyunApiClient implements ApiClient {
             { role: 'user', content: content }
         );
 
-        try {
+        return retryWithBackoff(async () => {
             const response = await axios.post(
                 `${this.baseUrl}/chat/completions`,
                 {
@@ -228,17 +289,18 @@ export class AliyunApiClient implements ApiClient {
                     headers: {
                         'Authorization': `Bearer ${this.apiKey}`,
                         'Content-Type': 'application/json',
-                    }
+                    },
+                    timeout: 30000, // 设置30秒超时
+                    maxContentLength: Infinity, // 不限制响应大小
+                    maxBodyLength: Infinity, // 不限制请求大小
+                    validateStatus: (status) => status >= 200 && status < 500 // 只对500以上的错误抛出异常
                 }
             );
 
             let result = response.data.choices[0].message.content;
             result = result.replace('\n</target>', '').replace('<target>\n', '');
             return result;
-        } catch (error) {
-            console.error('API调用出错:', error);
-            return null;
-        }
+        });
     }
 }
 
@@ -262,7 +324,7 @@ export class GoogleApiClient implements ApiClient {
     }
 
     async proofread(content: string, reference: string = ''): Promise<string | null> {
-        try {
+        return retryWithBackoff(async () => {
             let contents = content;
             if(reference) {
                 contents = [contents, reference].join('\n\n');
@@ -277,10 +339,7 @@ export class GoogleApiClient implements ApiClient {
             });
 
             return response.text || null;
-        } catch (error) {
-            console.error('API调用出错:', error);
-            return null;
-        }
+        });
     }
 }
 
@@ -307,8 +366,8 @@ export async function processJsonFileAsync(
         stopCount,
         platform = 'deepseek',
         model = 'deepseek-chat',
-        rpm = 15,
-        maxConcurrent = 3,
+        rpm = 5,
+        maxConcurrent = 1,
         onProgress,
         token
     } = options;
@@ -402,6 +461,8 @@ export async function processJsonFileAsync(
         console.log(postText);
 
         const startTime = Date.now();
+
+        // 在重试之前等待限速器
         await rateLimiter.wait();
 
         const processedText = await client.proofread(postText, preText);
@@ -432,11 +493,21 @@ export async function processJsonFileAsync(
                 return;
             }
 
-            const slot = await Promise.race(
-                semaphore.map((_, i) =>
-                    Promise.resolve(i)
-                )
-            );
+            // 等待可用的并发槽
+            let slot: number;
+            do {
+                slot = await Promise.race(
+                    semaphore.map((_, i) =>
+                        Promise.resolve(i)
+                    )
+                );
+                if (slot === undefined) {
+                    // 如果没有可用槽，等待一段时间后重试
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            } while (slot === undefined);
+
+            // 执行处理
             semaphore[slot] = processOne(index).finally(() => {
                 semaphore[slot] = null;
             });
