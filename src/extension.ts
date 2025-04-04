@@ -14,35 +14,13 @@ import {
 import { PromptManager } from './promptManager';
 import { mergeTwoFiles } from './merger';
 import { showDiff, showFileDiff } from './differ';
-
-// 清理临时文件的函数
-async function cleanupTempFiles(context: vscode.ExtensionContext) {
-    const tempDir = vscode.Uri.joinPath(context.globalStorageUri, 'temp');
-    try {
-        const files = await vscode.workspace.fs.readDirectory(tempDir);
-        const now = Date.now();
-        const oneDay = 24 * 60 * 60 * 1000; // 24小时
-
-        for (const [file] of files) {
-            const fileUri = vscode.Uri.joinPath(tempDir, file);
-            const stat = await vscode.workspace.fs.stat(fileUri);
-            const fileAge = now - stat.mtime;
-
-            // 删除超过24小时的临时文件
-            if (fileAge > oneDay) {
-                await vscode.workspace.fs.delete(fileUri);
-            }
-        }
-    } catch (error) {
-        // 如果目录不存在或其他错误，忽略
-    }
-}
+import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager } from './utils';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('AI Proofread extension is now active!');
 
     // 清理临时文件
-    cleanupTempFiles(context);
+    TempFileManager.getInstance(context).cleanup();
 
     // 通用的文件切分处理函数
     async function handleFileSplitCommand(
@@ -207,7 +185,7 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showInformationMessage(`文件已成功切分！\nJSON文件：${result.jsonFilePath}\nMarkdown文件：${result.markdownFilePath}`);
 
         } catch (error) {
-            vscode.window.showErrorMessage(`切分文件时出错：${error instanceof Error ? error.message : String(error)}`);
+            ErrorUtils.showError(error, '切分文件时出错：');
         }
     }
 
@@ -279,15 +257,15 @@ export function activate(context: vscode.ExtensionContext) {
 
                 // 获取当前文件路径
                 const currentFilePath = document.uri.fsPath;
-                const outputFilePath = currentFilePath.replace('.json', '.proofread.json');
-                const logFilePath = currentFilePath.replace('.json', '.proofread.log');
+                const outputFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread', '.json');
+                const logFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread', '.log');
 
                 // 获取配置
-                const config = vscode.workspace.getConfiguration('ai-proofread');
-                const platform = config.get<string>('proofread.platform', 'deepseek');
-                const model = config.get<string>(`proofread.models.${platform}`, 'deepseek-chat');
-                const rpm = config.get<number>('proofread.rpm', 15);
-                const maxConcurrent = config.get<number>('proofread.maxConcurrent', 3);
+                const configManager = ConfigManager.getInstance();
+                const platform = configManager.getPlatform();
+                const model = configManager.getModel(platform);
+                const rpm = configManager.getRpm();
+                const maxConcurrent = configManager.getMaxConcurrent();
 
                 // 写入开始日志
                 const startTime = new Date().toLocaleString();
@@ -301,19 +279,7 @@ export function activate(context: vscode.ExtensionContext) {
                 fs.writeFileSync(logFilePath, logMessage, 'utf8');
 
                 // 检查API密钥是否已配置
-                let apiKey = '';
-                switch (platform) {
-                    case 'deepseek':
-                        apiKey = config.get<string>('apiKeys.deepseek', '');
-                        break;
-                    case 'aliyun':
-                        apiKey = config.get<string>('apiKeys.aliyun', '');
-                        break;
-                    case 'google':
-                        apiKey = config.get<string>('apiKeys.google', '');
-                        break;
-                }
-
+                const apiKey = configManager.getApiKey(platform);
                 if (!apiKey) {
                     const result = await vscode.window.showErrorMessage(
                         `未配置${platform}平台的API密钥，是否现在配置？`,
@@ -407,7 +373,7 @@ export function activate(context: vscode.ExtensionContext) {
                             try {
                                 await showFileDiff(originalMarkdownFile, proofreadMarkdownFile);
                             } catch (error) {
-                                vscode.window.showErrorMessage(`显示差异时出错：${error instanceof Error ? error.message : String(error)}`);
+                                ErrorUtils.showError(error, '显示差异时出错：');
                             }
                         }
                     } catch (error) {
@@ -421,12 +387,12 @@ export function activate(context: vscode.ExtensionContext) {
                                 await vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread.apiKeys');
                             }
                         } else {
-                            vscode.window.showErrorMessage(`校对过程中出错：${error instanceof Error ? error.message : String(error)}`);
+                            ErrorUtils.showError(error, '校对过程中出错：');
                         }
                     }
                 });
             } catch (error) {
-                vscode.window.showErrorMessage(`解析JSON文件时出错：${error instanceof Error ? error.message : String(error)}`);
+                ErrorUtils.showError(error, '解析JSON文件时出错：');
             }
         }),
 
@@ -439,24 +405,12 @@ export function activate(context: vscode.ExtensionContext) {
 
             try {
                 // 获取配置
-                const config = vscode.workspace.getConfiguration('ai-proofread');
-                const platform = config.get<string>('proofread.platform', 'deepseek');
-                const model = config.get<string>(`proofread.models.${platform}`, 'deepseek-chat');
+                const configManager = ConfigManager.getInstance();
+                const platform = configManager.getPlatform();
+                const model = configManager.getModel(platform);
 
                 // 检查API密钥是否已配置
-                let apiKey = '';
-                switch (platform) {
-                    case 'deepseek':
-                        apiKey = config.get<string>('apiKeys.deepseek', '');
-                        break;
-                    case 'aliyun':
-                        apiKey = config.get<string>('apiKeys.aliyun', '');
-                        break;
-                    case 'google':
-                        apiKey = config.get<string>('apiKeys.google', '');
-                        break;
-                }
-
+                const apiKey = configManager.getApiKey(platform);
                 if (!apiKey) {
                     const result = await vscode.window.showErrorMessage(
                         `未配置${platform}平台的API密钥，是否现在配置？`,
@@ -527,11 +481,11 @@ export function activate(context: vscode.ExtensionContext) {
                             vscode.window.showErrorMessage('校对失败，请重试。');
                         }
                     } catch (error) {
-                        vscode.window.showErrorMessage(`校对过程中出错：${error instanceof Error ? error.message : String(error)}`);
+                        ErrorUtils.showError(error, '校对过程中出错：');
                     }
                 });
             } catch (error) {
-                vscode.window.showErrorMessage(`校对过程中出错：${error instanceof Error ? error.message : String(error)}`);
+                ErrorUtils.showError(error, '校对过程中出错：');
             }
         }),
 
@@ -616,7 +570,7 @@ export function activate(context: vscode.ExtensionContext) {
                     `合并完成！更新了 ${result.updated}/${result.total} 项`
                 );
             } catch (error) {
-                vscode.window.showErrorMessage(`合并文件时出错：${error instanceof Error ? error.message : String(error)}`);
+                ErrorUtils.showError(error, '合并文件时出错：');
             }
         })
     ];

@@ -9,6 +9,7 @@ import axios from 'axios';
 import * as dotenv from 'dotenv';
 import { RateLimiter } from './rateLimiter';
 import { GoogleGenAI } from "@google/genai";
+import { ConfigManager, ErrorUtils } from './utils';
 
 // 加载环境变量
 dotenv.config();
@@ -126,9 +127,9 @@ export class DeepseekApiClient implements ApiClient {
     private model: string;
 
     constructor(model: string) {
-        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const configManager = ConfigManager.getInstance();
         this.model = model;
-        this.apiKey = config.get<string>('apiKeys.deepseek', '');
+        this.apiKey = configManager.getApiKey('deepseek');
         this.baseUrl = 'https://api.deepseek.com/v1';
 
         if (!this.apiKey) {
@@ -188,9 +189,9 @@ export class AliyunApiClient implements ApiClient {
     private model: string;
 
     constructor(model: string) {
-        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const configManager = ConfigManager.getInstance();
         this.model = model;
-        this.apiKey = config.get<string>('apiKeys.aliyun', '');
+        this.apiKey = configManager.getApiKey('aliyun');
         this.baseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 
         if (!this.apiKey) {
@@ -250,9 +251,9 @@ export class GoogleApiClient implements ApiClient {
     private ai: GoogleGenAI;
 
     constructor(model: string) {
-        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const configManager = ConfigManager.getInstance();
         this.model = model;
-        this.apiKey = config.get<string>('apiKeys.google', '');
+        this.apiKey = configManager.getApiKey('google');
         this.ai = new GoogleGenAI({ apiKey: this.apiKey });
 
         if (!this.apiKey) {

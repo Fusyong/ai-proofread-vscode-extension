@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
+import { TempFileManager } from './utils';
 
 /**
  * 显示两个文本之间的差异
@@ -14,23 +14,9 @@ export async function showDiff(
     proofreadText: string,
     fileExt: string
 ): Promise<void> {
-    const timestamp = Date.now();
-    const tempDir = vscode.Uri.joinPath(context.globalStorageUri, 'temp');
-
-    // 确保临时目录存在
-    try {
-        await vscode.workspace.fs.createDirectory(tempDir);
-    } catch (error) {
-        // 目录可能已存在，忽略错误
-    }
-
-    const originalUri = vscode.Uri.joinPath(tempDir, `original-${timestamp}${fileExt}`);
-    const proofreadUri = vscode.Uri.joinPath(tempDir, `proofread-${timestamp}${fileExt}`);
-
-    // 写入内容到临时文件
-    await vscode.workspace.fs.writeFile(originalUri, Buffer.from(originalText));
-    await vscode.workspace.fs.writeFile(proofreadUri, Buffer.from(proofreadText));
-
+    const tempFileManager = TempFileManager.getInstance(context);
+    const originalUri = await tempFileManager.createTempFile(originalText, fileExt);
+    const proofreadUri = await tempFileManager.createTempFile(proofreadText, fileExt);
     await openDiffView(originalUri, proofreadUri);
 }
 
@@ -45,7 +31,6 @@ export async function showFileDiff(
 ): Promise<void> {
     const originalUri = vscode.Uri.file(originalFile);
     const proofreadUri = vscode.Uri.file(proofreadFile);
-
     await openDiffView(originalUri, proofreadUri);
 }
 
