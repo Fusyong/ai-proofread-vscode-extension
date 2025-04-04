@@ -13,6 +13,7 @@ import {
 } from './proofreader';
 import { PromptManager } from './promptManager';
 import { mergeTwoFiles } from './merger';
+import { showDiff, showFileDiff } from './differ';
 
 // 清理临时文件的函数
 async function cleanupTempFiles(context: vscode.ExtensionContext) {
@@ -376,7 +377,8 @@ export function activate(context: vscode.ExtensionContext) {
                         const result = await vscode.window.showInformationMessage(
                             message,
                             '查看结果',
-                            '查看未处理段落'
+                            '查看未处理段落',
+                            '显示校对前后的差异'
                         );
 
                         if (result === '查看结果') {
@@ -396,6 +398,16 @@ export function activate(context: vscode.ExtensionContext) {
                                 });
                             } else {
                                 vscode.window.showInformationMessage('没有未处理的段落！');
+                            }
+                        } else if (result === '显示校对前后的差异') {
+                            // 显示校对前后的差异
+                            const originalMarkdownFile = currentFilePath.replace('.json', '.md');
+                            const proofreadMarkdownFile = outputFilePath.replace('.json', '.json.md');
+
+                            try {
+                                await showFileDiff(originalMarkdownFile, proofreadMarkdownFile);
+                            } catch (error) {
+                                vscode.window.showErrorMessage(`显示差异时出错：${error instanceof Error ? error.message : String(error)}`);
                             }
                         }
                     } catch (error) {
@@ -526,8 +538,8 @@ export function activate(context: vscode.ExtensionContext) {
                             await vscode.workspace.fs.writeFile(originalUri, Buffer.from(originalText));
                             await vscode.workspace.fs.writeFile(proofreadUri, Buffer.from(result));
 
-                            // 打开diff视图
-                            await vscode.commands.executeCommand('vscode.diff', originalUri, proofreadUri, 'Original ↔ Proofread');
+                            // 显示差异
+                            await showDiff(context, originalText, result, fileExt);
                         } else {
                             vscode.window.showErrorMessage('校对失败，请重试。');
                         }

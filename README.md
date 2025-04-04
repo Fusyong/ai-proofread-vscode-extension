@@ -1,5 +1,7 @@
 
-这是[一个基于AI的文档/图书校对VS Code插件](https://github.com/Fusyong/ai-proofread-vscode-extension)，支持文档切分和AI校对功能；与[相应的Python工具库](https://github.com/Fusyong/ai-proofread)的功能大致相同。
+这是[一个基于AI的文档/图书校对VS Code插件](https://github.com/Fusyong/ai-proofread-vscode-extension)，支持文档切分和AI校对；与[相应的Python工具库](https://github.com/Fusyong/ai-proofread)的功能大致相同。
+
+An AI-based document and book proofreading VS Code extension that supports document segmentation and AI proofreading. Its functions are roughly the same as [the corresponding Python tool repository](https://github.com/Fusyong/ai-proofread).
 
 ## 功能概览
 
