@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 /**
  * 文本切分工具模块
  */
@@ -236,6 +239,93 @@ export function splitText(
     return {
         jsonOutput,
         markdownOutput,
+        segments
+    };
+}
+
+/**
+ * 处理文件切分
+ * @param filePath 要处理的文件路径
+ * @param options 切分选项
+ * @returns 切分后的文件路径信息
+ */
+export async function handleFileSplit(
+    filePath: string,
+    options: {
+        mode: 'length' | 'title' | 'title-length' | 'context';
+        cutBy?: number;
+        levels?: number[];
+        threshold?: number;
+        minLength?: number;
+    }
+): Promise<{
+    jsonFilePath: string;
+    markdownFilePath: string;
+    logFilePath: string;
+    segments: Array<{ target: string; context?: string }>;
+}> {
+    const text = fs.readFileSync(filePath, 'utf8');
+    const currentFileDir = path.dirname(filePath);
+    const baseFileName = path.basename(filePath, path.extname(filePath));
+
+    // 生成输出文件路径
+    const jsonFilePath = path.join(currentFileDir, `${baseFileName}.json`);
+    const markdownFilePath = path.join(currentFileDir, `${baseFileName}.json.md`);
+    const logFilePath = path.join(currentFileDir, `${baseFileName}.log`);
+
+    // 执行文本切分
+    const { jsonOutput, markdownOutput, segments } = splitText(text, options);
+
+    // 写入JSON文件
+    fs.writeFileSync(jsonFilePath, jsonOutput, 'utf8');
+
+    // 写入Markdown文件
+    fs.writeFileSync(markdownFilePath, markdownOutput, 'utf8');
+
+    // 显示结果统计
+    let statsMessage = '';
+    if (options.mode === 'length') {
+        statsMessage = `切分长度: ${options.cutBy}\n\n`;
+    } else if (options.mode === 'title') {
+        statsMessage = `切分标题级别: ${options.levels!.join(',')}\n\n`;
+    } else if (options.mode === 'context') {
+        statsMessage = `切分模式: 带上下文切分\n` +
+            `标题级别: ${options.levels!.join(',')}\n` +
+            `切分长度: ${options.cutBy}\n\n`;
+    } else {
+        statsMessage = `切分模式: 标题加长度切分\n` +
+            `标题级别: ${options.levels!.join(',')}\n` +
+            `长度阈值: ${options.threshold}\n` +
+            `切分长度: ${options.cutBy}\n` +
+            `最小长度: ${options.minLength}\n\n`;
+    }
+
+    statsMessage += `片段号\t字符数\t上下文长度\t起始文字\n${'-'.repeat(50)}\n`;
+    let totalTargetLength = 0;
+    let totalContextLength = 0;
+    segments.forEach((segment, index) => {
+        const targetLength = segment.target.trim().length;
+        const contextLength = segment.context ? segment.context.trim().length : 0;
+        const firstLine = segment.target.trim().split('\n')[0].slice(0, 15);
+        statsMessage += `No.${index + 1}\t${targetLength}\t${contextLength}\t${firstLine}\n`;
+        totalTargetLength += targetLength;
+        totalContextLength += contextLength;
+    });
+    if (options.mode === 'context') {
+        statsMessage += `\n合计\t${totalTargetLength}\t${totalContextLength}\t总计${totalTargetLength + totalContextLength}`;
+    } else {
+        statsMessage += `\n合计\t${totalTargetLength}`;
+    }
+
+    // 写入统计信息
+    const timestamp = new Date().toLocaleString();
+    statsMessage = `\n[${timestamp}]\n${statsMessage}\n${'='.repeat(50)}\n`;
+    fs.appendFileSync(logFilePath, statsMessage, 'utf8');
+
+    return {
+        jsonFilePath,
+        markdownFilePath,
+        logFilePath,
         segments
     };
 }

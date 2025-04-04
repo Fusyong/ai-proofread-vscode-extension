@@ -1,28 +1,54 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { splitText } from './splitter';
+import { splitText, handleFileSplit } from './splitter';
 import {
     processJsonFileAsync,
     ApiClient,
     ProcessStats,
     GoogleApiClient,
     DeepseekApiClient,
-    AliyunApiClient
+    AliyunApiClient,
+    proofreadSelection
 } from './proofreader';
 import { PromptManager } from './promptManager';
 import { mergeTwoFiles } from './merger';
 
+// 清理临时文件的函数
+async function cleanupTempFiles(context: vscode.ExtensionContext) {
+    const tempDir = vscode.Uri.joinPath(context.globalStorageUri, 'temp');
+    try {
+        const files = await vscode.workspace.fs.readDirectory(tempDir);
+        const now = Date.now();
+        const oneDay = 24 * 60 * 60 * 1000; // 24小时
+
+        for (const [file] of files) {
+            const fileUri = vscode.Uri.joinPath(tempDir, file);
+            const stat = await vscode.workspace.fs.stat(fileUri);
+            const fileAge = now - stat.mtime;
+
+            // 删除超过24小时的临时文件
+            if (fileAge > oneDay) {
+                await vscode.workspace.fs.delete(fileUri);
+            }
+        }
+    } catch (error) {
+        // 如果目录不存在或其他错误，忽略
+    }
+}
+
 export function activate(context: vscode.ExtensionContext) {
     console.log('AI Proofread extension is now active!');
 
+    // 清理临时文件
+    cleanupTempFiles(context);
+
     // 通用的文件切分处理函数
-    async function handleFileSplit(
+    async function handleFileSplitCommand(
         mode: 'length' | 'title' | 'title-length' | 'context',
         editor: vscode.TextEditor,
         document: vscode.TextDocument
     ) {
-        const text = document.getText();
         const config = vscode.workspace.getConfiguration('ai-proofread');
 
         try {
@@ -64,10 +90,10 @@ export function activate(context: vscode.ExtensionContext) {
 
                 // 让用户选择标题级别
                 const inputLevels = await vscode.window.showInputBox({
-                    prompt: '请输入标题级别（用逗号分隔，如：1,2）',
+                    prompt: '请输入标题级别，用作文本或语境的切分点（如：1,2）',
                     value: defaultLevels.join(','),
                     validateInput: (value: string) => {
-                        const levels = value.split(',').map(x => parseInt(x.trim()));
+                        const levels = value.split(/[，,]/).map(x => parseInt(x.trim()));
                         if (levels.some(isNaN)) {
                             return '请输入有效的数字，用逗号分隔';
                         }
@@ -173,66 +199,11 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             }
 
-            // 获取当前文件所在目录
-            const currentFileDir = path.dirname(document.uri.fsPath);
-            const baseFileName = path.basename(document.uri.fsPath, path.extname(document.uri.fsPath));
-
-            // 生成输出文件路径
-            const jsonFilePath = path.join(currentFileDir, `${baseFileName}.json`);
-            const markdownFilePath = path.join(currentFileDir, `${baseFileName}.json.md`);
-            const logFilePath = path.join(currentFileDir, `${baseFileName}.log`);
-
-            // 执行文本切分
-            const { jsonOutput, markdownOutput, segments } = splitText(text, options);
-
-            // 写入JSON文件
-            fs.writeFileSync(jsonFilePath, jsonOutput, 'utf8');
-
-            // 写入Markdown文件
-            fs.writeFileSync(markdownFilePath, markdownOutput, 'utf8');
-
-            // 显示结果统计
-            let statsMessage = '';
-            if (mode === 'length') {
-                statsMessage = `切分长度: ${options.cutBy}\n\n`;
-            } else if (mode === 'title') {
-                statsMessage = `切分标题级别: ${options.levels!.join(',')}\n\n`;
-            } else if (mode === 'context') {
-                statsMessage = `切分模式: 带上下文切分\n` +
-                    `标题级别: ${options.levels!.join(',')}\n` +
-                    `切分长度: ${options.cutBy}\n\n`;
-            } else {
-                statsMessage = `切分模式: 标题加长度切分\n` +
-                    `标题级别: ${options.levels!.join(',')}\n` +
-                    `长度阈值: ${options.threshold}\n` +
-                    `切分长度: ${options.cutBy}\n` +
-                    `最小长度: ${options.minLength}\n\n`;
-            }
-
-            statsMessage += `片段号\t字符数\t上下文长度\t起始文字\n${'-'.repeat(50)}\n`;
-            let totalTargetLength = 0;
-            let totalContextLength = 0;
-            segments.forEach((segment, index) => {
-                const targetLength = segment.target.trim().length;
-                const contextLength = segment.context ? segment.context.trim().length : 0;
-                const firstLine = segment.target.trim().split('\n')[0].slice(0, 15);
-                statsMessage += `No.${index + 1}\t${targetLength}\t${contextLength}\t${firstLine}\n`;
-                totalTargetLength += targetLength;
-                totalContextLength += contextLength;
-            });
-            if (mode === 'context') {
-                statsMessage += `\n合计\t${totalTargetLength}\t${totalContextLength}\t总计${totalTargetLength + totalContextLength}`;
-            } else {
-                statsMessage += `\n合计\t${totalTargetLength}`;
-            }
+            // 调用splitter模块中的handleFileSplit函数
+            const result = await handleFileSplit(document.uri.fsPath, options);
 
             // 显示成功消息
-            vscode.window.showInformationMessage(`文件已成功切分！\nJSON文件：${jsonFilePath}\nMarkdown文件：${markdownFilePath}`);
-
-            // 写入统计信息
-            const timestamp = new Date().toLocaleString();
-            statsMessage = `\n[${timestamp}]\n${statsMessage}\n${'='.repeat(50)}\n`;
-            fs.appendFileSync(logFilePath, statsMessage, 'utf8');
+            vscode.window.showInformationMessage(`文件已成功切分！\nJSON文件：${result.jsonFilePath}\nMarkdown文件：${result.markdownFilePath}`);
 
         } catch (error) {
             vscode.window.showErrorMessage(`切分文件时出错：${error instanceof Error ? error.message : String(error)}`);
@@ -247,7 +218,7 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('No active editor!');
                 return;
             }
-            await handleFileSplit('length', editor, editor.document);
+            await handleFileSplitCommand('length', editor, editor.document);
         }),
 
         vscode.commands.registerCommand('ai-proofread.splitFileByTitle', async () => {
@@ -256,7 +227,7 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('No active editor!');
                 return;
             }
-            await handleFileSplit('title', editor, editor.document);
+            await handleFileSplitCommand('title', editor, editor.document);
         }),
 
         vscode.commands.registerCommand('ai-proofread.splitFileWithContext', async () => {
@@ -265,7 +236,7 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('No active editor!');
                 return;
             }
-            await handleFileSplit('context', editor, editor.document);
+            await handleFileSplitCommand('context', editor, editor.document);
         }),
 
         vscode.commands.registerCommand('ai-proofread.splitFileByTitleAndLength', async () => {
@@ -274,7 +245,7 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('No active editor!');
                 return;
             }
-            await handleFileSplit('title-length', editor, editor.document);
+            await handleFileSplitCommand('title-length', editor, editor.document);
         }),
 
         vscode.commands.registerCommand('ai-proofread.proofreadFile', async () => {
@@ -454,20 +425,11 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            // 获取选中的文本
-            const selection = editor.selection;
-            const selectedText = editor.document.getText(selection);
-            if (!selectedText) {
-                vscode.window.showInformationMessage('请先选择要校对的文本！');
-                return;
-            }
-
             try {
                 // 获取配置
                 const config = vscode.workspace.getConfiguration('ai-proofread');
                 const platform = config.get<string>('proofread.platform', 'deepseek');
                 const model = config.get<string>(`proofread.models.${platform}`, 'deepseek-chat');
-                const defaultContextLevel = config.get<number>('proofread.defaultContextLevel', 0);
 
                 // 检查API密钥是否已配置
                 let apiKey = '';
@@ -525,67 +487,6 @@ export function activate(context: vscode.ExtensionContext) {
                     });
                 }
 
-                // 准备校对文本
-                let targetText = selectedText;
-                let contextText = '';
-                let referenceText = '';
-
-                // 如果选择了上下文级别，获取上下文
-                if (contextLevel && contextLevel !== '不使用上下文') {
-                    const level = contextLevel.charAt(0);
-                    const fullText = editor.document.getText();
-                    const lines = fullText.split('\n');
-                    const selectionStartLine = selection.start.line;
-                    const selectionEndLine = selection.end.line;
-
-                    // 从本行开始向上查找最近的指定级别标题
-                    let startLine = selectionStartLine + 1;
-                    while (startLine > 0) {
-                        const line = lines[startLine - 1];
-                        if (line.startsWith(`${'#'.repeat(parseInt(level))} `)) {
-                            break;
-                        }
-                        startLine--;
-                    }
-
-                    // 向下查找下一个同级别标题
-                    let endLine = selectionEndLine;
-                    while (endLine < lines.length - 1) {
-                        const line = lines[endLine + 1];
-                        if (line.startsWith(`${'#'.repeat(parseInt(level))} `)) {
-                            break;
-                        }
-                        endLine++;
-                    }
-
-                    // 提取上下文
-                    contextText = lines.slice(startLine-1, endLine + 1).join('\n');
-
-                }
-
-                // 如果选择了参考文件，读取参考文件内容
-                if (referenceFile && referenceFile[0]) {
-                    referenceText = fs.readFileSync(referenceFile[0].fsPath, 'utf8');
-                }
-
-                // 显示文本信息
-                const haseContext = contextText && contextText.trim() !== targetText.trim();
-                const progressInfo = `处理 Len ${targetText.length}` +
-                    `${haseContext ? ` with context ${contextText.length}` : ''}`+
-                    `${referenceText ? ` with reference ${referenceText.length}` : ''}`;
-                vscode.window.showInformationMessage(progressInfo);
-
-                // 构建提示文本
-                let preText = referenceText ? `<reference>\n${referenceText}\n</reference>` : '';
-                if (haseContext) {
-                    preText += `\n<context>\n${contextText}\n</context>`;
-                }
-                const postText = `<target>\n${targetText}\n</target>`;
-
-                console.log(model);
-                console.log(preText);
-                console.log(postText);
-
                 // 显示进度
                 await vscode.window.withProgress({
                     location: vscode.ProgressLocation.Notification,
@@ -593,27 +494,40 @@ export function activate(context: vscode.ExtensionContext) {
                     cancellable: false
                 }, async (progress) => {
                     try {
-                        // 调用API进行校对
-                        const client = (() => {
-                            switch (platform) {
-                                case 'google':
-                                    return new GoogleApiClient(model);
-                                case 'aliyun':
-                                    return new AliyunApiClient(model);
-                                case 'deepseek':
-                                default:
-                                    return new DeepseekApiClient(model);
-                            }
-                        })();
-                        const result = await client.proofread(postText, preText);
+                        const result = await proofreadSelection(
+                            editor,
+                            editor.selection,
+                            platform,
+                            model,
+                            contextLevel,
+                            referenceFile
+                        );
 
                         if (result) {
-                            // 在新的编辑器中显示结果
-                            const document = await vscode.workspace.openTextDocument({
-                                content: result,
-                                language: editor.document.languageId
-                            });
-                            await vscode.window.showTextDocument(document, vscode.ViewColumn.Beside);
+                            // 创建原始文本和校对后文本的临时文件
+                            const originalText = editor.document.getText(editor.selection);
+                            const timestamp = Date.now();
+                            const tempDir = vscode.Uri.joinPath(context.globalStorageUri, 'temp');
+
+                            // 确保临时目录存在
+                            try {
+                                await vscode.workspace.fs.createDirectory(tempDir);
+                            } catch (error) {
+                                // 目录可能已存在，忽略错误
+                            }
+
+                            // 获取原文件的扩展名
+                            const fileExt = path.extname(editor.document.fileName);
+
+                            const originalUri = vscode.Uri.joinPath(tempDir, `original-${timestamp}${fileExt}`);
+                            const proofreadUri = vscode.Uri.joinPath(tempDir, `proofread-${timestamp}${fileExt}`);
+
+                            // 写入内容到临时文件
+                            await vscode.workspace.fs.writeFile(originalUri, Buffer.from(originalText));
+                            await vscode.workspace.fs.writeFile(proofreadUri, Buffer.from(result));
+
+                            // 打开diff视图
+                            await vscode.commands.executeCommand('vscode.diff', originalUri, proofreadUri, 'Original ↔ Proofread');
                         } else {
                             vscode.window.showErrorMessage('校对失败，请重试。');
                         }

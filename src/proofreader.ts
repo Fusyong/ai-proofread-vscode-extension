@@ -68,8 +68,7 @@ let DEFAULT_SYSTEM_PROMPT = `
 1. 用户提供的文本的格式可能是markdown、纯文本、TEX、ConTeXt，请保持文本原有的格式和标记；
 2. 原文的空行、换行、分段等格式保持不变；
 3. 不回答原文中的任何提问；
-4. 不给出任何说明或解释；
-
+4. 如果的的确确没有任何修改，请输出noCorrections，不给出任何说明或解释；
 </output-format>
 </proofreader-system-setting>
 `;
@@ -467,4 +466,93 @@ export async function processJsonFileAsync(
         processedLength,
         unprocessedParagraphs
     };
+}
+
+/**
+ * 处理选中的文本校对
+ * @param editor 当前编辑器
+ * @param selection 选中的文本范围
+ * @param platform 使用的平台
+ * @param model 使用的模型
+ * @param contextLevel 上下文级别
+ * @param referenceFile 参考文件
+ * @returns 校对后的文本
+ */
+export async function proofreadSelection(
+    editor: vscode.TextEditor,
+    selection: vscode.Selection,
+    platform: string,
+    model: string,
+    contextLevel?: string,
+    referenceFile?: vscode.Uri[]
+): Promise<string | null> {
+    // 获取选中的文本
+    const selectedText = editor.document.getText(selection);
+    if (!selectedText) {
+        throw new Error('请先选择要校对的文本！');
+    }
+
+    // 准备校对文本
+    let targetText = selectedText;
+    let contextText = '';
+    let referenceText = '';
+
+    // 如果选择了上下文级别，获取上下文
+    if (contextLevel && contextLevel !== '不使用上下文') {
+        const level = contextLevel.charAt(0);
+        const fullText = editor.document.getText();
+        const lines = fullText.split('\n');
+        const selectionStartLine = selection.start.line;
+        const selectionEndLine = selection.end.line;
+
+        // 从本行开始向上查找最近的指定级别标题
+        let startLine = selectionStartLine + 1;
+        while (startLine > 0) {
+            const line = lines[startLine - 1];
+            if (line.startsWith(`${'#'.repeat(parseInt(level))} `)) {
+                break;
+            }
+            startLine--;
+        }
+
+        // 向下查找下一个同级别标题
+        let endLine = selectionEndLine;
+        while (endLine < lines.length - 1) {
+            const line = lines[endLine + 1];
+            if (line.startsWith(`${'#'.repeat(parseInt(level))} `)) {
+                break;
+            }
+            endLine++;
+        }
+
+        // 提取上下文
+        contextText = lines.slice(startLine-1, endLine + 1).join('\n');
+    }
+
+    // 如果选择了参考文件，读取参考文件内容
+    if (referenceFile && referenceFile[0]) {
+        referenceText = fs.readFileSync(referenceFile[0].fsPath, 'utf8');
+    }
+
+    // 构建提示文本
+    let preText = referenceText ? `<reference>\n${referenceText}\n</reference>` : '';
+    if (contextText && contextText.trim() !== targetText.trim()) {
+        preText += `\n<context>\n${contextText}\n</context>`;
+    }
+    const postText = `<target>\n${targetText}\n</target>`;
+
+    // 调用API进行校对
+    const client = (() => {
+        switch (platform) {
+            case 'google':
+                return new GoogleApiClient(model);
+            case 'aliyun':
+                return new AliyunApiClient(model);
+            case 'deepseek':
+            default:
+                return new DeepseekApiClient(model);
+        }
+    })();
+
+    return await client.proofread(postText, preText);
 }
