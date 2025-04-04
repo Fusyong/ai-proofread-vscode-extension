@@ -518,25 +518,8 @@ export function activate(context: vscode.ExtensionContext) {
                         if (result) {
                             // 创建原始文本和校对后文本的临时文件
                             const originalText = editor.document.getText(editor.selection);
-                            const timestamp = Date.now();
-                            const tempDir = vscode.Uri.joinPath(context.globalStorageUri, 'temp');
-
-                            // 确保临时目录存在
-                            try {
-                                await vscode.workspace.fs.createDirectory(tempDir);
-                            } catch (error) {
-                                // 目录可能已存在，忽略错误
-                            }
-
                             // 获取原文件的扩展名
                             const fileExt = path.extname(editor.document.fileName);
-
-                            const originalUri = vscode.Uri.joinPath(tempDir, `original-${timestamp}${fileExt}`);
-                            const proofreadUri = vscode.Uri.joinPath(tempDir, `proofread-${timestamp}${fileExt}`);
-
-                            // 写入内容到临时文件
-                            await vscode.workspace.fs.writeFile(originalUri, Buffer.from(originalText));
-                            await vscode.workspace.fs.writeFile(proofreadUri, Buffer.from(result));
 
                             // 显示差异
                             await showDiff(context, originalText, result, fileExt);
