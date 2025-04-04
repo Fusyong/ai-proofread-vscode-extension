@@ -13,7 +13,7 @@ import {
 } from './proofreader';
 import { PromptManager } from './promptManager';
 import { mergeTwoFiles } from './merger';
-import { showDiff, showFileDiff } from './differ';
+import { showDiff, showFileDiff, generateJsDiff } from './differ';
 import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager } from './utils';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -259,6 +259,9 @@ export function activate(context: vscode.ExtensionContext) {
                 const currentFilePath = document.uri.fsPath;
                 const outputFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread', '.json');
                 const logFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread', '.log');
+                const originalMarkdownFilePath = FilePathUtils.getOutputPath(currentFilePath, '', '.md');
+                const proofreadMarkdownFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread.json', '.md');
+                const jsdiffFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread', '.html');
 
                 // 获取配置
                 const configManager = ConfigManager.getInstance();
@@ -312,6 +315,9 @@ export function activate(context: vscode.ExtensionContext) {
                             token // 传递取消令牌
                         });
 
+                        // 生成差异文件
+                        await generateJsDiff(originalMarkdownFilePath, proofreadMarkdownFilePath, jsdiffFilePath);
+
                         // 写入完成日志
                         const endTime = new Date().toLocaleString();
                         logMessage = `\n${'='.repeat(50)}\n`;
@@ -342,13 +348,14 @@ export function activate(context: vscode.ExtensionContext) {
 
                         const result = await vscode.window.showInformationMessage(
                             message,
-                            '查看结果',
+                            '比较前后差异',
+                            '查看差异文件',
+                            '查看JSON结果',
                             '查看未处理段落',
-                            '显示校对前后的差异'
                         );
 
-                        if (result === '查看结果') {
-                            // 打开校对后的文件
+                        if (result === '查看JSON结果') {
+                            // 打开校对后的JSON文件
                             const outputUri = vscode.Uri.file(outputFilePath);
                             await vscode.workspace.openTextDocument(outputUri);
                             await vscode.window.showTextDocument(outputUri);
@@ -365,8 +372,8 @@ export function activate(context: vscode.ExtensionContext) {
                             } else {
                                 vscode.window.showInformationMessage('没有未处理的段落！');
                             }
-                        } else if (result === '显示校对前后的差异') {
-                            // 显示校对前后的差异
+                        } else if (result === '比较前后差异') {
+                            // 比较前后差异
                             const originalMarkdownFile = currentFilePath.replace('.json', '.md');
                             const proofreadMarkdownFile = outputFilePath.replace('.json', '.json.md');
 
@@ -375,6 +382,10 @@ export function activate(context: vscode.ExtensionContext) {
                             } catch (error) {
                                 ErrorUtils.showError(error, '显示差异时出错：');
                             }
+                        } else if (result === '查看差异文件') {
+                            // 使用系统默认程序打开差异文件
+                            const jsdiffUri = vscode.Uri.file(jsdiffFilePath);
+                            await vscode.env.openExternal(jsdiffUri);
                         }
                     } catch (error) {
                         if (error instanceof Error && error.message.includes('未配置')) {

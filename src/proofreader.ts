@@ -155,13 +155,22 @@ export class DeepseekApiClient implements ApiClient {
         );
 
         try {
+            const config = vscode.workspace.getConfiguration('ai-proofread');
+            const temperature = config.get<number>('proofread.temperature');
+            const requestBody: any = {
+                model: this.model,
+                messages,
+            };
+
+            if (temperature !== undefined) {
+                requestBody.temperature = temperature;
+            } else {
+                console.log('未配置温度，使用模型默认温度');
+            }
+
             const response = await axios.post(
                 `${this.baseUrl}/chat/completions`,
-                {
-                    model: this.model,
-                    messages,
-                    temperature: 1,
-                },
+                requestBody,
                 {
                     headers: {
                         'Authorization': `Bearer ${this.apiKey}`,
@@ -217,13 +226,22 @@ export class AliyunApiClient implements ApiClient {
         );
 
         try {
+            const config = vscode.workspace.getConfiguration('ai-proofread');
+            const temperature = config.get<number>('proofread.temperature');
+            const requestBody: any = {
+                model: this.model,
+                messages,
+            };
+
+            if (temperature !== undefined) {
+                requestBody.temperature = temperature;
+            } else {
+                console.log('未配置温度，使用模型默认温度');
+            }
+
             const response = await axios.post(
                 `${this.baseUrl}/chat/completions`,
-                {
-                    model: this.model,
-                    messages,
-                    temperature: 1,
-                },
+                requestBody,
                 {
                     headers: {
                         'Authorization': `Bearer ${this.apiKey}`,
@@ -267,12 +285,22 @@ export class GoogleApiClient implements ApiClient {
             if(reference) {
                 contents = [contents, reference].join('\n\n');
             }
+
+            const config = vscode.workspace.getConfiguration('ai-proofread');
+            const temperature = config.get<number>('proofread.temperature');
+            const configObj: any = {
+                systemInstruction: getSystemPrompt(),
+            };
+
+            if (temperature !== undefined) {
+                configObj.temperature = temperature;
+            } else {
+                console.log('未配置温度，使用模型默认温度');
+            }
+
             const response = await this.ai.models.generateContent({
                 model: this.model,
-                config: {
-                    systemInstruction: getSystemPrompt(),
-                    temperature: 1,
-                },
+                config: configObj,
                 contents: contents,
             });
 

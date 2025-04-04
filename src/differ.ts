@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { TempFileManager } from './utils';
 
 /**
@@ -44,4 +45,97 @@ async function openDiffView(
     proofreadUri: vscode.Uri
 ): Promise<void> {
     await vscode.commands.executeCommand('vscode.diff', originalUri, proofreadUri, 'Original ↔ Proofread');
+}
+
+/**
+ * 生成jsdiff文件
+ * @param originalFile 原始文件路径
+ * @param proofreadFile 校对后的文件路径
+ * @param outputFile 输出文件路径
+ */
+export async function generateJsDiff(
+    originalFile: string,
+    proofreadFile: string,
+    outputFile: string
+): Promise<void> {
+    const originalFileContent = fs.readFileSync(originalFile, 'utf8');
+    const proofreadFileContent = fs.readFileSync(proofreadFile, 'utf8');
+    // jsdiff 模版
+    const jsdiffTemplate = `
+<html>
+  <head>
+    <title>Diff</title>
+    <meta charset="utf-8">
+    <style>
+      #display {
+        white-space: pre-wrap;       /* CSS3 */
+        word-wrap: break-word;       /* IE */
+        overflow-wrap: break-word;   /* Modern browsers */
+        font-family: "SimSun", "宋体" !important;
+        font-size: 14px !important;
+        line-height: 1.5  !important;
+      }
+      #display span {
+        display: inline;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="display"></pre>
+    <!-- <script src="diff.js"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/diff@7.0.0/dist/diff.min.js"></script>
+    <script type="text/plain" id="a-text">${originalFileContent}</script>
+    <script type="text/plain" id="b-text">${proofreadFileContent}</script>
+    <script>
+    // 获取文本内容
+    const a = document.getElementById('a-text').textContent;
+    const b = document.getElementById('b-text').textContent;
+    </script>
+    <!-- <script src="a.js"></script>
+    <script src="b.js"></script> -->
+    <script>
+// Variables 'a' and 'b' are now available from the included JS files
+let span = null;
+
+const segmenter = new Intl.Segmenter(
+  'zh', { granularity: 'word' }
+);
+const diff = Diff.diffWordsWithSpace(a, b, segmenter),
+    display = document.getElementById('display'),
+    fragment = document.createDocumentFragment();
+
+diff.forEach((part) => {
+  // green for additions, red for deletions
+  // grey for common parts
+  const color = part.added ? 'green' :
+    part.removed ? 'red' : 'black';
+  span = document.createElement('span');
+  span.style.color = color;
+
+  // Add underline for additions and strikethrough for deletions
+  if (part.added) {
+    span.style.textDecoration = 'underline 2px';
+  } else if (part.removed) {
+    span.style.textDecoration = 'dotted underline 2px';
+  }
+
+  span.appendChild(document
+    .createTextNode(part.value));
+  fragment.appendChild(span);
+});
+
+display.appendChild(fragment);
+</script>
+</body>
+</html>
+`;
+
+    // 替换模版中的文本内容
+    const jsdiffHtml = jsdiffTemplate.replace('${originalFileContent}', originalFileContent)
+        .replace('${proofreadFileContent}', proofreadFileContent);
+
+    // 写文件
+    fs.writeFileSync(outputFile, jsdiffHtml);
 }
