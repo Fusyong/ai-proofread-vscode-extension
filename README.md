@@ -136,6 +136,7 @@ An AI-based document and book proofreading VS Code extension that supports docum
 
 默认为1
 
+<!--
 ## 开发命令
 
 ```bash
@@ -150,4 +151,8 @@ npm run watch
 
 # 构建 vsix 扩展安装文件用
 npm run package-vsix
+
+# 发布
+npm run publish
 ```
+-->

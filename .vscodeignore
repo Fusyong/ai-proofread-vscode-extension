@@ -10,3 +10,4 @@ node_modules
 **/*.ts
 test
 *.code-workspace
+*.psd
