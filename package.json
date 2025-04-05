@@ -249,7 +249,8 @@
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex)"
         }
       ]
-    }
+    },
+    "icon": "./icon.jpeg"
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -289,7 +290,7 @@
       "outputFormat": "commonjs"
     }
   },
-  "publisher": "fusyong",
+  "publisher": "HuangFusyong",
   "repository": {
     "type": "git",
     "url": "https://github.com/Fusyong/ai-proofread-vscode-extension.git"
