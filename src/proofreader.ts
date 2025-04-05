@@ -425,9 +425,9 @@ export async function processJsonFileAsync(
         }
         const postText = `<target>\n${targetText}\n</target>`;
 
-        console.log(model);
-        console.log(preText);
-        console.log(postText);
+        // console.log(model);
+        // console.log(preText);
+        // console.log(postText);
 
         const startTime = Date.now();
         await rateLimiter.wait();
@@ -569,6 +569,12 @@ export async function proofreadSelection(
         preText += `\n<context>\n${contextText}\n</context>`;
     }
     const postText = `<target>\n${targetText}\n</target>`;
+
+    // 显示校对信息
+    const targetLength = targetText.length;
+    const contextLength = contextText.length;
+    const referenceLength = referenceText.length;
+    vscode.window.showInformationMessage(`target ${targetLength}, context ${contextLength}, reference ${referenceLength}, model: ${platform}, ${model}`);
 
     // 调用API进行校对
     const client = (() => {

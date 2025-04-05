@@ -52,11 +52,13 @@ async function openDiffView(
  * @param originalFile 原始文件路径
  * @param proofreadFile 校对后的文件路径
  * @param outputFile 输出文件路径
+ * @param diffTitle 标题
  */
 export async function generateJsDiff(
     originalFile: string,
     proofreadFile: string,
-    outputFile: string
+    outputFile: string,
+    diffTitle: string
 ): Promise<void> {
     const originalFileContent = fs.readFileSync(originalFile, 'utf8');
     const proofreadFileContent = fs.readFileSync(proofreadFile, 'utf8');
@@ -64,7 +66,7 @@ export async function generateJsDiff(
     const jsdiffTemplate = `
 <html>
   <head>
-    <title>Diff</title>
+    <title>${diffTitle}</title>
     <meta charset="utf-8">
     <style>
       #display {
@@ -134,7 +136,8 @@ display.appendChild(fragment);
 
     // 替换模版中的文本内容
     const jsdiffHtml = jsdiffTemplate.replace('${originalFileContent}', originalFileContent)
-        .replace('${proofreadFileContent}', proofreadFileContent);
+        .replace('${proofreadFileContent}', proofreadFileContent)
+        .replace('${diffTitle}', diffTitle);
 
     // 写文件
     fs.writeFileSync(outputFile, jsdiffHtml);

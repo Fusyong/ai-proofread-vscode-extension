@@ -262,6 +262,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const originalMarkdownFilePath = FilePathUtils.getOutputPath(currentFilePath, '', '.md');
                 const proofreadMarkdownFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread.json', '.md');
                 const jsdiffFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread', '.html');
+                const diffTitle = path.basename(jsdiffFilePath, path.extname(jsdiffFilePath));
 
                 // 获取配置
                 const configManager = ConfigManager.getInstance();
@@ -316,7 +317,7 @@ export function activate(context: vscode.ExtensionContext) {
                         });
 
                         // 生成差异文件
-                        await generateJsDiff(originalMarkdownFilePath, proofreadMarkdownFilePath, jsdiffFilePath);
+                        await generateJsDiff(originalMarkdownFilePath, proofreadMarkdownFilePath, jsdiffFilePath, diffTitle);
 
                         // 写入完成日志
                         const endTime = new Date().toLocaleString();
