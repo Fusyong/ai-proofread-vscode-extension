@@ -277,7 +277,7 @@
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
-    "@vscode/vsce": "^2.24.0",
+    "@vscode/vsce": "^3.3.2",
     "eslint": "^8.57.0",
     "glob": "^10.3.10",
     "parcel": "^2.11.0",
@@ -294,7 +294,7 @@
       "outputFormat": "commonjs"
     }
   },
-  "icon": "./icon.png",
+  "icon": "icon.png",
   "publisher": "HuangFusyong",
   "repository": {
     "type": "git",
