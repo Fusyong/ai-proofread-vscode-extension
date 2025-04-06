@@ -10,16 +10,20 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 ## 2. 功能便览
 
-1. **直接校对：**
-   1. 打开markdown等文本文件，选中一段文字
-   2. 打开右键菜单，使用其中的AI proofreader: proofread selection项校对选中文本
-   3. 其间可选上下文范围、参考文本和温度
-   4. 最后会自动展示校对前后的差异
+1. **校对文档中的选段：**
+    1. 打开markdown等文本文件，选中一段文字
+    2. 打开右键菜单，使用其中的AI proofreader: proofread selection项校对选中文本
+    3. 其间可选上下文范围、参考文本和温度
+    4. 最后会自动展示校对前后的差异
 
-2. **切分后校对：**
-   1. 打开markdown文档，打开右键菜单，使用其中的AI proofreader: split ... 选项中的一个，把当前的切分为JSON文档
-   2. 打开上述JSON文档，打开右键菜单，使用其中的AI proofreader: proofread file选项，批量校对切分好的片段
-   3. 最后会提示你查看结果：前后差异、差异文件、JSON结果、日志文件
+2. **切分文档后批量校对：**
+    1. 打开markdown文档，打开右键菜单，使用其中的AI proofreader: split ... 选项中的一个，把当前的切分为JSON文档
+    2. 打开上述JSON文档，打开右键菜单，使用其中的AI proofreader: proofread file选项，批量校对切分好的片段
+    3. 最后会提示你查看结果：前后差异、差异文件、JSON结果、日志文件
+
+前后差异示例：
+
+![前后差异](https://blog.xiiigame.com/img/2025-02-07-%E6%AF%94%E8%BE%83AI%E6%A8%A1%E5%9E%8B%E6%A0%A1%E5%AF%B9%E6%95%88%E6%9E%9C/20252507-160022-52.png)
 
 打开命令面板（Ctrl+Shift+P）能查看和使用所有命令：
 
@@ -32,56 +36,58 @@ A VS Code extension for document and book proofreading based on LLM services, su
 请在 VS Code 设置中进行配置（Ctrl+, 打开设置）。
 
 1. **平台选择**：
-   * `ai-proofread.proofread.platform`: 选择大模型服务平台（deepseek/aliyun/google）
+    * `ai-proofread.proofread.platform`: 选择大模型服务平台（deepseek/aliyun/google）
 
 2. **API密钥配置**（**以上选中平台必须配置**）：
-   * `ai-proofread.apiKeys.deepseek`: Deepseek开放平台 API 密钥
-   * `ai-proofread.apiKeys.aliyun`: 阿里云百炼平台 API 密钥
-   * `ai-proofread.apiKeys.google`: Google Gemini API 密钥
+    * `ai-proofread.apiKeys.deepseek`: Deepseek开放平台 API 密钥
+    * `ai-proofread.apiKeys.aliyun`: 阿里云百炼平台 API 密钥
+    * `ai-proofread.apiKeys.google`: Google Gemini API 密钥
 
 3. **模型选择**
-   * `ai-proofread.proofread.models.deepseek`: Deepseek开放平台模型选择（deepseek-chat/deepseek-reasoner）
-   * `ai-proofread.proofread.models.aliyun`: 阿里云百炼模型选择（deepseek-v3/deepseek-r1/qwen-max-2025-01-25/qwen-plus）
-   * `ai-proofread.proofread.models.google`: Google Gemini模型选择（gemini-2.0-flash/gemini-2.0-flash-lite/gemini-2.0-flash-thinking-exp-01-21/gemini-2.5-pro-exp-03-25）
+    * `ai-proofread.proofread.models.deepseek`: Deepseek开放平台模型选择（deepseek-chat/deepseek-reasoner）
+    * `ai-proofread.proofread.models.aliyun`: 阿里云百炼模型选择（deepseek-v3/deepseek-r1/qwen-max-2025-01-25/qwen-plus）
+    * `ai-proofread.proofread.models.google`: Google Gemini模型选择（gemini-2.0-flash/gemini-2.0-flash-lite/gemini-2.0-flash-thinking-exp-01-21/gemini-2.5-pro-exp-03-25）
 
 1. **校对相关**：
-   * `ai-proofread.proofread.rpm`: 每分钟最大请求数（默认15）
-   * `ai-proofread.proofread.maxConcurrent`: 最大并发请求数（默认3）
-   * `ai-proofread.proofread.temperature`: 模型温度（默认1.0，取值范围[0:2)）
-   * `ai-proofread.proofread.defaultContextLevel`: 校对选中文本时默认使用的标题级别，作为上下文范围（默认0，表示不使用）
+    * `ai-proofread.proofread.rpm`: 每分钟最大请求数（默认15）
+    * `ai-proofread.proofread.maxConcurrent`: 最大并发请求数（默认3）
+    * `ai-proofread.proofread.temperature`: 模型温度（默认1.0，取值范围[0:2)）
+    * `ai-proofread.proofread.defaultContextLevel`: 校对选中文本时默认使用的标题级别，作为上下文范围（默认0，表示不使用）
 
 2. **文档切分相关**：
-   * `ai-proofread.defaultSplitLength`: 默认的文本切分长度（默认600字符）
-   * `ai-proofread.defaultTitleLevels`: 默认的标题切分级别（默认[2]，表示按二级标题切分）
-   * `ai-proofread.contextSplit.cutBy`: 带上下文切分模式下的切分长度（默认600）
-   * `ai-proofread.titleAndLengthSplit.threshold`: 标题加长度切分时的段落长度阈值（默认1500）
-   * `ai-proofread.titleAndLengthSplit.cutBy`: 标题加长度切分时的目标长度（默认800）
-   * `ai-proofread.titleAndLengthSplit.minLength`: 标题加长度切分时的最小长度（默认120）
+    * `ai-proofread.defaultSplitLength`: 默认的文本切分长度（默认600字符）
+    * `ai-proofread.defaultTitleLevels`: 默认的标题切分级别（默认[2]，表示按二级标题切分）
+    * `ai-proofread.contextSplit.cutBy`: 带上下文切分模式下的切分长度（默认600）
+    * `ai-proofread.titleAndLengthSplit.threshold`: 标题加长度切分时的段落长度阈值（默认1500）
+    * `ai-proofread.titleAndLengthSplit.cutBy`: 标题加长度切分时的目标长度（默认800）
+    * `ai-proofread.titleAndLengthSplit.minLength`: 标题加长度切分时的最小长度（默认120）
 
 3. **提示词管理**：
-   * 必须通过命令面板选择提示词
-   * 一般用户建议通过命令面板（Ctrl+Shift+P）设置提示词
-   * 或通过设置项`ai-proofread.prompts`设置:
-     - 每个提示词必须包含名称和内容
-     - 内容必须对目标文本（target）、参考资料（reference）、上下文（context）进行说明
+    * 必须通过命令面板选择提示词
+    * 一般用户建议通过命令面板（Ctrl+Shift+P）设置提示词
+    * 或通过设置项`ai-proofread.prompts`设置:
+        - 每个提示词必须包含名称和内容
+        - 内容必须对要处理的目标文本（target）、参考资料（reference）、上下文（context）进行说明
 
 4. **调试**：
-   * `ai-proofread.debug`: 是否显示调试日志（默认false）
+    * `ai-proofread.debug`: 是否显示调试日志（默认false）
 
 ### 3.2. 切分文档
+
+我的经验，在一般语言文字和知识校对场景中，大语言模型一次输出六百到八百字会有比较好的效果。因此，一本十来万字的书稿需要切分成三百多段，然后交给大模型校对。
 
 打开markdown文件，右键点击编辑器，可以看到以下切分选项（或通过命令面板查找）：
 
 ![切分文档](https://blog.xiiigame.com/img/2025-03-28-%E7%94%A8%E4%BA%8EAI%E5%9B%BE%E4%B9%A6%E6%A0%A1%E5%AF%B9%E7%9A%84vscod%E6%89%A9%E5%B1%95/Code_1w0X1wqgyf.png)
 
 1. **按标题切分** (Split File by Title)
-   * 输入标题级别（如：1,2）
+    * 输入标题级别（如：1,2）
 2. **按长度切分** (Split File by Length)
-   * 输入目标切分长度
+    * 输入目标切分长度
 3. **按标题和长度切分** (Split File by Title and Length)
-   * 可配置标题级别、阈值（过大则切分）、切分长度和最小长度（过小则合并）
+    * 可配置标题级别、阈值（过大则切分）、切分长度和最小长度（过小则合并）
 4. **带上下文切分** (Split File with Context)
-   * 输入标题级别作为上下文范围，输入切分长度
+    * 输入标题级别作为上下文范围，输入切分长度
 
 切分后都生成同名的 `.json`（用于校对） 和 `.json.md`（可查看切分情况） 两个结果文件。
 切分操作都会生成日志文件（`.log`），记录切分统计信息。
@@ -90,36 +96,35 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 ### 3.3. 合并JSON
 
-打开JSON文件，右键点击编辑器，可以看到以下切分选项（或通过命令面板查找）：
+插件每次调用大语言模型时能提交三种文本：**要处理的目标文本（target，必须）、参考资料（reference，可选）、上下文（context，可选）**。比如以一篇文章中的一部分作为target，那么整篇就可以作为context，而在处理中有参考价值的资料，如相关词条，就可以作为reference。
 
-![校对功能](https://blog.xiiigame.com/img/2025-03-28-%E7%94%A8%E4%BA%8EAI%E5%9B%BE%E4%B9%A6%E6%A0%A1%E5%AF%B9%E7%9A%84vscod%E6%89%A9%E5%B1%95/Code_K2nKGGM9Nj.png)
+假设你校对一本书，切分后得到包含300个target的JSON文件。那么可以准备相同数量、一一对应的上下文或参考文献，切分成包含相同数量target的JSON文件。然后使用合并命令，将上下文文本中的target作为context合并，将参考文本中的target作为reference合并。
 
 **合并 JSON 文件** (Merge Two Files)：
 
-1. 打开已切分的 JSON 文件
-2. 右键选择Merge Two Files，选择要合并的文件
-3. 确定要更新的字段和来源字段
+1. 打开已切分的要校对的 JSON 文件
+2. 右键选择AI proofreader: Merge Two Files（或通过命令面板查找），选择要合并的文件
+3. 确定要插入/更新的字段和来源字段
 
-假设你校对一本书，这时可以按相同的切分结构准备上下文文本和参考文本，同样切分后，上下文文本、参考文本中的target作为context、reference合并。这样，大模型就会参考context、reference来校对你书稿中的target。
+![校对功能](https://blog.xiiigame.com/img/2025-03-28-%E7%94%A8%E4%BA%8EAI%E5%9B%BE%E4%B9%A6%E6%A0%A1%E5%AF%B9%E7%9A%84vscod%E6%89%A9%E5%B1%95/Code_K2nKGGM9Nj.png)
 
-### 3.4. 校对文档和选段
+### 3.4. 校对文本选段或JSON文档
 
 菜单见上两图。
 
-1. **校对 JSON 文件** (Proofread File)
-    1. 打开已切分的 JSON 文件
-    2. 右键选择Proofread File
-    3. 自动使用配置的默认值进行校对
-    4. 支持进度显示和取消操作
-    5. 最后会提示你查看结果
-    6. 并生成日志
-
-2. **校对选中文本** (Proofread Selection)
+1. **校对选中文本** (Proofread Selection)
     1. 打开文本文件（支持常见文本文件，推荐使用Markdown）
     2. 选中要校对的段落
     3. 从右键菜单中选择 Proofread Selection
     4. 可选择上下文范围、参考文件和温度
     5. 最后会自动展示校对前后的差异
+    6. 并生成日志
+2. **校对 JSON 文件** (Proofread File)
+    1. 打开已切分的 JSON 文件
+    2. 右键选择Proofread File
+    3. 自动使用配置的默认值进行校对
+    4. 支持进度显示和取消操作
+    5. 最后会提示你查看结果
     6. 并生成日志
 
 ### 3.5. 管理提示词
@@ -132,9 +137,18 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 也可以在配置文件中处理提示词，但不适合没有编程知识的用户使用。
 
-### 3.6. 日志
+### 3.6. 日志等过程文件
 
-切分和校对会生成对应的.log文件，方便检查。
+为了让用户能够核验、控制每一个步骤，插件会生成一些中间文件，比如：
+
+1. 测试.md，要校对的文档
+2. 测试.json，切分上述文档的结果，供检查后用于校对；可以进一步与别的切分结果进行合并，以便搭配target + context + reference一起提交处理
+3. 测试.json.md，拼合上项JSON文件中的target的结果，用于查看或比较原始markdown文件，比JSON直观
+4. 测试.log，切分日志，用来检查切分是否合理
+5. 测试.proofread.json，校对上述JSON文件的直接结果，其中的null项表示还没有校对结果，重新校对时只处理null对应的条目，而不会重复处理已经完成的条目
+6. 测试.proofread.json.md，拼合上项JSON文件中的结果，比较最初的markdown文件即可看出改动处（可通过校对最终界面查看）
+7. 测试.proofread.html，通过jsdiff库比较校对前后markdown文件所得的结果，与Word近似的行内标记，可通过浏览器打印成PDF，需要联网调用jsdiff库
+8. 测试.proofread.log，校对日志，**校对文本选段的结果也会存在这里**
 
 ### 3.7. 模型温度
 
@@ -146,28 +160,28 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 以下是官方资料：
 
-#### 3.7.1. deepseek
+1. deepseek
 
-`temperature` 参数默认为 1.0。
+    `temperature` 参数默认为 1.0。
 
-官方建议根据如下表格，按使用场景设置 `temperature`。
+    官方建议根据如下表格，按使用场景设置 `temperature`。
 
-| 场景                | 温度 |
-| ------------------- | ---- |
-| 代码生成/数学解题   | 0.0  |
-| 数据抽取/分析       | 1.0  |
-| 通用对话            | 1.3  |
-| 翻译                | 1.3  |
-| 创意类写作/诗歌创作 | 1.5  |
+    | 场景                | 温度 |
+    | ------------------- | ---- |
+    | 代码生成/数学解题   | 0.0  |
+    | 数据抽取/分析       | 1.0  |
+    | 通用对话            | 1.3  |
+    | 翻译                | 1.3  |
+    | 创意类写作/诗歌创作 | 1.5  |
 
-#### 3.7.2. 阿里云百炼平台
+2. 阿里云百炼平台
 
-* deepseek v3/r1: temperature：0.7（取值范围是`[0:2)`）
-* qwen系列: 取值范围是`[0:2)`
+    * deepseek v3/r1: temperature：0.7（取值范围是`[0:2)`）
+    * qwen系列: 取值范围是`[0:2)`
 
-#### 3.7.3. Google Gemini
+3. Google Gemini
 
-默认为1
+    默认为1
 
 ### 3.8. 注意事项
 
@@ -176,8 +190,27 @@ A VS Code extension for document and book proofreading based on LLM services, su
 3. 校对过程可以随时取消，已处理的内容会得到保存，重新校对时不会重复处理
 4. 注意所用模型 API 调用频率限制，可通过配置调整
 
+## 4. 相关工具
 
-## 4. 开发命令
+1. **vscode提供的比较（diff）功能**：通过文档浏览窗口，对原文件使用右键菜单的`select for compare`项，对校对后的文件使用`compare with selected`项，比较结果见“功能便览”一节。
+2. **pandoc**，强大的文档转换工具
+    1. docx转markdown
+        ```bash
+        set myfilename="myfilename"
+
+        pandoc -f docx -t markdown-smart+pipe_tables+footnotes --wrap=none --toc --extract-media="./attachments/%myfilename%" %myfilename%.docx -o %myfilename%.md
+        ```
+
+        或：
+
+        ```shell
+        set myfilename="myfilename"
+        pandoc -t markdown_strict --extract-media="./attachments/%myfilename%" %myfilename%.docx -o %myfilename%.md
+        ```
+    2. markdown转docx：`pandoc -f markdown -t docx -o out.docx in.markdown`
+3. **Acrobat**，商业软件，可以把PDF文件转成docx或HTML，再用pandoc转markdown
+
+## 5. 开发命令
 
 ```bash
 # 安装依赖
