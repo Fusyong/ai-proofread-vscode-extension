@@ -9,7 +9,7 @@ import axios from 'axios';
 import * as dotenv from 'dotenv';
 import { RateLimiter } from './rateLimiter';
 import { GoogleGenAI } from "@google/genai";
-import { ConfigManager, ErrorUtils } from './utils';
+import { ConfigManager, ErrorUtils, Logger } from './utils';
 
 // 加载环境变量
 dotenv.config();
@@ -79,21 +79,22 @@ function getSystemPrompt(): string {
     const config = vscode.workspace.getConfiguration('ai-proofread');
     const prompts = config.get<Array<{name: string, content: string}>>('prompts', []);
     const defaultIndex = config.get<number>('defaultPromptIndex', 0);
+    const logger = Logger.getInstance();
 
     // 如果defaultIndex为-1，使用系统默认提示词
     if (defaultIndex === -1) {
-        console.log('使用系统默认提示词');
+        logger.info('使用系统默认提示词');
         return DEFAULT_SYSTEM_PROMPT;
     }
 
     // 使用自定义提示词
     if (prompts.length > 0 && defaultIndex >= 0 && defaultIndex < prompts.length) {
-        console.log(`使用自定义提示词: ${prompts[defaultIndex].name}`);
+        logger.info(`使用自定义提示词: ${prompts[defaultIndex].name}`);
         return prompts[defaultIndex].content;
     }
 
     // 如果没有有效的自定义提示词，使用系统默认提示词
-    console.log('使用系统默认提示词');
+    logger.info('使用系统默认提示词');
     return DEFAULT_SYSTEM_PROMPT;
 }
 
@@ -133,11 +134,13 @@ export class DeepseekApiClient implements ApiClient {
         this.baseUrl = 'https://api.deepseek.com/v1';
 
         if (!this.apiKey) {
-            throw new Error('未配置 Deepseek 平台 API密钥，请在设置中配置');
+            throw new Error('未配置 Deepseek开放平台 API密钥，请在设置中配置');
         }
     }
 
-    async proofread(content: string, reference: string = ''): Promise<string | null> {
+    // 使用 Deepseek API 进行校对
+    async proofread(content: string, reference: string = '', temperature: number|null = null): Promise<string | null> {
+        const logger = Logger.getInstance();
         const messages = [
             { role: 'system', content: getSystemPrompt() }
         ];
@@ -156,16 +159,17 @@ export class DeepseekApiClient implements ApiClient {
 
         try {
             const config = vscode.workspace.getConfiguration('ai-proofread');
-            const temperature = config.get<number>('proofread.temperature');
+            const finalTemperature = temperature || config.get<number>('proofread.temperature');
             const requestBody: any = {
                 model: this.model,
                 messages,
             };
 
-            if (temperature !== undefined) {
-                requestBody.temperature = temperature;
+            if (finalTemperature !== undefined) {
+                requestBody.temperature = finalTemperature;
+                logger.debug(`使用温度: ${finalTemperature}`);
             } else {
-                console.log('未配置温度，使用模型默认温度');
+                logger.debug('未配置温度，使用模型默认温度');
             }
 
             const response = await axios.post(
@@ -183,7 +187,7 @@ export class DeepseekApiClient implements ApiClient {
             result = result.replace('\n</target>', '').replace('<target>\n', '');
             return result;
         } catch (error) {
-            console.error('API调用出错:', error);
+            logger.error('API调用出错', error);
             return null;
         }
     }
@@ -208,7 +212,9 @@ export class AliyunApiClient implements ApiClient {
         }
     }
 
-    async proofread(content: string, reference: string = ''): Promise<string | null> {
+    // 使用阿里云百炼 API 进行校对
+    async proofread(content: string, reference: string = '', temperature: number|null = null): Promise<string | null> {
+        const logger = Logger.getInstance();
         const messages = [
             { role: 'system', content: getSystemPrompt() }
         ];
@@ -227,16 +233,17 @@ export class AliyunApiClient implements ApiClient {
 
         try {
             const config = vscode.workspace.getConfiguration('ai-proofread');
-            const temperature = config.get<number>('proofread.temperature');
+            const finalTemperature = temperature || config.get<number>('proofread.temperature');
             const requestBody: any = {
                 model: this.model,
                 messages,
             };
 
-            if (temperature !== undefined) {
-                requestBody.temperature = temperature;
+            if (finalTemperature !== undefined) {
+                requestBody.temperature = finalTemperature;
+                logger.debug(`使用温度: ${finalTemperature}`);
             } else {
-                console.log('未配置温度，使用模型默认温度');
+                logger.debug('未配置温度，使用模型默认温度');
             }
 
             const response = await axios.post(
@@ -254,7 +261,7 @@ export class AliyunApiClient implements ApiClient {
             result = result.replace('\n</target>', '').replace('<target>\n', '');
             return result;
         } catch (error) {
-            console.error('API调用出错:', error);
+            logger.error('API调用出错', error);
             return null;
         }
     }
@@ -279,7 +286,9 @@ export class GoogleApiClient implements ApiClient {
         }
     }
 
-    async proofread(content: string, reference: string = ''): Promise<string | null> {
+    // 使用 Google API 进行校对
+    async proofread(content: string, reference: string = '', temperature: number|null = null): Promise<string | null> {
+        const logger = Logger.getInstance();
         try {
             let contents = content;
             if(reference) {
@@ -287,15 +296,16 @@ export class GoogleApiClient implements ApiClient {
             }
 
             const config = vscode.workspace.getConfiguration('ai-proofread');
-            const temperature = config.get<number>('proofread.temperature');
+            const finalTemperature = temperature || config.get<number>('proofread.temperature');
             const configObj: any = {
                 systemInstruction: getSystemPrompt(),
             };
 
-            if (temperature !== undefined) {
-                configObj.temperature = temperature;
+            if (finalTemperature !== undefined) {
+                configObj.temperature = finalTemperature;
+                logger.debug(`使用温度: ${finalTemperature}`);
             } else {
-                console.log('未配置温度，使用模型默认温度');
+                logger.debug('未配置温度，使用模型默认温度');
             }
 
             const response = await this.ai.models.generateContent({
@@ -306,7 +316,7 @@ export class GoogleApiClient implements ApiClient {
 
             return response.text || null;
         } catch (error) {
-            console.error('API调用出错:', error);
+            logger.error('API调用出错', error);
             return null;
         }
     }
@@ -325,10 +335,12 @@ export async function processJsonFileAsync(
         model?: string;
         rpm?: number;
         maxConcurrent?: number;
+        temperature?: number;
         onProgress?: (info: string) => void;
         token?: vscode.CancellationToken;
     } = {}
 ): Promise<ProcessStats> {
+    const logger = Logger.getInstance();
     // 设置默认值
     const {
         startCount = 1,
@@ -337,6 +349,7 @@ export async function processJsonFileAsync(
         model = 'deepseek-chat',
         rpm = 15,
         maxConcurrent = 3,
+        temperature = 1,
         onProgress,
         token
     } = options;
@@ -413,7 +426,7 @@ export async function processJsonFileAsync(
             `${referenceText ? ` with reference ${referenceText.length}` : ''}:`+
             `\n${targetText.slice(0, 30)} ...\n`+
             `${'-'.repeat(40)}\n`;
-        console.log(progressInfo);
+        logger.info(progressInfo);
         if (onProgress) {
             onProgress(progressInfo);
         }
@@ -439,13 +452,13 @@ export async function processJsonFileAsync(
             outputParagraphs[index] = processedText;
             fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
             const completeInfo = `完成 ${index + 1}/${totalCount} 长度 ${targetText.length} 用时 ${elapsed.toFixed(2)}s\n${'-'.repeat(40)}\n`;
-            console.log(completeInfo);
+            logger.info(completeInfo);
             if (onProgress) {
                 onProgress(completeInfo);
             }
         } else {
             const errorInfo = `段落 ${index + 1}/${totalCount}: 处理失败，跳过\n${'-'.repeat(40)}\n`;
-            console.log(errorInfo);
+            logger.error(errorInfo);
             if (onProgress) {
                 onProgress(errorInfo);
             }
@@ -513,7 +526,8 @@ export async function proofreadSelection(
     platform: string,
     model: string,
     contextLevel?: string,
-    referenceFile?: vscode.Uri[]
+    referenceFile?: vscode.Uri[],
+    userTemperature?: number
 ): Promise<string | null> {
     // 获取选中的文本
     const selectedText = editor.document.getText(selection);
@@ -574,7 +588,7 @@ export async function proofreadSelection(
     const targetLength = targetText.length;
     const contextLength = contextText.length;
     const referenceLength = referenceText.length;
-    vscode.window.showInformationMessage(`target ${targetLength}, context ${contextLength}, reference ${referenceLength}, model: ${platform}, ${model}`);
+    vscode.window.showInformationMessage(`target ${targetLength}, context ${contextLength}, reference ${referenceLength}, model: ${platform}, ${model}, temperature: ${userTemperature}`);
 
     // 调用API进行校对
     const client = (() => {
@@ -589,5 +603,5 @@ export async function proofreadSelection(
         }
     })();
 
-    return await client.proofread(postText, preText);
+    return await client.proofread(postText, preText, userTemperature);
 }

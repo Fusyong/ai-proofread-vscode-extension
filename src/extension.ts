@@ -14,10 +14,11 @@ import {
 import { PromptManager } from './promptManager';
 import { mergeTwoFiles } from './merger';
 import { showDiff, showFileDiff, generateJsDiff } from './differ';
-import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager } from './utils';
+import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager, Logger } from './utils';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('AI Proofread extension is now active!');
+    const logger = Logger.getInstance();
+    logger.info('AI Proofread extension is now active!');
 
     // 清理临时文件
     TempFileManager.getInstance(context).cleanup();
@@ -182,7 +183,35 @@ export function activate(context: vscode.ExtensionContext) {
             const result = await handleFileSplit(document.uri.fsPath, options);
 
             // 显示成功消息
-            vscode.window.showInformationMessage(`文件已成功切分！\nJSON文件：${result.jsonFilePath}\nMarkdown文件：${result.markdownFilePath}`);
+            // vscode.window.showInformationMessage(`文件已成功切分！\nJSON文件：${result.jsonFilePath}\nMarkdown文件：${result.markdownFilePath}`);
+
+            // 提示用户查看结果
+            const message = `文件已成功切分！`;
+            const userChoice = await vscode.window.showInformationMessage(
+                message,
+                '比较前后差异',
+                '查看JSON结果',
+                '查看日志文件',
+            );
+
+            if (userChoice === '查看JSON结果') {
+                // 打开校对后的JSON文件
+                const outputUri = vscode.Uri.file(result.jsonFilePath);
+                await vscode.workspace.openTextDocument(outputUri);
+                await vscode.window.showTextDocument(outputUri);
+            } else if (userChoice === '查看日志文件') {
+                // 显示日志文件
+                const logUri = vscode.Uri.file(result.logFilePath);
+                await vscode.workspace.openTextDocument(logUri);
+                await vscode.window.showTextDocument(logUri);
+            } else if (userChoice === '比较前后差异') {
+                // 比较前后差异
+                try {
+                    await showFileDiff(document.uri.fsPath, result.markdownFilePath);
+                } catch (error) {
+                    ErrorUtils.showError(error, '显示差异时出错：');
+                }
+            }
 
         } catch (error) {
             ErrorUtils.showError(error, '切分文件时出错：');
@@ -270,6 +299,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const model = configManager.getModel(platform);
                 const rpm = configManager.getRpm();
                 const maxConcurrent = configManager.getMaxConcurrent();
+                const temperature = configManager.getTemperature();
 
                 // 写入开始日志
                 const startTime = new Date().toLocaleString();
@@ -279,8 +309,9 @@ export function activate(context: vscode.ExtensionContext) {
                 logMessage += `模型: ${model}\n`;
                 logMessage += `RPM: ${rpm}\n`;
                 logMessage += `最大并发数: ${maxConcurrent}\n`;
+                logMessage += `温度: ${temperature}\n`;
                 logMessage += `${'='.repeat(50)}\n`;
-                fs.writeFileSync(logFilePath, logMessage, 'utf8');
+                fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
                 // 检查API密钥是否已配置
                 const apiKey = configManager.getApiKey(platform);
@@ -308,6 +339,7 @@ export function activate(context: vscode.ExtensionContext) {
                             model,
                             rpm,
                             maxConcurrent,
+                            temperature,
                             onProgress: (info: string) => {
                                 // 将进度信息写入日志
                                 fs.appendFileSync(logFilePath, info + '\n', 'utf8');
@@ -352,7 +384,7 @@ export function activate(context: vscode.ExtensionContext) {
                             '比较前后差异',
                             '查看差异文件',
                             '查看JSON结果',
-                            '查看未处理段落',
+                            '查看日志文件',
                         );
 
                         if (result === '查看JSON结果') {
@@ -360,26 +392,15 @@ export function activate(context: vscode.ExtensionContext) {
                             const outputUri = vscode.Uri.file(outputFilePath);
                             await vscode.workspace.openTextDocument(outputUri);
                             await vscode.window.showTextDocument(outputUri);
-                        } else if (result === '查看未处理段落') {
-                            // 显示未处理的段落
-                            if (stats.unprocessedParagraphs.length > 0) {
-                                const items = stats.unprocessedParagraphs.map(p => ({
-                                    label: `No.${p.index}`,
-                                    description: p.preview + '...'
-                                }));
-                                await vscode.window.showQuickPick(items, {
-                                    placeHolder: '未处理的段落'
-                                });
-                            } else {
-                                vscode.window.showInformationMessage('没有未处理的段落！');
-                            }
+                        } else if (result === '查看日志文件') {
+                            // 显示日志文件
+                            const logUri = vscode.Uri.file(logFilePath);
+                            await vscode.workspace.openTextDocument(logUri);
+                            await vscode.window.showTextDocument(logUri);
                         } else if (result === '比较前后差异') {
                             // 比较前后差异
-                            const originalMarkdownFile = currentFilePath.replace('.json', '.md');
-                            const proofreadMarkdownFile = outputFilePath.replace('.json', '.json.md');
-
                             try {
-                                await showFileDiff(originalMarkdownFile, proofreadMarkdownFile);
+                                await showFileDiff(originalMarkdownFilePath, proofreadMarkdownFilePath);
                             } catch (error) {
                                 ErrorUtils.showError(error, '显示差异时出错：');
                             }
@@ -420,6 +441,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const configManager = ConfigManager.getInstance();
                 const platform = configManager.getPlatform();
                 const model = configManager.getModel(platform);
+                const temperature = configManager.getTemperature();
 
                 // 检查API密钥是否已配置
                 const apiKey = configManager.getApiKey(platform);
@@ -465,6 +487,19 @@ export function activate(context: vscode.ExtensionContext) {
                     });
                 }
 
+                // 让用户选择温度
+                const userTemperature = await vscode.window.showInputBox({
+                    prompt: '请输入温度',
+                    value: configManager.getTemperature().toString(),
+                    validateInput: (value: string) => {
+                        const temperature = parseFloat(value);
+                        if (isNaN(temperature) || temperature < 0 || temperature >= 2) {
+                            return '请输入一个[0:2)之间的数字';
+                        }
+                        return null;
+                    }
+                });
+
                 // 显示进度
                 await vscode.window.withProgress({
                     location: vscode.ProgressLocation.Notification,
@@ -478,17 +513,23 @@ export function activate(context: vscode.ExtensionContext) {
                             platform,
                             model,
                             contextLevel,
-                            referenceFile
+                            referenceFile,
+                            userTemperature ? parseFloat(userTemperature) : undefined
                         );
 
                         if (result) {
+                            // 把参数和校对结果写入日志文件
+                            const logFilePath = FilePathUtils.getOutputPath(editor.document.uri.fsPath, '.proofread', '.log');
+                            const logMessage = `\n${'='.repeat(50)}\n平台: ${platform}\n模型: ${model}\n温度: ${userTemperature}\n上下文范围: ${contextLevel}\n参考文件: ${referenceFile}\n校对结果:\n\n${result}\n${'='.repeat(50)}\n\n`;
+                            fs.appendFileSync(logFilePath, logMessage, 'utf8');
+
                             // 创建原始文本和校对后文本的临时文件
                             const originalText = editor.document.getText(editor.selection);
                             // 获取原文件的扩展名
                             const fileExt = path.extname(editor.document.fileName);
 
                             // 显示差异
-                            await showDiff(context, originalText, result, fileExt);
+                            await showDiff(context, originalText, result, fileExt, false);
                         } else {
                             vscode.window.showErrorMessage('校对失败，请重试。');
                         }
@@ -590,4 +631,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(...disposables);
 }
 
-export function deactivate() {}
+export function deactivate() {
+    const logger = Logger.getInstance();
+    logger.dispose();
+}

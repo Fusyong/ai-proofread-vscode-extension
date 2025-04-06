@@ -187,4 +187,63 @@ export class ConfigManager {
     public getMaxConcurrent(): number {
         return this.config.get<number>('proofread.maxConcurrent', 3);
     }
+
+    /**
+     * 获取温度配置
+     * @returns 温度
+     */
+    public getTemperature(): number {
+        return this.config.get<number>('proofread.temperature', 1);
+    }
+}
+
+/**
+ * 日志工具类
+ */
+export class Logger {
+    private static instance: Logger;
+    private isDebug: boolean;
+    private configListener: vscode.Disposable;
+
+    private constructor() {
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        this.isDebug = config.get<boolean>('debug', false);
+
+        // 监听配置变化
+        this.configListener = vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('ai-proofread.debug')) {
+                const config = vscode.workspace.getConfiguration('ai-proofread');
+                this.isDebug = config.get<boolean>('debug', false);
+            }
+        });
+    }
+
+    public static getInstance(): Logger {
+        if (!Logger.instance) {
+            Logger.instance = new Logger();
+        }
+        return Logger.instance;
+    }
+
+    public info(message: string): void {
+        console.log(`[INFO] ${message}`);
+    }
+
+    public debug(message: string): void {
+        if (this.isDebug) {
+            console.log(`[DEBUG] ${message}`);
+        }
+    }
+
+    public error(message: string, error?: any): void {
+        console.error(`[ERROR] ${message}`, error);
+    }
+
+    public warn(message: string): void {
+        console.warn(`[WARN] ${message}`);
+    }
+
+    public dispose(): void {
+        this.configListener.dispose();
+    }
 }

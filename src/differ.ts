@@ -13,12 +13,13 @@ export async function showDiff(
     context: vscode.ExtensionContext,
     originalText: string,
     proofreadText: string,
-    fileExt: string
+    fileExt: string,
+    preview: boolean = true
 ): Promise<void> {
     const tempFileManager = TempFileManager.getInstance(context);
     const originalUri = await tempFileManager.createTempFile(originalText, fileExt);
     const proofreadUri = await tempFileManager.createTempFile(proofreadText, fileExt);
-    await openDiffView(originalUri, proofreadUri);
+    await openDiffView(originalUri, proofreadUri, preview);
 }
 
 /**
@@ -28,11 +29,12 @@ export async function showDiff(
  */
 export async function showFileDiff(
     originalFile: string,
-    proofreadFile: string
+    proofreadFile: string,
+    preview: boolean = true
 ): Promise<void> {
     const originalUri = vscode.Uri.file(originalFile);
     const proofreadUri = vscode.Uri.file(proofreadFile);
-    await openDiffView(originalUri, proofreadUri);
+    await openDiffView(originalUri, proofreadUri, preview);
 }
 
 /**
@@ -42,9 +44,10 @@ export async function showFileDiff(
  */
 async function openDiffView(
     originalUri: vscode.Uri,
-    proofreadUri: vscode.Uri
+    proofreadUri: vscode.Uri,
+    preview: boolean = true
 ): Promise<void> {
-    await vscode.commands.executeCommand('vscode.diff', originalUri, proofreadUri, 'Original ↔ Proofread');
+    await vscode.commands.executeCommand('vscode.diff', originalUri, proofreadUri, 'Original ↔ Processed', { preview: preview });
 }
 
 /**

@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -69,7 +69,7 @@
           "order": 11,
           "type": "string",
           "default": "",
-          "description": "Deepseek 平台 API 密钥"
+          "description": "Deepseek开放平台 API 密钥"
         },
         "ai-proofread.proofread.models.deepseek": {
           "order": 12,
@@ -79,7 +79,7 @@
             "deepseek-reasoner"
           ],
           "default": "deepseek-chat",
-          "description": "Deepseek 平台模型选择"
+          "description": "Deepseek开放平台模型选择"
         },
         "ai-proofread.apiKeys.aliyun": {
           "order": 13,
@@ -132,8 +132,8 @@
         "ai-proofread.proofread.temperature": {
           "order": 19,
           "type": "number",
-          "default": 1.3,
-          "description": "模型温度，通常取值范围是[0:2)，留空则使用模型默认温度"
+          "default": 1.0,
+          "description": "模型温度，取值范围是[0:2)，留空则使用模型默认温度"
         },
         "ai-proofread.defaultSplitLength": {
           "order": 21,
@@ -208,6 +208,11 @@
             ]
           },
           "description": "自定义AI校对提示词列表，最多5个。每个提示词必须包含名称和内容，内容必须对要校对的目标文本（target）、参考资料（reference）、上下文（context）进行说明。也可以通过命令管理"
+        },
+        "ai-proofread.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否显示调试日志"
         }
       }
     },
