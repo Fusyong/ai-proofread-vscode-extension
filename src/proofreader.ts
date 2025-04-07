@@ -588,7 +588,7 @@ export async function proofreadSelection(
     const targetLength = targetText.length;
     const contextLength = contextText.length;
     const referenceLength = referenceText.length;
-    vscode.window.showInformationMessage(`target ${targetLength}, context ${contextLength}, reference ${referenceLength}, model: ${platform}, ${model}, temperature: ${userTemperature}`);
+    vscode.window.showInformationMessage(`TText ${targetLength}, CText ${contextLength}, RText ${referenceLength}, Model: ${platform}, ${model}, Temp. ${userTemperature}`);
 
     // 调用API进行校对
     const client = (() => {
