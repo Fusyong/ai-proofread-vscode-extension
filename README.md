@@ -147,7 +147,7 @@ A VS Code extension for document and book proofreading based on LLM services, su
 4. 测试.log，切分日志，用来检查切分是否合理
 5. 测试.proofread.json，校对上述JSON文件的直接结果，其中的null项表示还没有校对结果，重新校对时只处理null对应的条目，而不会重复处理已经完成的条目
 6. 测试.proofread.json.md，拼合上项JSON文件中的结果，比较最初的markdown文件即可看出改动处（可通过校对最终界面查看）
-7. 测试.proofread.html，通过jsdiff库比较校对前后markdown文件所得的结果，与Word近似的行内标记，可通过浏览器打印成PDF，需要联网调用jsdiff库
+7. 测试.proofread.html：通过jsdiff库比较校对前后markdown文件所得的结果，与Word近似的行内标记，可通过浏览器打印成PDF。需要联网调用jsdiff库，并等待运算完成；如果长文本处理困难，可分章节处理
 8. 测试.proofread.log，校对日志，**校对文本选段的结果也会存在这里**
 
 ### 3.7. 模型温度
