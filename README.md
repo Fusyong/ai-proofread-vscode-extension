@@ -192,16 +192,14 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 ## 4. 相关工具
 
-1. **vscode提供的比较（diff）功能**：通过文档浏览窗口，对原文件使用右键菜单的`select for compare`项，对校对后的文件使用`compare with selected`项，比较结果见“功能便览”一节。vscode是这些年最流行的文本编辑器，有许多便捷的文字编辑功能，很适合编辑工作者用作主力编辑器。
+1. **vscode提供的比较（diff）功能**：本插件在查看“前后差异”时即调用了本功能，效果见“功能便览”一节。也可手动调用：通过文档浏览窗口，对原文件使用右键菜单的`select for compare`项，对校对后的文件使用`compare with selected`项。段落无法对齐时，可以通过分行或删除分行来帮助diff。vscode是这些年最流行的文本编辑器，有许多便捷的文字编辑功能，很适合编辑工用作主力编辑器。
 2. **pandoc**，转换文档格式的命令行工具
     1. docx转markdown
         ```bash
         set myfilename="myfilename"
         pandoc -f docx -t markdown-smart+pipe_tables+footnotes --wrap=none --toc --extract-media="./attachments/%myfilename%" %myfilename%.docx -o %myfilename%.md
         ```
-
         或：
-
         ```shell
         set myfilename="myfilename"
         pandoc -t markdown_strict --extract-media="./attachments/%myfilename%" %myfilename%.docx -o %myfilename%.md
