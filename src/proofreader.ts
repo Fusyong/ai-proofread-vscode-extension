@@ -103,7 +103,7 @@ function getSystemPrompt(): string {
  * API调用接口
  */
 export interface ApiClient {
-    proofread(content: string, reference?: string): Promise<string | null>;
+    proofread(targetText: string, preText?: string): Promise<string | null>;
 }
 
 /**
@@ -140,22 +140,22 @@ export class DeepseekApiClient implements ApiClient {
     }
 
     // 使用 Deepseek API 进行校对
-    async proofread(content: string, reference: string = '', temperature: number|null = null): Promise<string | null> {
+    async proofread(targetText: string, preText: string = '', temperature: number|null = null): Promise<string | null> {
         const logger = Logger.getInstance();
         const messages = [
             { role: 'system', content: getSystemPrompt() }
         ];
 
-        if (reference) {
+        if (preText) {
             messages.push(
                 { role: 'assistant', content: '' },
-                { role: 'user', content: reference }
+                { role: 'user', content: preText }
             );
         }
 
         messages.push(
             { role: 'assistant', content: '' },
-            { role: 'user', content: content }
+            { role: 'user', content: targetText }
         );
 
         try {
@@ -214,22 +214,22 @@ export class AliyunApiClient implements ApiClient {
     }
 
     // 使用阿里云百炼 API 进行校对
-    async proofread(content: string, reference: string = '', temperature: number|null = null): Promise<string | null> {
+    async proofread(targetText: string, preText: string = '', temperature: number|null = null): Promise<string | null> {
         const logger = Logger.getInstance();
         const messages = [
             { role: 'system', content: getSystemPrompt() }
         ];
 
-        if (reference) {
+        if (preText) {
             messages.push(
                 { role: 'assistant', content: '' },
-                { role: 'user', content: reference }
+                { role: 'user', content: preText }
             );
         }
 
         messages.push(
             { role: 'assistant', content: '' },
-            { role: 'user', content: content }
+            { role: 'user', content: targetText }
         );
 
         try {
@@ -288,12 +288,12 @@ export class GoogleApiClient implements ApiClient {
     }
 
     // 使用 Google API 进行校对
-    async proofread(content: string, reference: string = '', temperature: number|null = null): Promise<string | null> {
+    async proofread(targetText: string, preText: string = '', temperature: number|null = null): Promise<string | null> {
         const logger = Logger.getInstance();
         try {
-            let contents = content;
-            if(reference) {
-                contents = [contents, reference].join('\n\n');
+            let contents = targetText;
+            if(preText) {
+                contents = [contents, preText].join('\n\n');
             }
 
             const config = vscode.workspace.getConfiguration('ai-proofread');
@@ -437,7 +437,7 @@ export async function processJsonFileAsync(
         if (haseContext) {
             preText += `\n<context>\n${contextText}\n</context>`;
         }
-        const postText = `<target>\n${targetText}\n</target>`;
+        const labeledTargetText = `<target>\n${targetText}\n</target>`;
 
         // console.log(model);
         // console.log(preText);
@@ -446,7 +446,7 @@ export async function processJsonFileAsync(
         const startTime = Date.now();
         await rateLimiter.wait();
 
-        const processedText = await client.proofread(postText, preText);
+        const processedText = await client.proofread(labeledTargetText, preText);
         const elapsed = (Date.now() - startTime) / 1000;
 
         if (processedText) {

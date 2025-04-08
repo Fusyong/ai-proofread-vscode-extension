@@ -18,6 +18,7 @@ import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager, Logger } fro
 
 export function activate(context: vscode.ExtensionContext) {
     const logger = Logger.getInstance();
+    const configManager = ConfigManager.getInstance();
     logger.info('AI Proofread extension is now active!');
 
     // 清理临时文件
@@ -294,7 +295,6 @@ export function activate(context: vscode.ExtensionContext) {
                 const diffTitle = path.basename(jsdiffFilePath, path.extname(jsdiffFilePath));
 
                 // 获取配置
-                const configManager = ConfigManager.getInstance();
                 const platform = configManager.getPlatform();
                 const model = configManager.getModel(platform);
                 const rpm = configManager.getRpm();
@@ -438,7 +438,6 @@ export function activate(context: vscode.ExtensionContext) {
 
             try {
                 // 获取配置
-                const configManager = ConfigManager.getInstance();
                 const platform = configManager.getPlatform();
                 const model = configManager.getModel(platform);
                 const temperature = configManager.getTemperature();
@@ -628,10 +627,12 @@ export function activate(context: vscode.ExtensionContext) {
         })
     ];
 
-    context.subscriptions.push(...disposables);
+    context.subscriptions.push(...disposables, configManager);
 }
 
 export function deactivate() {
     const logger = Logger.getInstance();
+    const configManager = ConfigManager.getInstance();
     logger.dispose();
+    configManager.dispose();
 }

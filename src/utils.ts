@@ -134,9 +134,16 @@ export class ErrorUtils {
 export class ConfigManager {
     private static instance: ConfigManager;
     private config: vscode.WorkspaceConfiguration;
+    private configListener: vscode.Disposable;
 
     private constructor() {
         this.config = vscode.workspace.getConfiguration('ai-proofread');
+        // 监听配置变化
+        this.configListener = vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('ai-proofread')) {
+                this.config = vscode.workspace.getConfiguration('ai-proofread');
+            }
+        });
     }
 
     public static getInstance(): ConfigManager {
@@ -194,6 +201,10 @@ export class ConfigManager {
      */
     public getTemperature(): number {
         return this.config.get<number>('proofread.temperature', 1);
+    }
+
+    public dispose(): void {
+        this.configListener.dispose();
     }
 }
 
