@@ -506,6 +506,9 @@ export function activate(context: vscode.ExtensionContext) {
                     cancellable: false
                 }, async (progress) => {
                     try {
+                        // 固定原始文本以免用户操作
+                        const originalText = editor.document.getText(editor.selection);
+                        const fileExt = path.extname(editor.document.fileName);
                         const result = await proofreadSelection(
                             editor,
                             editor.selection,
@@ -523,9 +526,6 @@ export function activate(context: vscode.ExtensionContext) {
                             fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
                             // 创建原始文本和校对后文本的临时文件
-                            const originalText = editor.document.getText(editor.selection);
-                            // 获取原文件的扩展名
-                            const fileExt = path.extname(editor.document.fileName);
 
                             // 显示差异
                             await showDiff(context, originalText, result, fileExt, false);
