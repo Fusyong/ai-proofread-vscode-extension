@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -49,6 +49,10 @@
       {
         "command": "ai-proofread.mergeTwoFiles",
         "title": "AI Proofreader: merge two files"
+      },
+      {
+        "command": "ai-proofread.searchSelectionInPDF",
+        "title": "AI Proofreader: search selection in PDF"
       }
     ],
     "configuration": {
@@ -251,6 +255,11 @@
         {
           "command": "ai-proofread.proofreadSelection",
           "group": "ai-proofread@7",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex)"
+        },
+        {
+          "command": "ai-proofread.searchSelectionInPDF",
+          "group": "ai-proofread@8",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex)"
         }
       ]

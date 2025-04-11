@@ -87,7 +87,7 @@ export class FilePathUtils {
      * @param ext 扩展名
      * @returns 输出文件路径
      */
-    public static getOutputPath(inputPath: string, suffix: string, ext: string): string {
+    public static getFilePath(inputPath: string, suffix: string, ext: string): string {
         const dir = path.dirname(inputPath);
         const baseName = path.basename(inputPath, path.extname(inputPath));
         return path.join(dir, `${baseName}${suffix}${ext}`);

@@ -219,6 +219,27 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }
 
+    async function searchSelectionInPDF(editor: vscode.TextEditor): Promise<void> {
+
+        const selection = editor.document.getText(editor.selection);
+        if (!selection) {
+            vscode.window.showInformationMessage('请先选择要搜索的文本');
+            return;
+        }
+
+        const currentFile = editor.document.uri.fsPath;
+        const pdfPath = FilePathUtils.getFilePath(currentFile, '', '.pdf');
+
+        if (!fs.existsSync(pdfPath)) {
+            vscode.window.showInformationMessage(`未找到对应的PDF文件: ${pdfPath}`);
+            return;
+        }
+
+        const terminal = vscode.window.createTerminal('SumatraPDF Search');
+        terminal.sendText(`SumatraPDF -search "${selection}" "${pdfPath}"`);
+        terminal.show();
+    }
+
     // 注册所有命令
     let disposables = [
         vscode.commands.registerCommand('ai-proofread.splitFileByLength', async () => {
@@ -287,11 +308,11 @@ export function activate(context: vscode.ExtensionContext) {
 
                 // 获取当前文件路径
                 const currentFilePath = document.uri.fsPath;
-                const outputFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread', '.json');
-                const logFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread', '.log');
-                const originalMarkdownFilePath = FilePathUtils.getOutputPath(currentFilePath, '', '.md');
-                const proofreadMarkdownFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread.json', '.md');
-                const jsdiffFilePath = FilePathUtils.getOutputPath(currentFilePath, '.proofread', '.html');
+                const outputFilePath = FilePathUtils.getFilePath(currentFilePath, '.proofread', '.json');
+                const logFilePath = FilePathUtils.getFilePath(currentFilePath, '.proofread', '.log');
+                const originalMarkdownFilePath = FilePathUtils.getFilePath(currentFilePath, '', '.md');
+                const proofreadMarkdownFilePath = FilePathUtils.getFilePath(currentFilePath, '.proofread.json', '.md');
+                const jsdiffFilePath = FilePathUtils.getFilePath(currentFilePath, '.proofread', '.html');
                 const diffTitle = path.basename(jsdiffFilePath, path.extname(jsdiffFilePath));
 
                 // 获取配置
@@ -521,7 +542,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                         if (result) {
                             // 把参数和校对结果写入日志文件
-                            const logFilePath = FilePathUtils.getOutputPath(editor.document.uri.fsPath, '.proofread', '.log');
+                            const logFilePath = FilePathUtils.getFilePath(editor.document.uri.fsPath, '.proofread', '.log');
                             const logMessage = `\n${'='.repeat(50)}\n平台: ${platform}\n模型: ${model}\n温度: ${userTemperature}\n上下文范围: ${contextLevel}\n参考文件: ${referenceFile}\n校对结果:\n\n${result}\n${'='.repeat(50)}\n\n`;
                             fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
@@ -623,6 +644,21 @@ export function activate(context: vscode.ExtensionContext) {
                 );
             } catch (error) {
                 ErrorUtils.showError(error, '合并文件时出错：');
+            }
+        }),
+
+        // 注册在PDF中搜索选中文本命令
+        vscode.commands.registerCommand('ai-proofread.searchSelectionInPDF', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('请先打开一个Markdown文件并选择要搜索的文本');
+                return;
+            }
+
+            try {
+                await searchSelectionInPDF(editor);
+            } catch (error) {
+                ErrorUtils.showError(error, '搜索PDF时出错：');
             }
         })
     ];
