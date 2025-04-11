@@ -1,3 +1,7 @@
+/**
+ * 扩展入口
+ */
+
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -7,6 +11,7 @@ import { PromptManager } from './promptManager';
 import { mergeTwoFiles } from './merger';
 import { showDiff, showFileDiff, generateJsDiff } from './differ';
 import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager, Logger } from './utils';
+import { searchSelectionInPDF } from './pdfSearcher';
 
 export function activate(context: vscode.ExtensionContext) {
     const logger = Logger.getInstance();
@@ -209,29 +214,6 @@ export function activate(context: vscode.ExtensionContext) {
         } catch (error) {
             ErrorUtils.showError(error, '切分文件时出错：');
         }
-    }
-
-    async function searchSelectionInPDF(editor: vscode.TextEditor): Promise<void> {
-
-        const selection = editor.document.getText(editor.selection);
-        if (!selection) {
-            vscode.window.showInformationMessage('请先选择要搜索的文本');
-            return;
-        }
-
-        const currentFile = editor.document.uri.fsPath;
-        const pdfPath = FilePathUtils.getFilePath(currentFile, '', '.pdf');
-
-        if (!fs.existsSync(pdfPath)) {
-            vscode.window.showInformationMessage(`未找到对应的PDF文件: ${pdfPath}`);
-            return;
-        }
-
-        let terminal = vscode.window.terminals.find(t => t.name === 'SumatraPDF Search');
-        if (!terminal) {
-            terminal = vscode.window.createTerminal('SumatraPDF Search');
-        }
-        terminal.sendText(`SumatraPDF -search "${selection}" "${pdfPath}"`);
     }
 
     // 注册所有命令

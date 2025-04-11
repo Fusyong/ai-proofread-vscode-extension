@@ -3,13 +3,12 @@
  */
 
 import * as vscode from 'vscode';
-import * as path from 'path';
 import * as fs from 'fs';
 import axios from 'axios';
 import * as dotenv from 'dotenv';
 import { RateLimiter } from './rateLimiter';
 import { GoogleGenAI } from "@google/genai";
-import { ConfigManager, ErrorUtils, Logger } from './utils';
+import { ConfigManager, Logger } from './utils';
 
 // 加载环境变量
 dotenv.config();

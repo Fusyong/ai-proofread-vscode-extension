@@ -1,9 +1,9 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
 /**
  * 文本切分工具模块
- */
+*/
+
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * 将文本大致按长度切分（在指定长度前后最近一个空行处）

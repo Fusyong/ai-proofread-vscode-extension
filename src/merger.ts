@@ -1,11 +1,8 @@
-import * as vscode from 'vscode';
-import * as fs from 'fs';
+/**
+ * 文件合并工具模块
+ */
 
-interface JsonItem {
-    target?: string;
-    reference?: string;
-    context?: string;
-}
+import * as fs from 'fs';
 
 export async function mergeTwoFiles(
     currentFilePath: string,

@@ -1,3 +1,7 @@
+/**
+ * 比较工具模块
+ */
+
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { TempFileManager } from './utils';

@@ -1,3 +1,7 @@
+/**
+ * 提示词管理器模块
+ */
+
 import * as vscode from 'vscode';
 
 interface Prompt {
