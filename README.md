@@ -204,7 +204,7 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 ### 3.8. 其他功能
 
-* 从要校对的markdown文件选择文本，搜索同名PDF文件，须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)软件。
+* **反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
 
 ### 3.9. 注意事项
 

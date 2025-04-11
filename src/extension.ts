@@ -1,16 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { splitText, handleFileSplit } from './splitter';
-import {
-    processJsonFileAsync,
-    ApiClient,
-    ProcessStats,
-    GoogleApiClient,
-    DeepseekApiClient,
-    AliyunApiClient,
-    proofreadSelection
-} from './proofreader';
+import {handleFileSplit } from './splitter';
+import {processJsonFileAsync, proofreadSelection} from './proofreader';
 import { PromptManager } from './promptManager';
 import { mergeTwoFiles } from './merger';
 import { showDiff, showFileDiff, generateJsDiff } from './differ';
@@ -235,9 +227,11 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        const terminal = vscode.window.createTerminal('SumatraPDF Search');
+        let terminal = vscode.window.terminals.find(t => t.name === 'SumatraPDF Search');
+        if (!terminal) {
+            terminal = vscode.window.createTerminal('SumatraPDF Search');
+        }
         terminal.sendText(`SumatraPDF -search "${selection}" "${pdfPath}"`);
-        terminal.show();
     }
 
     // 注册所有命令
@@ -651,7 +645,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.searchSelectionInPDF', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
-                vscode.window.showInformationMessage('请先打开一个Markdown文件并选择要搜索的文本');
+                vscode.window.showInformationMessage('请先打开PDF对应的Markdown文件并选择要搜索的文本');
                 return;
             }
 
