@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -39,6 +39,10 @@
         "title": "AI Proofreader: split by title and length"
       },
       {
+        "command": "ai-proofread.mergeTwoFiles",
+        "title": "AI Proofreader: merge two files"
+      },
+      {
         "command": "ai-proofread.proofreadFile",
         "title": "AI Proofreader: proofread file"
       },
@@ -47,8 +51,8 @@
         "title": "AI Proofreader: proofread selection"
       },
       {
-        "command": "ai-proofread.mergeTwoFiles",
-        "title": "AI Proofreader: merge two files"
+        "command": "ai-proofread.diffItWithAnotherFile",
+        "title": "AI Proofreader: diff it with another file"
       },
       {
         "command": "ai-proofread.searchSelectionInPDF",
@@ -223,44 +227,49 @@
     "menus": {
       "editor/context": [
         {
-          "command": "ai-proofread.splitFileByTitle",
-          "group": "ai-proofread@1",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
-        },
-        {
-          "command": "ai-proofread.splitFileByLength",
-          "group": "ai-proofread@2",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
-        },
-        {
-          "command": "ai-proofread.splitFileByTitleAndLength",
-          "group": "ai-proofread@3",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
-        },
-        {
-          "command": "ai-proofread.splitFileWithContext",
-          "group": "ai-proofread@4",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
-        },
-        {
-          "command": "ai-proofread.mergeTwoFiles",
-          "group": "ai-proofread@5",
-          "when": "resourceLangId == json"
-        },
-        {
-          "command": "ai-proofread.proofreadFile",
-          "group": "ai-proofread@6",
-          "when": "resourceLangId == json"
-        },
-        {
           "command": "ai-proofread.proofreadSelection",
-          "group": "ai-proofread@7",
+          "group": "ai-proofread@11",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex)"
         },
         {
           "command": "ai-proofread.searchSelectionInPDF",
-          "group": "ai-proofread@8",
+          "group": "ai-proofread@12",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex)"
+        },
+        {
+          "command": "ai-proofread.diffItWithAnotherFile",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
+        },
+        {
+          "command": "ai-proofread.splitFileByTitle",
+          "group": "ai-proofread@21",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
+        },
+        {
+          "command": "ai-proofread.splitFileByLength",
+          "group": "ai-proofread@22",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
+        },
+        {
+          "command": "ai-proofread.splitFileByTitleAndLength",
+          "group": "ai-proofread@23",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
+        },
+        {
+          "command": "ai-proofread.splitFileWithContext",
+          "group": "ai-proofread@24",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
+        },
+        {
+          "command": "ai-proofread.proofreadFile",
+          "group": "ai-proofread@31",
+          "when": "resourceLangId == json"
+        },
+        {
+          "command": "ai-proofread.mergeTwoFiles",
+          "group": "ai-proofread@32",
+          "when": "resourceLangId == json"
         }
       ]
     }

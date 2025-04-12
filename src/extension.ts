@@ -291,6 +291,13 @@ export function activate(context: vscode.ExtensionContext) {
                 const jsdiffFilePath = FilePathUtils.getFilePath(currentFilePath, '.proofread', '.html');
                 const diffTitle = path.basename(jsdiffFilePath, path.extname(jsdiffFilePath));
 
+                // 检查proofreadMarkdownFilePath文件是否存在
+                if (fs.existsSync(proofreadMarkdownFilePath)) {
+                    // 备份旧文件，名字追加时间戳
+                    const backupFilePath = FilePathUtils.getFilePath(currentFilePath, `.proofread.json-${new Date().getTime()}`, '.md');
+                    fs.copyFileSync(proofreadMarkdownFilePath, backupFilePath);
+                }
+
                 // 获取配置
                 const platform = configManager.getPlatform();
                 const model = configManager.getModel(platform);
@@ -635,6 +642,67 @@ export function activate(context: vscode.ExtensionContext) {
                 await searchSelectionInPDF(editor);
             } catch (error) {
                 ErrorUtils.showError(error, '搜索PDF时出错：');
+            }
+        }),
+
+        // 注册比较两个文件命令
+        vscode.commands.registerCommand('ai-proofread.diffItWithAnotherFile', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('请先打开一个文件！');
+                return;
+            }
+
+            // 检查当前文件是否为markdown
+            if (editor.document.languageId !== 'markdown') {
+                vscode.window.showInformationMessage('请打开一个markdown文件！');
+                return;
+            }
+
+            // 让用户选择比较方式
+            const diffMethod = await vscode.window.showQuickPick(
+                ['使用diff编辑器比较', '生成jsDiff结果文件并打开'],
+                {
+                    placeHolder: '请选择比较方式'
+                }
+            );
+
+            if (!diffMethod) {
+                return;
+            }
+
+            // 让用户选择第二个文件
+            const fileUris = await vscode.window.showOpenDialog({
+                canSelectMany: false,
+                filters: {
+                    'Markdown文件': ['md', 'markdown'],
+                    'Context文件': ['tex', 'lmtx'],
+                    'Text文件': ['txt'],
+                    'Tex文件': ['tex']
+                }
+            });
+
+            if (!fileUris || fileUris.length === 0) {
+                return;
+            }
+
+            const currentFile = editor.document.uri.fsPath;
+            const anotherFile = fileUris[0].fsPath;
+
+            try {
+                if (diffMethod === '使用diff编辑器比较') {
+                    await showFileDiff(currentFile, anotherFile);
+                } else {
+                    // 在第一个文件的位置生成jsdiff结果文件
+                    const outputFile = FilePathUtils.getFilePath(currentFile, '.diff', '.html');
+                    const title = `${path.basename(currentFile)} ↔ ${path.basename(anotherFile)}`;
+                    await generateJsDiff(currentFile, anotherFile, outputFile, title);
+
+                    // 使用系统默认程序打开生成的diff.html文件
+                    await vscode.env.openExternal(vscode.Uri.file(outputFile));
+                }
+            } catch (error) {
+                ErrorUtils.showError(error, '比较文件时出错：');
             }
         })
     ];

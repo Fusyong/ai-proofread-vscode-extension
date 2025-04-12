@@ -158,16 +158,18 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 ### 3.6. 日志等过程文件
 
-为了让用户能够核验、控制每一个步骤，插件会生成一些中间文件，比如：
+为了让用户能够核验、控制每一个步骤，插件会以要校对的文档（以“测试.md”为例）的文件名为基础，生成一些中间文件，各自的作用如下：
 
 1. 测试.md，要校对的文档
 2. 测试.json，切分上述文档的结果，供检查后用于校对；可以进一步与别的切分结果进行合并，以便搭配target + context + reference一起提交处理
 3. 测试.json.md，拼合上项JSON文件中的target的结果，用于查看或比较原始markdown文件，比JSON直观
 4. 测试.log，切分日志，用来检查切分是否合理
 5. 测试.proofread.json，校对上述JSON文件的直接结果，其中的null项表示还没有校对结果，重新校对时只处理null对应的条目，而不会重复处理已经完成的条目
-6. 测试.proofread.json.md，拼合上项JSON文件中的结果，比较最初的markdown文件即可看出改动处（可通过校对最终界面查看）
+6. 测试.proofread.json.md，拼合上项JSON文件中的结果，比较最初的markdown文件即可看出改动处（可通过校对最终界面查看）；如果这个文件已经存在，则自动备份，名字加时间戳
 7. 测试.proofread.html：通过jsdiff库比较校对前后markdown文件所得的结果，与Word近似的行内标记，可通过浏览器打印成PDF。需要联网调用jsdiff库，并等待运算完成；如果长文本处理困难，可分章节处理
 8. 测试.proofread.log，校对日志，**校对文本选段的结果也会存在这里**
+
+**请特别注意：除自动累加的日志文件和自动备份的`测试.proofread.json.md`，其余中间文件，每次操作都将重新生成！** 如有需要，请自行备份。
 
 ### 3.7. 模型温度
 
@@ -204,7 +206,10 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 ### 3.8. 其他功能
 
-* **反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
+1. **比较（diff）文件**，使用右键菜单`diff it with another file`，然后可选两种模式：
+    1. 调用vscode diff editor比较。查看“前后差异”的功能与此相通。对于长文本，diff editor有段落无法对齐的问题。此时，可以通过分行或删除分行来帮助diff。
+    2. 用jsdiff生成HTML形式的比较结果文件。
+2. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
 
 ### 3.9. 注意事项
 
@@ -215,7 +220,7 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 ## 4. 相关工具
 
-1. **vscode提供的比较（diff）功能**：本插件在查看“前后差异”时即调用了本功能，效果见“功能便览”一节。也可手动调用：通过文档浏览窗口，对原文件使用右键菜单的`select for compare`项，对校对后的文件使用`compare with selected`项。段落无法对齐时，可以通过分行或删除分行来帮助diff。vscode是这些年最流行的文本编辑器，有许多便捷的文字编辑功能，很适合编辑工用作主力编辑器。
+1. **vscode提供的比较（diff）功能**：通过文件浏览器右键菜单使用；本插件在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，有许多便捷的文字编辑功能，很适合编辑工用作主力编辑器。
 2. **pandoc**，转换文档格式的命令行工具
     1. docx转markdown
         ```bash
