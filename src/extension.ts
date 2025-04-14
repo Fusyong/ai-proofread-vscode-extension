@@ -751,12 +751,6 @@ export function activate(context: vscode.ExtensionContext) {
                     outputPath
                 );
 
-                // 检查输出路径是否存在
-                if (!fs.existsSync(outputPath)) {
-                    vscode.window.showErrorMessage('转换失败，请检查文件是否存在！');
-                    return;
-                }
-
                 // 打开转换后的文件
                 const outputUri = vscode.Uri.file(outputPath);
                 await vscode.workspace.openTextDocument(outputUri);
