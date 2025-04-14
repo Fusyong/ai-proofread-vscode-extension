@@ -210,7 +210,21 @@ A VS Code extension for document and book proofreading based on LLM services, su
     1. 调用vscode diff editor比较。查看“前后差异”的功能与此相通。对于长文本，diff editor有段落无法对齐的问题。此时，可以通过分行或删除分行来帮助diff。
     2. 用jsdiff生成HTML形式的比较结果文件。
 2. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
-
+3. **文件转换功能**，须先安装好[Pandoc](https://pandoc.org/installing.html)
+    1. 使用命令`convert docx to markdown`将docx转为markdown，与下面的命令行等效
+        ```bash
+        set myfilename="myfilename"
+        pandoc -f docx -t markdown-smart+pipe_tables+footnotes --wrap=none --toc --extract-media="./attachments/%myfilename%" %myfilename%.docx -o %myfilename%.md
+        ```
+        或：
+        ```shell
+        set myfilename="myfilename"
+        pandoc -t markdown_strict --extract-media="./attachments/%myfilename%" %myfilename%.docx -o %myfilename%.md
+        ```
+    2. 使用命令或菜单`convert markdown to docx`，将markdown转为docx，与下面的命令行等效
+        ```bash
+        pandoc -f markdown -t docx -o myfilename.docx myfilename.markdown
+        ```
 ### 3.9. 注意事项
 
 1. 确保在使用前已正确配置必要 API 密钥
@@ -221,19 +235,7 @@ A VS Code extension for document and book proofreading based on LLM services, su
 ## 4. 相关工具
 
 1. **vscode提供的比较（diff）功能**：通过文件浏览器右键菜单使用；本插件在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，有许多便捷的文字编辑功能，很适合编辑工用作主力编辑器。
-2. **pandoc**，转换文档格式的命令行工具
-    1. docx转markdown
-        ```bash
-        set myfilename="myfilename"
-        pandoc -f docx -t markdown-smart+pipe_tables+footnotes --wrap=none --toc --extract-media="./attachments/%myfilename%" %myfilename%.docx -o %myfilename%.md
-        ```
-        或：
-        ```shell
-        set myfilename="myfilename"
-        pandoc -t markdown_strict --extract-media="./attachments/%myfilename%" %myfilename%.docx -o %myfilename%.md
-        ```
-    2. markdown转docx：`pandoc -f markdown -t docx -o out.docx in.markdown`
-3. **Acrobat**，商业软件，可以把PDF文件转成docx或HTML，再用pandoc转markdown
+2. **Acrobat**，商业软件，可以把PDF文件转成docx或HTML，再用pandoc转markdown
 
 ## 5. 开发命令
 

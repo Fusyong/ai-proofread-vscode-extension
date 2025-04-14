@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -57,6 +57,14 @@
       {
         "command": "ai-proofread.searchSelectionInPDF",
         "title": "AI Proofreader: search selection in PDF"
+      },
+      {
+        "command": "ai-proofread.convertDocxToMarkdown",
+        "title": "AI Proofreader: convert docx to markdown"
+      },
+      {
+        "command": "ai-proofread.convertMarkdownToDocx",
+        "title": "AI Proofreader: convert markdown to docx"
       }
     ],
     "configuration": {
@@ -260,6 +268,11 @@
           "command": "ai-proofread.splitFileWithContext",
           "group": "ai-proofread@24",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
+        },
+        {
+          "command": "ai-proofread.convertMarkdownToDocx",
+          "group": "ai-proofread@25",
+          "when": "resourceLangId == markdown"
         },
         {
           "command": "ai-proofread.proofreadFile",
