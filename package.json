@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -78,6 +78,11 @@
             "aliyun",
             "google"
           ],
+          "enumDescriptions": [
+            "Deepseek开放平台",
+            "阿里云百炼平台",
+            "Google Gemini平台"
+          ],
           "default": "deepseek",
           "description": "大模型服务平台选择"
         },
@@ -90,12 +95,8 @@
         "ai-proofread.proofread.models.deepseek": {
           "order": 12,
           "type": "string",
-          "enum": [
-            "deepseek-chat",
-            "deepseek-reasoner"
-          ],
           "default": "deepseek-chat",
-          "description": "Deepseek开放平台模型选择"
+          "description": "Deepseek开放平台模型,如: deepseek-chat, deepseek-reasoner"
         },
         "ai-proofread.apiKeys.aliyun": {
           "order": 13,
@@ -106,14 +107,8 @@
         "ai-proofread.proofread.models.aliyun": {
           "order": 14,
           "type": "string",
-          "enum": [
-            "deepseek-v3",
-            "deepseek-r1",
-            "qwen-max-2025-01-25",
-            "qwen-plus"
-          ],
-          "default": "deepseek-v3",
-          "description": "阿里云百炼平台模型选择"
+          "default": "qwen-max-2025-01-25",
+          "description": "阿里云百炼平台模型,如: qwen-max-2025-01-25, qwen-plus-2025-01-25, deepseek-v3, deepseek-r1"
         },
         "ai-proofread.apiKeys.google": {
           "order": 15,
@@ -124,14 +119,8 @@
         "ai-proofread.proofread.models.google": {
           "order": 16,
           "type": "string",
-          "enum": [
-            "gemini-2.0-flash",
-            "gemini-2.0-flash-lite",
-            "gemini-2.0-flash-thinking-exp-01-21",
-            "gemini-2.5-pro-exp-03-25"
-          ],
-          "default": "gemini-2.0-flash",
-          "description": "Google Gemini 平台模型选择"
+          "default": "gemini-2.5-pro-exp-03-25",
+          "description": "Google Gemini 平台模型,如: gemini-2.5-pro-exp-03-25, gemini-2.5-flash-preview-04-17, gemini-2.0-flash"
         },
         "ai-proofread.proofread.rpm": {
           "order": 17,
