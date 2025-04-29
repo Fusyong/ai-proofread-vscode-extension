@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -65,6 +65,10 @@
       {
         "command": "ai-proofread.convertMarkdownToDocx",
         "title": "AI Proofreader: convert markdown to docx"
+      },
+      {
+        "command": "ai-proofread.convertQuotes",
+        "title": "AI Proofreader: convert quotes to Chinese"
       }
     ],
     "configuration": {
@@ -139,6 +143,12 @@
           "type": "number",
           "default": 1.0,
           "description": "模型温度，取值范围是[0:2)，留空则使用模型默认温度"
+        },
+        "ai-proofread.convertQuotes": {
+          "order": 20,
+          "type": "boolean",
+          "default": false,
+          "description": "是否在校对后自动将拉丁半角引号转换为中文全角引号"
         },
         "ai-proofread.defaultSplitLength": {
           "order": 21,
@@ -234,8 +244,14 @@
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex)"
         },
         {
-          "command": "ai-proofread.diffItWithAnotherFile",
+          "command": "ai-proofread.convertQuotes",
           "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
+
+        },
+        {
+          "command": "ai-proofread.diffItWithAnotherFile",
+          "group": "ai-proofread@14",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
         },
         {

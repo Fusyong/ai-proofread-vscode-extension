@@ -9,6 +9,7 @@ import * as dotenv from 'dotenv';
 import { RateLimiter } from './rateLimiter';
 import { GoogleGenAI } from "@google/genai";
 import { ConfigManager, Logger } from './utils';
+import { convertQuotes } from './quoteConverter';
 
 // 加载环境变量
 dotenv.config();
@@ -603,5 +604,16 @@ export async function proofreadSelection(
         }
     })();
 
-    return await client.proofread(postText, preText, userTemperature);
+    let result = await client.proofread(postText, preText, userTemperature);
+
+    // 如果校对成功且启用了引号转换，则自动转换引号
+    if (result) {
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const shouldConvertQuotes = config.get<boolean>('convertQuotes', true);
+        if (shouldConvertQuotes) {
+            result = convertQuotes(result);
+        }
+    }
+
+    return result;
 }

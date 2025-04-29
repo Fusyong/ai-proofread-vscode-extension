@@ -13,6 +13,7 @@ import { showDiff, showFileDiff, generateJsDiff } from './differ';
 import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager, Logger } from './utils';
 import { searchSelectionInPDF } from './pdfSearcher';
 import { convertDocxToMarkdown, convertMarkdownToDocx } from './docConverter';
+import { convertQuotes } from './quoteConverter';
 
 export function activate(context: vscode.ExtensionContext) {
     const logger = Logger.getInstance();
@@ -832,6 +833,41 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('转换完成！');
             } catch (error) {
                 ErrorUtils.showError(error, '转换文件时出错：');
+            }
+        }),
+
+        // 注册引号转换命令
+        vscode.commands.registerCommand('ai-proofread.convertQuotes', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+
+            try {
+                const document = editor.document;
+                const selection = editor.selection;
+                const text = selection.isEmpty ? document.getText() : document.getText(selection);
+
+                // 转换引号
+                const convertedText = convertQuotes(text);
+
+                // 替换文本
+                await editor.edit(editBuilder => {
+                    if (selection.isEmpty) {
+                        const fullRange = new vscode.Range(
+                            document.positionAt(0),
+                            document.positionAt(document.getText().length)
+                        );
+                        editBuilder.replace(fullRange, convertedText);
+                    } else {
+                        editBuilder.replace(selection, convertedText);
+                    }
+                });
+
+                vscode.window.showInformationMessage('引号转换完成！');
+            } catch (error) {
+                ErrorUtils.showError(error, '转换引号时出错：');
             }
         }),
     ];

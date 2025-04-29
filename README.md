@@ -60,6 +60,7 @@ A VS Code extension for document and book proofreading based on LLM services, su
     * `ai-proofread.proofread.maxConcurrent`: 最大并发请求数（默认3）
     * `ai-proofread.proofread.temperature`: 模型温度（默认1.0，取值范围[0:2)）
     * `ai-proofread.proofread.defaultContextLevel`: 校对选中文本时默认使用的标题级别，作为上下文范围（默认0，表示不使用）
+    * `ai-proofread.convertQuotes`: 是否在校对后自动将拉丁半角引号转换为中文全角引号（默认为false）
 
 2. **文档切分相关**：
     * `ai-proofread.defaultSplitLength`: 默认的文本切分长度（默认600字符）
@@ -210,7 +211,8 @@ A VS Code extension for document and book proofreading based on LLM services, su
     1. 调用vscode diff editor比较。查看“前后差异”的功能与此相通。对于长文本，diff editor有段落无法对齐的问题。此时，可以通过分行或删除分行来帮助diff。
     2. 用jsdiff生成HTML形式的比较结果文件。
 2. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
-3. **文件转换功能**，须先安装好[Pandoc](https://pandoc.org/installing.html)
+3. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
+4. **文件格式转换功能**，须先安装好[Pandoc](https://pandoc.org/installing.html)
     1. 使用命令`convert docx to markdown`将docx转为markdown，与下面的命令行等效
         ```bash
         set myfilename="myfilename"
