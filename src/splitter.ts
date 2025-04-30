@@ -197,13 +197,7 @@ export interface SplitOptions {
  */
 export function splitText(
     text: string,
-    options: {
-        mode: 'length' | 'title' | 'title-length' | 'context';
-        cutBy?: number;
-        levels?: number[];
-        threshold?: number;
-        minLength?: number;
-    }
+    options: SplitOptions = { mode: 'length' }  // 设置默认模式为length
 ): {
     jsonOutput: string;
     markdownOutput: string;

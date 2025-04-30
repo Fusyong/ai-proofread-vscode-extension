@@ -220,6 +220,31 @@ export function activate(context: vscode.ExtensionContext) {
 
     // 注册所有命令
     let disposables = [
+        vscode.commands.registerCommand('ai-proofread.splitFile', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+
+            // 让用户选择切分模式
+            const mode = await vscode.window.showQuickPick([
+                { label: '按长度切分', value: 'length' },
+                { label: '按标题切分', value: 'title' },
+                { label: '按标题和长度切分', value: 'title-length' },
+                { label: '带上下文切分', value: 'context' }
+            ], {
+                placeHolder: '请选择切分模式',
+                canPickMany: false
+            });
+
+            if (!mode) {
+                return;
+            }
+
+            await handleFileSplitCommand(mode.value as 'length' | 'title' | 'title-length' | 'context', editor, editor.document);
+        }),
+
         vscode.commands.registerCommand('ai-proofread.splitFileByLength', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {

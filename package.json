@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -69,6 +69,10 @@
       {
         "command": "ai-proofread.convertQuotes",
         "title": "AI Proofreader: convert quotes to Chinese"
+      },
+      {
+        "command": "ai-proofread.splitFile",
+        "title": "AI Proofreader: split file"
       }
     ],
     "configuration": {
@@ -255,28 +259,13 @@
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
         },
         {
-          "command": "ai-proofread.splitFileByTitle",
-          "group": "ai-proofread@21",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
-        },
-        {
-          "command": "ai-proofread.splitFileByLength",
-          "group": "ai-proofread@22",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
-        },
-        {
-          "command": "ai-proofread.splitFileByTitleAndLength",
-          "group": "ai-proofread@23",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
-        },
-        {
-          "command": "ai-proofread.splitFileWithContext",
-          "group": "ai-proofread@24",
+          "command": "ai-proofread.splitFile",
+          "group": "ai-proofread@20",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
         },
         {
           "command": "ai-proofread.convertMarkdownToDocx",
-          "group": "ai-proofread@25",
+          "group": "ai-proofread@21",
           "when": "resourceLangId == markdown"
         },
         {

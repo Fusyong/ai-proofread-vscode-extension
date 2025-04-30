@@ -7,13 +7,12 @@ A VS Code extension for document and book proofreading based on LLM services, su
 1. 打开VS Code中插件界面（Ctrl+Shift+X）
 2. 搜索AI Proofreader
 3. 点击安装按钮install安装
-4. 安装后点击设置按钮⚙️，
-5. 选中弹出菜单中的设置项Settings，
-6. 选择下面的一个大语言模型服务平台
-    1. [Deepseek开放平台](https://platform.deepseek.com/)
-    2. [阿里云百炼](https://bailian.console.aliyun.com/)
-    3. [Google Gemini](https://aistudio.google.com/)
-7. 填写所选平台的API秘钥（须到上述平台通过注册、实名认证、生成API秘钥等操作后获得）
+4. 安装后点击设置按钮⚙️，选中弹出菜单中的设置项Settings
+5. 在设置界面选择下面的一个大语言模型服务平台
+    * [Deepseek开放平台](https://platform.deepseek.com/)（默认）
+    * [阿里云百炼](https://bailian.console.aliyun.com/)
+    * [Google Gemini](https://aistudio.google.com/)
+6. 填写所选平台的API秘钥（须到上述平台通过注册、实名认证、生成API秘钥、充值等操作后获得有效的秘钥）
 
 ## 2. 快速上手
 
