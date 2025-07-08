@@ -376,7 +376,8 @@ export function activate(context: vscode.ExtensionContext) {
                                 fs.appendFileSync(logFilePath, info + '\n', 'utf8');
                                 progress.report({ message: info });
                             },
-                            token // 传递取消令牌
+                            token, // 传递取消令牌
+                            context // 传递扩展上下文
                         });
 
                         // 生成差异文件
@@ -547,7 +548,8 @@ export function activate(context: vscode.ExtensionContext) {
                             model,
                             contextLevel,
                             referenceFile,
-                            userTemperature ? parseFloat(userTemperature) : undefined
+                            userTemperature ? parseFloat(userTemperature) : undefined,
+                            context
                         );
 
                         if (result) {

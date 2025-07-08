@@ -76,25 +76,39 @@ let DEFAULT_SYSTEM_PROMPT = `
 `;
 
 // 获取用户配置的提示词
-function getSystemPrompt(): string {
+function getSystemPrompt(context?: vscode.ExtensionContext): string {
     const config = vscode.workspace.getConfiguration('ai-proofread');
     const prompts = config.get<Array<{name: string, content: string}>>('prompts', []);
-    const defaultIndex = config.get<number>('defaultPromptIndex', 0);
     const logger = Logger.getInstance();
 
-    // 如果defaultIndex为-1，使用系统默认提示词
-    if (defaultIndex === -1) {
-        logger.info('使用系统默认提示词');
-        return DEFAULT_SYSTEM_PROMPT;
+    // 如果有context，从全局状态获取当前选择的提示词名称
+    if (context) {
+        const currentPromptName = context.globalState.get<string>('currentPrompt', '');
+
+        // 如果当前选择的是系统默认提示词（空字符串）
+        if (currentPromptName === '') {
+            logger.info('使用系统默认提示词');
+            return DEFAULT_SYSTEM_PROMPT;
+        }
+
+        // 如果当前选择的是自定义提示词，查找对应的提示词
+        if (currentPromptName && prompts.length > 0) {
+            const selectedPrompt = prompts.find(p => p.name === currentPromptName);
+            if (selectedPrompt) {
+                logger.info(`使用自定义提示词: ${selectedPrompt.name}`);
+                return selectedPrompt.content;
+            }
+        }
     }
 
-    // 使用自定义提示词
-    if (prompts.length > 0 && defaultIndex >= 0 && defaultIndex < prompts.length) {
-        logger.info(`使用自定义提示词: ${prompts[defaultIndex].name}`);
-        return prompts[defaultIndex].content;
+    // 如果没有context或没有找到对应的提示词，使用默认逻辑
+    if (prompts.length > 0) {
+        // 如果有自定义提示词，使用第一个作为默认
+        logger.info(`使用自定义提示词: ${prompts[0].name}`);
+        return prompts[0].content;
     }
 
-    // 如果没有有效的自定义提示词，使用系统默认提示词
+    // 如果没有自定义提示词，使用系统默认提示词
     logger.info('使用系统默认提示词');
     return DEFAULT_SYSTEM_PROMPT;
 }
@@ -103,7 +117,7 @@ function getSystemPrompt(): string {
  * API调用接口
  */
 export interface ApiClient {
-    proofread(targetText: string, preText?: string): Promise<string | null>;
+    proofread(targetText: string, preText?: string, temperature?: number | null, context?: vscode.ExtensionContext): Promise<string | null>;
 }
 
 /**
@@ -140,10 +154,10 @@ export class DeepseekApiClient implements ApiClient {
     }
 
     // 使用 Deepseek API 进行校对
-    async proofread(targetText: string, preText: string = '', temperature: number|null = null): Promise<string | null> {
+    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
         const logger = Logger.getInstance();
         const messages = [
-            { role: 'system', content: getSystemPrompt() }
+            { role: 'system', content: getSystemPrompt(context) }
         ];
 
         if (preText) {
@@ -214,10 +228,10 @@ export class AliyunApiClient implements ApiClient {
     }
 
     // 使用阿里云百炼 API 进行校对
-    async proofread(targetText: string, preText: string = '', temperature: number|null = null): Promise<string | null> {
+    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
         const logger = Logger.getInstance();
         const messages = [
-            { role: 'system', content: getSystemPrompt() }
+            { role: 'system', content: getSystemPrompt(context) }
         ];
 
         if (preText) {
@@ -288,7 +302,7 @@ export class GoogleApiClient implements ApiClient {
     }
 
     // 使用 Google API 进行校对
-    async proofread(targetText: string, preText: string = '', temperature: number|null = null): Promise<string | null> {
+    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
         const logger = Logger.getInstance();
         try {
             let contents = targetText;
@@ -299,7 +313,7 @@ export class GoogleApiClient implements ApiClient {
             const config = vscode.workspace.getConfiguration('ai-proofread');
             const finalTemperature = temperature || config.get<number>('proofread.temperature');
             const configObj: any = {
-                systemInstruction: getSystemPrompt(),
+                systemInstruction: getSystemPrompt(context),
             };
 
             if (finalTemperature !== undefined) {
@@ -339,6 +353,7 @@ export async function processJsonFileAsync(
         temperature?: number;
         onProgress?: (info: string) => void;
         token?: vscode.CancellationToken;
+        context?: vscode.ExtensionContext;
     } = {}
 ): Promise<ProcessStats> {
     const logger = Logger.getInstance();
@@ -352,7 +367,8 @@ export async function processJsonFileAsync(
         maxConcurrent = 3,
         temperature = 1,
         onProgress,
-        token
+        token,
+        context
     } = options;
 
     // 读取输入JSON文件
@@ -446,7 +462,7 @@ export async function processJsonFileAsync(
         const startTime = Date.now();
         await rateLimiter.wait();
 
-        const processedText = await client.proofread(labeledTargetText, preText);
+        const processedText = await client.proofread(labeledTargetText, preText, temperature, context);
         const elapsed = (Date.now() - startTime) / 1000;
 
         if (processedText) {
@@ -519,6 +535,8 @@ export async function processJsonFileAsync(
  * @param model 使用的模型
  * @param contextLevel 上下文级别
  * @param referenceFile 参考文件
+ * @param userTemperature 用户指定的温度
+ * @param context 扩展上下文
  * @returns 校对后的文本
  */
 export async function proofreadSelection(
@@ -528,7 +546,8 @@ export async function proofreadSelection(
     model: string,
     contextLevel?: string,
     referenceFile?: vscode.Uri[],
-    userTemperature?: number
+    userTemperature?: number,
+    context?: vscode.ExtensionContext
 ): Promise<string | null> {
     // 获取选中的文本
     const selectedText = editor.document.getText(selection);
@@ -604,7 +623,7 @@ export async function proofreadSelection(
         }
     })();
 
-    let result = await client.proofread(postText, preText, userTemperature);
+    let result = await client.proofread(postText, preText, userTemperature, context);
 
     // 如果校对成功且启用了引号转换，则自动转换引号
     if (result) {

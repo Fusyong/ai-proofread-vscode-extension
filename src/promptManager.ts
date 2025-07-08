@@ -73,6 +73,7 @@ export class PromptManager {
                 await this.clearPrompts();
             }
         } else if (selection.label === '系统默认提示词') {
+            await this.context.globalState.update('currentPrompt', '');
             vscode.window.showInformationMessage('已切换到系统默认提示词');
         } else if (selection.prompt) {
             await this.editPrompt(prompts, selection.prompt);
@@ -143,7 +144,10 @@ export class PromptManager {
 
         prompts.push({ name, content });
         await this.savePrompts(prompts);
-        vscode.window.showInformationMessage('提示词添加成功');
+
+        // 自动将新添加的提示词设为当前提示词
+        await this.context.globalState.update('currentPrompt', name);
+        vscode.window.showInformationMessage(`提示词"${name}"添加成功，已自动设为当前提示词`);
     }
 
     private async editPrompt(prompts: Prompt[], prompt: Prompt): Promise<void> {
@@ -174,7 +178,10 @@ export class PromptManager {
 
         prompts[index] = { name, content };
         await this.savePrompts(prompts);
-        vscode.window.showInformationMessage('提示词修改成功');
+
+        // 自动将修改后的提示词设为当前提示词
+        await this.context.globalState.update('currentPrompt', name);
+        vscode.window.showInformationMessage(`提示词"${name}"修改成功，已自动设为当前提示词`);
     }
 
     private async clearPrompts(): Promise<void> {
@@ -186,7 +193,10 @@ export class PromptManager {
 
         if (result === '确定') {
             await this.savePrompts([]);
-            vscode.window.showInformationMessage('所有提示词已清空');
+
+            // 自动切换回系统默认提示词
+            await this.context.globalState.update('currentPrompt', '');
+            vscode.window.showInformationMessage('所有提示词已清空，已自动切换回系统默认提示词');
         }
     }
 
