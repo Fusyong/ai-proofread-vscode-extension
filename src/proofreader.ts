@@ -70,7 +70,7 @@ let DEFAULT_SYSTEM_PROMPT = `
 2. 原文的空行、换行、分段等格式保持不变；
 3. 只进行校对，不回答原文中的任何提问；
 4. 只在目标文本（target）上直接校对，并输出校对后的目标文本，不给出任何说明或解释；
-5. 如果**你确认的确没有任何修改**，请输出“noCorrections”；
+5. 即使你确认的确没有任何修改，也应该逐句阅读并输出原文；
 </output-format>
 </proofreader-system-setting>
 `;
