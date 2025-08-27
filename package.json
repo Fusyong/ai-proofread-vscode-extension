@@ -116,7 +116,7 @@
           "order": 14,
           "type": "string",
           "default": "qwen-max-2025-01-25",
-          "description": "阿里云百炼平台模型,如: qwen-max-2025-01-25, qwen-plus-2025-01-25, deepseek-v3, deepseek-r1"
+          "description": "阿里云百炼平台模型,如: qwen-max-2025-01-25, qwen-max-latest, qwen-plus-latest, deepseek-v3, deepseek-r1"
         },
         "ai-proofread.apiKeys.google": {
           "order": 15,
