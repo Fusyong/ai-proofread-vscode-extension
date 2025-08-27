@@ -1,8 +1,8 @@
-一个用于文档和图书校对、基于大语言模型的VS Code插件，支持选中文本直接校对和长文档切分后校对两种工作流，[这里是代码库](https://github.com/Fusyong/ai-proofread-vscode-extension)。本插件与[相应的Python校对工具库](https://github.com/Fusyong/ai-proofread)的功能大致相同。
+一个用于文档和图书校对、基于大语言模型的VS Code插件，支持选中文本直接校对和长文档切分后校对两种工作流，[这里是代码库](https://github.com/Fusyong/ai-proofread-vscode-extension)。本插件与[相应的Python校对工具库](https://github.com/Fusyong/ai-proofread)的功能大致相同。当前版本：v0.1.1
 
 另外，你也可以设置自己的提示词，用于其他文本处理场景，比如翻译、注释、编写练习题等。
 
-A VS Code extension for document and book proofreading based on LLM services, supporting two workflows: proofreading selected text directly and proofreading long documents after segmentation. [Here is the code repository](https://github.com/Fusyong/ai-proofread-vscode-extension). This extension has roughly the same functions as [the corresponding Python proofreading tool library](https://github.com/Fusyong/ai-proofread).
+A VS Code extension for document and book proofreading based on LLM services, supporting two workflows: proofreading selected text directly and proofreading long documents after segmentation. [Here is the code repository](https://github.com/Fusyong/ai-proofread-vscode-extension). This extension has roughly the same functions as [the corresponding Python proofreading tool library](https://github.com/Fusyong/ai-proofread). Current version: v0.1.1
 
 Additionally, you can also set your own prompts for other text processing scenarios, such as translation, annotation, creating exercises, and more.
 
@@ -27,7 +27,7 @@ Additionally, you can also set your own prompts for other text processing scenar
     4. 最后会自动展示校对前后的差异
 
 2. **切分文档后批量校对：**
-    1. 打开markdown文档，打开右键菜单，使用其中的`AI proofreader: split ...` 选项中的一个，把当前的切分为JSON文档
+    1. 打开markdown文档，打开右键菜单，使用其中的`AI proofreader: split file`选项，选择切分模式（按长度、按标题、按标题和长度、带上下文等），把当前的切分为JSON文档
     2. 打开上述JSON文档，打开右键菜单，使用其中的`AI proofreader: proofread file`选项，批量校对切分好的片段
     3. 最后会提示你查看结果：前后差异、差异文件、JSON结果、日志文件
 
@@ -55,12 +55,12 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 3. **模型选择**
     * `ai-proofread.proofread.models.deepseek`: Deepseek开放平台模型选择（deepseek-chat/deepseek-reasoner）
-    * `ai-proofread.proofread.models.aliyun`: 阿里云百炼模型选择（deepseek-v3/deepseek-r1/qwen-max-2025-01-25/qwen-plus）
-    * `ai-proofread.proofread.models.google`: Google Gemini模型选择（gemini-2.0-flash/gemini-2.0-flash-lite/gemini-2.0-flash-thinking-exp-01-21/gemini-2.5-pro-exp-03-25）
+    * `ai-proofread.proofread.models.aliyun`: 阿里云百炼模型选择（deepseek-v3/deepseek-r1/qwen-max-2025-01-25/qwen-max-latest/qwen-plus-latest）
+    * `ai-proofread.proofread.models.google`: Google Gemini模型选择（gemini-2.5-pro-exp-03-25/gemini-2.5-flash-preview-04-17/gemini-2.0-flash）
 
 1. **校对相关**：
     * `ai-proofread.proofread.rpm`: 每分钟最大请求数（默认15）
-    * `ai-proofread.proofread.maxConcurrent`: 最大并发请求数（默认3）
+    * `ai-proofread.proofread.maxConcurrent`: 最大并发请求数（默认1）
     * `ai-proofread.proofread.temperature`: 模型温度（默认1.0，取值范围[0:2)）
     * `ai-proofread.proofread.defaultContextLevel`: 校对选中文本时默认使用的标题级别，作为上下文范围（默认0，表示不使用）
     * `ai-proofread.convertQuotes`: 是否在校对后自动将拉丁半角引号转换为中文全角引号（默认为false）
@@ -69,8 +69,8 @@ Additionally, you can also set your own prompts for other text processing scenar
     * `ai-proofread.defaultSplitLength`: 默认的文本切分长度（默认600字符）
     * `ai-proofread.defaultTitleLevels`: 默认的标题切分级别（默认[2]，表示按二级标题切分）
     * `ai-proofread.contextSplit.cutBy`: 带上下文切分模式下的切分长度（默认600）
-    * `ai-proofread.titleAndLengthSplit.threshold`: 标题加长度切分时的段落长度阈值（默认1500）
-    * `ai-proofread.titleAndLengthSplit.cutBy`: 标题加长度切分时的目标长度（默认800）
+    * `ai-proofread.titleAndLengthSplit.threshold`: 标题加长度切分时的段落长度阈值（默认1000）
+    * `ai-proofread.titleAndLengthSplit.cutBy`: 标题加长度切分时的目标长度（默认600）
     * `ai-proofread.titleAndLengthSplit.minLength`: 标题加长度切分时的最小长度（默认120）
 
 3. **提示词管理**：
@@ -87,7 +87,9 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 我的经验，在一般语言文字和知识校对场景中，大语言模型一次**输出**六百到八百字会有比较好的效果。因此，一本十来万字的书稿需要切分成三百多段，然后交给大模型校对。
 
-打开markdown文件，右键点击编辑器，可以看到以下切分选项（或通过命令面板查找）：
+打开markdown文件，右键点击编辑器，可以看到切分选项 `AI proofreader: split file`
+
+或通过命令面板查找更具体的选项：
 
 ![切分文档](https://blog.xiiigame.com/img/2025-03-28-%E7%94%A8%E4%BA%8EAI%E5%9B%BE%E4%B9%A6%E6%A0%A1%E5%AF%B9%E7%9A%84vscod%E6%89%A9%E5%B1%95/Code_1w0X1wqgyf.png)
 
@@ -135,8 +137,8 @@ Additionally, you can also set your own prompts for other text processing scenar
     2. 右键选择Proofread File
     3. 自动使用配置的默认值进行校对
     4. 支持进度显示和取消操作
-    5. 最后会提示你查看结果
-    6. 并生成日志
+    5. 最后会提示你查看结果：前后差异、差异文件、JSON结果、日志文件
+    6. 如有未完成的条目，可重新校对，重新校对时只处理未完成的条目
 
 ### 3.5. 管理提示词
 
@@ -264,7 +266,17 @@ Additionally, you can also set your own prompts for other text processing scenar
 5. [ ] 在按长度切分的基础上调用LLM辅助切分
 6. [ ] 支持Copilot
 
-## 5. 开发命令
+## 6. 更新日志
+
+### v0.1.1
+- 优化了文件切分功能，新增统一的切分入口
+- 改进了校对进度显示和取消操作
+- 增强了自动备份功能
+- 优化了临时文件管理
+- 修复了并发请求数的默认值问题
+- 完善了错误处理和用户提示
+
+## 7. 开发命令
 
 ```bash
 # 安装依赖
