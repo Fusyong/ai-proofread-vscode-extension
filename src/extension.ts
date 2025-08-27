@@ -376,7 +376,8 @@ export function activate(context: vscode.ExtensionContext) {
                                 fs.appendFileSync(logFilePath, info + '\n', 'utf8');
                                 progress.report({ message: info });
                             },
-                            token // 传递取消令牌
+                            token, // 传递取消令牌
+                            context // 传递扩展上下文
                         });
 
                         // 生成差异文件
@@ -547,7 +548,8 @@ export function activate(context: vscode.ExtensionContext) {
                             model,
                             contextLevel,
                             referenceFile,
-                            userTemperature ? parseFloat(userTemperature) : undefined
+                            userTemperature ? parseFloat(userTemperature) : undefined,
+                            context
                         );
 
                         if (result) {
@@ -770,12 +772,25 @@ export function activate(context: vscode.ExtensionContext) {
                 outputPath = FilePathUtils.getFilePath(fileUri[0].fsPath, `-${timestamp}`, '.md');
             }
 
+            // 等待文件写入完成的辅助函数
+            async function waitForFile(filePath: string, maxTries = 10, interval = 100): Promise<boolean> {
+                for (let i = 0; i < maxTries; i++) {
+                    if (fs.existsSync(filePath)) return true;
+                    await new Promise(res => setTimeout(res, interval));
+                }
+                return false;
+            }
+
             try {
                 outputPath = await convertDocxToMarkdown(
                     fileUri[0].fsPath,
                     mode === '默认模式' ? 'default' : 'markdown_strict',
                     outputPath
                 );
+
+                // 等待文件写入完成
+                const fileReady = await waitForFile(outputPath, 20, 100);
+                if (!fileReady) throw new Error('文件写入超时');
 
                 // 打开转换后的文件
                 const outputUri = vscode.Uri.file(outputPath);

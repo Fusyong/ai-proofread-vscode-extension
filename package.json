@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.0.19",
+  "version": "0.1.1",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -183,13 +183,13 @@
         "ai-proofread.titleAndLengthSplit.threshold": {
           "order": 25,
           "type": "number",
-          "default": 1500,
+          "default": 1000,
           "description": "标题加长度切分：段落长度阈值，超过此长度的段落将被切分"
         },
         "ai-proofread.titleAndLengthSplit.cutBy": {
           "order": 26,
           "type": "number",
-          "default": 800,
+          "default": 600,
           "description": "标题加长度切分：切分长段落时的目标长度"
         },
         "ai-proofread.titleAndLengthSplit.minLength": {
