@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // 通用的文件切分处理函数
     async function handleFileSplitCommand(
-        mode: 'length' | 'title' | 'title-length' | 'context',
+        mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext',
         editor: vscode.TextEditor,
         document: vscode.TextDocument
     ) {
@@ -33,11 +33,13 @@ export function activate(context: vscode.ExtensionContext) {
 
         try {
             let options: {
-                mode: 'length' | 'title' | 'title-length' | 'context';
+                mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext';
                 cutBy?: number;
                 levels?: number[];
                 threshold?: number;
                 minLength?: number;
+                beforeParagraphs?: number;
+                afterParagraphs?: number;
             } = { mode };
 
             if (mode === 'length') {
@@ -64,7 +66,7 @@ export function activate(context: vscode.ExtensionContext) {
                     return;
                 }
                 options.cutBy = parseInt(inputLength);
-            } else if (mode === 'title' || mode === 'title-length' || mode === 'context') {
+            } else if (mode === 'title' || mode === 'title-length' || mode === 'titleContext') {
                 // 获取配置中的默认标题级别
                 const defaultLevels = config.get<number[]>('defaultTitleLevels', [2]);
 
@@ -89,9 +91,9 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 options.levels = inputLevels.split(',').map(x => parseInt(x.trim()));
 
-                if (mode === 'context') {
+                if (mode === 'titleContext') {
                     // 获取带上下文切分的配置
-                    const defaultCutBy = config.get<number>('contextSplit.cutBy', 600);
+                    const defaultCutBy = config.get<number>('defaultSplitLength', 600);
 
                     // 让用户选择切分长度
                     const inputCutBy = await vscode.window.showInputBox({
@@ -116,8 +118,8 @@ export function activate(context: vscode.ExtensionContext) {
 
                 } else if (mode === 'title-length') {
                     // 获取标题加长度切分的配置
-                    options.threshold = config.get<number>('titleAndLengthSplit.threshold', 1500);
-                    options.cutBy = config.get<number>('titleAndLengthSplit.cutBy', 800);
+                    options.threshold = config.get<number>('titleAndLengthSplit.threshold', 1000);
+                    options.cutBy = config.get<number>('defaultSplitLength', 600);
                     options.minLength = config.get<number>('titleAndLengthSplit.minLength', 120);
 
                     // 让用户确认或修改参数
@@ -177,6 +179,68 @@ export function activate(context: vscode.ExtensionContext) {
                         options.minLength = parseInt(inputMinLength);
                     }
                 }
+            } else if (mode === 'paragraphContext') {
+                // 获取前后段落上下文切分的配置
+                const defaultCutBy = config.get<number>('defaultSplitLength', 600);
+                const defaultBeforeParagraphs = config.get<number>('paragraphContextSplit.beforeParagraphs', 1);
+                const defaultAfterParagraphs = config.get<number>('paragraphContextSplit.afterParagraphs', 1);
+
+                // 让用户选择切分长度
+                const inputCutBy = await vscode.window.showInputBox({
+                    prompt: '请输入切分长度（字符数）',
+                    value: defaultCutBy.toString(),
+                    validateInput: (value: string) => {
+                        const num = parseInt(value);
+                        if (isNaN(num)) {
+                            return '请输入有效的数字';
+                        }
+                        if (num < 50) {
+                            return '切分长度不能小于50字符';
+                        }
+                        return null;
+                    }
+                });
+
+                if (!inputCutBy) {
+                    return;
+                }
+                options.cutBy = parseInt(inputCutBy);
+
+                // 让用户选择前文段落数
+                const inputBeforeParagraphs = await vscode.window.showInputBox({
+                    prompt: '请输入前文段落数',
+                    value: defaultBeforeParagraphs.toString(),
+                    validateInput: (value: string) => {
+                        const num = parseInt(value);
+                        if (isNaN(num) || num < 0) {
+                            return '请输入有效的非负整数';
+                        }
+                        return null;
+                    }
+                });
+
+                if (!inputBeforeParagraphs) {
+                    return;
+                }
+                options.beforeParagraphs = parseInt(inputBeforeParagraphs);
+
+                // 让用户选择后文段落数
+                const inputAfterParagraphs = await vscode.window.showInputBox({
+                    prompt: '请输入后文段落数',
+                    value: defaultAfterParagraphs.toString(),
+                    validateInput: (value: string) => {
+                        const num = parseInt(value);
+                        if (isNaN(num) || num < 0) {
+                            return '请输入有效的非负整数';
+                        }
+                        return null;
+                    }
+                });
+
+                if (!inputAfterParagraphs) {
+                    return;
+                }
+                options.afterParagraphs = parseInt(inputAfterParagraphs);
             }
 
             // 调用splitter模块中的handleFileSplit函数
@@ -232,7 +296,8 @@ export function activate(context: vscode.ExtensionContext) {
                 { label: '按长度切分', value: 'length' },
                 { label: '按标题切分', value: 'title' },
                 { label: '按标题和长度切分', value: 'title-length' },
-                { label: '带上下文切分', value: 'context' }
+                { label: '按长度切分，以标题范围为上下文', value: 'titleContext' },
+                { label: '按长度切分，扩展前后段落为上下文', value: 'paragraphContext' },
             ], {
                 placeHolder: '请选择切分模式',
                 canPickMany: false
@@ -242,7 +307,7 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            await handleFileSplitCommand(mode.value as 'length' | 'title' | 'title-length' | 'context', editor, editor.document);
+            await handleFileSplitCommand(mode.value as 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext', editor, editor.document);
         }),
 
         vscode.commands.registerCommand('ai-proofread.splitFileByLength', async () => {
@@ -263,13 +328,22 @@ export function activate(context: vscode.ExtensionContext) {
             await handleFileSplitCommand('title', editor, editor.document);
         }),
 
-        vscode.commands.registerCommand('ai-proofread.splitFileWithContext', async () => {
+        vscode.commands.registerCommand('ai-proofread.splitFileWithTitleContext', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showInformationMessage('No active editor!');
                 return;
             }
-            await handleFileSplitCommand('context', editor, editor.document);
+            await handleFileSplitCommand('titleContext', editor, editor.document);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.splitFileWithParagraphContext', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await handleFileSplitCommand('paragraphContext', editor, editor.document);
         }),
 
         vscode.commands.registerCommand('ai-proofread.splitFileByTitleAndLength', async () => {
@@ -488,14 +562,59 @@ export function activate(context: vscode.ExtensionContext) {
                     return;
                 }
 
-                // 让用户选择是否使用上下文和参考文件
-                const contextLevel = await vscode.window.showQuickPick(
-                    ['不使用上下文', '1 级标题', '2 级标题', '3 级标题', '4 级标题', '5 级标题', '6 级标题'],
+                // 让用户选择上下文构建方式
+                const contextBuildMethod = await vscode.window.showQuickPick(
+                    ['不使用上下文', '前后增加段落', '使用所在标题范围'],
                     {
-                        placeHolder: '选择上下文范围（可选）',
+                        placeHolder: '选择上下文构建方式',
                         ignoreFocusOut: true
                     }
                 );
+
+                let contextLevel: string | undefined;
+                let beforeParagraphs: number = 0;
+                let afterParagraphs: number = 0;
+
+                if (contextBuildMethod === '前后增加段落') {
+                    // 选择前文增加段落个数
+                    const beforeParagraphsInput = await vscode.window.showInputBox({
+                        prompt: '前文增加段落个数',
+                        value: '1',
+                        validateInput: (value: string) => {
+                            const num = parseInt(value);
+                            if (isNaN(num) || num < 0 || num > 10) {
+                                return '请输入一个[0:10]之间的数字';
+                            }
+                            return null;
+                        }
+                    });
+                    beforeParagraphs = beforeParagraphsInput ? parseInt(beforeParagraphsInput) : 2;
+
+                    // 选择后文增加段落个数
+                    const afterParagraphsInput = await vscode.window.showInputBox({
+                        prompt: '后文增加段落个数',
+                        value: '1',
+                        validateInput: (value: string) => {
+                            const num = parseInt(value);
+                            if (isNaN(num) || num < 0 || num > 10) {
+                                return '请输入一个[0:10]之间的数字';
+                            }
+                            return null;
+                        }
+                    });
+                    afterParagraphs = afterParagraphsInput ? parseInt(afterParagraphsInput) : 2;
+
+                    contextLevel = '前后增加段落';
+                } else if (contextBuildMethod === '使用所在标题范围') {
+                    // 让用户选择是否使用上下文和参考文件
+                    contextLevel = await vscode.window.showQuickPick(
+                        ['1 级标题', '2 级标题', '3 级标题', '4 级标题', '5 级标题', '6 级标题'],
+                        {
+                            placeHolder: '选择上下文范围（可选）',
+                            ignoreFocusOut: true
+                        }
+                    );
+                }
 
                 let referenceFile: vscode.Uri[] | undefined;
                 const useReference = await vscode.window.showQuickPick(

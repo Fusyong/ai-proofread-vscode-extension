@@ -182,11 +182,13 @@ export function mergeShortParagraphs(paragraphs: string[], minLength: number = 1
 }
 
 export interface SplitOptions {
-    mode: 'length' | 'title' | 'title-length' | 'context';
+    mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext';
     cutBy?: number;
     levels?: number[];
     threshold?: number;
     minLength?: number;
+    beforeParagraphs?: number;
+    afterParagraphs?: number;
 }
 
 /**
@@ -213,9 +215,17 @@ export function splitText(
         // 按标题切分
         const textList = splitMarkdownByTitle(text, options.levels);
         segments = textList.map(x => ({ target: x }));
-    } else if (options.mode === 'context') {
+    } else if (options.mode === 'titleContext') {
         // 按标题和长度切分，带上下文
         segments = splitMarkdownByTitleAndLengthWithContext(text, options.levels, options.cutBy);
+    } else if (options.mode === 'paragraphContext') {
+        // 按长度切分，使用前后段落作为上下文
+        segments = splitMarkdownByLengthWithParagraphsAsContext(
+            text, 
+            options.cutBy, 
+            options.beforeParagraphs, 
+            options.afterParagraphs
+        );
     } else {
         // 标题加长度切分：先按标题切分，然后处理长短段落
         let textList = splitMarkdownByTitle(text, options.levels);
@@ -246,11 +256,13 @@ export function splitText(
 export async function handleFileSplit(
     filePath: string,
     options: {
-        mode: 'length' | 'title' | 'title-length' | 'context';
+        mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext';
         cutBy?: number;
         levels?: number[];
         threshold?: number;
         minLength?: number;
+        beforeParagraphs?: number;
+        afterParagraphs?: number;
     }
 ): Promise<{
     jsonFilePath: string;
@@ -282,10 +294,15 @@ export async function handleFileSplit(
         statsMessage = `切分长度: ${options.cutBy}\n\n`;
     } else if (options.mode === 'title') {
         statsMessage = `切分标题级别: ${options.levels!.join(',')}\n\n`;
-    } else if (options.mode === 'context') {
-        statsMessage = `切分模式: 带上下文切分\n` +
+    } else if (options.mode === 'titleContext') {
+        statsMessage = `切分模式: 以标题范围为上下文\n` +
             `标题级别: ${options.levels!.join(',')}\n` +
             `切分长度: ${options.cutBy}\n\n`;
+    } else if (options.mode === 'paragraphContext') {
+        statsMessage = `切分模式: 扩展前后段落为上下文\n` +
+            `切分长度: ${options.cutBy}\n` +
+            `前文段落数: ${options.beforeParagraphs}\n` +
+            `后文段落数: ${options.afterParagraphs}\n\n`;
     } else {
         statsMessage = `切分模式: 标题加长度切分\n` +
             `标题级别: ${options.levels!.join(',')}\n` +
@@ -305,7 +322,7 @@ export async function handleFileSplit(
         totalTargetLength += targetLength;
         totalContextLength += contextLength;
     });
-    if (options.mode === 'context') {
+    if (options.mode === 'titleContext' || options.mode === 'paragraphContext') {
         statsMessage += `\n合计\t${totalTargetLength}\t${totalContextLength}\t总计${totalTargetLength + totalContextLength}`;
     } else {
         statsMessage += `\n合计\t${totalTargetLength}`;
@@ -322,4 +339,182 @@ export async function handleFileSplit(
         logFilePath,
         segments
     };
+}
+
+/**
+ * 构建基于标题级别的上下文
+ * @param text 完整文本
+ * @param selectionStartLine 选中文本起始行号（从0开始）
+ * @param selectionEndLine 选中文本结束行号（从0开始）
+ * @param contextLevel 上下文级别（如"1"、"2"等）
+ * @returns 上下文文本
+ */
+export function buildTitleBasedContext(
+    text: string,
+    selectionStartLine: number,
+    selectionEndLine: number,
+    contextLevel: string
+): string {
+    const lines = text.split('\n');
+    const level = contextLevel.charAt(0);
+    
+    // 从本行开始向上查找最近的指定级别标题
+    let startLine = selectionStartLine + 1;
+    while (startLine > 0) {
+        const line = lines[startLine - 1];
+        if (line.startsWith(`${'#'.repeat(parseInt(level))} `)) {
+            break;
+        }
+        startLine--;
+    }
+
+    // 向下查找下一个同级别标题
+    let endLine = selectionEndLine;
+    while (endLine < lines.length - 1) {
+        const line = lines[endLine + 1];
+        if (line.startsWith(`${'#'.repeat(parseInt(level))} `)) {
+            break;
+        }
+        endLine++;
+    }
+
+    // 提取上下文
+    return lines.slice(startLine-1, endLine + 1).join('\n');
+}
+
+/**
+ * 构建基于前后段落的上下文
+ * @param text 完整文本
+ * @param selectionStartLine 选中文本起始行号（从0开始）
+ * @param selectionEndLine 选中文本结束行号（从0开始）
+ * @param beforeParagraphs 前文段落数量
+ * @param afterParagraphs 后文段落数量
+ * @returns 上下文文本
+ */
+export function buildParagraphBasedContext(
+    text: string,
+    selectionStartLine: number,
+    selectionEndLine: number,
+    beforeParagraphs: number = 2,
+    afterParagraphs: number = 2
+): string {
+    // 将文本按行分割
+    const textLines = text.split('\n');
+    
+    // 找到选中文本所在段落的边界
+    let paragraphStart = selectionStartLine;
+    let paragraphEnd = selectionEndLine;
+    
+    // 向上查找段落开始
+    while (paragraphStart > 0) {
+        const prevLine = textLines[paragraphStart - 1];
+        if (prevLine.trim() === '') {
+            // 遇到空行，说明找到了段落边界
+            break;
+        }
+        paragraphStart--;
+    }
+    
+    // 向下查找段落结束
+    while (paragraphEnd < textLines.length - 1) {
+        const nextLine = textLines[paragraphEnd + 1];
+        if (nextLine.trim() === '') {
+            // 遇到空行，说明找到了段落边界
+            break;
+        }
+        paragraphEnd++;
+    }
+    
+    // 获取前文段落
+    let beforeStart = paragraphStart;
+    let beforeCount = 0;
+    
+    while (beforeCount < beforeParagraphs && beforeStart > 0) {
+        // 向上跳过空行
+        while (beforeStart > 0 && textLines[beforeStart - 1].trim() === '') {
+            beforeStart--;
+        }
+        // 向上查找段落开始
+        while (beforeStart > 0 && textLines[beforeStart - 1].trim() !== '') {
+            beforeStart--;
+        }
+        beforeCount++;
+    }
+    
+    // 获取后文段落
+    let afterEnd = paragraphEnd;
+    let afterCount = 0;
+    
+    while (afterCount < afterParagraphs && afterEnd < textLines.length - 1) {
+        // // 向下跳过空行
+        // while (afterEnd < textLines.length - 1 && textLines[afterEnd + 1].trim() === '') {
+        //     afterEnd++;
+        // }
+        // 向下查找段落结束
+        while (afterEnd < textLines.length - 1 && textLines[afterEnd + 1].trim() !== '') {
+            afterEnd++;
+        }
+        afterCount++;
+    }
+    
+    // 提取上下文文本（包含前后段落）
+    const contextStart = Math.max(0, beforeStart);
+    const contextEnd = Math.min(textLines.length - 1, afterEnd);
+    return textLines.slice(contextStart, contextEnd + 1).join('\n');
+}
+
+/**
+ * 将markdown文本按长度切分，使用前后段落作为上下文
+ * @param text markdown文本
+ * @param cutBy 切分长度
+ * @param beforeParagraphs 前文段落数量
+ * @param afterParagraphs 后文段落数量
+ * @returns 切分后的文本列表，每个元素包含完整上下文和目标文本
+ */
+export function splitMarkdownByLengthWithParagraphsAsContext(
+    text: string,
+    cutBy: number = 600,
+    beforeParagraphs: number = 1,
+    afterParagraphs: number = 1
+): Array<{ context: string; target: string }> {
+    // 按长度切分文本
+    const pieces = splitTextByLength(text, cutBy);
+    
+    // 存储结果
+    const result: Array<{ context: string; target: string }> = [];
+    
+    // 为每个片段添加前后段落上下文
+    pieces.forEach((piece, index) => {
+        // 找到当前片段在原文中的位置
+        const pieceStart = text.indexOf(piece);
+        if (pieceStart === -1) {
+            // 如果找不到片段，使用整个文本作为上下文
+            result.push({
+                context: text,
+                target: piece
+            });
+            return;
+        }
+        
+        // 计算片段在文本中的行号范围
+        const beforeText = text.substring(0, pieceStart);
+        const startLine = beforeText.split('\n').length - 1;
+        const endLine = startLine + piece.split('\n').length - 1;
+        
+        // 构建上下文
+        const contextText = buildParagraphBasedContext(
+            text,
+            startLine,
+            endLine,
+            beforeParagraphs,
+            afterParagraphs
+        );
+        
+        result.push({
+            context: contextText,
+            target: piece
+        });
+    });
+    
+    return result;
 }

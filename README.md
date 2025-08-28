@@ -1,8 +1,8 @@
-一个用于文档和图书校对、基于大语言模型的VS Code插件，支持选中文本直接校对和长文档切分后校对两种工作流，[这里是代码库](https://github.com/Fusyong/ai-proofread-vscode-extension)。本插件与[相应的Python校对工具库](https://github.com/Fusyong/ai-proofread)的功能大致相同。当前版本：v0.1.1
+一个用于文档和图书校对、基于大语言模型的VS Code插件，支持选中文本直接校对和长文档切分后校对两种工作流，[这里是代码库](https://github.com/Fusyong/ai-proofread-vscode-extension)。本插件与[相应的Python校对工具库](https://github.com/Fusyong/ai-proofread)的功能大致相同。
 
 另外，你也可以设置自己的提示词，用于其他文本处理场景，比如翻译、注释、编写练习题等。
 
-A VS Code extension for document and book proofreading based on LLM services, supporting two workflows: proofreading selected text directly and proofreading long documents after segmentation. [Here is the code repository](https://github.com/Fusyong/ai-proofread-vscode-extension). This extension has roughly the same functions as [the corresponding Python proofreading tool library](https://github.com/Fusyong/ai-proofread). Current version: v0.1.1
+A VS Code extension for document and book proofreading based on LLM services, supporting two workflows: proofreading selected text directly and proofreading long documents after segmentation. [Here is the code repository](https://github.com/Fusyong/ai-proofread-vscode-extension). This extension has roughly the same functions as [the corresponding Python proofreading tool library](https://github.com/Fusyong/ai-proofread).
 
 Additionally, you can also set your own prompts for other text processing scenarios, such as translation, annotation, creating exercises, and more.
 
@@ -68,9 +68,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 2. **文档切分相关**：
     * `ai-proofread.defaultSplitLength`: 默认的文本切分长度（默认600字符）
     * `ai-proofread.defaultTitleLevels`: 默认的标题切分级别（默认[2]，表示按二级标题切分）
-    * `ai-proofread.contextSplit.cutBy`: 带上下文切分模式下的切分长度（默认600）
     * `ai-proofread.titleAndLengthSplit.threshold`: 标题加长度切分时的段落长度阈值（默认1000）
-    * `ai-proofread.titleAndLengthSplit.cutBy`: 标题加长度切分时的目标长度（默认600）
     * `ai-proofread.titleAndLengthSplit.minLength`: 标题加长度切分时的最小长度（默认120）
 
 3. **提示词管理**：
@@ -264,7 +262,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 1. [x] jsdiff支持JSON文件，允许用户指定每次jsdiff的片段数量，避免文本过长可能无法渲染
 2. [x] 优化“转换半角引号为全角”算法，避免跨行引号转换错误
-3. [ ] 加入前后target作为context
+3. [x] markdown切分/选段校对，加入前后段落作为context
 4. [ ] 支持Ollama
 5. [ ] 在按长度切分的基础上调用LLM辅助切分
 6. [ ] 支持Copilot
@@ -285,10 +283,16 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
+### v0.1.3
+
+- 新增功能：markdown切分/选段校对时，可以加入前后段落作为context
+
 ### v0.1.2
+
 - 扩展了jsdiff比较并生成html的功能，支持JSON文件，并允许用户指定每次比较的片段数量，避免过长文本无法渲染的问题
 
 ### v0.1.1
+
 - 优化了文件切分功能，新增统一的切分入口
 - 改进了校对进度显示和取消操作
 - 增强了自动备份功能

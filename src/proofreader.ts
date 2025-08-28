@@ -10,6 +10,7 @@ import { RateLimiter } from './rateLimiter';
 import { GoogleGenAI } from "@google/genai";
 import { ConfigManager, Logger } from './utils';
 import { convertQuotes } from './quoteConverter';
+import { buildTitleBasedContext, buildParagraphBasedContext } from './splitter';
 
 // 加载环境变量
 dotenv.config();
@@ -547,7 +548,9 @@ export async function proofreadSelection(
     contextLevel?: string,
     referenceFile?: vscode.Uri[],
     userTemperature?: number,
-    context?: vscode.ExtensionContext
+    context?: vscode.ExtensionContext,
+    beforeParagraphs?: number,
+    afterParagraphs?: number
 ): Promise<string | null> {
     // 获取选中的文本
     const selectedText = editor.document.getText(selection);
@@ -562,34 +565,30 @@ export async function proofreadSelection(
 
     // 如果选择了上下文级别，获取上下文
     if (contextLevel && contextLevel !== '不使用上下文') {
-        const level = contextLevel.charAt(0);
         const fullText = editor.document.getText();
-        const lines = fullText.split('\n');
+        // 切分成段落
+        const lines = fullText.split(/\n/);
         const selectionStartLine = selection.start.line;
         const selectionEndLine = selection.end.line;
 
-        // 从本行开始向上查找最近的指定级别标题
-        let startLine = selectionStartLine + 1;
-        while (startLine > 0) {
-            const line = lines[startLine - 1];
-            if (line.startsWith(`${'#'.repeat(parseInt(level))} `)) {
-                break;
-            }
-            startLine--;
+        if (contextLevel === '前后增加段落') {
+            // 使用抽象的前后段落上下文构建函数
+            contextText = buildParagraphBasedContext(
+                fullText,
+                selectionStartLine,
+                selectionEndLine,
+                beforeParagraphs || 1,
+                afterParagraphs || 1
+            );
+        } else {
+            // 使用抽象的标题级别上下文构建函数
+            contextText = buildTitleBasedContext(
+                fullText,
+                selectionStartLine,
+                selectionEndLine,
+                contextLevel
+            );
         }
-
-        // 向下查找下一个同级别标题
-        let endLine = selectionEndLine;
-        while (endLine < lines.length - 1) {
-            const line = lines[endLine + 1];
-            if (line.startsWith(`${'#'.repeat(parseInt(level))} `)) {
-                break;
-            }
-            endLine++;
-        }
-
-        // 提取上下文
-        contextText = lines.slice(startLine-1, endLine + 1).join('\n');
     }
 
     // 如果选择了参考文件，读取参考文件内容
@@ -628,7 +627,7 @@ export async function proofreadSelection(
     // 如果校对成功且启用了引号转换，则自动转换引号
     if (result) {
         const config = vscode.workspace.getConfiguration('ai-proofread');
-        const shouldConvertQuotes = config.get<boolean>('convertQuotes', true);
+        const shouldConvertQuotes = config.get<boolean>('convertQuotes', false);
         if (shouldConvertQuotes) {
             result = convertQuotes(result);
         }

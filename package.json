@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -31,8 +31,12 @@
         "title": "AI Proofreader: split by title"
       },
       {
-        "command": "ai-proofread.splitFileWithContext",
-        "title": "AI Proofreader: split with context"
+        "command": "ai-proofread.splitFileWithTitleContext",
+        "title": "AI Proofreader: split with title based context"
+      },
+      {
+        "command": "ai-proofread.splitFileWithParagraphContext",
+        "title": "AI Proofreader: split with paragraph based context"
       },
       {
         "command": "ai-proofread.splitFileByTitleAndLength",
@@ -139,7 +143,7 @@
         "ai-proofread.proofread.maxConcurrent": {
           "order": 18,
           "type": "number",
-          "default": 1,
+          "default": 3,
           "description": "最大并发请求数"
         },
         "ai-proofread.proofread.temperature": {
@@ -174,23 +178,11 @@
           ],
           "description": "默认的标题切分级别（例如：[1,2] 表示按一级和二级标题切分）"
         },
-        "ai-proofread.contextSplit.cutBy": {
-          "order": 24,
-          "type": "number",
-          "default": 600,
-          "description": "带上下文切分模式：切分长度"
-        },
         "ai-proofread.titleAndLengthSplit.threshold": {
           "order": 25,
           "type": "number",
           "default": 1000,
           "description": "标题加长度切分：段落长度阈值，超过此长度的段落将被切分"
-        },
-        "ai-proofread.titleAndLengthSplit.cutBy": {
-          "order": 26,
-          "type": "number",
-          "default": 600,
-          "description": "标题加长度切分：切分长段落时的目标长度"
         },
         "ai-proofread.titleAndLengthSplit.minLength": {
           "order": 27,
@@ -203,6 +195,18 @@
           "type": "number",
           "default": 0,
           "description": "校对选中文本时，默认使用的标题级别作为上下文范围（0表示不使用）"
+        },
+        "ai-proofread.paragraphContextSplit.beforeParagraphs": {
+          "order": 30,
+          "type": "number",
+          "default": 1,
+          "description": "段落上下文切分模式：前文段落数"
+        },
+        "ai-proofread.paragraphContextSplit.afterParagraphs": {
+          "order": 31,
+          "type": "number",
+          "default": 1,
+          "description": "段落上下文切分模式：后文段落数"
         },
         "ai-proofread.prompts": {
           "order": 32,
