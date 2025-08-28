@@ -43,47 +43,11 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ### 3.1. 配置
 
-请在 VS Code 设置中进行配置（Ctrl+, 打开设置）。
-
-1. **平台选择**：
-    * `ai-proofread.proofread.platform`: 选择大模型服务平台（deepseek/aliyun/google）
-
-2. **API密钥配置**（**以上选中平台必须配置**）：
-    * `ai-proofread.apiKeys.deepseek`: Deepseek开放平台 API 密钥
-    * `ai-proofread.apiKeys.aliyun`: 阿里云百炼平台 API 密钥
-    * `ai-proofread.apiKeys.google`: Google Gemini API 密钥
-
-3. **模型选择**
-    * `ai-proofread.proofread.models.deepseek`: Deepseek开放平台模型选择（deepseek-chat/deepseek-reasoner）
-    * `ai-proofread.proofread.models.aliyun`: 阿里云百炼模型选择（deepseek-v3/deepseek-r1/qwen-max-2025-01-25/qwen-max-latest/qwen-plus-latest）
-    * `ai-proofread.proofread.models.google`: Google Gemini模型选择（gemini-2.5-pro-exp-03-25/gemini-2.5-flash-preview-04-17/gemini-2.0-flash）
-
-1. **校对相关**：
-    * `ai-proofread.proofread.rpm`: 每分钟最大请求数（默认15）
-    * `ai-proofread.proofread.maxConcurrent`: 最大并发请求数（默认1）
-    * `ai-proofread.proofread.temperature`: 模型温度（默认1.0，取值范围[0:2)）
-    * `ai-proofread.proofread.defaultContextLevel`: 校对选中文本时默认使用的标题级别，作为上下文范围（默认0，表示不使用）
-    * `ai-proofread.convertQuotes`: 是否在校对后自动将拉丁半角引号转换为中文全角引号（默认为false）
-
-2. **文档切分相关**：
-    * `ai-proofread.defaultSplitLength`: 默认的文本切分长度（默认600字符）
-    * `ai-proofread.defaultTitleLevels`: 默认的标题切分级别（默认[2]，表示按二级标题切分）
-    * `ai-proofread.titleAndLengthSplit.threshold`: 标题加长度切分时的段落长度阈值（默认1000）
-    * `ai-proofread.titleAndLengthSplit.minLength`: 标题加长度切分时的最小长度（默认120）
-
-3. **提示词管理**：
-    * 必须通过命令面板选择提示词
-    * 一般用户建议通过命令面板（Ctrl+Shift+P）设置提示词
-    * 或通过设置项`ai-proofread.prompts`设置:
-        - 每个提示词必须包含名称和内容
-        - 内容必须对要处理的目标文本（target）、参考资料（reference）、上下文（context）进行说明
-
-4. **调试**：
-    * `ai-proofread.debug`: 是否显示调试日志（默认false）
+从VS Code界面左下角或扩展界面的⚙️，或从命令面板（Ctrl+Shift+P）查找命令Preferences: Open Settings (UI)都能进入扩展配置界面。
 
 ### 3.2. 切分文档
 
-我的经验，在一般语言文字和知识校对场景中，大语言模型一次**输出**六百到八百字会有比较好的效果。因此，一本十来万字的书稿需要切分成三百多段，然后交给大模型校对。
+我的经验，在一般语言文字和知识校对场景中，大语言模型一次输出六百到八百字会有比较好的效果。因此，一本十来万字的书稿需要切分成三百多段，然后交给大模型校对。
 
 打开markdown文件，右键点击编辑器，可以看到切分选项 `AI proofreader: split file`
 
@@ -91,17 +55,20 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ![切分文档](https://blog.xiiigame.com/img/2025-03-28-%E7%94%A8%E4%BA%8EAI%E5%9B%BE%E4%B9%A6%E6%A0%A1%E5%AF%B9%E7%9A%84vscod%E6%89%A9%E5%B1%95/Code_1w0X1wqgyf.png)
 
-1. **按标题切分** (Split File by Title)
-    * 输入标题级别（如：1,2）
-2. **按长度切分** (Split File by Length)
+1. **按长度切分** (Split File by Length)
     * 输入目标切分长度
+2. **按标题切分** (Split File by Title)
+    * 输入标题级别（如：1,2）
 3. **按标题和长度切分** (Split File by Title and Length)
     * 可配置标题级别、阈值（过大则切分）、切分长度和最小长度（过小则合并）
-4. **带上下文切分** (Split File with Context)
-    * 输入标题级别作为上下文范围，输入切分长度
+4. **按长度切分，以标题范围为上下文** (Split File with Title Based Context)
+    * 输入切分长度、题级级别
+5. **按长度切分，扩展前后段落为上下文** (Split File with Paragraph Based Context)
+    * 输入切分长度、前文段落数和后文段落数
 
 切分后都生成同名的 `.json`（用于校对） 和 `.json.md`（可查看切分情况） 两个结果文件。
 切分操作都会生成日志文件（`.log`），记录切分统计信息。
+切分完成后会提示用户选择查看结果的方式：比较前后差异、查看JSON结果或查看日志文件。
 
 **请注意，本扩展默认用户需要校对的文档为[markdown格式](https://www.markdownguide.org/basic-syntax/)，文档切分依赖markdown文档中的两种标记：**（一）空行。在markdown中，一个或多个空行表示分段，没有空行的断行在渲染时被忽略。（二）各级标题。如`## `开头的是二级标题。至少要有空行，否则无法切分。
 
@@ -111,7 +78,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 假设你校对一本书，切分后得到包含300个target的JSON文件。那么可以准备相同数量、一一对应的上下文或参考文献，切分成包含相同数量target的JSON文件。然后使用合并命令，将上下文文本中的target作为context合并，将参考文本中的target作为reference合并。
 
-**合并 JSON 文件** (Merge Two Files)：
+**合并 JSON 文件 (Merge Two Files)：**
 
 1. 打开已切分的要校对的 JSON 文件
 2. 右键选择`AI proofreader: Merge Two Files`（或通过命令面板查找），选择要合并的文件
@@ -123,14 +90,14 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 菜单见上两图。
 
-1. **校对选中文本** (Proofread Selection)
+1. **校对选中文本 (Proofread Selection)**
     1. 打开文本文件（支持常见文本文件，推荐使用Markdown）
     2. 选中要校对的段落
     3. 从右键菜单中选择 Proofread Selection
     4. 可选择上下文范围、参考文件和温度
     5. 最后会自动展示校对前后的差异
     6. 并生成日志
-2. **校对 JSON 文件** (Proofread File)
+2. **校对 JSON 文件 (Proofread File)**
     1. 打开已切分的 JSON 文件
     2. 右键选择Proofread File
     3. 自动使用配置的默认值进行校对
@@ -140,12 +107,12 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ### 3.5. 管理提示词
 
-本插件目前默认提示词的功能是**校对一般的语言文字错误和知识性错误**，具体内容见代码库种的proofreader.ts文件。
+**本插件目前默认提示词的功能是校对一般的语言文字错误和知识性错误**，具体内容见代码库种的proofreader.ts文件。
 
 通过命令面板（Ctrl+Shift+P）可以
 
-1. **管理提示词** (AI Proofreader: set prompts)，可增、删、改
-2. **选择当前使用的提示词** (AI Proofreader: select prompt)
+1. 管理提示词 (AI Proofreader: set prompts)，可增、删、改
+2. 选择当前使用的提示词 (AI Proofreader: select prompt)
 
 也可以在配置文件中处理提示词，但不适合没有编程知识的用户使用。
 
@@ -158,7 +125,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 整个过程没有魔法，处理的目的和方法完全由提示词和三种文本及其标签（reference、context、target）来定义。这就是说，**你可以通过自己的提示词，让AI根据三种文本做你期望的任何处理，** 比如撰写大意、插图脚本、练习题、注释，绘制图表，注音，翻译，进行专项核查（专名统一性、内容安全、引文、年代、注释等）……
 
-需要注意的是，在自定义提示词中，必须对要处理的目标文本（target）、参考资料（reference）、上下文（context）进行说明，如果用不到后两者也可以不说明。并且这种说明应尽可能与三种标签的字面意义相协调，比如target可以用作“要处理的目标文本”，也可以用作“要得到的具体目标”（**作为系统提示词的补充**），但不宜作为参考文本、样例等类。
+需要注意的是，在自定义提示词中，必须对要处理的目标文本（target）、参考资料（reference）、上下文（context）进行说明，如果用不到后两者也可以不说明。并且这种说明应尽可能与三种标签的字面意义相协调，比如target可以用作“要处理的目标文本”，也可以用作“要得到的具体目标”（作为系统提示词的补充），但不宜作为参考文本、样例等类。
 
 提示词示例：
 
@@ -186,7 +153,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 7. 测试.proofread.html：通过jsdiff库比较校对前后markdown文件所得的结果，与Word近似的行内标记，可通过浏览器打印成PDF。需要联网调用jsdiff库，并等待运算完成
 8. 测试.proofread.log，校对日志，**校对文本选段的结果也会存在这里**
 
-**请特别注意：除自动累加的日志文件和自动备份的`测试.proofread.json.md`，其余中间文件，每次操作都将重新生成！** 如有需要，请自行备份。
+**请特别注意：除自动累加的日志文件和自动备份的`测试.proofread.json.md`，其余中间文件，每次操作都将重新生成！如有需要，请自行备份。** 
 
 ### 3.7. 模型温度
 
@@ -226,8 +193,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 1. **比较（diff）文件**，使用右键菜单`diff it with another file`，然后可选两种模式：
     1. 调用vscode diff editor比较。查看“前后差异”的功能与此相通。对于长文本，diff editor有段落无法对齐的问题。此时，可以通过分行或删除分行来帮助diff。
     2. 用jsdiff生成HTML形式的比较结果文件
-        - 支持Markdown文件（.md, .markdown）
-        - 支持JSON文件（.json），自动拼接JSON一级元素或`target`字段内容进行比较，支持每次比较的片段数量（默认0表示所有片段），生成多个有序的差异文件
+        - 支持Markdown文件
+        - 支持JSON文件，自动拼接JSON一级元素或`target`字段内容进行比较，支持每次比较的片段数量（默认0表示所有片段），生成多个有序的差异文件，避免过长文本无法渲染的问题
 
 2. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
 3. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
@@ -248,15 +215,17 @@ Additionally, you can also set your own prompts for other text processing scenar
         ```
 ### 3.9. 注意事项
 
-1. 确保在使用前已正确配置必要 API 密钥
+1. 确保在使用前已正确配置必要的 API 密钥
 2. 长文本建议先切分后校对
 3. 校对过程可以随时取消，已处理的内容会得到保存，重新校对时不会重复处理
-4. 注意所用模型 API 调用频率限制，可通过配置调整
+4. 注意所用模型 API 调用频率和并发数限制，可通过配置调整
 
 ## 4. 相关工具
 
-1. **vscode提供的比较（diff）功能**：通过文件浏览器右键菜单使用；本插件在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，有许多便捷的文字编辑功能，很适合编辑工用作主力编辑器。
-2. Acrobat、WPS等软件，可以把PDF文件转成docx或HTML，再用pandoc转markdown
+1. vscode提供的比较（diff）功能：通过文件浏览器右键菜单使用；本插件在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://code.visualstudio.com/shortcuts/keyboard-shortcuts-windows.pdf)，很适合编辑工用作主力编辑器。
+2. PDF查看器[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，速度快，能跨行搜索
+3. 多功能文档格式转换工具[Pandoc](https://pandoc.org/installing.html)
+4. Acrobat、WPS等软件，可以把PDF文件转成docx或HTML，再用pandoc转markdown
 
 ## 5. TODO
 
