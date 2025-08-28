@@ -263,7 +263,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 ## 5. TODO
 
 1. [x] jsdiff支持JSON文件，允许用户指定每次jsdiff的片段数量，避免文本过长可能无法渲染
-2. [ ] 优化“转换半角引号为全角”算法，避免跨行引号转换错误
+2. [x] 优化“转换半角引号为全角”算法，避免跨行引号转换错误
 3. [ ] 加入前后target作为context
 4. [ ] 支持Ollama
 5. [ ] 在按长度切分的基础上调用LLM辅助切分

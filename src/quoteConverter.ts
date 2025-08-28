@@ -8,14 +8,15 @@
  * @returns 转换后的文本
  */
 export function convertQuotes(text: string): string {
-    // 定义引号映射
+    // 定义引号映射，拉丁半角双引号和单引号都转换为中文全角引号
     const quoteMap = {
         '"': '“”', // 双引号
         "'": "‘’"  // 单引号
     };
 
-    // 按段落分割文本
-    const paragraphs = text.split(/\n/);
+    // 按markdown段落分割文本
+    // 段落由两个或更多连续的空行（或包含空格的行）分隔
+    const paragraphs = text.split(/\n(\s*\n)+/);
     let result = '';
 
     for (const paragraph of paragraphs) {
