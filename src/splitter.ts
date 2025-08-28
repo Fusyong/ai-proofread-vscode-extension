@@ -11,7 +11,7 @@ import * as path from 'path';
  * @param cutBy 切分长度
  * @returns 切分后的文本列表
  */
-export function cutTextByLength(text: string, cutBy: number = 600): string[] {
+export function splitTextByLength(text: string, cutBy: number = 600): string[] {
     // 如果长度小于50，则按50字切分
     cutBy = Math.max(50, cutBy);
 
@@ -110,7 +110,7 @@ export function splitMarkdownByTitleAndLengthWithContext(
     // 处理每个段落
     for (const section of sections) {
         // 将段落按长度切分
-        const pieces = cutTextByLength(section, cutBy);
+        const pieces = splitTextByLength(section, cutBy);
 
         // 为每个片段添加完整上下文
         pieces.forEach(piece => {
@@ -131,11 +131,11 @@ export function splitMarkdownByTitleAndLengthWithContext(
  * @param cutBy 拆分长段落时的目标长度
  * @returns 处理后的段落列表
  */
-export function cutTextInListByLength(textList: string[], threshold: number = 1500, cutBy: number = 800): string[] {
+export function splitTextInListByLength(textList: string[], threshold: number = 1500, cutBy: number = 800): string[] {
     const textListShort: string[] = [];
     for (const text of textList) {
         if (text.length > threshold) {
-            textListShort.push(...cutTextByLength(text, cutBy));
+            textListShort.push(...splitTextByLength(text, cutBy));
         } else {
             textListShort.push(text);
         }
@@ -207,7 +207,7 @@ export function splitText(
 
     if (options.mode === 'length') {
         // 按长度切分
-        const textList = cutTextByLength(text, options.cutBy);
+        const textList = splitTextByLength(text, options.cutBy);
         segments = textList.map(x => ({ target: x }));
     } else if (options.mode === 'title') {
         // 按标题切分
@@ -219,7 +219,7 @@ export function splitText(
     } else {
         // 标题加长度切分：先按标题切分，然后处理长短段落
         let textList = splitMarkdownByTitle(text, options.levels);
-        textList = cutTextInListByLength(textList, options.threshold, options.cutBy);
+        textList = splitTextInListByLength(textList, options.threshold, options.cutBy);
         textList = mergeShortParagraphs(textList, options.minLength);
         segments = textList.map(x => ({ target: x }));
     }

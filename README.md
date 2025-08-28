@@ -227,7 +227,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 1. **比较（diff）文件**，使用右键菜单`diff it with another file`，然后可选两种模式：
     1. 调用vscode diff editor比较。查看“前后差异”的功能与此相通。对于长文本，diff editor有段落无法对齐的问题。此时，可以通过分行或删除分行来帮助diff。
-    2. 用jsdiff生成HTML形式的比较结果文件。
+    2. 用jsdiff生成HTML形式的比较结果文件
+        - 支持Markdown文件（.md, .markdown）
+        - 支持JSON文件（.json），自动拼接JSON一级元素或`target`字段内容进行比较，支持每次比较的片段数量（默认0表示所有片段），生成多个有序的差异文件
+
 2. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
 3. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
 4. **文件格式转换功能**，须先安装好[Pandoc](https://pandoc.org/installing.html)
@@ -259,14 +262,31 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 5. TODO
 
-1. [ ] 默认每30段进行一次jsdiff，可设置
+1. [x] jsdiff支持JSON文件，允许用户指定每次jsdiff的片段数量，避免文本过长可能无法渲染
 2. [ ] 优化“转换半角引号为全角”算法，避免跨行引号转换错误
 3. [ ] 加入前后target作为context
 4. [ ] 支持Ollama
 5. [ ] 在按长度切分的基础上调用LLM辅助切分
 6. [ ] 支持Copilot
+7. [ ] 预置更多提示词，包括常用的专项校对
+    1. [ ] PDF/OCR纯文本整理
+    2. [ ] 练习题就地回答
+    3. [ ] 翻译
+    4. [ ] 按小学语文教材标准加拼音
+    5. [ ] 标点符号用法专项校对
+    6. [ ] 数字用法专项校对
+    7. [ ] 年代、时间专项校对
+    8. [ ] 专名统一性专项校对
+8. [ ] 自主发现、提出、校对知识性问题
+9.  [ ] 检索、核对互联网资料
+10. [ ] 检索、核对本地词典
+11. [ ] 生成、提交校对记录
+12. [ ] 内部git版本管理
 
 ## 6. 更新日志
+
+### v0.1.2
+- 扩展了jsdiff比较并生成html的功能，支持JSON文件，并允许用户指定每次比较的片段数量，避免过长文本无法渲染的问题
 
 ### v0.1.1
 - 优化了文件切分功能，新增统一的切分入口
