@@ -17,8 +17,10 @@ Additionally, you can also set your own prompts for other text processing scenar
     * [阿里云百炼](https://bailian.console.aliyun.com/)
     * [Google Gemini](https://aistudio.google.com/)
     * [Ollama本地模型](https://ollama.ai/)，对计算机性能、专业知识要求较高
+    * [GitHub Copilot](https://github.com/features/copilot)，调用GitHub Copilot扩展的服务，无需配置API密钥，目前免费用户每月50次请求**暂不可用**
 6. 填写所选平台的API秘钥（须到上述平台通过注册、实名认证、生成API秘钥、充值等操作后获得有效的秘钥）
    * 对于Ollama，填写本地服务地址（如：http://localhost:11434）
+   * 对于Copilot，无需配置API密钥，但需要安装GitHub Copilot扩展并登录账户
 
 ## 2. 快速上手
 
