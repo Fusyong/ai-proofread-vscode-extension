@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -88,12 +88,14 @@
           "enum": [
             "deepseek",
             "aliyun",
-            "google"
+            "google",
+            "ollama"
           ],
           "enumDescriptions": [
             "Deepseek开放平台",
             "阿里云百炼平台",
-            "Google Gemini平台"
+            "Google Gemini平台",
+            "Ollama本地模型"
           ],
           "default": "deepseek",
           "description": "大模型服务平台选择"
@@ -134,39 +136,51 @@
           "default": "gemini-2.5-pro-exp-03-25",
           "description": "Google Gemini 平台模型,如: gemini-2.5-pro-exp-03-25, gemini-2.5-flash-preview-04-17, gemini-2.0-flash"
         },
-        "ai-proofread.proofread.rpm": {
+        "ai-proofread.apiKeys.ollama": {
           "order": 17,
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama本地模型服务地址，如: http://localhost:11434"
+        },
+        "ai-proofread.proofread.models.ollama": {
+          "order": 18,
+          "type": "string",
+          "default": "qwen2.5:7b",
+          "description": "Ollama本地模型名称,如: gemma3:4b, llama3.2:3b, mistral:7b, qwen3:4b, deepseek-r1:1.5b"
+        },
+        "ai-proofread.proofread.rpm": {
+          "order": 19,
           "type": "number",
           "default": 15,
           "description": "每分钟最大请求数"
         },
         "ai-proofread.proofread.maxConcurrent": {
-          "order": 18,
+          "order": 20,
           "type": "number",
           "default": 3,
           "description": "最大并发请求数"
         },
         "ai-proofread.proofread.temperature": {
-          "order": 19,
+          "order": 21,
           "type": "number",
           "default": 1.0,
           "description": "模型温度，取值范围是[0:2)，留空则使用模型默认温度"
         },
         "ai-proofread.convertQuotes": {
-          "order": 20,
+          "order": 22,
           "type": "boolean",
           "default": false,
           "description": "是否在校对后自动将拉丁半角引号转换为中文全角引号"
         },
         "ai-proofread.defaultSplitLength": {
-          "order": 21,
+          "order": 23,
           "type": "number",
           "default": 600,
           "minimum": 50,
           "description": "默认的文本切分长度（字符数）"
         },
         "ai-proofread.defaultTitleLevels": {
-          "order": 22,
+          "order": 24,
           "type": "array",
           "items": {
             "type": "number",

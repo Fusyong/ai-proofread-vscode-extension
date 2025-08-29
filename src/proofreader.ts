@@ -339,6 +339,81 @@ export class GoogleApiClient implements ApiClient {
 }
 
 /**
+ * Ollama本地模型 API客户端
+ */
+export class OllamaApiClient implements ApiClient {
+    private baseUrl: string;
+    private model: string;
+
+    constructor(model: string) {
+        const configManager = ConfigManager.getInstance();
+        this.model = model;
+        this.baseUrl = configManager.getApiKey('ollama') || 'http://localhost:11434';
+
+        if (!this.baseUrl) {
+            throw new Error('未配置 Ollama 服务地址，请在设置中配置');
+        }
+    }
+
+    // 使用 Ollama API 进行校对
+    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
+        const logger = Logger.getInstance();
+        const messages = [
+            { role: 'system', content: getSystemPrompt(context) }
+        ];
+
+        if (preText) {
+            messages.push(
+                { role: 'assistant', content: '' },
+                { role: 'user', content: preText }
+            );
+        }
+
+        messages.push(
+            { role: 'assistant', content: '' },
+            { role: 'user', content: targetText }
+        );
+
+        try {
+            const config = vscode.workspace.getConfiguration('ai-proofread');
+            const finalTemperature = temperature || config.get<number>('proofread.temperature');
+            const requestBody: any = {
+                model: this.model,
+                messages,
+                stream: false
+            };
+
+            if (finalTemperature !== undefined) {
+                requestBody.options = {
+                    temperature: finalTemperature
+                };
+                logger.debug(`使用温度: ${finalTemperature}`);
+            } else {
+                logger.debug('未配置温度，使用模型默认温度');
+            }
+
+            const response = await axios.post(
+                `${this.baseUrl}/api/chat`,
+                requestBody,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 300000 // 5分钟超时，本地模型可能较慢
+                }
+            );
+
+            let result = response.data.message.content;
+            result = result.replace('\n</target>', '').replace('<target>\n', '');
+            return result;
+        } catch (error) {
+            logger.error('Ollama API调用出错', error);
+            return null;
+        }
+    }
+}
+
+/**
  * 异步处理段落
  */
 export async function processJsonFileAsync(
@@ -414,6 +489,8 @@ export async function processJsonFileAsync(
                 return new GoogleApiClient(model);
             case 'aliyun':
                 return new AliyunApiClient(model);
+            case 'ollama':
+                return new OllamaApiClient(model);
             case 'deepseek':
             default:
                 return new DeepseekApiClient(model);
@@ -616,6 +693,8 @@ export async function proofreadSelection(
                 return new GoogleApiClient(model);
             case 'aliyun':
                 return new AliyunApiClient(model);
+            case 'ollama':
+                return new OllamaApiClient(model);
             case 'deepseek':
             default:
                 return new DeepseekApiClient(model);

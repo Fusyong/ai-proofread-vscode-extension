@@ -16,7 +16,9 @@ Additionally, you can also set your own prompts for other text processing scenar
     * [Deepseek开放平台](https://platform.deepseek.com/)（默认）
     * [阿里云百炼](https://bailian.console.aliyun.com/)
     * [Google Gemini](https://aistudio.google.com/)
+    * [Ollama本地模型](https://ollama.ai/)，对计算机性能、专业知识要求较高
 6. 填写所选平台的API秘钥（须到上述平台通过注册、实名认证、生成API秘钥、充值等操作后获得有效的秘钥）
+   * 对于Ollama，填写本地服务地址（如：http://localhost:11434）
 
 ## 2. 快速上手
 
@@ -216,9 +218,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 ### 3.9. 注意事项
 
 1. 确保在使用前已正确配置必要的 API 密钥
-2. 长文本建议先切分后校对
-3. 校对过程可以随时取消，已处理的内容会得到保存，重新校对时不会重复处理
-4. 注意所用模型 API 调用频率和并发数限制，可通过配置调整
+2. 一般的语言文字校对依赖丰富的知识，建议使用大规模、非推理模型
+3. 长文本建议先切分后校对
+4. 校对过程可以随时取消，已处理的内容会得到保存，重新校对时不会重复处理
+5. 注意所用模型 API 调用频率和并发数限制，可通过配置调整
 
 ## 4. 相关工具
 
@@ -232,7 +235,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 1. [x] jsdiff支持JSON文件，允许用户指定每次jsdiff的片段数量，避免文本过长可能无法渲染
 2. [x] 优化“转换半角引号为全角”算法，避免跨行引号转换错误
 3. [x] markdown切分/选段校对，加入前后段落作为context
-4. [ ] 支持Ollama
+4. [x] 支持Ollama
 5. [ ] 在按长度切分的基础上调用LLM辅助切分
 6. [ ] 支持Copilot
 7. [ ] 预置更多提示词，包括常用的专项校对
@@ -251,6 +254,11 @@ Additionally, you can also set your own prompts for other text processing scenar
 12. [ ] 内部git版本管理
 
 ## 6. 更新日志
+
+### v0.1.4
+
+- 新增功能：支持Ollama本地模型，无需网络连接即可使用本地大语言模型进行校对
+- 优化：为本地模型增加了更长的超时时间，适应本地计算的特点
 
 ### v0.1.3
 
