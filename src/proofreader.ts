@@ -680,11 +680,20 @@ export async function proofreadSelection(
     }
     const postText = `<target>\n${targetText}\n</target>`;
 
+    // 获取当前使用的提示词名称
+    let currentPromptName = '系统默认提示词';
+    if (context) {
+        const promptName = context.globalState.get<string>('currentPrompt', '');
+        if (promptName !== '') {
+            currentPromptName = promptName;
+        }
+    }
+
     // 显示校对信息
     const targetLength = targetText.length;
     const contextLength = contextText.length;
     const referenceLength = referenceText.length;
-    vscode.window.showInformationMessage(`TText ${targetLength}, CText ${contextLength}, RText ${referenceLength}, Model: ${platform}, ${model}, Temp. ${userTemperature}`);
+    vscode.window.showInformationMessage(`Prompt: ${currentPromptName.slice(0, 4)}…; Context: T. ${targetLength}, C. ${contextLength}, R. ${referenceLength}; Model: ${platform}, ${model}, T. ${userTemperature}`);
 
     // 调用API进行校对
     const client = (() => {

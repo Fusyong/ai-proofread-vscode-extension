@@ -407,14 +407,22 @@ export function activate(context: vscode.ExtensionContext) {
                 const temperature = configManager.getTemperature();
 
                 // 写入开始日志
+                // 获取当前使用的提示词名称
+                let currentPromptName = '系统默认提示词';
+                if (context) {
+                    const promptName = context.globalState.get<string>('currentPrompt', '');
+                    if (promptName !== '') {
+                        currentPromptName = promptName;
+                    }
+                }
+
                 const startTime = new Date().toLocaleString();
                 let logMessage = `\n${'='.repeat(50)}\n`;
-                logMessage += `开始校对时间: ${startTime}\n`;
-                logMessage += `平台: ${platform}\n`;
-                logMessage += `模型: ${model}\n`;
+                logMessage += `Start: ${startTime}\n`;
+                logMessage += `Prompt: ${currentPromptName}\n`;
+                logMessage += `Model: ${platform}, ${model}, T. ${temperature}\n`;
                 logMessage += `RPM: ${rpm}\n`;
-                logMessage += `最大并发数: ${maxConcurrent}\n`;
-                logMessage += `温度: ${temperature}\n`;
+                logMessage += `MaxConcurrent: ${maxConcurrent}\n`;
                 logMessage += `${'='.repeat(50)}\n`;
                 fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
@@ -431,6 +439,9 @@ export function activate(context: vscode.ExtensionContext) {
                     }
                     return;
                 }
+
+                // 显示当前配置信息（模仿文件选段校对的显示方式）
+                vscode.window.showInformationMessage(`Prompt: ${currentPromptName.slice(0, 4)}…; Model: ${platform}, ${model}, T. ${temperature}; RPM: ${rpm}, MaxConcurrent: ${maxConcurrent}`);
 
                 // 显示进度
                 await vscode.window.withProgress({
@@ -672,9 +683,18 @@ export function activate(context: vscode.ExtensionContext) {
                         );
 
                         if (result) {
+                            // 获取当前使用的提示词名称
+                            let currentPromptName = '系统默认提示词';
+                            if (context) {
+                                const promptName = context.globalState.get<string>('currentPrompt', '');
+                                if (promptName !== '') {
+                                    currentPromptName = promptName;
+                                }
+                            }
+
                             // 把参数和校对结果写入日志文件
                             const logFilePath = FilePathUtils.getFilePath(editor.document.uri.fsPath, '.proofread', '.log');
-                            const logMessage = `\n${'='.repeat(50)}\n平台: ${platform}\n模型: ${model}\n温度: ${userTemperature}\n上下文范围: ${contextLevel}\n参考文件: ${referenceFile}\n校对结果:\n\n${result}\n${'='.repeat(50)}\n\n`;
+                            const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${result}\n${'='.repeat(50)}\n\n`;
                             fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
                             // 创建原始文本和校对后文本的临时文件

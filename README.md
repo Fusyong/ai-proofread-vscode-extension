@@ -107,7 +107,14 @@ Additionally, you can also set your own prompts for other text processing scenar
     5. 最后会提示你查看结果：前后差异、差异文件、JSON结果、日志文件
     6. 如有未完成的条目，可重新校对，重新校对时只处理未完成的条目
 
-### 3.5. 管理提示词
+### 3.5. 比较（diff）校对前后的文件差异
+
+在当前markdown或json界面，使用右键菜单`diff it with another file`，如果当前是markdown则有两种模式：
+
+1. 调用vscode内置的diff editor比较。查看“前后差异”的功能与此相通。对于长文本，diff editor有段落无法对齐的问题。此时，可以通过分行或删除分行来帮助diff。
+2. 用jsdiff生成HTML形式的比较结果文件。本模式还支持JSON文件，自动拼接JSON一级元素或`target`字段内容进行比较，支持每次比较的片段数量（默认0表示所有片段），生成多个有序的差异文件，避免过长文本无法渲染的问题
+
+### 3.6 管理提示词
 
 **本插件目前默认提示词的功能是校对一般的语言文字错误和知识性错误**，具体内容见代码库种的proofreader.ts文件。
 
@@ -142,7 +149,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 > 1. 翻译目标文本（target）后输出;
 > 2. ……
 
-### 3.6. 日志等过程文件
+### 3.7. 日志等过程文件
 
 为了让用户能够核验、控制每一个步骤，插件会以要校对的文档的文件名（以“测试.md”为例）为基础，生成一些中间文件，各自的作用如下：
 
@@ -157,7 +164,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 **请特别注意：除自动累加的日志文件和自动备份的`测试.proofread.json.md`，其余中间文件，每次操作都将重新生成！如有需要，请自行备份。** 
 
-### 3.7. 模型温度
+### 3.8. 模型温度
 
 每个模型用于校对的最佳温度需要耐心测试才能得到。
 
@@ -190,17 +197,11 @@ Additionally, you can also set your own prompts for other text processing scenar
 
     默认为1
 
-### 3.8. 其他功能
+### 3.9. 其他功能
 
-1. **比较（diff）文件**，使用右键菜单`diff it with another file`，然后可选两种模式：
-    1. 调用vscode diff editor比较。查看“前后差异”的功能与此相通。对于长文本，diff editor有段落无法对齐的问题。此时，可以通过分行或删除分行来帮助diff。
-    2. 用jsdiff生成HTML形式的比较结果文件
-        - 支持Markdown文件
-        - 支持JSON文件，自动拼接JSON一级元素或`target`字段内容进行比较，支持每次比较的片段数量（默认0表示所有片段），生成多个有序的差异文件，避免过长文本无法渲染的问题
-
-2. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
-3. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
-4. **文件格式转换功能**，须先安装好[Pandoc](https://pandoc.org/installing.html)
+1. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
+2. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
+3. **文件格式转换功能**，须先安装好[Pandoc](https://pandoc.org/installing.html)
     1. 使用命令`convert docx to markdown`将docx转为markdown，与下面的命令行等效
         ```bash
         set myfilename="myfilename"
@@ -215,10 +216,10 @@ Additionally, you can also set your own prompts for other text processing scenar
         ```bash
         pandoc -f markdown -t docx -o myfilename.docx myfilename.markdown
         ```
-### 3.9. 注意事项
+### 3.10. 注意事项
 
 1. 确保在使用前已正确配置必要的 API 密钥
-2. 一般的语言文字校对依赖丰富的知识，建议使用大规模、非推理模型
+2. **一般的语言文字校对依赖丰富的知识、语料，建议使用大规模、非推理模型**
 3. 长文本建议先切分后校对
 4. 校对过程可以随时取消，已处理的内容会得到保存，重新校对时不会重复处理
 5. 注意所用模型 API 调用频率和并发数限制，可通过配置调整
@@ -236,8 +237,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 2. [x] 优化“转换半角引号为全角”算法，避免跨行引号转换错误
 3. [x] markdown切分/选段校对，加入前后段落作为context
 4. [x] 支持Ollama
-5. [ ] 在按长度切分的基础上调用LLM辅助切分
-6. [ ] 支持Copilot
+5. [ ] 支持Copilot
+6. [ ] 在按长度切分的基础上调用LLM辅助切分
 7. [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] PDF/OCR纯文本整理
     2. [ ] 练习题就地回答
@@ -257,12 +258,14 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ### v0.1.4
 
-- 新增功能：支持Ollama本地模型，无需网络连接即可使用本地大语言模型进行校对
+- 新增功能：支持Ollama本地模型，无需网络连接即可使用本地大语言模型进行校对（适合专家用户）
 - 优化：为本地模型增加了更长的超时时间，适应本地计算的特点
+- 优化：完善校对过程中给用户的配置信息、日志文件中输出的配置信息
 
 ### v0.1.3
 
 - 新增功能：markdown切分/选段校对时，可以加入前后段落作为context
+- 优化：转换半角引号为全角的算法，避免跨行引号转换错误
 
 ### v0.1.2
 
