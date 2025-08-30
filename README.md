@@ -22,22 +22,21 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 2. 快速上手
 
-1. **校对文档中的选段：**
+1. **校对文档中的选段**
     1. 打开或新建一个[markdown文档](https://www.markdownguide.org/basic-syntax/)（后缀为`.md`），选中其中的一段文字
     2. 在所选右键打开菜单，使用其中的`AI proofreader: proofread selection`项校对选中文本
     3. 其间可选上下文范围、参考文本和温度
-    4. 最后会自动展示校对前后的差异
-
-2. **切分文档后批量校对：**
+    4. 最后会自动展示校对前后的差异，效果如下：
+    ![前后差异](https://blog.xiiigame.com/img/2025-02-07-%E6%AF%94%E8%BE%83AI%E6%A8%A1%E5%9E%8B%E6%A0%A1%E5%AF%B9%E6%95%88%E6%9E%9C/20252507-160022-52.png)
+2. **切分文档后批量校对**
     1. 打开markdown文档，打开右键菜单，使用其中的`AI proofreader: split file`选项，选择切分模式（按长度、按标题、按标题和长度、带上下文等），把当前的切分为JSON文档
     2. 打开上述JSON文档，打开右键菜单，使用其中的`AI proofreader: proofread file`选项，批量校对切分好的片段
     3. 最后会提示你查看结果：前后差异、差异文件、JSON结果、日志文件
+3. **尝试所有命令**
 
-前后差异示例：
+在打开的markdown（或选中其中一段文字）、JSON文件窗口，可以使用右键菜单访问与文本类型相关的命令。
 
-![前后差异](https://blog.xiiigame.com/img/2025-02-07-%E6%AF%94%E8%BE%83AI%E6%A8%A1%E5%9E%8B%E6%A0%A1%E5%AF%B9%E6%95%88%E6%9E%9C/20252507-160022-52.png)
-
-打开命令面板（Ctrl+Shift+P）能查看和使用所有命令：
+本扩展所有功能，则可以通过命令面板（Ctrl+Shift+P）查找、访问：
 
 ![所有命令](https://blog.xiiigame.com/img/2025-03-28-%E7%94%A8%E4%BA%8EAI%E5%9B%BE%E4%B9%A6%E6%A0%A1%E5%AF%B9%E7%9A%84vscod%E6%89%A9%E5%B1%95/Code_LzE5PiE7EW.png)
 
@@ -54,8 +53,6 @@ Additionally, you can also set your own prompts for other text processing scenar
 打开markdown文件，右键点击编辑器，可以看到切分选项 `AI proofreader: split file`
 
 或通过命令面板查找更具体的选项：
-
-![切分文档](https://blog.xiiigame.com/img/2025-03-28-%E7%94%A8%E4%BA%8EAI%E5%9B%BE%E4%B9%A6%E6%A0%A1%E5%AF%B9%E7%9A%84vscod%E6%89%A9%E5%B1%95/Code_1w0X1wqgyf.png)
 
 1. **按长度切分** (Split File by Length)
     * 输入目标切分长度
@@ -83,10 +80,9 @@ Additionally, you can also set your own prompts for other text processing scenar
 **合并 JSON 文件 (Merge Two Files)：**
 
 1. 打开已切分的要校对的 JSON 文件
-2. 右键选择`AI proofreader: Merge Two Files`（或通过命令面板查找），选择要合并的文件
-3. 确定要插入/更新的字段和来源字段
-
-![校对功能](https://blog.xiiigame.com/img/2025-03-28-%E7%94%A8%E4%BA%8EAI%E5%9B%BE%E4%B9%A6%E6%A0%A1%E5%AF%B9%E7%9A%84vscod%E6%89%A9%E5%B1%95/Code_K2nKGGM9Nj.png)
+2. 打开右键菜单，选择`AI proofreader: Merge Two Files`（或通过命令面板查找）命令
+3. 选择要合并的文件
+4. 确定要插入/更新的字段和来源字段
 
 ### 3.4. 校对文本选段或JSON文档
 
