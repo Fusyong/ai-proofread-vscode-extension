@@ -237,9 +237,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 2. [x] 优化“转换半角引号为全角”算法，避免跨行引号转换错误
 3. [x] markdown切分/选段校对，加入前后段落作为context
 4. [x] 支持Ollama
-5. [ ] 支持Copilot
-6. [ ] 在按长度切分的基础上调用LLM辅助切分
-7. [ ] 预置更多提示词，包括常用的专项校对
+5. [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] PDF/OCR纯文本整理
     2. [ ] 练习题就地回答
     3. [ ] 翻译
@@ -248,11 +246,13 @@ Additionally, you can also set your own prompts for other text processing scenar
     6. [ ] 数字用法专项校对
     7. [ ] 年代、时间专项校对
     8. [ ] 专名统一性专项校对
-8. [ ] 自主发现、提出、校对知识性问题
-9.  [ ] 检索、核对互联网资料
-10. [ ] 检索、核对本地词典
-11. [ ] 生成、提交校对记录
-12. [ ] 内部git版本管理
+6. [ ] 自主发现、提出、校对知识性问题
+7.  [ ] 检索、核对互联网资料
+8.  [ ] 检索、核对本地词典
+9.  [ ] 生成、提交校对记录
+10. [ ] 内部git版本管理
+11. [ ] 在按长度切分的基础上调用LLM辅助切分
+12. [ ] 支持Copilot
 
 ## 6. 更新日志
 
