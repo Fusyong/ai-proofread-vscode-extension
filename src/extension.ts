@@ -14,7 +14,6 @@ import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager, Logger } fro
 import { searchSelectionInPDF } from './pdfSearcher';
 import { convertDocxToMarkdown, convertMarkdownToDocx } from './docConverter';
 import { convertQuotes } from './quoteConverter';
-import { CopilotManager } from './copilotManager';
 
 export function activate(context: vscode.ExtensionContext) {
     const logger = Logger.getInstance();
@@ -427,20 +426,18 @@ export function activate(context: vscode.ExtensionContext) {
                 logMessage += `${'='.repeat(50)}\n`;
                 fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
-                // 检查API密钥是否已配置（Copilot平台不需要API密钥）
-                if (platform !== 'copilot') {
-                    const apiKey = configManager.getApiKey(platform);
-                    if (!apiKey) {
-                        const result = await vscode.window.showErrorMessage(
-                            `未配置${platform}平台的API密钥，是否现在配置？`,
-                            '是',
-                            '否'
-                        );
-                        if (result === '是') {
-                            await vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread.apiKeys');
-                        }
-                        return;
+                // 检查API密钥是否已配置
+                const apiKey = configManager.getApiKey(platform);
+                if (!apiKey) {
+                    const result = await vscode.window.showErrorMessage(
+                        `未配置${platform}平台的API密钥，是否现在配置？`,
+                        '是',
+                        '否'
+                    );
+                    if (result === '是') {
+                        await vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread.apiKeys');
                     }
+                    return;
                 }
 
                 // 显示当前配置信息（模仿文件选段校对的显示方式）
@@ -562,20 +559,18 @@ export function activate(context: vscode.ExtensionContext) {
                 const model = configManager.getModel(platform);
                 const temperature = configManager.getTemperature();
 
-                // 检查API密钥是否已配置（Copilot平台不需要API密钥）
-                if (platform !== 'copilot') {
-                    const apiKey = configManager.getApiKey(platform);
-                    if (!apiKey) {
-                        const result = await vscode.window.showErrorMessage(
-                            `未配置${platform}平台的API密钥，是否现在配置？`,
-                            '是',
-                            '否'
-                        );
-                        if (result === '是') {
-                            await vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread.apiKeys');
-                        }
-                        return;
+                // 检查API密钥是否已配置
+                const apiKey = configManager.getApiKey(platform);
+                if (!apiKey) {
+                    const result = await vscode.window.showErrorMessage(
+                        `未配置${platform}平台的API密钥，是否现在配置？`,
+                        '是',
+                        '否'
+                    );
+                    if (result === '是') {
+                        await vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread.apiKeys');
                     }
+                    return;
                 }
 
                 // 让用户选择上下文构建方式
@@ -1121,16 +1116,6 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('引号转换完成！');
             } catch (error) {
                 ErrorUtils.showError(error, '转换引号时出错：');
-            }
-        }),
-
-        // 注册Copilot状态检查命令
-        vscode.commands.registerCommand('ai-proofread.copilotStatus', async () => {
-            try {
-                const copilotManager = CopilotManager.getInstance();
-                await copilotManager.showStatusInfo();
-            } catch (error) {
-                ErrorUtils.showError(error, '检查Copilot状态时出错：');
             }
         }),
     ];

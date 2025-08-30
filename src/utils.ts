@@ -179,16 +179,7 @@ export class ConfigManager {
      * @returns 模型名称
      */
     public getModel(platform: string): string {
-        const defaultModels: { [key: string]: string } = {
-            'deepseek': 'deepseek-chat',
-            'aliyun': 'deepseek-v3',
-            'google': 'gemini-2.5-pro',
-            'ollama': 'qwen3:4b',
-            'copilot': 'copilot'
-        };
-        
-        const defaultModel = defaultModels[platform] || 'deepseek-chat';
-        return this.config.get<string>(`proofread.models.${platform}`, defaultModel);
+        return this.config.get<string>(`proofread.models.${platform}`, 'deepseek-chat');
     }
 
     /**

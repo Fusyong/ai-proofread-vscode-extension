@@ -11,7 +11,6 @@ import { GoogleGenAI } from "@google/genai";
 import { ConfigManager, Logger } from './utils';
 import { convertQuotes } from './quoteConverter';
 import { buildTitleBasedContext, buildParagraphBasedContext } from './splitter';
-import { CopilotApiClient } from './copilotClient';
 
 // 加载环境变量
 dotenv.config();
@@ -492,8 +491,6 @@ export async function processJsonFileAsync(
                 return new AliyunApiClient(model);
             case 'ollama':
                 return new OllamaApiClient(model);
-            case 'copilot':
-                return new CopilotApiClient(model);
             case 'deepseek':
             default:
                 return new DeepseekApiClient(model);
@@ -707,8 +704,6 @@ export async function proofreadSelection(
                 return new AliyunApiClient(model);
             case 'ollama':
                 return new OllamaApiClient(model);
-            case 'copilot':
-                return new CopilotApiClient(model);
             case 'deepseek':
             default:
                 return new DeepseekApiClient(model);
