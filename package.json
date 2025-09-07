@@ -110,7 +110,7 @@
           "order": 12,
           "type": "string",
           "default": "deepseek-chat",
-          "description": "Deepseek开放平台模型,如: deepseek-chat, deepseek-reasoner"
+          "description": "Deepseek开放平台模型,如: deepseek-chat（暂时无法使用推理模型deepseek-reasoner）"
         },
         "ai-proofread.apiKeys.aliyun": {
           "order": 13,
