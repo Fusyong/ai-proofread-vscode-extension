@@ -157,6 +157,11 @@ export class DeepseekApiClient implements ApiClient {
     // 使用 Deepseek API 进行校对
     async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
         const logger = Logger.getInstance();
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
+        const retryDelay = config.get<number>('proofread.retryDelay', 1000);
+        const timeout = config.get<number>('proofread.timeout', 30000);
+
         const messages = [
             { role: 'system', content: getSystemPrompt(context) }
         ];
@@ -173,39 +178,67 @@ export class DeepseekApiClient implements ApiClient {
             { role: 'user', content: targetText }
         );
 
-        try {
-            const config = vscode.workspace.getConfiguration('ai-proofread');
-            const finalTemperature = temperature || config.get<number>('proofread.temperature');
-            const requestBody: any = {
-                model: this.model,
-                messages,
-            };
+        const finalTemperature = temperature || config.get<number>('proofread.temperature');
+        const requestBody: any = {
+            model: this.model,
+            messages,
+        };
 
-            if (finalTemperature !== undefined) {
-                requestBody.temperature = finalTemperature;
-                logger.debug(`使用温度: ${finalTemperature}`);
-            } else {
-                logger.debug('未配置温度，使用模型默认温度');
-            }
-
-            const response = await axios.post(
-                `${this.baseUrl}/chat/completions`,
-                requestBody,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.apiKey}`,
-                        'Content-Type': 'application/json',
-                    }
-                }
-            );
-
-            let result = response.data.choices[0].message.content;
-            result = result.replace('\n</target>', '').replace('<target>\n', '');
-            return result;
-        } catch (error) {
-            logger.error('API调用出错', error);
-            return null;
+        if (finalTemperature !== undefined) {
+            requestBody.temperature = finalTemperature;
+            logger.debug(`使用温度: ${finalTemperature}`);
+        } else {
+            logger.debug('未配置温度，使用模型默认温度');
         }
+
+        // 重试机制
+        for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+            try {
+                logger.debug(`API调用尝试 ${attempt}/${retryAttempts}`);
+                
+                const response = await axios.post(
+                    `${this.baseUrl}/chat/completions`,
+                    requestBody,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${this.apiKey}`,
+                            'Content-Type': 'application/json',
+                        },
+                        timeout: timeout
+                    }
+                );
+
+                let result = response.data.choices[0].message.content;
+                result = result.replace('\n</target>', '').replace('<target>\n', '');
+                return result;
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                const isNetworkError = errorMessage.includes('fetch failed') || 
+                                     errorMessage.includes('network') || 
+                                     errorMessage.includes('timeout') ||
+                                     errorMessage.includes('ECONNRESET') ||
+                                     errorMessage.includes('ENOTFOUND') ||
+                                     errorMessage.includes('ECONNREFUSED');
+
+                if (attempt === retryAttempts) {
+                    // 最后一次尝试失败
+                    logger.error(`API调用失败，已重试 ${retryAttempts} 次`, error);
+                    return null;
+                }
+
+                if (isNetworkError) {
+                    // 网络错误，进行重试
+                    logger.warn(`网络错误，${retryDelay}ms后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                } else {
+                    // 非网络错误，不重试
+                    logger.error('API调用出错（非网络错误，不重试）', error);
+                    return null;
+                }
+            }
+        }
+
+        return null;
     }
 }
 
@@ -231,6 +264,11 @@ export class AliyunApiClient implements ApiClient {
     // 使用阿里云百炼 API 进行校对
     async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
         const logger = Logger.getInstance();
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
+        const retryDelay = config.get<number>('proofread.retryDelay', 1000);
+        const timeout = config.get<number>('proofread.timeout', 30000);
+
         const messages = [
             { role: 'system', content: getSystemPrompt(context) }
         ];
@@ -247,39 +285,67 @@ export class AliyunApiClient implements ApiClient {
             { role: 'user', content: targetText }
         );
 
-        try {
-            const config = vscode.workspace.getConfiguration('ai-proofread');
-            const finalTemperature = temperature || config.get<number>('proofread.temperature');
-            const requestBody: any = {
-                model: this.model,
-                messages,
-            };
+        const finalTemperature = temperature || config.get<number>('proofread.temperature');
+        const requestBody: any = {
+            model: this.model,
+            messages,
+        };
 
-            if (finalTemperature !== undefined) {
-                requestBody.temperature = finalTemperature;
-                logger.debug(`使用温度: ${finalTemperature}`);
-            } else {
-                logger.debug('未配置温度，使用模型默认温度');
-            }
-
-            const response = await axios.post(
-                `${this.baseUrl}/chat/completions`,
-                requestBody,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.apiKey}`,
-                        'Content-Type': 'application/json',
-                    }
-                }
-            );
-
-            let result = response.data.choices[0].message.content;
-            result = result.replace('\n</target>', '').replace('<target>\n', '');
-            return result;
-        } catch (error) {
-            logger.error('API调用出错', error);
-            return null;
+        if (finalTemperature !== undefined) {
+            requestBody.temperature = finalTemperature;
+            logger.debug(`使用温度: ${finalTemperature}`);
+        } else {
+            logger.debug('未配置温度，使用模型默认温度');
         }
+
+        // 重试机制
+        for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+            try {
+                logger.debug(`API调用尝试 ${attempt}/${retryAttempts}`);
+                
+                const response = await axios.post(
+                    `${this.baseUrl}/chat/completions`,
+                    requestBody,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${this.apiKey}`,
+                            'Content-Type': 'application/json',
+                        },
+                        timeout: timeout
+                    }
+                );
+
+                let result = response.data.choices[0].message.content;
+                result = result.replace('\n</target>', '').replace('<target>\n', '');
+                return result;
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                const isNetworkError = errorMessage.includes('fetch failed') || 
+                                     errorMessage.includes('network') || 
+                                     errorMessage.includes('timeout') ||
+                                     errorMessage.includes('ECONNRESET') ||
+                                     errorMessage.includes('ENOTFOUND') ||
+                                     errorMessage.includes('ECONNREFUSED');
+
+                if (attempt === retryAttempts) {
+                    // 最后一次尝试失败
+                    logger.error(`API调用失败，已重试 ${retryAttempts} 次`, error);
+                    return null;
+                }
+
+                if (isNetworkError) {
+                    // 网络错误，进行重试
+                    logger.warn(`网络错误，${retryDelay}ms后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                } else {
+                    // 非网络错误，不重试
+                    logger.error('API调用出错（非网络错误，不重试）', error);
+                    return null;
+                }
+            }
+        }
+
+        return null;
     }
 }
 
@@ -305,36 +371,81 @@ export class GoogleApiClient implements ApiClient {
     // 使用 Google API 进行校对
     async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
         const logger = Logger.getInstance();
-        try {
-            let contents = targetText;
-            if(preText) {
-                contents = [contents, preText].join('\n\n');
-            }
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
+        const retryDelay = config.get<number>('proofread.retryDelay', 1000);
 
-            const config = vscode.workspace.getConfiguration('ai-proofread');
-            const finalTemperature = temperature || config.get<number>('proofread.temperature');
-            const configObj: any = {
-                systemInstruction: getSystemPrompt(context),
-            };
-
-            if (finalTemperature !== undefined) {
-                configObj.temperature = finalTemperature;
-                logger.debug(`使用温度: ${finalTemperature}`);
-            } else {
-                logger.debug('未配置温度，使用模型默认温度');
-            }
-
-            const response = await this.ai.models.generateContent({
-                model: this.model,
-                config: configObj,
-                contents: contents,
-            });
-
-            return response.text || null;
-        } catch (error) {
-            logger.error('API调用出错', error);
-            return null;
+        let contents = targetText;
+        if(preText) {
+            contents = [contents, preText].join('\n\n');
         }
+
+        const finalTemperature = temperature || config.get<number>('proofread.temperature');
+        const disableThinking = config.get<boolean>('proofread.disableThinking', true);
+        
+        const configObj: any = {
+            systemInstruction: getSystemPrompt(context),
+        };
+
+        if (finalTemperature !== undefined) {
+            configObj.temperature = finalTemperature;
+            logger.debug(`使用温度: ${finalTemperature}`);
+        } else {
+            logger.debug('未配置温度，使用模型默认温度');
+        }
+
+        // 配置思考功能
+        if (!disableThinking) {
+            configObj.thinkingConfig = {
+                thinkingBudget: 1 // 1表示启用思考，0表示禁用思考
+            };
+            logger.debug('启用Gemini思考功能');
+        } else {
+            configObj.thinkingConfig = {
+                thinkingBudget: 0 // 1表示启用思考，0表示禁用思考
+            };
+            logger.debug('禁用Gemini思考功能');
+        }
+
+        // 重试机制
+        for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+            try {
+                logger.debug(`API调用尝试 ${attempt}/${retryAttempts}`);
+                
+                const response = await this.ai.models.generateContent({
+                    model: this.model,
+                    config: configObj,
+                    contents: contents,
+                });
+
+                return response.text || null;
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                const isNetworkError = errorMessage.includes('fetch failed') || 
+                                     errorMessage.includes('network') || 
+                                     errorMessage.includes('timeout') ||
+                                     errorMessage.includes('ECONNRESET') ||
+                                     errorMessage.includes('ENOTFOUND');
+
+                if (attempt === retryAttempts) {
+                    // 最后一次尝试失败
+                    logger.error(`API调用失败，已重试 ${retryAttempts} 次`, error);
+                    return null;
+                }
+
+                if (isNetworkError) {
+                    // 网络错误，进行重试
+                    logger.warn(`网络错误，${retryDelay}ms后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                } else {
+                    // 非网络错误，不重试
+                    logger.error('API调用出错（非网络错误，不重试）', error);
+                    return null;
+                }
+            }
+        }
+
+        return null;
     }
 }
 
@@ -358,6 +469,11 @@ export class OllamaApiClient implements ApiClient {
     // 使用 Ollama API 进行校对
     async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
         const logger = Logger.getInstance();
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
+        const retryDelay = config.get<number>('proofread.retryDelay', 1000);
+        const timeout = config.get<number>('proofread.timeout', 300000); // Ollama本地模型默认5分钟超时
+
         const messages = [
             { role: 'system', content: getSystemPrompt(context) }
         ];
@@ -374,42 +490,69 @@ export class OllamaApiClient implements ApiClient {
             { role: 'user', content: targetText }
         );
 
-        try {
-            const config = vscode.workspace.getConfiguration('ai-proofread');
-            const finalTemperature = temperature || config.get<number>('proofread.temperature');
-            const requestBody: any = {
-                model: this.model,
-                messages,
-                stream: false
+        const finalTemperature = temperature || config.get<number>('proofread.temperature');
+        const requestBody: any = {
+            model: this.model,
+            messages,
+            stream: false
+        };
+
+        if (finalTemperature !== undefined) {
+            requestBody.options = {
+                temperature: finalTemperature
             };
-
-            if (finalTemperature !== undefined) {
-                requestBody.options = {
-                    temperature: finalTemperature
-                };
-                logger.debug(`使用温度: ${finalTemperature}`);
-            } else {
-                logger.debug('未配置温度，使用模型默认温度');
-            }
-
-            const response = await axios.post(
-                `${this.baseUrl}/api/chat`,
-                requestBody,
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    timeout: 300000 // 5分钟超时，本地模型可能较慢
-                }
-            );
-
-            let result = response.data.message.content;
-            result = result.replace('\n</target>', '').replace('<target>\n', '');
-            return result;
-        } catch (error) {
-            logger.error('Ollama API调用出错', error);
-            return null;
+            logger.debug(`使用温度: ${finalTemperature}`);
+        } else {
+            logger.debug('未配置温度，使用模型默认温度');
         }
+
+        // 重试机制
+        for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+            try {
+                logger.debug(`API调用尝试 ${attempt}/${retryAttempts}`);
+                
+                const response = await axios.post(
+                    `${this.baseUrl}/api/chat`,
+                    requestBody,
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        timeout: timeout
+                    }
+                );
+
+                let result = response.data.message.content;
+                result = result.replace('\n</target>', '').replace('<target>\n', '');
+                return result;
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                const isNetworkError = errorMessage.includes('fetch failed') || 
+                                     errorMessage.includes('network') || 
+                                     errorMessage.includes('timeout') ||
+                                     errorMessage.includes('ECONNRESET') ||
+                                     errorMessage.includes('ENOTFOUND') ||
+                                     errorMessage.includes('ECONNREFUSED');
+
+                if (attempt === retryAttempts) {
+                    // 最后一次尝试失败
+                    logger.error(`API调用失败，已重试 ${retryAttempts} 次`, error);
+                    return null;
+                }
+
+                if (isNetworkError) {
+                    // 网络错误，进行重试
+                    logger.warn(`网络错误，${retryDelay}ms后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                } else {
+                    // 非网络错误，不重试
+                    logger.error('API调用出错（非网络错误，不重试）', error);
+                    return null;
+                }
+            }
+        }
+
+        return null;
     }
 }
 

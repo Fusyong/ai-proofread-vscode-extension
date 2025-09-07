@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -122,7 +122,7 @@
           "order": 14,
           "type": "string",
           "default": "qwen-max-2025-01-25",
-          "description": "阿里云百炼平台模型,如: qwen-max-2025-01-25, qwen-max-latest, qwen-plus-latest, deepseek-v3, deepseek-r1"
+          "description": "阿里云百炼平台模型,如: qwen3-max-preview, qwen-max-latest,qwen-max,  qwen-plus-latest, qwen-plus, deepseek-v3, deepseek-r1"
         },
         "ai-proofread.apiKeys.google": {
           "order": 15,
@@ -134,53 +134,83 @@
           "order": 16,
           "type": "string",
           "default": "gemini-2.5-pro-exp-03-25",
-          "description": "Google Gemini 平台模型,如: gemini-2.5-pro-exp-03-25, gemini-2.5-flash-preview-04-17, gemini-2.0-flash"
+          "description": "Google Gemini 平台模型,如: gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite"
         },
         "ai-proofread.apiKeys.ollama": {
-          "order": 17,
+          "order": 18,
           "type": "string",
           "default": "http://localhost:11434",
           "description": "Ollama本地模型服务地址，如: http://localhost:11434"
         },
         "ai-proofread.proofread.models.ollama": {
-          "order": 18,
+          "order": 19,
           "type": "string",
           "default": "qwen2.5:7b",
           "description": "Ollama本地模型名称,如: gemma3:4b, llama3.2:3b, mistral:7b, qwen3:4b, deepseek-r1:1.5b"
         },
+        "ai-proofread.proofread.disableThinking": {
+          "order": 20,
+          "type": "boolean",
+          "default": true,
+          "description": "禁用模型思考功能（一般语言文字校对建议禁用，以提高速度，充分利用模型知识。目前仅适用于Gemini 2.5系列模型，且无法在 Gemini 2.5 Pro 上停用）"
+        },
+        "ai-proofread.proofread.retryAttempts": {
+          "order": 21,
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "API调用失败时的重试次数"
+        },
+        "ai-proofread.proofread.retryDelay": {
+          "order": 22,
+          "type": "number",
+          "default": 1000,
+          "minimum": 100,
+          "maximum": 10000,
+          "description": "重试间隔时间（毫秒）"
+        },
+        "ai-proofread.proofread.timeout": {
+          "order": 23,
+          "type": "number",
+          "default": 30000,
+          "minimum": 5000,
+          "maximum": 300000,
+          "description": "API请求超时时间（毫秒）"
+        },
         "ai-proofread.proofread.rpm": {
-          "order": 19,
+          "order": 24,
           "type": "number",
           "default": 15,
           "description": "每分钟最大请求数"
         },
         "ai-proofread.proofread.maxConcurrent": {
-          "order": 20,
+          "order": 25,
           "type": "number",
           "default": 3,
           "description": "最大并发请求数"
         },
         "ai-proofread.proofread.temperature": {
-          "order": 21,
+          "order": 26,
           "type": "number",
           "default": 1.0,
           "description": "模型温度，取值范围是[0:2)，留空则使用模型默认温度"
         },
         "ai-proofread.convertQuotes": {
-          "order": 22,
+          "order": 27,
           "type": "boolean",
           "default": false,
           "description": "是否在校对后自动将拉丁半角引号转换为中文全角引号"
         },
         "ai-proofread.defaultSplitLength": {
-          "order": 23,
+          "order": 28,
           "type": "number",
           "default": 600,
           "minimum": 50,
           "description": "默认的文本切分长度（字符数）"
         },
         "ai-proofread.defaultTitleLevels": {
-          "order": 24,
+          "order": 29,
           "type": "array",
           "items": {
             "type": "number",
@@ -193,37 +223,37 @@
           "description": "默认的标题切分级别（例如：[1,2] 表示按一级和二级标题切分）"
         },
         "ai-proofread.titleAndLengthSplit.threshold": {
-          "order": 25,
+          "order": 30,
           "type": "number",
           "default": 1000,
           "description": "标题加长度切分：段落长度阈值，超过此长度的段落将被切分"
         },
         "ai-proofread.titleAndLengthSplit.minLength": {
-          "order": 27,
+          "order": 31,
           "type": "number",
           "default": 120,
           "description": "标题加长度切分：最小长度，小于此长度的段落将被合并"
         },
         "ai-proofread.proofread.defaultContextLevel": {
-          "order": 28,
+          "order": 32,
           "type": "number",
           "default": 0,
           "description": "校对选中文本时，默认使用的标题级别作为上下文范围（0表示不使用）"
         },
         "ai-proofread.paragraphContextSplit.beforeParagraphs": {
-          "order": 30,
+          "order": 34,
           "type": "number",
           "default": 1,
           "description": "段落上下文切分模式：前文段落数"
         },
         "ai-proofread.paragraphContextSplit.afterParagraphs": {
-          "order": 31,
+          "order": 35,
           "type": "number",
           "default": 1,
           "description": "段落上下文切分模式：后文段落数"
         },
         "ai-proofread.prompts": {
-          "order": 32,
+          "order": 36,
           "type": "array",
           "default": [],
           "maxItems": 5,

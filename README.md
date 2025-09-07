@@ -14,8 +14,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 4. 安装后点击设置按钮⚙️，选中弹出菜单中的设置项Settings
 5. 在设置界面选择下面的一个大语言模型服务平台
     * [Deepseek开放平台](https://platform.deepseek.com/)（默认）
-    * [阿里云百炼](https://bailian.console.aliyun.com/)
-    * [Google Gemini](https://aistudio.google.com/)
+    * [阿里云百炼](https://bailian.console.aliyun.com/)，[模型列表](https://bailian.console.aliyun.com/?tab=model#/model-market)
+    * [Google Gemini](https://aistudio.google.com/)，[模型列表](https://ai.google.dev/gemini-api/docs/models)
     * [Ollama本地模型](https://ollama.ai/)，对计算机性能、专业知识要求较高
 6. 填写所选平台的API秘钥（须到上述平台通过注册、实名认证、生成API秘钥、充值等操作后获得有效的秘钥）
    * 对于Ollama，填写本地服务地址（如：http://localhost:11434）
@@ -233,7 +233,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 2. [x] 优化“转换半角引号为全角”算法，避免跨行引号转换错误
 3. [x] markdown切分/选段校对，加入前后段落作为context
 4. [x] 支持Ollama
-5. [ ] 预置更多提示词，包括常用的专项校对
+5. [x] 禁用Gemini 模型的思考功能
+6. [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] PDF/OCR纯文本整理
     2. [ ] 练习题就地回答
     3. [ ] 翻译
@@ -242,15 +243,20 @@ Additionally, you can also set your own prompts for other text processing scenar
     6. [ ] 数字用法专项校对
     7. [ ] 年代、时间专项校对
     8. [ ] 专名统一性专项校对
-6. [ ] 自主发现、提出、校对知识性问题
-7.  [ ] 检索、核对互联网资料
-8.  [ ] 检索、核对本地词典
-9.  [ ] 生成、提交校对记录
-10. [ ] 内部git版本管理
-11. [ ] 在按长度切分的基础上调用LLM辅助切分
-12. [ ] 支持Copilot
+7. [ ] 自主发现、提出、校对知识性问题
+8.  [ ] 检索、核对互联网资料
+9.  [ ] 检索、核对本地词典
+10. [ ] 生成、提交校对记录
+11. [ ] 内部git版本管理
+12. [ ] 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
+13. [ ] 支持Copilot（尝试过一次，回文说API还没有开放。还需要研究参考项目。）
 
 ## 6. 更新日志
+
+### v0.1.5
+
+- 禁用Gemini模型思考功能
+- 添加重试机制
 
 ### v0.1.4
 
