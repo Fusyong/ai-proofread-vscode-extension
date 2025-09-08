@@ -160,7 +160,7 @@ export class DeepseekApiClient implements ApiClient {
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
         const retryDelay = config.get<number>('proofread.retryDelay', 1000);
-        const timeout = config.get<number>('proofread.timeout', 30000);
+        const timeout = config.get<number>('proofread.timeout', 50000);
 
         const messages = [
             { role: 'system', content: getSystemPrompt(context) }
@@ -267,7 +267,7 @@ export class AliyunApiClient implements ApiClient {
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
         const retryDelay = config.get<number>('proofread.retryDelay', 1000);
-        const timeout = config.get<number>('proofread.timeout', 30000);
+        const timeout = config.get<number>('proofread.timeout', 50000);
 
         const messages = [
             { role: 'system', content: getSystemPrompt(context) }

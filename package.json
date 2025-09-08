@@ -173,7 +173,7 @@
         "ai-proofread.proofread.timeout": {
           "order": 23,
           "type": "number",
-          "default": 30000,
+          "default": 50000,
           "minimum": 5000,
           "maximum": 300000,
           "description": "API请求超时时间（毫秒）"
