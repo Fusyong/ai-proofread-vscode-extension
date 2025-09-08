@@ -599,7 +599,7 @@ export async function processJsonFileAsync(
     if (fs.existsSync(jsonOutPath)) {
         outputParagraphs = JSON.parse(fs.readFileSync(jsonOutPath, 'utf8'));
         if (outputParagraphs.length !== totalCount) {
-            throw new Error(`输出JSON的长度与输入JSON的长度不同: ${outputParagraphs.length} != ${totalCount}`);
+            throw new Error(`输出JSON的长度与输入JSON的长度不同: ${outputParagraphs.length} != ${totalCount}。请解决冲突，或删除原有的输出JSON文件。`);
         }
     } else {
         outputParagraphs = new Array(totalCount).fill(null);

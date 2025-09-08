@@ -238,8 +238,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 3. [x] markdown切分/选段校对，加入前后段落作为context
 4. [x] 支持Ollama
 5. [x] 禁用Gemini 模型的思考功能
-6. [ ] 保持切分和校对结果菜单，由用户主动关闭；
-7. [ ] 切分结果菜单增加一个“校对JSON结果”按钮
+6. [x] 保持切分和校对结果菜单，由用户主动关闭；
+7. [x] 切分结果菜单增加一个“校对JSON结果”按钮
 8. [ ] 推理模型无法使用的问题（可能单纯是因为运行时间过长）
 9. [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] PDF/OCR纯文本整理
@@ -260,6 +260,12 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 
 ## 6. 更新日志
+
+### v0.1.6
+
+- 切分和校对结果改成Webview Panel呈现，在一个切分、校对流程中可以重新打开
+- 切分结果菜单增加一个“校对JSON结果”按钮
+
 
 ### v0.1.5
 

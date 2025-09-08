@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -77,6 +77,10 @@
       {
         "command": "ai-proofread.splitFile",
         "title": "AI Proofreader: split file"
+      },
+      {
+        "command": "ai-proofread.reopenResultPanel",
+        "title": "AI Proofreader: reopen result panel"
       }
     ],
     "configuration": {

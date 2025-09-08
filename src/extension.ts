@@ -15,6 +15,759 @@ import { searchSelectionInPDF } from './pdfSearcher';
 import { convertDocxToMarkdown, convertMarkdownToDocx } from './docConverter';
 import { convertQuotes } from './quoteConverter';
 
+// Webview Panel 工具函数
+interface SplitResult {
+    jsonFilePath: string;
+    markdownFilePath: string;
+    logFilePath: string;
+    originalFilePath: string;
+}
+
+interface ProofreadResult {
+    outputFilePath: string;
+    logFilePath: string;
+    originalFilePath: string;
+    markdownFilePath: string;
+    jsdiffFilePath: string;
+    stats: {
+        totalCount: number;
+        processedCount: number;
+        processedLength: number;
+        totalLength: number;
+    };
+}
+
+interface ProcessResult {
+    title: string;
+    message: string;
+    splitResult?: SplitResult;
+    proofreadResult?: ProofreadResult;
+    actions: {
+        showJson?: boolean;
+        showLog?: boolean;
+        showDiff?: boolean;
+        showJsdiff?: boolean;
+    };
+}
+
+// 全局面板管理
+let currentPanel: vscode.WebviewPanel | undefined;
+let currentProcessResult: ProcessResult | undefined;
+
+function createWebviewPanel(result: ProcessResult): vscode.WebviewPanel {
+    // 如果已有面板，先关闭它
+    if (currentPanel) {
+        currentPanel.dispose();
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+        'processResult',
+        result.title,
+        vscode.ViewColumn.Beside,
+        {
+            enableScripts: true,
+            retainContextWhenHidden: true
+        }
+    );
+
+    // 保存当前面板和结果
+    currentPanel = panel;
+    currentProcessResult = result;
+
+    // 生成切分结果HTML
+    const splitHtml = result.splitResult ? `
+        <div class="process-section">
+            <h3>📄 文件切分结果</h3>
+            <div class="file-paths">
+                <div class="file-path-item">
+                    <span class="file-label">原始文件:</span>
+                    <span class="file-path">${result.splitResult.originalFilePath}</span>
+                </div>
+                <div class="file-path-item">
+                    <span class="file-label">JSON文件:</span>
+                    <span class="file-path">${result.splitResult.jsonFilePath}</span>
+                </div>
+                <div class="file-path-item">
+                    <span class="file-label">Markdown文件:</span>
+                    <span class="file-path">${result.splitResult.markdownFilePath}</span>
+                </div>
+                <div class="file-path-item">
+                    <span class="file-label">日志文件:</span>
+                    <span class="file-path">${result.splitResult.logFilePath}</span>
+                </div>
+            </div>
+            <div class="section-actions">
+                ${result.splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitJson\')">查看JSON文件</button>' : ''}
+                ${result.splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'proofreadJson\')">校对JSON文件</button>' : ''}
+                ${result.splitResult.logFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitLog\')">查看切分日志</button>' : ''}
+                ${result.splitResult.originalFilePath && result.splitResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitDiff\')">比较前后差异</button>' : ''}
+            </div>
+        </div>
+    ` : '';
+
+    // 生成校对结果HTML
+    const proofreadHtml = result.proofreadResult ? `
+        <div class="process-section">
+            <h3>✏️ 校对结果</h3>
+            <div class="stats-section">
+                <h4>处理统计</h4>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">总段落数:</span>
+                        <span class="stat-value">${result.proofreadResult.stats.totalCount}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">已处理段落数:</span>
+                        <span class="stat-value">${result.proofreadResult.stats.processedCount} (${(result.proofreadResult.stats.processedCount/result.proofreadResult.stats.totalCount*100).toFixed(2)}%)</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">已处理字数:</span>
+                        <span class="stat-value">${result.proofreadResult.stats.processedLength} (${(result.proofreadResult.stats.processedLength/result.proofreadResult.stats.totalLength*100).toFixed(2)}%)</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">未处理段落数:</span>
+                        <span class="stat-value">${result.proofreadResult.stats.totalCount - result.proofreadResult.stats.processedCount}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="file-paths">
+                <div class="file-path-item">
+                    <span class="file-label">输出文件:</span>
+                    <span class="file-path">${result.proofreadResult.outputFilePath}</span>
+                </div>
+                <div class="file-path-item">
+                    <span class="file-label">校对后Markdown:</span>
+                    <span class="file-path">${result.proofreadResult.markdownFilePath}</span>
+                </div>
+                <div class="file-path-item">
+                    <span class="file-label">日志文件:</span>
+                    <span class="file-path">${result.proofreadResult.logFilePath}</span>
+                </div>
+                <div class="file-path-item">
+                    <span class="file-label">差异文件:</span>
+                    <span class="file-path">${result.proofreadResult.jsdiffFilePath}</span>
+                </div>
+            </div>
+            <div class="section-actions">
+                ${result.proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadJson\')">查看JSON文件</button>' : ''}
+                ${result.proofreadResult.logFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadLog\')">查看校对日志</button>' : ''}
+                ${result.proofreadResult.originalFilePath && result.proofreadResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadDiff\')">比较前后差异</button>' : ''}
+                ${result.proofreadResult.jsdiffFilePath ? '<button class="action-button" onclick="handleAction(\'showJsdiff\')">查看差异文件</button>' : ''}
+            </div>
+        </div>
+    ` : '';
+
+    panel.webview.html = `
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>${result.title}</title>
+            <style>
+                body {
+                    font-family: var(--vscode-font-family);
+                    font-size: var(--vscode-font-size);
+                    color: var(--vscode-foreground);
+                    background-color: var(--vscode-editor-background);
+                    padding: 20px;
+                    line-height: 1.6;
+                }
+                .header {
+                    margin-bottom: 20px;
+                    padding-bottom: 15px;
+                    border-bottom: 1px solid var(--vscode-panel-border);
+                }
+                .message {
+                    font-size: 16px;
+                    margin-bottom: 20px;
+                    color: var(--vscode-textLink-foreground);
+                }
+                .process-section {
+                    margin-bottom: 25px;
+                    padding: 20px;
+                    background-color: var(--vscode-editor-background);
+                    border: 1px solid var(--vscode-panel-border);
+                    border-radius: 6px;
+                }
+                .process-section h3 {
+                    margin-top: 0;
+                    margin-bottom: 15px;
+                    color: var(--vscode-textLink-foreground);
+                    font-size: 18px;
+                    border-bottom: 2px solid var(--vscode-panel-border);
+                    padding-bottom: 8px;
+                }
+                .process-section h4 {
+                    margin-top: 0;
+                    margin-bottom: 10px;
+                    color: var(--vscode-textLink-foreground);
+                    font-size: 14px;
+                }
+                .stats-section {
+                    margin-bottom: 15px;
+                    padding: 15px;
+                    background-color: var(--vscode-editor-background);
+                    border: 1px solid var(--vscode-panel-border);
+                    border-radius: 4px;
+                }
+                .stats-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 10px;
+                }
+                .stat-item {
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 5px 0;
+                }
+                .stat-label {
+                    font-weight: 500;
+                }
+                .stat-value {
+                    color: var(--vscode-textLink-foreground);
+                }
+                .file-paths {
+                    margin-bottom: 20px;
+                    padding: 15px;
+                    background-color: var(--vscode-editor-background);
+                    border: 1px solid var(--vscode-panel-border);
+                    border-radius: 4px;
+                }
+                .file-path-item {
+                    margin-bottom: 8px;
+                    display: flex;
+                    align-items: center;
+                }
+                .file-label {
+                    font-weight: 500;
+                    min-width: 120px;
+                }
+                .file-path {
+                    color: var(--vscode-textLink-foreground);
+                    font-family: var(--vscode-editor-font-family);
+                    font-size: 12px;
+                    word-break: break-all;
+                }
+                .section-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    margin-top: 15px;
+                    padding-top: 15px;
+                    border-top: 1px solid var(--vscode-panel-border);
+                }
+                .actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                }
+                .action-button {
+                    padding: 8px 16px;
+                    background-color: var(--vscode-button-background);
+                    color: var(--vscode-button-foreground);
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: background-color 0.2s;
+                }
+                .action-button:hover {
+                    background-color: var(--vscode-button-hoverBackground);
+                }
+                .action-button:disabled {
+                    background-color: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                    cursor: not-allowed;
+                }
+                .close-button {
+                    background-color: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                }
+                .close-button:hover {
+                    background-color: var(--vscode-button-secondaryHoverBackground);
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h2>${result.title}</h2>
+                <div class="message">${result.message}</div>
+            </div>
+            
+            ${splitHtml}
+            ${proofreadHtml}
+            
+
+            <script>
+                const vscode = acquireVsCodeApi();
+                
+                function handleAction(action) {
+                    vscode.postMessage({
+                        command: action
+                    });
+                }
+            </script>
+        </body>
+        </html>
+    `;
+
+    return panel;
+}
+
+function getFileLabel(key: string): string {
+    const labels: { [key: string]: string } = {
+        jsonFilePath: 'JSON文件',
+        markdownFilePath: 'Markdown文件',
+        logFilePath: '日志文件',
+        originalFilePath: '原始文件',
+        outputFilePath: '输出文件',
+        jsdiffFilePath: '差异文件'
+    };
+    return labels[key] || key;
+}
+
+async function handleWebviewMessage(message: any, panel: vscode.WebviewPanel, context: vscode.ExtensionContext) {
+    const { command, data } = message;
+
+    try {
+        switch (command) {
+            case 'showSplitJson':
+                const splitJsonPath = currentProcessResult?.splitResult?.jsonFilePath;
+                if (splitJsonPath) {
+                    const outputUri = vscode.Uri.file(splitJsonPath);
+                    await vscode.workspace.openTextDocument(outputUri);
+                    await vscode.window.showTextDocument(outputUri);
+                }
+                break;
+            case 'showSplitLog':
+                const splitLogPath = currentProcessResult?.splitResult?.logFilePath;
+                if (splitLogPath) {
+                    const logUri = vscode.Uri.file(splitLogPath);
+                    await vscode.workspace.openTextDocument(logUri);
+                    await vscode.window.showTextDocument(logUri);
+                }
+                break;
+            case 'showSplitDiff':
+                const splitOriginalPath = currentProcessResult?.splitResult?.originalFilePath;
+                const splitMarkdownPath = currentProcessResult?.splitResult?.markdownFilePath;
+                if (splitOriginalPath && splitMarkdownPath) {
+                    await showFileDiff(splitOriginalPath, splitMarkdownPath);
+                }
+                break;
+            case 'proofreadJson':
+                const jsonPath = currentProcessResult?.splitResult?.jsonFilePath;
+                if (jsonPath) {
+                    await proofreadJsonFile(jsonPath, context);
+                }
+                break;
+            case 'showProofreadJson':
+                const proofreadJsonPath = currentProcessResult?.proofreadResult?.outputFilePath;
+                if (proofreadJsonPath) {
+                    const outputUri = vscode.Uri.file(proofreadJsonPath);
+                    await vscode.workspace.openTextDocument(outputUri);
+                    await vscode.window.showTextDocument(outputUri);
+                }
+                break;
+            case 'showProofreadLog':
+                const proofreadLogPath = currentProcessResult?.proofreadResult?.logFilePath;
+                if (proofreadLogPath) {
+                    const logUri = vscode.Uri.file(proofreadLogPath);
+                    await vscode.workspace.openTextDocument(logUri);
+                    await vscode.window.showTextDocument(logUri);
+                }
+                break;
+            case 'showProofreadDiff':
+                const proofreadOriginalPath = currentProcessResult?.proofreadResult?.originalFilePath;
+                const proofreadMarkdownPath = currentProcessResult?.proofreadResult?.markdownFilePath;
+                if (proofreadOriginalPath && proofreadMarkdownPath) {
+                    await showFileDiff(proofreadOriginalPath, proofreadMarkdownPath);
+                }
+                break;
+            case 'showJsdiff':
+                const jsdiffPath = currentProcessResult?.proofreadResult?.jsdiffFilePath;
+                if (jsdiffPath) {
+                    const jsdiffUri = vscode.Uri.file(jsdiffPath);
+                    await vscode.workspace.openTextDocument(jsdiffUri);
+                    await vscode.window.showTextDocument(jsdiffUri);
+                }
+                break;
+        }
+    } catch (error) {
+        ErrorUtils.showError(error, `执行操作时出错：`);
+    }
+}
+
+async function proofreadJsonFile(jsonFilePath: string, context: vscode.ExtensionContext) {
+    try {
+        // 检查文件是否存在
+        if (!fs.existsSync(jsonFilePath)) {
+            vscode.window.showErrorMessage('JSON文件不存在！');
+            return;
+        }
+
+        // 读取并验证JSON文件
+        const content = fs.readFileSync(jsonFilePath, 'utf8');
+        const jsonContent = JSON.parse(content);
+
+        // 验证JSON格式是否符合要求
+        if (!Array.isArray(jsonContent) || !jsonContent.every(item =>
+            typeof item === 'object' && item !== null && 'target' in item
+        )) {
+            vscode.window.showErrorMessage('JSON文件格式不正确！需要包含target字段的对象数组。');
+            return;
+        }
+
+        // 生成输出文件路径
+        const outputFilePath = FilePathUtils.getFilePath(jsonFilePath, '.proofread', '.json');
+        const logFilePath = FilePathUtils.getFilePath(jsonFilePath, '.proofread', '.log');
+        const originalMarkdownFilePath = FilePathUtils.getFilePath(jsonFilePath, '', '.md');
+        const proofreadMarkdownFilePath = FilePathUtils.getFilePath(jsonFilePath, '.proofread.json', '.md');
+        const jsdiffFilePath = FilePathUtils.getFilePath(jsonFilePath, '.proofread', '.html');
+
+        // 检查proofreadMarkdownFilePath文件是否存在，如果存在则备份
+        if (fs.existsSync(proofreadMarkdownFilePath)) {
+            const backupFilePath = FilePathUtils.getFilePath(jsonFilePath, `.proofread.json-${new Date().getTime()}`, '.md');
+            fs.copyFileSync(proofreadMarkdownFilePath, backupFilePath);
+        }
+
+        // 获取配置
+        const configManager = ConfigManager.getInstance();
+        const platform = configManager.getPlatform();
+        const model = configManager.getModel(platform);
+        const rpm = configManager.getRpm();
+        const maxConcurrent = configManager.getMaxConcurrent();
+        const temperature = configManager.getTemperature();
+
+        // 调用校对功能
+        const stats = await processJsonFileAsync(
+            jsonFilePath,
+            outputFilePath,
+            logFilePath,
+            originalMarkdownFilePath,
+            proofreadMarkdownFilePath,
+            jsdiffFilePath,
+            platform,
+            model,
+            rpm,
+            maxConcurrent,
+            temperature
+        );
+
+        // 更新面板显示校对结果
+        const processResult: ProcessResult = {
+            title: '处理完成',
+            message: '文件切分和校对都已完成！',
+            splitResult: currentProcessResult?.splitResult, // 保留切分结果
+            proofreadResult: {
+                outputFilePath: outputFilePath,
+                logFilePath: logFilePath,
+                originalFilePath: originalMarkdownFilePath,
+                markdownFilePath: proofreadMarkdownFilePath,
+                jsdiffFilePath: jsdiffFilePath,
+                stats: {
+                    totalCount: stats.totalCount,
+                    processedCount: stats.processedCount,
+                    processedLength: stats.processedLength,
+                    totalLength: stats.totalLength
+                }
+            },
+            actions: {
+                showJson: true,
+                showLog: true,
+                showDiff: true,
+                showJsdiff: true
+            }
+        };
+
+        if (currentPanel) {
+            // 如果已有面板，更新内容
+            updatePanelContent(processResult);
+            // 激活面板
+            currentPanel.reveal();
+        } else {
+            // 如果没有面板，创建新面板
+            const panel = createWebviewPanel(processResult);
+            
+            // 监听Webview消息
+            panel.webview.onDidReceiveMessage(
+                (message) => handleWebviewMessage(message, panel, context),
+                undefined,
+                context.subscriptions
+            );
+            
+            // 激活面板
+            panel.reveal();
+        }
+
+    } catch (error) {
+        if (error instanceof Error && error.message.includes('未配置')) {
+            const result = await vscode.window.showErrorMessage(
+                error.message + '，是否现在配置？',
+                '是',
+                '否'
+            );
+            if (result === '是') {
+                PromptManager.getInstance(context).managePrompts();
+            }
+        } else {
+            ErrorUtils.showError(error, '校对JSON文件时出错：');
+        }
+    }
+}
+
+function updatePanelContent(result: ProcessResult) {
+    if (currentPanel && currentProcessResult) {
+        // 更新当前结果
+        currentProcessResult = result;
+        
+        // 重新生成HTML内容
+        const splitHtml = result.splitResult ? `
+            <div class="process-section">
+                <h3>📄 文件切分结果</h3>
+                <div class="file-paths">
+                    <div class="file-path-item">
+                        <span class="file-label">原始文件:</span>
+                        <span class="file-path">${result.splitResult.originalFilePath}</span>
+                    </div>
+                    <div class="file-path-item">
+                        <span class="file-label">JSON文件:</span>
+                        <span class="file-path">${result.splitResult.jsonFilePath}</span>
+                    </div>
+                    <div class="file-path-item">
+                        <span class="file-label">Markdown文件:</span>
+                        <span class="file-path">${result.splitResult.markdownFilePath}</span>
+                    </div>
+                    <div class="file-path-item">
+                        <span class="file-label">日志文件:</span>
+                        <span class="file-path">${result.splitResult.logFilePath}</span>
+                    </div>
+                </div>
+                <div class="section-actions">
+                    ${result.splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitJson\')">查看JSON文件</button>' : ''}
+                    ${result.splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'proofreadJson\')">校对JSON文件</button>' : ''}
+                    ${result.splitResult.logFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitLog\')">查看切分日志</button>' : ''}
+                    ${result.splitResult.originalFilePath && result.splitResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitDiff\')">比较前后差异</button>' : ''}
+                </div>
+            </div>
+        ` : '';
+
+        const proofreadHtml = result.proofreadResult ? `
+            <div class="process-section">
+                <h3>✏️ 校对结果</h3>
+                <div class="stats-section">
+                    <h4>处理统计</h4>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">总段落数:</span>
+                            <span class="stat-value">${result.proofreadResult.stats.totalCount}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">已处理段落数:</span>
+                            <span class="stat-value">${result.proofreadResult.stats.processedCount} (${(result.proofreadResult.stats.processedCount/result.proofreadResult.stats.totalCount*100).toFixed(2)}%)</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">已处理字数:</span>
+                            <span class="stat-value">${result.proofreadResult.stats.processedLength} (${(result.proofreadResult.stats.processedLength/result.proofreadResult.stats.totalLength*100).toFixed(2)}%)</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">未处理段落数:</span>
+                            <span class="stat-value">${result.proofreadResult.stats.totalCount - result.proofreadResult.stats.processedCount}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="file-paths">
+                    <div class="file-path-item">
+                        <span class="file-label">输出文件:</span>
+                        <span class="file-path">${result.proofreadResult.outputFilePath}</span>
+                    </div>
+                    <div class="file-path-item">
+                        <span class="file-label">校对后Markdown:</span>
+                        <span class="file-path">${result.proofreadResult.markdownFilePath}</span>
+                    </div>
+                    <div class="file-path-item">
+                        <span class="file-label">日志文件:</span>
+                        <span class="file-path">${result.proofreadResult.logFilePath}</span>
+                    </div>
+                    <div class="file-path-item">
+                        <span class="file-label">差异文件:</span>
+                        <span class="file-path">${result.proofreadResult.jsdiffFilePath}</span>
+                    </div>
+                </div>
+                <div class="section-actions">
+                    ${result.proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadJson\')">查看JSON文件</button>' : ''}
+                    ${result.proofreadResult.logFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadLog\')">查看校对日志</button>' : ''}
+                    ${result.proofreadResult.originalFilePath && result.proofreadResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadDiff\')">比较前后差异</button>' : ''}
+                    ${result.proofreadResult.jsdiffFilePath ? '<button class="action-button" onclick="handleAction(\'showJsdiff\')">查看差异文件</button>' : ''}
+                </div>
+            </div>
+        ` : '';
+
+        // 更新面板HTML
+        currentPanel.webview.html = `
+            <!DOCTYPE html>
+            <html lang="zh-CN">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>${result.title}</title>
+                <style>
+                    body {
+                        font-family: var(--vscode-font-family);
+                        font-size: var(--vscode-font-size);
+                        color: var(--vscode-foreground);
+                        background-color: var(--vscode-editor-background);
+                        padding: 20px;
+                        line-height: 1.6;
+                    }
+                    .header {
+                        margin-bottom: 20px;
+                        padding-bottom: 15px;
+                        border-bottom: 1px solid var(--vscode-panel-border);
+                    }
+                    .message {
+                        font-size: 16px;
+                        margin-bottom: 20px;
+                        color: var(--vscode-textLink-foreground);
+                    }
+                    .process-section {
+                        margin-bottom: 25px;
+                        padding: 20px;
+                        background-color: var(--vscode-editor-background);
+                        border: 1px solid var(--vscode-panel-border);
+                        border-radius: 6px;
+                    }
+                    .process-section h3 {
+                        margin-top: 0;
+                        margin-bottom: 15px;
+                        color: var(--vscode-textLink-foreground);
+                        font-size: 18px;
+                        border-bottom: 2px solid var(--vscode-panel-border);
+                        padding-bottom: 8px;
+                    }
+                    .process-section h4 {
+                        margin-top: 0;
+                        margin-bottom: 10px;
+                        color: var(--vscode-textLink-foreground);
+                        font-size: 14px;
+                    }
+                    .stats-section {
+                        margin-bottom: 15px;
+                        padding: 15px;
+                        background-color: var(--vscode-editor-background);
+                        border: 1px solid var(--vscode-panel-border);
+                        border-radius: 4px;
+                    }
+                    .stats-grid {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 10px;
+                    }
+                    .stat-item {
+                        display: flex;
+                        justify-content: space-between;
+                        padding: 5px 0;
+                    }
+                    .stat-label {
+                        font-weight: 500;
+                    }
+                    .stat-value {
+                        color: var(--vscode-textLink-foreground);
+                    }
+                    .file-paths {
+                        margin-bottom: 20px;
+                        padding: 15px;
+                        background-color: var(--vscode-editor-background);
+                        border: 1px solid var(--vscode-panel-border);
+                        border-radius: 4px;
+                    }
+                    .file-path-item {
+                        margin-bottom: 8px;
+                        display: flex;
+                        align-items: center;
+                    }
+                    .file-label {
+                        font-weight: 500;
+                        min-width: 120px;
+                    }
+                    .file-path {
+                        color: var(--vscode-textLink-foreground);
+                        font-family: var(--vscode-editor-font-family);
+                        font-size: 12px;
+                        word-break: break-all;
+                    }
+                    .actions {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 10px;
+                    }
+                    .action-button {
+                        padding: 8px 16px;
+                        background-color: var(--vscode-button-background);
+                        color: var(--vscode-button-foreground);
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        transition: background-color 0.2s;
+                    }
+                    .action-button:hover {
+                        background-color: var(--vscode-button-hoverBackground);
+                    }
+                    .action-button:disabled {
+                        background-color: var(--vscode-button-secondaryBackground);
+                        color: var(--vscode-button-secondaryForeground);
+                        cursor: not-allowed;
+                    }
+                    .close-button {
+                        background-color: var(--vscode-button-secondaryBackground);
+                        color: var(--vscode-button-secondaryForeground);
+                    }
+                    .close-button:hover {
+                        background-color: var(--vscode-button-secondaryHoverBackground);
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h2>${result.title}</h2>
+                    <div class="message">${result.message}</div>
+                </div>
+                
+                ${splitHtml}
+                ${proofreadHtml}
+                
+
+                <script>
+                    const vscode = acquireVsCodeApi();
+                    
+                    function handleAction(action) {
+                        vscode.postMessage({
+                            command: action
+                        });
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+    }
+}
+
+function reopenResultPanel(context: vscode.ExtensionContext) {
+    if (currentProcessResult) {
+        const panel = createWebviewPanel(currentProcessResult);
+        
+        // 监听Webview消息
+        panel.webview.onDidReceiveMessage(
+            (message) => handleWebviewMessage(message, panel, context),
+            undefined,
+            context.subscriptions
+        );
+    } else {
+        vscode.window.showInformationMessage('没有可显示的处理结果');
+    }
+}
+
 export function activate(context: vscode.ExtensionContext) {
     const logger = Logger.getInstance();
     const configManager = ConfigManager.getInstance();
@@ -249,32 +1002,41 @@ export function activate(context: vscode.ExtensionContext) {
             // 显示成功消息
             // vscode.window.showInformationMessage(`文件已成功切分！\nJSON文件：${result.jsonFilePath}\nMarkdown文件：${result.markdownFilePath}`);
 
-            // 提示用户查看结果
-            const message = `文件已成功切分！`;
-            const userChoice = await vscode.window.showInformationMessage(
-                message,
-                '比较前后差异',
-                '查看JSON结果',
-                '查看日志文件',
-            );
-
-            if (userChoice === '查看JSON结果') {
-                // 打开校对后的JSON文件
-                const outputUri = vscode.Uri.file(result.jsonFilePath);
-                await vscode.workspace.openTextDocument(outputUri);
-                await vscode.window.showTextDocument(outputUri);
-            } else if (userChoice === '查看日志文件') {
-                // 显示日志文件
-                const logUri = vscode.Uri.file(result.logFilePath);
-                await vscode.workspace.openTextDocument(logUri);
-                await vscode.window.showTextDocument(logUri);
-            } else if (userChoice === '比较前后差异') {
-                // 比较前后差异
-                try {
-                    await showFileDiff(document.uri.fsPath, result.markdownFilePath);
-                } catch (error) {
-                    ErrorUtils.showError(error, '显示差异时出错：');
+            // 创建或更新智能面板
+            const processResult: ProcessResult = {
+                title: '处理结果',
+                message: '文件已成功切分！',
+                splitResult: {
+                    jsonFilePath: result.jsonFilePath,
+                    markdownFilePath: result.markdownFilePath,
+                    logFilePath: result.logFilePath,
+                    originalFilePath: document.uri.fsPath
+                },
+                actions: {
+                    showJson: true,
+                    showLog: true,
+                    showDiff: true
                 }
+            };
+
+            if (currentPanel) {
+                // 如果已有面板，更新内容
+                updatePanelContent(processResult);
+                // 激活面板
+                currentPanel.reveal();
+            } else {
+                // 如果没有面板，创建新面板
+                const panel = createWebviewPanel(processResult);
+                
+                // 监听Webview消息
+                panel.webview.onDidReceiveMessage(
+                    (message) => handleWebviewMessage(message, panel, context),
+                    undefined,
+                    context.subscriptions
+                );
+                
+                // 激活面板
+                panel.reveal();
             }
 
         } catch (error) {
@@ -488,43 +1250,50 @@ export function activate(context: vscode.ExtensionContext) {
                         logMessage += `${'='.repeat(50)}\n\n`;
                         fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
-                        // 显示处理结果
-                        const message =
-                            `校对完成！\n` +
-                            `总段落数: ${stats.totalCount}\n` +
-                            `已处理段落数: ${stats.processedCount} (${(stats.processedCount/stats.totalCount*100).toFixed(2)}%)\n` +
-                            `已处理字数: ${stats.processedLength} (${(stats.processedLength/stats.totalLength*100).toFixed(2)}%)\n` +
-                            `未处理段落数: ${stats.totalCount - stats.processedCount}`;
-
-                        const result = await vscode.window.showInformationMessage(
-                            message,
-                            '比较前后差异',
-                            '查看差异文件',
-                            '查看JSON结果',
-                            '查看日志文件',
-                        );
-
-                        if (result === '查看JSON结果') {
-                            // 打开校对后的JSON文件
-                            const outputUri = vscode.Uri.file(outputFilePath);
-                            await vscode.workspace.openTextDocument(outputUri);
-                            await vscode.window.showTextDocument(outputUri);
-                        } else if (result === '查看日志文件') {
-                            // 显示日志文件
-                            const logUri = vscode.Uri.file(logFilePath);
-                            await vscode.workspace.openTextDocument(logUri);
-                            await vscode.window.showTextDocument(logUri);
-                        } else if (result === '比较前后差异') {
-                            // 比较前后差异
-                            try {
-                                await showFileDiff(originalMarkdownFilePath, proofreadMarkdownFilePath);
-                            } catch (error) {
-                                ErrorUtils.showError(error, '显示差异时出错：');
+                        // 更新智能面板显示校对结果
+                        const processResult: ProcessResult = {
+                            title: '处理完成',
+                            message: '文件切分和校对都已完成！',
+                            splitResult: currentProcessResult?.splitResult, // 保留切分结果
+                            proofreadResult: {
+                                outputFilePath: outputFilePath,
+                                logFilePath: logFilePath,
+                                originalFilePath: originalMarkdownFilePath,
+                                markdownFilePath: proofreadMarkdownFilePath,
+                                jsdiffFilePath: jsdiffFilePath,
+                                stats: {
+                                    totalCount: stats.totalCount,
+                                    processedCount: stats.processedCount,
+                                    processedLength: stats.processedLength,
+                                    totalLength: stats.totalLength
+                                }
+                            },
+                            actions: {
+                                showJson: true,
+                                showLog: true,
+                                showDiff: true,
+                                showJsdiff: true
                             }
-                        } else if (result === '查看差异文件') {
-                            // 使用系统默认程序打开差异文件
-                            const jsdiffUri = vscode.Uri.file(jsdiffFilePath);
-                            await vscode.env.openExternal(jsdiffUri);
+                        };
+
+                        if (currentPanel) {
+                            // 如果已有面板，更新内容
+                            updatePanelContent(processResult);
+                            // 激活面板
+                            currentPanel.reveal();
+                        } else {
+                            // 如果没有面板，创建新面板
+                            const panel = createWebviewPanel(processResult);
+                            
+                            // 监听Webview消息
+                            panel.webview.onDidReceiveMessage(
+                                (message) => handleWebviewMessage(message, panel, context),
+                                undefined,
+                                context.subscriptions
+                            );
+                            
+                            // 激活面板
+                            panel.reveal();
                         }
                     } catch (error) {
                         if (error instanceof Error && error.message.includes('未配置')) {
@@ -1117,6 +1886,11 @@ export function activate(context: vscode.ExtensionContext) {
             } catch (error) {
                 ErrorUtils.showError(error, '转换引号时出错：');
             }
+        }),
+
+        // 注册重新打开结果面板命令
+        vscode.commands.registerCommand('ai-proofread.reopenResultPanel', () => {
+            reopenResultPanel(context);
         }),
     ];
 
