@@ -262,6 +262,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
+### v0.1.7
+
+- 取消校对时生成jsdiff html，改成提示用户生成
+
 ### v0.1.6
 
 - 切分和校对结果改成Webview Panel呈现，在一个切分、校对流程中可以重新打开
