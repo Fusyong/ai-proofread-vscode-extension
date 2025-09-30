@@ -114,7 +114,7 @@
           "order": 12,
           "type": "string",
           "default": "deepseek-chat",
-          "description": "Deepseek开放平台模型,如: deepseek-chat（暂时无法使用推理模型deepseek-reasoner）"
+          "description": "Deepseek开放平台模型,如: deepseek-chat（推理模型deepseek-reasoner容易失败且费用高）"
         },
         "ai-proofread.apiKeys.aliyun": {
           "order": 13,
@@ -126,7 +126,7 @@
           "order": 14,
           "type": "string",
           "default": "qwen-max-2025-01-25",
-          "description": "阿里云百炼平台模型,如: qwen3-max-preview, qwen-max-latest,qwen-max,  qwen-plus-latest, qwen-plus, deepseek-v3, (暂时无法使用推理模型deepseek-r1)"
+          "description": "阿里云百炼平台模型,如: qwen3-max-preview, qwen-max-latest,qwen-max,  qwen-plus-latest, qwen-plus, deepseek-v3, (推理模型deepseek-r1容易失败且费用高)"
         },
         "ai-proofread.apiKeys.google": {
           "order": 15,
