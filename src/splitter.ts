@@ -269,6 +269,11 @@ export async function handleFileSplit(
     markdownFilePath: string;
     logFilePath: string;
     segments: Array<{ target: string; context?: string }>;
+    stats: {
+        segmentCount: number;
+        maxSegmentLength: number;
+        minSegmentLength: number;
+    };
 }> {
     const text = fs.readFileSync(filePath, 'utf8');
     const currentFileDir = path.dirname(filePath);
@@ -333,11 +338,20 @@ export async function handleFileSplit(
     statsMessage = `\n[${timestamp}]\n${statsMessage}\n${'='.repeat(50)}\n`;
     fs.appendFileSync(logFilePath, statsMessage, 'utf8');
 
+    // 计算切分统计数据
+    const segmentLengths = segments.map(segment => segment.target.trim().length);
+    const stats = {
+        segmentCount: segments.length,
+        maxSegmentLength: Math.max(...segmentLengths),
+        minSegmentLength: Math.min(...segmentLengths)
+    };
+
     return {
         jsonFilePath,
         markdownFilePath,
         logFilePath,
-        segments
+        segments,
+        stats
     };
 }
 

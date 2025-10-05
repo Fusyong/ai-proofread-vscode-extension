@@ -11,6 +11,7 @@ import { GoogleGenAI } from "@google/genai";
 import { ConfigManager, Logger } from './utils';
 import { convertQuotes } from './quoteConverter';
 import { buildTitleBasedContext, buildParagraphBasedContext } from './splitter';
+import { ProgressTracker, ProgressUpdateCallback } from './progressTracker';
 
 // 加载环境变量
 dotenv.config();
@@ -133,6 +134,7 @@ export interface ProcessStats {
         index: number;
         preview: string;
     }>;
+    progressTracker?: ProgressTracker;
 }
 
 /**
@@ -571,6 +573,7 @@ export async function processJsonFileAsync(
         maxConcurrent?: number;
         temperature?: number;
         onProgress?: (info: string) => void;
+        onProgressUpdate?: ProgressUpdateCallback;
         token?: vscode.CancellationToken;
         context?: vscode.ExtensionContext;
     } = {}
@@ -586,6 +589,7 @@ export async function processJsonFileAsync(
         maxConcurrent = 3,
         temperature = 1,
         onProgress,
+        onProgressUpdate,
         token,
         context
     } = options;
@@ -593,6 +597,9 @@ export async function processJsonFileAsync(
     // 读取输入JSON文件
     const inputParagraphs = JSON.parse(fs.readFileSync(jsonInPath, 'utf8'));
     const totalCount = inputParagraphs.length;
+
+    // 创建进度跟踪器
+    const progressTracker = new ProgressTracker(inputParagraphs, onProgressUpdate);
 
     // 初始化或读取输出JSON文件
     let outputParagraphs: (string | null)[] = [];
@@ -649,7 +656,7 @@ export async function processJsonFileAsync(
     // 处理段落
     const processOne = async (index: number): Promise<void> => {
         // 检查是否已取消
-        if (token?.isCancellationRequested) {
+        if (token?.isCancellationRequested || progressTracker.isCancellationRequested()) {
             return;
         }
 
@@ -657,6 +664,9 @@ export async function processJsonFileAsync(
         const targetText = paragraph.target;
         const referenceText = paragraph.reference || '';
         const contextText = paragraph.context || '';
+
+        // 更新状态为已提交
+        progressTracker.updateProgress(index, 'submitted');
 
         const haseContext = contextText && contextText.trim() !== targetText.trim();
         const progressInfo = `处理 No. ${index + 1}/${totalCount}, Len ${targetText.length}` +
@@ -683,19 +693,38 @@ export async function processJsonFileAsync(
         const startTime = Date.now();
         await rateLimiter.wait();
 
-        const processedText = await client.proofread(labeledTargetText, preText, temperature, context);
-        const elapsed = (Date.now() - startTime) / 1000;
+        try {
+            const processedText = await client.proofread(labeledTargetText, preText, temperature, context);
+            const elapsed = (Date.now() - startTime) / 1000;
 
-        if (processedText) {
-            outputParagraphs[index] = processedText;
-            fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
-            const completeInfo = `完成 ${index + 1}/${totalCount} 长度 ${targetText.length} 用时 ${elapsed.toFixed(2)}s\n${'-'.repeat(40)}\n`;
-            logger.info(completeInfo);
-            if (onProgress) {
-                onProgress(completeInfo);
+            if (processedText) {
+                outputParagraphs[index] = processedText;
+                fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
+                
+                // 更新状态为已完成
+                progressTracker.updateProgress(index, 'completed');
+                
+                const completeInfo = `完成 ${index + 1}/${totalCount} 长度 ${targetText.length} 用时 ${elapsed.toFixed(2)}s\n${'-'.repeat(40)}\n`;
+                logger.info(completeInfo);
+                if (onProgress) {
+                    onProgress(completeInfo);
+                }
+            } else {
+                // 更新状态为失败
+                progressTracker.updateProgress(index, 'failed', 'API返回空结果');
+                
+                const errorInfo = `段落 ${index + 1}/${totalCount}: 处理失败，跳过\n${'-'.repeat(40)}\n`;
+                logger.error(errorInfo);
+                if (onProgress) {
+                    onProgress(errorInfo);
+                }
             }
-        } else {
-            const errorInfo = `段落 ${index + 1}/${totalCount}: 处理失败，跳过\n${'-'.repeat(40)}\n`;
+        } catch (error) {
+            // 更新状态为失败
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            progressTracker.updateProgress(index, 'failed', errorMessage);
+            
+            const errorInfo = `段落 ${index + 1}/${totalCount}: 处理出错 - ${errorMessage}\n${'-'.repeat(40)}\n`;
             logger.error(errorInfo);
             if (onProgress) {
                 onProgress(errorInfo);
@@ -704,24 +733,38 @@ export async function processJsonFileAsync(
     };
 
     // 并发处理所有段落
-    await Promise.all(
-        indicesToProcess.map(async (index) => {
-            // 检查是否已取消
-            if (token?.isCancellationRequested) {
-                return;
-            }
+    const processingPromises: Promise<void>[] = [];
+    
+    for (const index of indicesToProcess) {
+        // 检查是否已取消
+        if (token?.isCancellationRequested || progressTracker.isCancellationRequested()) {
+            // 设置取消状态
+            progressTracker.setCancelled(true);
+            break;
+        }
 
-            const slot = await Promise.race(
-                semaphore.map((_, i) =>
-                    Promise.resolve(i)
-                )
-            );
-            semaphore[slot] = processOne(index).finally(() => {
-                semaphore[slot] = null;
-            });
-            await semaphore[slot];
-        })
-    );
+        const slot = await Promise.race(
+            semaphore.map((_, i) =>
+                Promise.resolve(i)
+            )
+        );
+        
+        const promise = processOne(index).finally(() => {
+            semaphore[slot] = null;
+        });
+        
+        semaphore[slot] = promise;
+        processingPromises.push(promise);
+        
+        await promise;
+    }
+
+    // 等待所有正在处理的任务完成
+    if (token?.isCancellationRequested || progressTracker.isCancellationRequested()) {
+        logger.info('用户取消操作，等待已提交的任务完成...');
+        await Promise.allSettled(processingPromises);
+        logger.info('已提交的任务已完成');
+    }
 
     // 生成处理统计
     const processedCount = outputParagraphs.filter(p => p !== null).length;
@@ -744,7 +787,8 @@ export async function processJsonFileAsync(
         processedCount,
         totalLength,
         processedLength,
-        unprocessedParagraphs
+        unprocessedParagraphs,
+        progressTracker
     };
 }
 

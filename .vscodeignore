@@ -12,3 +12,4 @@ test
 *.code-workspace
 *.psd
 *.vsix
+*.proofread.log

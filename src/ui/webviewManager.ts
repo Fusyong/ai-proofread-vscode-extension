@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { showFileDiff, jsDiffJsonFiles } from '../differ';
 import { ErrorUtils, FilePathUtils } from '../utils';
+import { ProgressTracker } from '../progressTracker';
 
 // 接口定义
 export interface SplitResult {
@@ -14,6 +15,11 @@ export interface SplitResult {
     markdownFilePath: string;
     logFilePath: string;
     originalFilePath: string;
+    stats?: {
+        segmentCount: number;
+        maxSegmentLength: number;
+        minSegmentLength: number;
+    };
 }
 
 export interface ProofreadResult {
@@ -34,6 +40,7 @@ export interface ProcessResult {
     message: string;
     splitResult?: SplitResult;
     proofreadResult?: ProofreadResult;
+    progressTracker?: ProgressTracker;
     actions: {
         showJson?: boolean;
         showLog?: boolean;
@@ -59,7 +66,7 @@ export class WebviewManager {
      * 创建 Webview 面板
      */
     public createWebviewPanel(result: ProcessResult): vscode.WebviewPanel {
-        // 如果已有面板，先关闭它
+        // 如果已有面板且未被dispose，先关闭它
         if (this.currentPanel) {
             this.currentPanel.dispose();
         }
@@ -74,6 +81,14 @@ export class WebviewManager {
             }
         );
 
+        // 监听面板关闭事件
+        panel.onDidDispose(() => {
+            if (this.currentPanel === panel) {
+                this.currentPanel = undefined;
+                this.currentProcessResult = undefined;
+            }
+        });
+
         // 保存当前面板和结果
         this.currentPanel = panel;
         this.currentProcessResult = result;
@@ -84,7 +99,10 @@ export class WebviewManager {
         // 生成校对结果HTML
         const proofreadHtml = result.proofreadResult ? this.generateProofreadResultHtml(result.proofreadResult) : '';
 
-        panel.webview.html = this.generateWebviewHtml(result, splitHtml, proofreadHtml);
+        // 生成进度条HTML
+        const progressHtml = result.progressTracker ? result.progressTracker.generateProgressBarHtml() : '';
+
+        panel.webview.html = this.generateWebviewHtml(result, splitHtml, proofreadHtml, progressHtml);
 
         return panel;
     }
@@ -94,15 +112,28 @@ export class WebviewManager {
      */
     public updatePanelContent(result: ProcessResult): void {
         if (this.currentPanel && this.currentProcessResult) {
-            // 更新当前结果
-            this.currentProcessResult = result;
-            
-            // 重新生成HTML内容
-            const splitHtml = result.splitResult ? this.generateSplitResultHtml(result.splitResult) : '';
-            const proofreadHtml = result.proofreadResult ? this.generateProofreadResultHtml(result.proofreadResult) : '';
+            try {
+                // 检查Webview是否已被dispose
+                if (!this.currentPanel) {
+                    console.warn('Webview已被dispose，无法更新内容');
+                    return;
+                }
 
-            // 更新面板HTML
-            this.currentPanel.webview.html = this.generateWebviewHtml(result, splitHtml, proofreadHtml);
+                // 更新当前结果
+                this.currentProcessResult = result;
+                
+                // 重新生成HTML内容
+                const splitHtml = result.splitResult ? this.generateSplitResultHtml(result.splitResult) : '';
+                const proofreadHtml = result.proofreadResult ? this.generateProofreadResultHtml(result.proofreadResult) : '';
+                const progressHtml = result.progressTracker ? result.progressTracker.generateProgressBarHtml() : '';
+
+                // 更新面板HTML
+                this.currentPanel.webview.html = this.generateWebviewHtml(result, splitHtml, proofreadHtml, progressHtml);
+            } catch (error) {
+                console.error('更新Webview内容时出错:', error);
+                // 如果更新失败，尝试重新创建面板
+                this.createWebviewPanel(result);
+            }
         }
     }
 
@@ -144,8 +175,15 @@ export class WebviewManager {
                     const splitLogPath = this.currentProcessResult?.splitResult?.logFilePath;
                     if (splitLogPath) {
                         const logUri = vscode.Uri.file(splitLogPath);
-                        await vscode.workspace.openTextDocument(logUri);
-                        await vscode.window.showTextDocument(logUri);
+                        const document = await vscode.workspace.openTextDocument(logUri);
+                        const editor = await vscode.window.showTextDocument(document);
+                        
+                        // 滚动到文件末端
+                        const lastLine = document.lineCount - 1;
+                        const lastLineLength = document.lineAt(lastLine).text.length;
+                        const endPosition = new vscode.Position(lastLine, lastLineLength);
+                        editor.selection = new vscode.Selection(endPosition, endPosition);
+                        editor.revealRange(new vscode.Range(endPosition, endPosition), vscode.TextEditorRevealType.InCenter);
                     }
                     break;
                 case 'showSplitDiff':
@@ -176,8 +214,15 @@ export class WebviewManager {
                     const proofreadLogPath = this.currentProcessResult?.proofreadResult?.logFilePath;
                     if (proofreadLogPath) {
                         const logUri = vscode.Uri.file(proofreadLogPath);
-                        await vscode.workspace.openTextDocument(logUri);
-                        await vscode.window.showTextDocument(logUri);
+                        const document = await vscode.workspace.openTextDocument(logUri);
+                        const editor = await vscode.window.showTextDocument(document);
+                        
+                        // 滚动到文件末端
+                        const lastLine = document.lineCount - 1;
+                        const lastLineLength = document.lineAt(lastLine).text.length;
+                        const endPosition = new vscode.Position(lastLine, lastLineLength);
+                        editor.selection = new vscode.Selection(endPosition, endPosition);
+                        editor.revealRange(new vscode.Range(endPosition, endPosition), vscode.TextEditorRevealType.InCenter);
                     }
                     break;
                 case 'showProofreadDiff':
@@ -274,12 +319,40 @@ export class WebviewManager {
     }
 
     /**
+     * 检查当前面板是否有效
+     */
+    public isCurrentPanelValid(): boolean {
+        return this.currentPanel !== undefined;
+    }
+
+    /**
      * 生成切分结果HTML
      */
     private generateSplitResultHtml(splitResult: SplitResult): string {
+        const statsHtml = splitResult.stats ? `
+            <div class="stats-section">
+                <h4>处理统计</h4>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">切分片段数:</span>
+                        <span class="stat-value">${splitResult.stats.segmentCount}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">最长片段字符数:</span>
+                        <span class="stat-value">${splitResult.stats.maxSegmentLength}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">最短片段字符数:</span>
+                        <span class="stat-value">${splitResult.stats.minSegmentLength}</span>
+                    </div>
+                </div>
+            </div>
+        ` : '';
+
         return `
             <div class="process-section">
                 <h3>📄 切分结果</h3>
+                ${statsHtml}
                 <div class="file-paths">
                     <div class="file-path-item">
                         <span class="file-label">原始文件:</span>
@@ -363,7 +436,7 @@ export class WebviewManager {
     /**
      * 生成完整的 Webview HTML
      */
-    private generateWebviewHtml(result: ProcessResult, splitHtml: string, proofreadHtml: string): string {
+    private generateWebviewHtml(result: ProcessResult, splitHtml: string, proofreadHtml: string, progressHtml: string): string {
         return `
             <!DOCTYPE html>
             <html lang="zh-CN">
@@ -487,22 +560,17 @@ export class WebviewManager {
                         color: var(--vscode-button-secondaryForeground);
                         cursor: not-allowed;
                     }
-                    .close-button {
-                        background-color: var(--vscode-button-secondaryBackground);
-                        color: var(--vscode-button-secondaryForeground);
-                    }
-                    .close-button:hover {
-                        background-color: var(--vscode-button-secondaryHoverBackground);
-                    }
+                    
+                    ${ProgressTracker.generateProgressBarCss()}
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <h2>${result.title}</h2>
                     <div class="message">${result.message}</div>
                 </div>
                 
                 ${splitHtml}
+                ${progressHtml}
                 ${proofreadHtml}
                 
 

@@ -9,6 +9,7 @@ import { processJsonFileAsync, proofreadSelection } from '../proofreader';
 import { showDiff } from '../differ';
 import { FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
 import { WebviewManager, ProcessResult } from '../ui/webviewManager';
+import { ProgressTracker } from '../progressTracker';
 
 export class ProofreadCommandHandler {
     private webviewManager: WebviewManager;
@@ -69,6 +70,36 @@ export class ProofreadCommandHandler {
             const maxConcurrent = this.configManager.getMaxConcurrent();
             const temperature = this.configManager.getTemperature();
 
+            // 检查API密钥是否已配置
+            const apiKey = this.configManager.getApiKey(platform);
+            if (!apiKey) {
+                const result = await vscode.window.showErrorMessage(
+                    `未配置${platform}平台的API密钥，是否现在配置？`,
+                    '是',
+                    '否'
+                );
+                if (result === '是') {
+                    await vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread.apiKeys');
+                }
+                return;
+            }
+
+            // 显示参数确认对话框
+            const confirmResult = await this.showJsonBatchConfirmation({
+                jsonFilePath: currentFilePath,
+                totalCount: jsonContent.length,
+                platform,
+                model,
+                rpm,
+                maxConcurrent,
+                temperature,
+                context
+            });
+
+            if (!confirmResult) {
+                return; // 用户取消操作
+            }
+
             // 写入开始日志
             // 获取当前使用的提示词名称
             let currentPromptName = '系统默认提示词';
@@ -89,22 +120,8 @@ export class ProofreadCommandHandler {
             logMessage += `${'='.repeat(50)}\n`;
             fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
-            // 检查API密钥是否已配置
-            const apiKey = this.configManager.getApiKey(platform);
-            if (!apiKey) {
-                const result = await vscode.window.showErrorMessage(
-                    `未配置${platform}平台的API密钥，是否现在配置？`,
-                    '是',
-                    '否'
-                );
-                if (result === '是') {
-                    await vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread.apiKeys');
-                }
-                return;
-            }
-
-            // 显示当前配置信息（模仿文件选段校对的显示方式）
-            vscode.window.showInformationMessage(`Prompt: ${currentPromptName.slice(0, 4)}…; Model: ${platform}, ${model}, T. ${temperature}; RPM: ${rpm}, MaxConcurrent: ${maxConcurrent}`);
+            // 创建进度跟踪器
+            let progressTracker: ProgressTracker | undefined;
 
             // 显示进度
             await vscode.window.withProgress({
@@ -124,9 +141,39 @@ export class ProofreadCommandHandler {
                             fs.appendFileSync(logFilePath, info + '\n', 'utf8');
                             progress.report({ message: info });
                         },
+                        onProgressUpdate: (progressStats, progressBarHtml) => {
+                            // 更新进度条显示
+                            if (progressTracker) {
+                                const processResult: ProcessResult = {
+                                    title: 'AI Proofreader Result Panel',
+                                    message: '正在校对文件...',
+                                    splitResult: this.webviewManager.getCurrentProcessResult()?.splitResult,
+                                    progressTracker: progressTracker,
+                                    actions: {
+                                        showJson: false,
+                                        showLog: false,
+                                        showDiff: false
+                                    }
+                                };
+                                
+                                if (this.webviewManager.getCurrentPanel()) {
+                                    this.webviewManager.updatePanelContent(processResult);
+                                } else {
+                                    const panel = this.webviewManager.createWebviewPanel(processResult);
+                                    panel.webview.onDidReceiveMessage(
+                                        (message) => this.webviewManager.handleWebviewMessage(message, panel, context),
+                                        undefined,
+                                        context.subscriptions
+                                    );
+                                    panel.reveal();
+                                }
+                            }
+                        },
                         token, // 传递取消令牌
                         context // 传递扩展上下文
                     });
+
+                    progressTracker = stats.progressTracker;
 
                     // 不再自动生成差异文件，改为在Webview中提供生成按钮
 
@@ -152,7 +199,7 @@ export class ProofreadCommandHandler {
 
                     // 更新智能面板显示校对结果
                     const processResult: ProcessResult = {
-                        title: '处理完成',
+                        title: 'AI Proofreader Result Panel',
                         message: '文件切分和校对都已完成！',
                         splitResult: this.webviewManager.getCurrentProcessResult()?.splitResult, // 保留切分结果
                         proofreadResult: {
@@ -167,6 +214,7 @@ export class ProofreadCommandHandler {
                                 totalLength: stats.totalLength
                             }
                         },
+                        progressTracker: progressTracker, // 包含进度跟踪器
                         actions: {
                             showJson: true,
                             showLog: true,
@@ -379,6 +427,63 @@ export class ProofreadCommandHandler {
     }
 
     /**
+     * 显示JSON批量提交参数确认对话框
+     */
+    private async showJsonBatchConfirmation(params: {
+        jsonFilePath: string;
+        totalCount: number;
+        platform: string;
+        model: string;
+        rpm: number;
+        maxConcurrent: number;
+        temperature: number;
+        context?: vscode.ExtensionContext;
+    }): Promise<boolean> {
+        const { jsonFilePath, totalCount, platform, model, rpm, maxConcurrent, temperature, context } = params;
+        
+        // 获取当前提示词名称
+        let currentPromptName = '系统默认提示词';
+        if (context) {
+            const promptName = context.globalState.get<string>('currentPrompt', '');
+            if (promptName !== '') {
+                currentPromptName = promptName;
+            }
+        }
+
+        // 构建确认信息
+        const confirmationMessage = [
+            '📋 JSON批量校对参数确认',
+            '',
+            `📁 文件路径: ${jsonFilePath}`,
+            `📊 总段落数: ${totalCount}`,
+            '',
+            '⚙️ 处理参数:',
+            `   • 平台: ${platform}`,
+            `   • 模型: ${model}`,
+            `   • 温度: ${temperature}`,
+            `   • 并发数: ${maxConcurrent}`,
+            `   • 请求频率: ${rpm} 次/分钟`,
+            `   • 提示词: ${currentPromptName}`,
+            '',
+            '⚠️ 注意事项:',
+            '   • 批处理中使用思考/推理模型极易出错并形成高计费！！！',
+            '   • 处理过程中可以随时取消',
+            '   • 已处理的段落会跳过',
+            '   • 结果会实时保存到输出文件',
+            '',
+            '是否确认开始批量校对？'
+        ].join('\n');
+
+        const result = await vscode.window.showInformationMessage(
+            confirmationMessage,
+            { modal: true },
+            '确认开始'
+        );
+
+        return result === '确认开始';
+    }
+
+    /**
      * 处理校对JSON文件命令（从Webview调用）
      */
     public async handleProofreadJsonFile(
@@ -437,6 +542,22 @@ export class ProofreadCommandHandler {
                 return;
             }
 
+            // 显示参数确认对话框
+            const confirmResult = await this.showJsonBatchConfirmation({
+                jsonFilePath,
+                totalCount: jsonContent.length,
+                platform,
+                model,
+                rpm,
+                maxConcurrent,
+                temperature,
+                context
+            });
+
+            if (!confirmResult) {
+                return; // 用户取消操作
+            }
+
             // 写入开始日志
             let currentPromptName = '系统默认提示词';
             if (context) {
@@ -455,6 +576,9 @@ export class ProofreadCommandHandler {
             logMessage += `MaxConcurrent: ${maxConcurrent}\n`;
             logMessage += `${'='.repeat(50)}\n`;
             fs.appendFileSync(logFilePath, logMessage, 'utf8');
+
+            // 创建进度跟踪器
+            let progressTracker: ProgressTracker | undefined;
 
             // 显示进度
             await vscode.window.withProgress({
@@ -475,9 +599,39 @@ export class ProofreadCommandHandler {
                             fs.appendFileSync(logFilePath, info + '\n', 'utf8');
                             progress.report({ message: info });
                         },
+                        onProgressUpdate: (progressStats, progressBarHtml) => {
+                            // 更新进度条显示
+                            if (progressTracker) {
+                                const processResult: ProcessResult = {
+                                    title: 'AI Proofreader Result Panel',
+                                    message: '正在校对文件...',
+                                    splitResult: this.webviewManager.getCurrentProcessResult()?.splitResult,
+                                    progressTracker: progressTracker,
+                                    actions: {
+                                        showJson: false,
+                                        showLog: false,
+                                        showDiff: false
+                                    }
+                                };
+                                
+                                if (this.webviewManager.getCurrentPanel()) {
+                                    this.webviewManager.updatePanelContent(processResult);
+                                } else {
+                                    const panel = this.webviewManager.createWebviewPanel(processResult);
+                                    panel.webview.onDidReceiveMessage(
+                                        (message) => this.webviewManager.handleWebviewMessage(message, panel, context),
+                                        undefined,
+                                        context.subscriptions
+                                    );
+                                    panel.reveal();
+                                }
+                            }
+                        },
                         token, // 传递取消令牌
                         context // 传递扩展上下文
                     });
+
+                    progressTracker = stats.progressTracker;
 
                     // 不再自动生成差异文件，改为在Webview中提供生成按钮
 
@@ -503,7 +657,7 @@ export class ProofreadCommandHandler {
 
                     // 更新面板显示校对结果
                     const processResult: ProcessResult = {
-                        title: '处理完成',
+                        title: 'AI Proofreader Result Panel',
                         message: '文件切分和校对都已完成！',
                         splitResult: this.webviewManager.getCurrentProcessResult()?.splitResult, // 保留切分结果
                         proofreadResult: {
@@ -518,6 +672,7 @@ export class ProofreadCommandHandler {
                                 totalLength: stats.totalLength
                             }
                         },
+                        progressTracker: progressTracker, // 包含进度跟踪器
                         actions: {
                             showJson: true,
                             showLog: true,

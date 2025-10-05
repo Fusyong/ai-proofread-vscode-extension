@@ -52,13 +52,14 @@ export class FileSplitCommandHandler {
 
             // 创建或更新智能面板
             const processResult: ProcessResult = {
-                title: '处理结果',
+                title: 'AI Proofreader Result Panel',
                 message: '文件已成功切分！',
                 splitResult: {
                     jsonFilePath: result.jsonFilePath,
                     markdownFilePath: result.markdownFilePath,
                     logFilePath: result.logFilePath,
-                    originalFilePath: document.uri.fsPath
+                    originalFilePath: document.uri.fsPath,
+                    stats: result.stats
                 },
                 actions: {
                     showJson: true,
@@ -67,13 +68,13 @@ export class FileSplitCommandHandler {
                 }
             };
 
-            if (this.webviewManager.getCurrentPanel()) {
-                // 如果已有面板，更新内容
+            if (this.webviewManager.isCurrentPanelValid()) {
+                // 如果已有有效面板，更新内容
                 this.webviewManager.updatePanelContent(processResult);
                 // 激活面板
                 this.webviewManager.getCurrentPanel()?.reveal();
             } else {
-                // 如果没有面板，创建新面板
+                // 如果没有面板或面板已被dispose，创建新面板
                 const panel = this.webviewManager.createWebviewPanel(processResult);
                 
                 // 监听Webview消息
