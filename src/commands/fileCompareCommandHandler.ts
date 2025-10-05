@@ -4,7 +4,6 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
 import { showFileDiff, jsDiffMarkdown, jsDiffJsonFiles } from '../differ';
 import { FilePathUtils, ErrorUtils } from '../utils';
 
@@ -26,11 +25,11 @@ export class FileCompareCommandHandler {
         let diffMethod: string;
         if (currentLanguageId === 'json') {
             // JSON文件直接使用jsdiff方式
-            diffMethod = '生成jsDiff结果文件并打开';
+            diffMethod = '生成jsDiff结果文件';
         } else {
             // 其他文件类型让用户选择比较方式
             const selectedMethod = await vscode.window.showQuickPick(
-                ['使用diff编辑器比较', '生成jsDiff结果文件并打开'],
+                ['使用diff编辑器比较', '生成jsDiff结果文件'],
                 {
                     placeHolder: '请选择比较方式'
                 }
@@ -75,7 +74,7 @@ export class FileCompareCommandHandler {
         // 如果两个文件都是JSON，提供特殊选项
         let segmentCount = 0;
         if (currentLanguageId === 'json' && anotherLanguageId === 'json') {
-            if (diffMethod === '生成jsDiff结果文件并打开') {
+            if (diffMethod === '生成jsDiff结果文件') {
                 // 让用户选择比较的片段数量
                 const segmentInput = await vscode.window.showInputBox({
                     prompt: '请输入每次比较的片段数量（0表示所有片段）',
@@ -107,21 +106,6 @@ export class FileCompareCommandHandler {
                 if (currentLanguageId === 'json' && anotherLanguageId === 'json') {
                     // 处理JSON文件比较
                     await jsDiffJsonFiles(currentFile, anotherFile, outputFile, title, segmentCount);
-                    
-                    // 根据是否分批处理来决定打开哪个文件
-                    if (segmentCount > 0) {
-                        // 分批处理时，打开第一个文件
-                        const firstBatchFile = FilePathUtils.getFilePath(currentFile, '.diff-001', '.html');
-                        if (fs.existsSync(firstBatchFile)) {
-                            await vscode.env.openExternal(vscode.Uri.file(firstBatchFile));
-                        } else {
-                            // 如果第一个批次文件不存在，尝试打开原始输出文件
-                            await vscode.env.openExternal(vscode.Uri.file(outputFile));
-                        }
-                    } else {
-                        // 一次性比较所有片段时，打开原始输出文件
-                        await vscode.env.openExternal(vscode.Uri.file(outputFile));
-                    }
                 } else {
                     // 处理普通文件比较
                     await jsDiffMarkdown(currentFile, anotherFile, outputFile, title);
