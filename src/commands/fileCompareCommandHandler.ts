@@ -125,9 +125,6 @@ export class FileCompareCommandHandler {
                 } else {
                     // 处理普通文件比较
                     await jsDiffMarkdown(currentFile, anotherFile, outputFile, title);
-
-                    // 使用系统默认程序打开生成的diff.html文件
-                    await vscode.env.openExternal(vscode.Uri.file(outputFile));
                 }
             }
         } catch (error) {
