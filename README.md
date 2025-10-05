@@ -274,6 +274,7 @@ Additionally, you can also set your own prompts for other text processing scenar
   - 用户可以选择确认开始或取消操作
   - 支持所有触发方式：右键菜单、命令面板、webview面板按钮等
 - 改进webwiew panel
+  - 增加进度条
   - 呈现切分摘要信息，如段落数、超长段落等
   - 查看日志文件时自动滚动到底部
   - debug：重用webwiew报错

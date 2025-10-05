@@ -149,8 +149,8 @@
         "ai-proofread.proofread.models.ollama": {
           "order": 19,
           "type": "string",
-          "default": "qwen2.5:7b",
-          "description": "Ollama本地模型名称,如: gemma3:4b, llama3.2:3b, mistral:7b, qwen3:4b, deepseek-r1:1.5b"
+          "default": "gemma3:4b",
+          "description": "Ollama本地模型名称,如: gemma3:1b, gemma3:4b, llama3.2:1b, llama3.2:3b, mistral:7b; 推理模型：qwen3:0.6b, qwen3:1.7b, qwen3:4b, deepseek-r1:1.5b"
         },
         "ai-proofread.proofread.disableThinking": {
           "order": 20,

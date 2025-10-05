@@ -573,7 +573,7 @@ export async function processJsonFileAsync(
         maxConcurrent?: number;
         temperature?: number;
         onProgress?: (info: string) => void;
-        onProgressUpdate?: ProgressUpdateCallback;
+        onProgressUpdate?: (progressTracker: ProgressTracker) => void;
         token?: vscode.CancellationToken;
         context?: vscode.ExtensionContext;
     } = {}
@@ -598,9 +598,6 @@ export async function processJsonFileAsync(
     const inputParagraphs = JSON.parse(fs.readFileSync(jsonInPath, 'utf8'));
     const totalCount = inputParagraphs.length;
 
-    // 创建进度跟踪器
-    const progressTracker = new ProgressTracker(inputParagraphs, onProgressUpdate);
-
     // 初始化或读取输出JSON文件
     let outputParagraphs: (string | null)[] = [];
     if (fs.existsSync(jsonOutPath)) {
@@ -611,6 +608,21 @@ export async function processJsonFileAsync(
     } else {
         outputParagraphs = new Array(totalCount).fill(null);
         fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
+    }
+
+    // 创建进度跟踪器
+    const progressTracker = new ProgressTracker(inputParagraphs, onProgressUpdate);
+
+    // 根据现有输出文件初始化已完成的状态
+    for (let i = 0; i < outputParagraphs.length; i++) {
+        if (outputParagraphs[i] !== null) {
+            progressTracker.updateProgress(i, 'completed');
+        }
+    }
+
+    // 触发初始状态更新
+    if (onProgressUpdate) {
+        onProgressUpdate(progressTracker);
     }
 
     // 确定要处理的段落索引

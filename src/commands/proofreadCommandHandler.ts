@@ -120,9 +120,6 @@ export class ProofreadCommandHandler {
             logMessage += `${'='.repeat(50)}\n`;
             fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
-            // 创建进度跟踪器
-            let progressTracker: ProgressTracker | undefined;
-
             // 显示进度
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
@@ -141,39 +138,35 @@ export class ProofreadCommandHandler {
                             fs.appendFileSync(logFilePath, info + '\n', 'utf8');
                             progress.report({ message: info });
                         },
-                        onProgressUpdate: (progressStats, progressBarHtml) => {
+                        onProgressUpdate: (progressTracker) => {
                             // 更新进度条显示
-                            if (progressTracker) {
-                                const processResult: ProcessResult = {
-                                    title: 'AI Proofreader Result Panel',
-                                    message: '正在校对文件...',
-                                    splitResult: this.webviewManager.getCurrentProcessResult()?.splitResult,
-                                    progressTracker: progressTracker,
-                                    actions: {
-                                        showJson: false,
-                                        showLog: false,
-                                        showDiff: false
-                                    }
-                                };
-                                
-                                if (this.webviewManager.getCurrentPanel()) {
-                                    this.webviewManager.updatePanelContent(processResult);
-                                } else {
-                                    const panel = this.webviewManager.createWebviewPanel(processResult);
-                                    panel.webview.onDidReceiveMessage(
-                                        (message) => this.webviewManager.handleWebviewMessage(message, panel, context),
-                                        undefined,
-                                        context.subscriptions
-                                    );
-                                    panel.reveal();
+                            const processResult: ProcessResult = {
+                                title: 'AI Proofreader Result Panel',
+                                message: '正在校对文件...',
+                                splitResult: this.webviewManager.getCurrentProcessResult()?.splitResult,
+                                progressTracker: progressTracker,
+                                actions: {
+                                    showJson: false,
+                                    showLog: false,
+                                    showDiff: false
                                 }
+                            };
+                            
+                            if (this.webviewManager.getCurrentPanel()) {
+                                this.webviewManager.updatePanelContent(processResult);
+                            } else {
+                                const panel = this.webviewManager.createWebviewPanel(processResult);
+                                panel.webview.onDidReceiveMessage(
+                                    (message) => this.webviewManager.handleWebviewMessage(message, panel, context),
+                                    undefined,
+                                    context.subscriptions
+                                );
+                                panel.reveal();
                             }
                         },
                         token, // 传递取消令牌
                         context // 传递扩展上下文
                     });
-
-                    progressTracker = stats.progressTracker;
 
                     // 不再自动生成差异文件，改为在Webview中提供生成按钮
 
@@ -214,7 +207,7 @@ export class ProofreadCommandHandler {
                                 totalLength: stats.totalLength
                             }
                         },
-                        progressTracker: progressTracker, // 包含进度跟踪器
+                        progressTracker: stats.progressTracker, // 包含进度跟踪器
                         actions: {
                             showJson: true,
                             showLog: true,
@@ -577,9 +570,6 @@ export class ProofreadCommandHandler {
             logMessage += `${'='.repeat(50)}\n`;
             fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
-            // 创建进度跟踪器
-            let progressTracker: ProgressTracker | undefined;
-
             // 显示进度
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
@@ -587,6 +577,9 @@ export class ProofreadCommandHandler {
                 cancellable: true
             }, async (progress, token) => {
                 try {
+                    // 创建进度跟踪器
+                    let progressTracker: ProgressTracker | undefined;
+
                     // 调用校对功能
                     const stats = await processJsonFileAsync(jsonFilePath, outputFilePath, {
                         platform,
@@ -599,32 +592,30 @@ export class ProofreadCommandHandler {
                             fs.appendFileSync(logFilePath, info + '\n', 'utf8');
                             progress.report({ message: info });
                         },
-                        onProgressUpdate: (progressStats, progressBarHtml) => {
+                        onProgressUpdate: (progressTracker) => {
                             // 更新进度条显示
-                            if (progressTracker) {
-                                const processResult: ProcessResult = {
-                                    title: 'AI Proofreader Result Panel',
-                                    message: '正在校对文件...',
-                                    splitResult: this.webviewManager.getCurrentProcessResult()?.splitResult,
-                                    progressTracker: progressTracker,
-                                    actions: {
-                                        showJson: false,
-                                        showLog: false,
-                                        showDiff: false
-                                    }
-                                };
-                                
-                                if (this.webviewManager.getCurrentPanel()) {
-                                    this.webviewManager.updatePanelContent(processResult);
-                                } else {
-                                    const panel = this.webviewManager.createWebviewPanel(processResult);
-                                    panel.webview.onDidReceiveMessage(
-                                        (message) => this.webviewManager.handleWebviewMessage(message, panel, context),
-                                        undefined,
-                                        context.subscriptions
-                                    );
-                                    panel.reveal();
+                            const processResult: ProcessResult = {
+                                title: 'AI Proofreader Result Panel',
+                                message: '正在校对文件...',
+                                splitResult: this.webviewManager.getCurrentProcessResult()?.splitResult,
+                                progressTracker: progressTracker,
+                                actions: {
+                                    showJson: false,
+                                    showLog: false,
+                                    showDiff: false
                                 }
+                            };
+                            
+                            if (this.webviewManager.getCurrentPanel()) {
+                                this.webviewManager.updatePanelContent(processResult);
+                            } else {
+                                const panel = this.webviewManager.createWebviewPanel(processResult);
+                                panel.webview.onDidReceiveMessage(
+                                    (message) => this.webviewManager.handleWebviewMessage(message, panel, context),
+                                    undefined,
+                                    context.subscriptions
+                                );
+                                panel.reveal();
                             }
                         },
                         token, // 传递取消令牌
@@ -672,7 +663,7 @@ export class ProofreadCommandHandler {
                                 totalLength: stats.totalLength
                             }
                         },
-                        progressTracker: progressTracker, // 包含进度跟踪器
+                        progressTracker: stats.progressTracker, // 包含进度跟踪器
                         actions: {
                             showJson: true,
                             showLog: true,

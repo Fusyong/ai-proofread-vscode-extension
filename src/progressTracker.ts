@@ -44,7 +44,7 @@ export interface ProgressStats {
 /**
  * 进度更新回调函数类型
  */
-export type ProgressUpdateCallback = (stats: ProgressStats, progressBarHtml: string) => void;
+export type ProgressUpdateCallback = (progressTracker: ProgressTracker) => void;
 
 /**
  * 进度跟踪器类
@@ -102,9 +102,7 @@ export class ProgressTracker {
 
         // 触发更新回调
         if (this.updateCallback) {
-            const stats = this.getStats();
-            const progressBarHtml = this.generateProgressBarHtml();
-            this.updateCallback(stats, progressBarHtml);
+            this.updateCallback(this);
         }
     }
 
