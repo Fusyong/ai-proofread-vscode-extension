@@ -31,11 +31,15 @@ export async function convertDocxToMarkdown(docxPath: string, mode: 'default' | 
             terminal = vscode.window.createTerminal('Pandoc');
         }
 
+        const docxDir = path.dirname(docxPath);
+        const docxFileName = path.basename(docxPath);
+        const outputFileName = path.basename(outputPath);
+        
         let command: string;
         if (mode === 'default') {
-            command = `pandoc -f docx -t markdown-smart+pipe_tables+footnotes --wrap=none --toc --extract-media="./attachments/${path.basename(docxPath, '.docx')}" "${docxPath}" -o "${outputPath}"`;
+            command = `cd "${docxDir}" & pandoc -f docx -t markdown-smart+pipe_tables+footnotes --wrap=none --toc --extract-media="./attachments/${path.basename(docxPath, '.docx')}" "${docxFileName}" -o "${outputFileName}"`;
         } else {
-            command = `pandoc -t markdown_strict --extract-media="./attachments/${path.basename(docxPath, '.docx')}" "${docxPath}" -o "${outputPath}"`;
+            command = `cd "${docxDir}" & pandoc -t markdown_strict --extract-media="./attachments/${path.basename(docxPath, '.docx')}" "${docxFileName}" -o "${outputFileName}"`;
         }
 
         terminal.sendText(command);
@@ -65,7 +69,8 @@ export async function convertMarkdownToDocx(mdPath: string, outputPath?: string 
             terminal = vscode.window.createTerminal('Pandoc');
         }
 
-        const command = `pandoc -f markdown -t docx "${mdPath}" -o "${outputPath}"`;
+        const mdDir = path.dirname(mdPath);
+        const command = `cd ${mdDir} & pandoc -f markdown -t docx "${mdPath}" -o "${outputPath}"`;
         terminal.sendText(command);
 
         vscode.window.showInformationMessage('转换完成，请查看输出文件！');

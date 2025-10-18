@@ -234,7 +234,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 ## 5. TODO
 
 1. [x] jsdiff支持JSON文件，允许用户指定每次jsdiff的片段数量，避免文本过长可能无法渲染
-    1. [ ] 取消打开文件步骤
+    1. [x] 取消打开文件步骤
 2. [x] 优化“转换半角引号为全角”算法，避免跨行引号转换错误
 3. [x] markdown切分/选段校对，加入前后段落作为context
 4. [x] 支持Ollama
@@ -266,6 +266,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 
 ## 6. 更新日志
+
+### v0.1.9
+
+- 修复了转换子目录中的文档时不能正确处理图片的问题
 
 ### v0.1.8
 
