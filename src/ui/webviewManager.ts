@@ -55,6 +55,23 @@ export class WebviewManager {
 
     private constructor() {}
 
+    /**
+     * 将绝对路径转换为相对路径
+     */
+    private getRelativePath(absolutePath: string): string {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            return absolutePath;
+        }
+        
+        const workspaceRoot = workspaceFolders[0].uri.fsPath;
+        if (absolutePath.startsWith(workspaceRoot)) {
+            return path.relative(workspaceRoot, absolutePath);
+        }
+        
+        return absolutePath;
+    }
+
     public static getInstance(): WebviewManager {
         if (!WebviewManager.instance) {
             WebviewManager.instance = new WebviewManager();
@@ -332,19 +349,10 @@ export class WebviewManager {
         const statsHtml = splitResult.stats ? `
             <div class="stats-section">
                 <h4>处理统计</h4>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <span class="stat-label">切分片段数:</span>
-                        <span class="stat-value">${splitResult.stats.segmentCount}</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">最长片段字符数:</span>
-                        <span class="stat-value">${splitResult.stats.maxSegmentLength}</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">最短片段字符数:</span>
-                        <span class="stat-value">${splitResult.stats.minSegmentLength}</span>
-                    </div>
+                <div class="stats-inline">
+                    <span class="stat-item">切分片段数: <span class="stat-value">${splitResult.stats.segmentCount}</span></span>
+                    <span class="stat-item">最长: <span class="stat-value">${splitResult.stats.maxSegmentLength}</span></span>
+                    <span class="stat-item">最短: <span class="stat-value">${splitResult.stats.minSegmentLength}</span></span>
                 </div>
             </div>
         ` : '';
@@ -353,22 +361,22 @@ export class WebviewManager {
             <div class="process-section">
                 <h3>📄 切分结果</h3>
                 ${statsHtml}
-                <div class="file-paths">
-                    <div class="file-path-item">
+                <div class="file-paths-compact">
+                    <div class="file-path-row">
                         <span class="file-label">原始文件:</span>
-                        <span class="file-path">${splitResult.originalFilePath}</span>
+                        <span class="file-path">${this.getRelativePath(splitResult.originalFilePath)}</span>
                     </div>
-                    <div class="file-path-item">
+                    <div class="file-path-row">
                         <span class="file-label">JSON结果:</span>
-                        <span class="file-path">${splitResult.jsonFilePath}</span>
+                        <span class="file-path">${this.getRelativePath(splitResult.jsonFilePath)}</span>
                     </div>
-                    <div class="file-path-item">
+                    <div class="file-path-row">
                         <span class="file-label">Markdown结果:</span>
-                        <span class="file-path">${splitResult.markdownFilePath}</span>
+                        <span class="file-path">${this.getRelativePath(splitResult.markdownFilePath)}</span>
                     </div>
-                    <div class="file-path-item">
+                    <div class="file-path-row">
                         <span class="file-label">日志文件:</span>
-                        <span class="file-path">${splitResult.logFilePath}</span>
+                        <span class="file-path">${this.getRelativePath(splitResult.logFilePath)}</span>
                     </div>
                 </div>
                 <div class="section-actions">
@@ -390,37 +398,25 @@ export class WebviewManager {
                 <h3>✏️ 校对结果</h3>
                 <div class="stats-section">
                     <h4>处理统计</h4>
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <span class="stat-label">总片段数:</span>
-                            <span class="stat-value">${proofreadResult.stats.totalCount}</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">已处理片段数:</span>
-                            <span class="stat-value">${proofreadResult.stats.processedCount} (${(proofreadResult.stats.processedCount/proofreadResult.stats.totalCount*100).toFixed(2)}%)</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">已处理字数:</span>
-                            <span class="stat-value">${proofreadResult.stats.processedLength} (${(proofreadResult.stats.processedLength/proofreadResult.stats.totalLength*100).toFixed(2)}%)</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">未处理片段数:</span>
-                            <span class="stat-value">${proofreadResult.stats.totalCount - proofreadResult.stats.processedCount}</span>
-                        </div>
+                    <div class="stats-inline">
+                        <span class="stat-item">总片段: <span class="stat-value">${proofreadResult.stats.totalCount}</span></span>
+                        <span class="stat-item">已处理: <span class="stat-value">${proofreadResult.stats.processedCount} (${(proofreadResult.stats.processedCount/proofreadResult.stats.totalCount*100).toFixed(1)}%)</span></span>
+                        <span class="stat-item">已处理字数: <span class="stat-value">${proofreadResult.stats.processedLength} (${(proofreadResult.stats.processedLength/proofreadResult.stats.totalLength*100).toFixed(1)}%)</span></span>
+                        <span class="stat-item">未处理: <span class="stat-value">${proofreadResult.stats.totalCount - proofreadResult.stats.processedCount}</span></span>
                     </div>
                 </div>
-                <div class="file-paths">
-                    <div class="file-path-item">
+                <div class="file-paths-compact">
+                    <div class="file-path-row">
                         <span class="file-label">JSON结果:</span>
-                        <span class="file-path">${proofreadResult.outputFilePath}</span>
+                        <span class="file-path">${this.getRelativePath(proofreadResult.outputFilePath)}</span>
                     </div>
-                    <div class="file-path-item">
+                    <div class="file-path-row">
                         <span class="file-label">Markdown结果:</span>
-                        <span class="file-path">${proofreadResult.markdownFilePath}</span>
+                        <span class="file-path">${this.getRelativePath(proofreadResult.markdownFilePath)}</span>
                     </div>
-                    <div class="file-path-item">
+                    <div class="file-path-row">
                         <span class="file-label">日志文件:</span>
-                        <span class="file-path">${proofreadResult.logFilePath}</span>
+                        <span class="file-path">${this.getRelativePath(proofreadResult.logFilePath)}</span>
                     </div>
                 </div>
                 <div class="section-actions">
@@ -450,114 +446,142 @@ export class WebviewManager {
                         font-size: var(--vscode-font-size);
                         color: var(--vscode-foreground);
                         background-color: var(--vscode-editor-background);
-                        padding: 20px;
-                        line-height: 1.6;
+                        padding: 16px;
+                        line-height: 1.4;
                     }
                     .header {
-                        margin-bottom: 20px;
-                        padding-bottom: 15px;
+                        margin-bottom: 16px;
+                        padding-bottom: 12px;
                         border-bottom: 1px solid var(--vscode-panel-border);
                     }
                     .message {
-                        font-size: 16px;
-                        margin-bottom: 20px;
-                        color: var(--vscode-textLink-foreground);
+                        font-size: 15px;
+                        margin-bottom: 16px;
+                        color: #6B8E9A;
+                        font-weight: 500;
                     }
                     .process-section {
-                        margin-bottom: 25px;
-                        padding: 20px;
+                        margin-bottom: 20px;
+                        padding: 16px;
                         background-color: var(--vscode-editor-background);
                         border: 1px solid var(--vscode-panel-border);
                         border-radius: 6px;
                     }
                     .process-section h3 {
                         margin-top: 0;
-                        margin-bottom: 15px;
-                        color: var(--vscode-textLink-foreground);
-                        font-size: 18px;
-                        border-bottom: 2px solid var(--vscode-panel-border);
-                        padding-bottom: 8px;
+                        margin-bottom: 12px;
+                        color: #5A7A85;
+                        font-size: 16px;
+                        border-bottom: 1px solid #E8F0F2;
+                        padding-bottom: 6px;
                     }
                     .process-section h4 {
                         margin-top: 0;
-                        margin-bottom: 10px;
-                        color: var(--vscode-textLink-foreground);
-                        font-size: 14px;
+                        margin-bottom: 8px;
+                        color: #6B8E9A;
+                        font-size: 13px;
+                        font-weight: 500;
                     }
                     .stats-section {
-                        margin-bottom: 15px;
-                        padding: 15px;
-                        background-color: var(--vscode-editor-background);
-                        border: 1px solid var(--vscode-panel-border);
+                        margin-bottom: 12px;
+                        padding: 12px;
+                        background-color: #F8FAFB;
+                        border: 1px solid #E8F0F2;
                         border-radius: 4px;
+                    }
+                    .stats-inline {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 16px;
+                        align-items: center;
                     }
                     .stats-grid {
                         display: grid;
                         grid-template-columns: 1fr 1fr;
-                        gap: 10px;
+                        gap: 8px;
                     }
                     .stat-item {
-                        display: flex;
-                        justify-content: space-between;
-                        padding: 5px 0;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        font-size: 13px;
                     }
                     .stat-label {
                         font-weight: 500;
+                        color: #6B8E9A;
                     }
                     .stat-value {
-                        color: var(--vscode-textLink-foreground);
+                        color: #4A6B7A;
+                        font-weight: 600;
                     }
-                    .file-paths {
-                        margin-bottom: 20px;
-                        padding: 15px;
-                        background-color: var(--vscode-editor-background);
-                        border: 1px solid var(--vscode-panel-border);
+                    .file-paths-compact {
+                        margin-bottom: 16px;
+                        padding: 12px;
+                        background-color: #F8FAFB;
+                        border: 1px solid #E8F0F2;
                         border-radius: 4px;
                     }
-                    .file-path-item {
-                        margin-bottom: 8px;
+                    .file-paths {
+                        margin-bottom: 16px;
+                        padding: 12px;
+                        background-color: #F8FAFB;
+                        border: 1px solid #E8F0F2;
+                        border-radius: 4px;
+                    }
+                    .file-path-row {
+                        margin-bottom: 6px;
                         display: flex;
                         align-items: center;
+                        font-size: 12px;
+                    }
+                    .file-path-item {
+                        margin-bottom: 6px;
+                        display: flex;
+                        align-items: center;
+                        font-size: 12px;
                     }
                     .file-label {
                         font-weight: 500;
-                        min-width: 120px;
+                        min-width: 100px;
+                        color: #6B8E9A;
                     }
                     .file-path {
-                        color: var(--vscode-textLink-foreground);
+                        color: #4A6B7A;
                         font-family: var(--vscode-editor-font-family);
-                        font-size: 12px;
+                        font-size: 11px;
                         word-break: break-all;
+                        margin-left: 8px;
                     }
                     .section-actions {
                         display: flex;
                         flex-wrap: wrap;
-                        gap: 10px;
-                        margin-top: 15px;
-                        padding-top: 15px;
-                        border-top: 1px solid var(--vscode-panel-border);
+                        gap: 8px;
+                        margin-top: 12px;
+                        padding-top: 12px;
+                        border-top: 1px solid #E8F0F2;
                     }
                     .actions {
                         display: flex;
                         flex-wrap: wrap;
-                        gap: 10px;
+                        gap: 8px;
                     }
                     .action-button {
-                        padding: 8px 16px;
-                        background-color: var(--vscode-button-background);
-                        color: var(--vscode-button-foreground);
+                        padding: 6px 12px;
+                        background-color: #7A9BA8;
+                        color: white;
                         border: none;
                         border-radius: 4px;
                         cursor: pointer;
-                        font-size: 14px;
+                        font-size: 12px;
                         transition: background-color 0.2s;
+                        font-weight: 500;
                     }
                     .action-button:hover {
-                        background-color: var(--vscode-button-hoverBackground);
+                        background-color: #6B8E9A;
                     }
                     .action-button:disabled {
-                        background-color: var(--vscode-button-secondaryBackground);
-                        color: var(--vscode-button-secondaryForeground);
+                        background-color: #B8C5CA;
+                        color: #8A9BA0;
                         cursor: not-allowed;
                     }
                     

@@ -166,15 +166,9 @@ export class ProgressTracker {
             <div class="progress-container">
                 <div class="progress-header">
                     <h4>校对进度</h4>
-                    <div class="progress-stats">
-                        <span class="stat-item">
-                            <span class="stat-label">段落进度:</span>
-                            <span class="stat-value">${stats.completedItems}/${stats.totalItems} (${stats.progressPercentage.toFixed(1)}%)</span>
-                        </span>
-                        <span class="stat-item">
-                            <span class="stat-label">字符进度:</span>
-                            <span class="stat-value">${stats.completedChars}/${stats.totalChars} (${stats.charProgressPercentage.toFixed(1)}%)</span>
-                        </span>
+                    <div class="progress-stats-inline">
+                        <span class="stat-item">段落: <span class="stat-value">${stats.completedItems}/${stats.totalItems} (${stats.progressPercentage.toFixed(1)}%)</span></span>
+                        <span class="stat-item">字符: <span class="stat-value">${stats.completedChars}/${stats.totalChars} (${stats.charProgressPercentage.toFixed(1)}%)</span></span>
                     </div>
                 </div>
                 <div class="progress-bar-container">
@@ -203,24 +197,6 @@ export class ProgressTracker {
                         </div>
                     </div>
                 </div>
-                <div class="progress-details">
-                    <div class="detail-item">
-                        <span class="detail-label">总字符数:</span>
-                        <span class="detail-value">${stats.totalChars.toLocaleString()}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">已完成字符:</span>
-                        <span class="detail-value">${stats.completedChars.toLocaleString()}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">处理中字符:</span>
-                        <span class="detail-value">${stats.submittedChars.toLocaleString()}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">待处理字符:</span>
-                        <span class="detail-value">${stats.pendingChars.toLocaleString()}</span>
-                    </div>
-                </div>
             </div>
         `;
     }
@@ -231,10 +207,10 @@ export class ProgressTracker {
     public static generateProgressBarCss(): string {
         return `
             .progress-container {
-                margin: 20px 0;
-                padding: 20px;
-                background-color: var(--vscode-editor-background);
-                border: 1px solid var(--vscode-panel-border);
+                margin: 16px 0;
+                padding: 16px;
+                background-color: #F8FAFB;
+                border: 1px solid #E8F0F2;
                 border-radius: 6px;
             }
             
@@ -242,48 +218,56 @@ export class ProgressTracker {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                margin-bottom: 15px;
+                margin-bottom: 12px;
             }
             
             .progress-header h4 {
                 margin: 0;
-                color: var(--vscode-textLink-foreground);
-                font-size: 16px;
+                color: #5A7A85;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            
+            .progress-stats-inline {
+                display: flex;
+                gap: 16px;
+                align-items: center;
             }
             
             .progress-stats {
                 display: flex;
-                gap: 20px;
+                gap: 16px;
             }
             
             .stat-item {
-                display: flex;
-                flex-direction: column;
+                display: inline-flex;
                 align-items: center;
+                gap: 4px;
+                font-size: 12px;
             }
             
             .stat-label {
                 font-size: 12px;
-                color: var(--vscode-descriptionForeground);
+                color: #6B8E9A;
                 margin-bottom: 2px;
             }
             
             .stat-value {
-                font-size: 14px;
+                font-size: 12px;
                 font-weight: 600;
-                color: var(--vscode-textLink-foreground);
+                color: #4A6B7A;
             }
             
             .progress-bar-container {
-                margin-bottom: 15px;
+                margin-bottom: 12px;
             }
             
             .progress-bar {
                 width: 100%;
-                height: 24px;
-                background-color: var(--vscode-input-background);
-                border: 1px solid var(--vscode-input-border);
-                border-radius: 12px;
+                height: 20px;
+                background-color: #E8F0F2;
+                border: 1px solid #D0DDE3;
+                border-radius: 10px;
                 overflow: hidden;
                 display: flex;
                 position: relative;
@@ -296,87 +280,96 @@ export class ProgressTracker {
             }
             
             .progress-segment.completed {
-                background: linear-gradient(90deg, #4CAF50, #66BB6A);
+                background: linear-gradient(90deg, #8BB5A0, #9BC2B0);
             }
             
             .progress-segment.submitted {
-                background: linear-gradient(90deg, #FFC107, #FFD54F);
+                background: linear-gradient(90deg, #D4C4A0, #E0D0B0);
             }
             
             .progress-segment.pending {
-                background: linear-gradient(90deg, #9E9E9E, #BDBDBD);
+                background: linear-gradient(90deg, #9BB5C2, #A8C0CC);
             }
             
             .progress-segment.failed {
-                background: linear-gradient(90deg, #F44336, #EF5350);
+                background: linear-gradient(90deg, #D4A0A0, #E0B0B0);
             }
             
             .progress-legend {
                 display: flex;
                 justify-content: center;
-                gap: 20px;
-                margin-top: 10px;
+                gap: 16px;
+                margin-top: 8px;
                 flex-wrap: wrap;
             }
             
             .legend-item {
                 display: flex;
                 align-items: center;
-                gap: 6px;
+                gap: 4px;
             }
             
             .legend-color {
-                width: 12px;
-                height: 12px;
+                width: 10px;
+                height: 10px;
                 border-radius: 50%;
             }
             
             .legend-color.completed {
-                background-color: #4CAF50;
+                background-color: #8BB5A0;
             }
             
             .legend-color.submitted {
-                background-color: #FFC107;
+                background-color: #D4C4A0;
             }
             
             .legend-color.pending {
-                background-color: #9E9E9E;
+                background-color: #9BB5C2;
             }
             
             .legend-color.failed {
-                background-color: #F44336;
+                background-color: #D4A0A0;
             }
             
             .legend-text {
-                font-size: 12px;
-                color: var(--vscode-foreground);
+                font-size: 11px;
+                color: #6B8E9A;
+            }
+            
+            .progress-details-inline {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                margin-top: 10px;
+                padding-top: 10px;
+                border-top: 1px solid #E8F0F2;
+                font-size: 11px;
             }
             
             .progress-details {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 10px;
-                margin-top: 15px;
-                padding-top: 15px;
-                border-top: 1px solid var(--vscode-panel-border);
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+                border-top: 1px solid #E8F0F2;
             }
             
             .detail-item {
-                display: flex;
-                justify-content: space-between;
+                display: inline-flex;
                 align-items: center;
-                padding: 5px 0;
+                gap: 4px;
             }
             
             .detail-label {
-                font-size: 12px;
-                color: var(--vscode-descriptionForeground);
+                font-size: 11px;
+                color: #6B8E9A;
             }
             
             .detail-value {
-                font-size: 12px;
+                font-size: 11px;
                 font-weight: 600;
-                color: var(--vscode-textLink-foreground);
+                color: #4A6B7A;
             }
         `;
     }
