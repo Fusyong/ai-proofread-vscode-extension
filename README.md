@@ -271,6 +271,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
+### v0.1.10
+
+- result panel 优化：紧凑设计，减少冗余信息，尽量一屏展示；色调更淡雅
+
 ### v0.1.9
 
 - 修复了转换子目录中的文档时不能正确处理图片的问题
