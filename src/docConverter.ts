@@ -21,6 +21,17 @@ export async function convertDocxToMarkdown(docxPath: string, mode: 'default' | 
     const attachmentsDir = path.join(path.dirname(docxPath), 'attachments', path.basename(docxPath, '.docx'));
 
     try {
+        // 检查pandoc是否可用
+        try {
+            if (process.platform === 'win32') {
+                await execAsync('where pandoc');
+            } else {
+                await execAsync('which pandoc');
+            }
+        } catch (error) {
+            throw new Error('pandoc未安装或不在PATH中，请先安装Pandoc工具包');
+        }
+
         // 确保附件目录存在
         if (!fs.existsSync(attachmentsDir)) {
             fs.mkdirSync(attachmentsDir, { recursive: true });
@@ -64,6 +75,17 @@ export async function convertMarkdownToDocx(mdPath: string, outputPath?: string 
     }
 
     try {
+        // 检查pandoc是否可用
+        try {
+            if (process.platform === 'win32') {
+                await execAsync('where pandoc');
+            } else {
+                await execAsync('which pandoc');
+            }
+        } catch (error) {
+            throw new Error('pandoc未安装或不在PATH中，请先安装Pandoc工具包');
+        }
+
         let terminal = vscode.window.terminals.find(t => t.name === 'Pandoc');
         if (!terminal) {
             terminal = vscode.window.createTerminal('Pandoc');
@@ -93,11 +115,15 @@ export async function convertPdfToMarkdown(pdfPath: string, outputPath?: string 
     }
 
     try {
-        // 检查pdftotext是否可用
+        // 检查pdftotext是否可用 - 使用 where 命令检查命令是否存在
         try {
-            await execAsync('pdftotext -v');
+            if (process.platform === 'win32') {
+                await execAsync('where pdftotext');
+            } else {
+                await execAsync('which pdftotext');
+            }
         } catch (error) {
-            throw new Error('pdftotext未安装或不在PATH中，请正确安装Poppler工具包');
+            throw new Error('pdftotext未安装或不在PATH中，请正确安装');
         }
 
         let terminal = vscode.window.terminals.find(t => t.name === 'PDF转换');

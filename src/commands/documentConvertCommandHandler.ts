@@ -47,7 +47,7 @@ export class DocumentConvertCommandHandler {
         }
 
         // 等待文件写入完成的辅助函数
-        async function waitForFile(filePath: string, maxTries = 10, interval = 100): Promise<boolean> {
+        async function waitForFile(filePath: string, maxTries = 50, interval = 200): Promise<boolean> {
             for (let i = 0; i < maxTries; i++) {
                 if (fs.existsSync(filePath)) return true;
                 await new Promise(res => setTimeout(res, interval));
@@ -63,8 +63,8 @@ export class DocumentConvertCommandHandler {
             );
 
             // 等待文件写入完成
-            const fileReady = await waitForFile(outputPath, 20, 100);
-            if (!fileReady) throw new Error('文件写入超时');
+            const fileReady = await waitForFile(outputPath, 50, 200);
+            if (!fileReady) throw new Error('文件写入超时（10秒）');
 
             // 打开转换后的文件
             const outputUri = vscode.Uri.file(outputPath);
@@ -178,7 +178,7 @@ export class DocumentConvertCommandHandler {
         }
 
         // 等待文件写入完成的辅助函数
-        async function waitForFile(filePath: string, maxTries = 10, interval = 100): Promise<boolean> {
+        async function waitForFile(filePath: string, maxTries = 50, interval = 200): Promise<boolean> {
             for (let i = 0; i < maxTries; i++) {
                 if (fs.existsSync(filePath)) return true;
                 await new Promise(res => setTimeout(res, interval));
@@ -190,8 +190,8 @@ export class DocumentConvertCommandHandler {
             outputPath = await convertPdfToMarkdown(fileUri[0].fsPath, outputPath);
 
             // 等待文件写入完成
-            const fileReady = await waitForFile(outputPath, 20, 100);
-            if (!fileReady) throw new Error('文件写入超时');
+            const fileReady = await waitForFile(outputPath, 50, 200);
+            if (!fileReady) throw new Error('文件写入超时（10秒）');
 
             // 打开转换后的文件
             const outputUri = vscode.Uri.file(outputPath);

@@ -277,6 +277,11 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
+### v0.1.12
+
+- bug修复：测试pdftotext是否存在改为更通用的方法
+- 优化：使用前测试pandoc是否存在
+
 ### v0.1.11
 
 - 增加使用pdftotext工具把PDF文件转换为Markdown文件（实际是纯文本）的功能

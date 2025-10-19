@@ -21,9 +21,13 @@ export async function searchSelectionInPDF(editor: vscode.TextEditor): Promise<v
         return;
     }
 
-    let terminal = vscode.window.terminals.find(t => t.name === 'SumatraPDF Search');
-    if (!terminal) {
-        terminal = vscode.window.createTerminal('SumatraPDF Search');
+    try {
+        let terminal = vscode.window.terminals.find(t => t.name === 'SumatraPDF Search');
+        if (!terminal) {
+            terminal = vscode.window.createTerminal('SumatraPDF Search');
+        }
+        terminal.sendText(`SumatraPDF -search "${selection}" "${pdfPath}"`);
+    } catch (error) {
+        vscode.window.showErrorMessage('SumatraPDF未安装或不在PATH中，请先安装SumatraPDF');
     }
-    terminal.sendText(`SumatraPDF -search "${selection}" "${pdfPath}"`);
 }
