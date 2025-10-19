@@ -237,7 +237,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 1. vscode提供的比较（diff）功能：通过文件浏览器右键菜单使用；本插件在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://code.visualstudio.com/shortcuts/keyboard-shortcuts-windows.pdf)，很适合编辑工用作主力编辑器。
 2. PDF查看器[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，速度快，能跨行搜索
 3. 多功能文档格式转换工具[Pandoc](https://pandoc.org/installing.html)
-4. Acrobat、WPS等软件，可以把PDF文件转成docx或HTML，再用pandoc转markdown
+4. PDF转文本用的[Xpdf command line tools](https://www.xpdfreader.com/download.html)
+5. Acrobat、WPS等软件，可以把PDF文件转成docx或HTML，再用pandoc转markdown
 
 ## 5. TODO
 
