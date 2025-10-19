@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { convertDocxToMarkdown, convertMarkdownToDocx } from '../docConverter';
+import { convertDocxToMarkdown, convertMarkdownToDocx, convertPdfToMarkdown } from '../docConverter';
 import { FilePathUtils, ErrorUtils } from '../utils';
 
 export class DocumentConvertCommandHandler {
@@ -145,6 +145,58 @@ export class DocumentConvertCommandHandler {
             // 打开转换后的文件
             const outputUri = vscode.Uri.file(outputPath);
             await vscode.env.openExternal(outputUri);
+
+            vscode.window.showInformationMessage('转换完成！');
+        } catch (error) {
+            ErrorUtils.showError(error, '转换文件时出错：');
+        }
+    }
+
+    /**
+     * 处理PDF转markdown命令
+     */
+    public async handleConvertPdfToMarkdownCommand(): Promise<void> {
+        // 让用户选择文件
+        const fileUri = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            filters: {
+                'PDF文件': ['pdf']
+            }
+        });
+
+        if (!fileUri || fileUri.length === 0) {
+            return;
+        }
+
+        // 检查是否已经存在同名的输出文件，存在则添加时间戳
+        let outputPath = FilePathUtils.getFilePath(fileUri[0].fsPath, '', '.md');
+        if (fs.existsSync(outputPath)) {
+            const timestamp = new Date().getTime();
+            outputPath = FilePathUtils.getFilePath(fileUri[0].fsPath, `-${timestamp}`, '.md');
+        }
+
+        // 等待文件写入完成的辅助函数
+        async function waitForFile(filePath: string, maxTries = 10, interval = 100): Promise<boolean> {
+            for (let i = 0; i < maxTries; i++) {
+                if (fs.existsSync(filePath)) return true;
+                await new Promise(res => setTimeout(res, interval));
+            }
+            return false;
+        }
+
+        try {
+            outputPath = await convertPdfToMarkdown(fileUri[0].fsPath, outputPath);
+
+            // 等待文件写入完成
+            const fileReady = await waitForFile(outputPath, 20, 100);
+            if (!fileReady) throw new Error('文件写入超时');
+
+            // 打开转换后的文件
+            const outputUri = vscode.Uri.file(outputPath);
+            await vscode.workspace.openTextDocument(outputUri);
+            await vscode.window.showTextDocument(outputUri);
 
             vscode.window.showInformationMessage('转换完成！');
         } catch (error) {

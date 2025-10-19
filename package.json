@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -65,6 +65,10 @@
       {
         "command": "ai-proofread.convertDocxToMarkdown",
         "title": "AI Proofreader: convert docx to markdown"
+      },
+      {
+        "command": "ai-proofread.convertPdfToMarkdown",
+        "title": "AI Proofreader: convert PDF to markdown"
       },
       {
         "command": "ai-proofread.convertMarkdownToDocx",

@@ -186,6 +186,11 @@ export function activate(context: vscode.ExtensionContext) {
             await documentConvertHandler.handleConvertMarkdownToDocxCommand();
         }),
 
+        // 注册PDF转markdown命令
+        vscode.commands.registerCommand('ai-proofread.convertPdfToMarkdown', async () => {
+            await documentConvertHandler.handleConvertPdfToMarkdownCommand();
+        }),
+
         // 注册引号转换命令
         vscode.commands.registerCommand('ai-proofread.convertQuotes', async () => {
             const editor = vscode.window.activeTextEditor;

@@ -205,8 +205,12 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 1. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
 2. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
-3. **文件格式转换功能**，须先安装好[Pandoc](https://pandoc.org/installing.html)
-    1. 使用命令`convert docx to markdown`将docx转为markdown，与下面的命令行等效
+3. **文件格式转换功能**
+    1. **PDF转Markdown（实际上是纯文本）**：使用命令`convert PDF to markdown`将PDF转为markdown，须先安装好[Xpdf command line tools](https://www.xpdfreader.com/download.html)中的pdftotext，作用与下面的命令行等效
+        ```bash
+        pdftotext -layout -enc UTF-8 "myfilename.pdf" "myfilename.md"
+        ```
+    2. **Docx转Markdown**：使用命令`convert docx to markdown`将docx转为markdown，须先安装好[Pandoc](https://pandoc.org/installing.html)，与下面的命令行等效
         ```bash
         set myfilename="myfilename"
         pandoc -f docx -t markdown-smart+pipe_tables+footnotes --wrap=none --toc --extract-media="./attachments/%myfilename%" %myfilename%.docx -o %myfilename%.md
@@ -216,7 +220,7 @@ Additionally, you can also set your own prompts for other text processing scenar
         set myfilename="myfilename"
         pandoc -t markdown_strict --extract-media="./attachments/%myfilename%" %myfilename%.docx -o %myfilename%.md
         ```
-    2. 使用命令或菜单`convert markdown to docx`，将markdown转为docx，与下面的命令行等效
+    3. **Markdown转Docx**：使用命令或菜单`convert markdown to docx`，将markdown转为docx，与下面的命令行等效
         ```bash
         pandoc -f markdown -t docx -o myfilename.docx myfilename.markdown
         ```
@@ -270,6 +274,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 
 ## 6. 更新日志
+
+### v0.1.11
+
+- 增加使用pdftotext工具把PDF文件转换为Markdown文件（实际是纯文本）的功能
 
 ### v0.1.10
 

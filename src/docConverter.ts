@@ -80,3 +80,42 @@ export async function convertMarkdownToDocx(mdPath: string, outputPath?: string 
         throw new Error(`转换markdown到docx失败: ${error}`);
     }
 }
+
+/**
+ * 将PDF文件转换为markdown
+ * @param pdfPath PDF文件路径
+ * @param outputPath 输出文件路径
+ * @returns 转换后的markdown文件路径
+ */
+export async function convertPdfToMarkdown(pdfPath: string, outputPath?: string | undefined): Promise<string> {
+    if (!outputPath) {
+        outputPath = FilePathUtils.getFilePath(pdfPath, '', '.md');
+    }
+
+    try {
+        // 检查pdftotext是否可用
+        try {
+            await execAsync('pdftotext -v');
+        } catch (error) {
+            throw new Error('pdftotext未安装或不在PATH中，请正确安装Poppler工具包');
+        }
+
+        let terminal = vscode.window.terminals.find(t => t.name === 'PDF转换');
+        if (!terminal) {
+            terminal = vscode.window.createTerminal('PDF转换');
+        }
+
+        const pdfDir = path.dirname(pdfPath);
+        const pdfFileName = path.basename(pdfPath);
+        const outputFileName = path.basename(outputPath);
+        
+        const command = `cd "${pdfDir}" & pdftotext -layout -enc UTF-8 "${pdfFileName}" "${outputFileName}"`;
+        terminal.sendText(command);
+
+        vscode.window.showInformationMessage('转换完成，请查看输出文件！');
+
+        return outputPath;
+    } catch (error) {
+        throw new Error(`转换PDF到markdown失败: ${error}`);
+    }
+}
