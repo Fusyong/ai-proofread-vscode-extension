@@ -54,10 +54,13 @@ export class ProgressTracker {
     private totalChars: number = 0;
     private updateCallback?: ProgressUpdateCallback;
     private isCancelled: boolean = false;
+    private startTime: number = 0;
+    private endTime: number = 0;
 
     constructor(paragraphs: Array<{target: string}>, updateCallback?: ProgressUpdateCallback) {
         this.updateCallback = updateCallback;
         this.initializeItems(paragraphs);
+        this.startTime = Date.now();
     }
 
     /**
@@ -169,6 +172,7 @@ export class ProgressTracker {
                     <div class="progress-stats-inline">
                         <span class="stat-item">段落: <span class="stat-value">${stats.completedItems}/${stats.totalItems} (${stats.progressPercentage.toFixed(1)}%)</span></span>
                         <span class="stat-item">字符: <span class="stat-value">${stats.completedChars}/${stats.totalChars} (${stats.charProgressPercentage.toFixed(1)}%)</span></span>
+                        <span class="stat-item">本次耗时: <span class="stat-value">${this.getFormattedElapsedTime()}</span></span>
                     </div>
                 </div>
                 <div class="progress-bar-container">
@@ -418,5 +422,38 @@ export class ProgressTracker {
      */
     public getItem(index: number): ProgressItem | undefined {
         return this.items.find(item => item.index === index);
+    }
+
+    /**
+     * 完成进度跟踪
+     */
+    public complete(): void {
+        this.endTime = Date.now();
+    }
+
+    /**
+     * 获取耗时（毫秒）
+     */
+    public getElapsedTime(): number {
+        const endTime = this.endTime || Date.now();
+        return endTime - this.startTime;
+    }
+
+    /**
+     * 格式化耗时显示
+     */
+    public getFormattedElapsedTime(): string {
+        const elapsed = this.getElapsedTime();
+        const seconds = Math.floor(elapsed / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+
+        if (hours > 0) {
+            return `${hours}:${(minutes % 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+        } else if (minutes > 0) {
+            return `${minutes}:${(seconds % 60).toString().padStart(2, '0')}`;
+        } else {
+            return `${seconds}s`;
+        }
     }
 }

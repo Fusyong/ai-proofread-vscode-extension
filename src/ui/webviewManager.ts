@@ -283,21 +283,6 @@ export class WebviewManager {
                                 // 生成差异文件
                                 await jsDiffJsonFiles(originalJsonPath, proofreadJsonFilePath, outputFile, title, segmentCount);
                                 
-                                // 根据是否分批处理来决定打开哪个文件
-                                if (segmentCount > 0) {
-                                    // 分批处理时，打开第一个文件
-                                    const firstBatchFile = FilePathUtils.getFilePath(originalJsonPath, '.diff-001', '.html');
-                                    if (fs.existsSync(firstBatchFile)) {
-                                        await vscode.env.openExternal(vscode.Uri.file(firstBatchFile));
-                                    } else {
-                                        // 如果第一个批次文件不存在，尝试打开原始输出文件
-                                        await vscode.env.openExternal(vscode.Uri.file(outputFile));
-                                    }
-                                } else {
-                                    // 一次性比较所有片段时，打开原始输出文件
-                                    await vscode.env.openExternal(vscode.Uri.file(outputFile));
-                                }
-                                
                                 vscode.window.showInformationMessage('差异文件生成完成！');
                             }
                         } catch (error) {
@@ -396,15 +381,6 @@ export class WebviewManager {
         return `
             <div class="process-section">
                 <h3>✏️ 校对结果</h3>
-                <div class="stats-section">
-                    <h4>处理统计</h4>
-                    <div class="stats-inline">
-                        <span class="stat-item">总片段: <span class="stat-value">${proofreadResult.stats.totalCount}</span></span>
-                        <span class="stat-item">已处理: <span class="stat-value">${proofreadResult.stats.processedCount} (${(proofreadResult.stats.processedCount/proofreadResult.stats.totalCount*100).toFixed(1)}%)</span></span>
-                        <span class="stat-item">已处理字数: <span class="stat-value">${proofreadResult.stats.processedLength} (${(proofreadResult.stats.processedLength/proofreadResult.stats.totalLength*100).toFixed(1)}%)</span></span>
-                        <span class="stat-item">未处理: <span class="stat-value">${proofreadResult.stats.totalCount - proofreadResult.stats.processedCount}</span></span>
-                    </div>
-                </div>
                 <div class="file-paths-compact">
                     <div class="file-path-row">
                         <span class="file-label">JSON结果:</span>

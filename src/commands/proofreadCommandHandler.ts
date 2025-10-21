@@ -623,6 +623,11 @@ export class ProofreadCommandHandler {
                     });
 
                     progressTracker = stats.progressTracker;
+                    
+                    // 标记进度跟踪完成
+                    if (progressTracker) {
+                        progressTracker.complete();
+                    }
 
                     // 不再自动生成差异文件，改为在Webview中提供生成按钮
 

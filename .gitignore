@@ -10,6 +10,7 @@ node_modules
 # 构建输出
 dist
 out
+*.vsix
 
 # 开发工具
 .vscode

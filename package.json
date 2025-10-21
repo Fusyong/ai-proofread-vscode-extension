@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -264,7 +264,6 @@
           "order": 36,
           "type": "array",
           "default": [],
-          "maxItems": 5,
           "items": {
             "type": "object",
             "properties": {
@@ -282,12 +281,7 @@
               "content"
             ]
           },
-          "description": "自定义AI校对提示词列表，最多5个。每个提示词必须包含名称和内容，内容必须对要校对的目标文本（target）、参考资料（reference）、上下文（context）进行说明。也可以通过命令管理"
-        },
-        "ai-proofread.debug": {
-          "type": "boolean",
-          "default": false,
-          "description": "是否显示调试日志"
+          "description": "设置给大语言模型提示词及其名称。提示词中应对要处理的目标文本（target）、参考资料（reference）、上下文（context）进行说明。也可以通过命令管理"
         }
       }
     },

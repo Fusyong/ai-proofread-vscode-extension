@@ -66,11 +66,6 @@ export class DocumentConvertCommandHandler {
             const fileReady = await waitForFile(outputPath, 50, 200);
             if (!fileReady) throw new Error('文件写入超时（10秒）');
 
-            // 打开转换后的文件
-            const outputUri = vscode.Uri.file(outputPath);
-            await vscode.workspace.openTextDocument(outputUri);
-            await vscode.window.showTextDocument(outputUri);
-
             vscode.window.showInformationMessage('转换完成！');
         } catch (error) {
             ErrorUtils.showError(error, '转换文件时出错：');
@@ -142,10 +137,6 @@ export class DocumentConvertCommandHandler {
         try {
             outputPath = await convertMarkdownToDocx(fileUri.fsPath, outputPath);
 
-            // 打开转换后的文件
-            const outputUri = vscode.Uri.file(outputPath);
-            await vscode.env.openExternal(outputUri);
-
             vscode.window.showInformationMessage('转换完成！');
         } catch (error) {
             ErrorUtils.showError(error, '转换文件时出错：');
@@ -192,11 +183,6 @@ export class DocumentConvertCommandHandler {
             // 等待文件写入完成
             const fileReady = await waitForFile(outputPath, 50, 200);
             if (!fileReady) throw new Error('文件写入超时（10秒）');
-
-            // 打开转换后的文件
-            const outputUri = vscode.Uri.file(outputPath);
-            await vscode.workspace.openTextDocument(outputUri);
-            await vscode.window.showTextDocument(outputUri);
 
             vscode.window.showInformationMessage('转换完成！');
         } catch (error) {

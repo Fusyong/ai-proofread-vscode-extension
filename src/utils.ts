@@ -216,20 +216,9 @@ export class ConfigManager {
  */
 export class Logger {
     private static instance: Logger;
-    private isDebug: boolean;
-    private configListener: vscode.Disposable;
 
     private constructor() {
-        const config = vscode.workspace.getConfiguration('ai-proofread');
-        this.isDebug = config.get<boolean>('debug', false);
-
-        // 监听配置变化
-        this.configListener = vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration('ai-proofread.debug')) {
-                const config = vscode.workspace.getConfiguration('ai-proofread');
-                this.isDebug = config.get<boolean>('debug', false);
-            }
-        });
+        // 不再需要监听配置变化
     }
 
     public static getInstance(): Logger {
@@ -243,11 +232,6 @@ export class Logger {
         console.log(`[INFO] ${message}`);
     }
 
-    public debug(message: string): void {
-        if (this.isDebug) {
-            console.log(`[DEBUG] ${message}`);
-        }
-    }
 
     public error(message: string, error?: any): void {
         console.error(`[ERROR] ${message}`, error);
@@ -258,6 +242,6 @@ export class Logger {
     }
 
     public dispose(): void {
-        this.configListener.dispose();
+        // 不再需要处理配置监听器
     }
 }

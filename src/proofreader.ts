@@ -188,15 +188,12 @@ export class DeepseekApiClient implements ApiClient {
 
         if (finalTemperature !== undefined) {
             requestBody.temperature = finalTemperature;
-            logger.debug(`使用温度: ${finalTemperature}`);
         } else {
-            logger.debug('未配置温度，使用模型默认温度');
         }
 
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
-                logger.debug(`API调用尝试 ${attempt}/${retryAttempts}`);
                 
                 const response = await axios.post(
                     `${this.baseUrl}/chat/completions`,
@@ -295,15 +292,12 @@ export class AliyunApiClient implements ApiClient {
 
         if (finalTemperature !== undefined) {
             requestBody.temperature = finalTemperature;
-            logger.debug(`使用温度: ${finalTemperature}`);
         } else {
-            logger.debug('未配置温度，使用模型默认温度');
         }
 
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
-                logger.debug(`API调用尝试 ${attempt}/${retryAttempts}`);
                 
                 const response = await axios.post(
                     `${this.baseUrl}/chat/completions`,
@@ -391,9 +385,7 @@ export class GoogleApiClient implements ApiClient {
 
         if (finalTemperature !== undefined) {
             configObj.temperature = finalTemperature;
-            logger.debug(`使用温度: ${finalTemperature}`);
         } else {
-            logger.debug('未配置温度，使用模型默认温度');
         }
 
         // 配置思考功能
@@ -401,18 +393,15 @@ export class GoogleApiClient implements ApiClient {
             configObj.thinkingConfig = {
                 thinkingBudget: 1 // 1表示启用思考，0表示禁用思考
             };
-            logger.debug('启用Gemini思考功能');
         } else {
             configObj.thinkingConfig = {
                 thinkingBudget: 0 // 1表示启用思考，0表示禁用思考
             };
-            logger.debug('禁用Gemini思考功能');
         }
 
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
-                logger.debug(`API调用尝试 ${attempt}/${retryAttempts}`);
                 
                 const response = await this.ai.models.generateContent({
                     model: this.model,
@@ -503,15 +492,12 @@ export class OllamaApiClient implements ApiClient {
             requestBody.options = {
                 temperature: finalTemperature
             };
-            logger.debug(`使用温度: ${finalTemperature}`);
         } else {
-            logger.debug('未配置温度，使用模型默认温度');
         }
 
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
-                logger.debug(`API调用尝试 ${attempt}/${retryAttempts}`);
                 
                 const response = await axios.post(
                     `${this.baseUrl}/api/chat`,

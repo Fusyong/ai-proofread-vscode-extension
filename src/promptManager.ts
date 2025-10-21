@@ -119,10 +119,6 @@ export class PromptManager {
     }
 
     private async addPrompt(prompts: Prompt[]): Promise<void> {
-        if (prompts.length >= 5) {
-            vscode.window.showErrorMessage('已达到最大提示词数量限制（5个）');
-            return;
-        }
 
         const name = await vscode.window.showInputBox({
             prompt: '请输入提示词名称',
