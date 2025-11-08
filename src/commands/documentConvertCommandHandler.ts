@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { convertDocxToMarkdown, convertMarkdownToDocx, convertPdfToMarkdown } from '../docConverter';
+import { convertDocxToMarkdown, convertMarkdownToDocx, convertPdfToMarkdown, collectPdfToTextOptions } from '../docConverter';
 import { FilePathUtils, ErrorUtils } from '../utils';
 
 export class DocumentConvertCommandHandler {
@@ -134,8 +134,21 @@ export class DocumentConvertCommandHandler {
             outputPath = FilePathUtils.getFilePath(fileUri.fsPath, `-${timestamp}`, '.docx');
         }
 
+        // 等待文件写入完成的辅助函数
+        async function waitForFile(filePath: string, maxTries = 50, interval = 200): Promise<boolean> {
+            for (let i = 0; i < maxTries; i++) {
+                if (fs.existsSync(filePath)) return true;
+                await new Promise(res => setTimeout(res, interval));
+            }
+            return false;
+        }
+
         try {
             outputPath = await convertMarkdownToDocx(fileUri.fsPath, outputPath);
+
+            // 等待文件写入完成
+            const fileReady = await waitForFile(outputPath, 50, 200);
+            if (!fileReady) throw new Error('文件写入超时（10秒）');
 
             vscode.window.showInformationMessage('转换完成！');
         } catch (error) {
@@ -161,6 +174,13 @@ export class DocumentConvertCommandHandler {
             return;
         }
 
+        // 收集用户选择的参数
+        const options = await collectPdfToTextOptions();
+        if (!options) {
+            // 用户取消了参数选择
+            return;
+        }
+
         // 检查是否已经存在同名的输出文件，存在则添加时间戳
         let outputPath = FilePathUtils.getFilePath(fileUri[0].fsPath, '', '.md');
         if (fs.existsSync(outputPath)) {
@@ -178,7 +198,7 @@ export class DocumentConvertCommandHandler {
         }
 
         try {
-            outputPath = await convertPdfToMarkdown(fileUri[0].fsPath, outputPath);
+            outputPath = await convertPdfToMarkdown(fileUri[0].fsPath, outputPath, options);
 
             // 等待文件写入完成
             const fileReady = await waitForFile(outputPath, 50, 200);
