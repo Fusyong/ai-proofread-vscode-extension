@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { FilePathUtils, ErrorUtils } from './utils';
+import { FilePathUtils, ErrorUtils, CommandBuilder } from './utils';
 
 const execAsync = promisify(exec);
 
@@ -111,9 +111,11 @@ export async function convertDocxToMarkdown(docxPath: string, mode: 'default' | 
 
         let command: string;
         if (mode === 'default') {
-            command = `cd "${docxDir}" & pandoc -f docx -t markdown-smart+pipe_tables+footnotes --wrap=none --toc --extract-media="./attachments/${path.basename(docxPath, '.docx')}" "${docxFileName}" -o "${outputFileName}"`;
+            const baseCommand = `pandoc -f docx -t markdown-smart+pipe_tables+footnotes --wrap=none --toc --extract-media="./attachments/${path.basename(docxPath, '.docx')}" "${docxFileName}" -o "${outputFileName}"`;
+            command = CommandBuilder.buildCommand(docxDir, baseCommand);
         } else {
-            command = `cd "${docxDir}" & pandoc -t markdown_strict --extract-media="./attachments/${path.basename(docxPath, '.docx')}" "${docxFileName}" -o "${outputFileName}"`;
+            const baseCommand = `pandoc -t markdown_strict --extract-media="./attachments/${path.basename(docxPath, '.docx')}" "${docxFileName}" -o "${outputFileName}"`;
+            command = CommandBuilder.buildCommand(docxDir, baseCommand);
         }
 
         terminal.sendText(command);
@@ -153,8 +155,24 @@ export async function convertMarkdownToDocx(mdPath: string, outputPath?: string 
         }
 
         const mdDir = path.dirname(mdPath);
-        const command = `cd ${mdDir} & pandoc -f markdown -t docx "${mdPath}" -o "${outputPath}"`;
-        terminal.sendText(command);
+        const mdFileName = path.basename(mdPath);
+        const outputDir = path.dirname(outputPath);
+        const outputFileName = path.basename(outputPath);
+        
+        // 如果输出目录与输入目录不同，使用绝对路径
+        let baseCommand: string;
+        if (path.resolve(mdDir) !== path.resolve(outputDir)) {
+            const absoluteMdPath = path.resolve(mdPath);
+            const absoluteOutputPath = path.resolve(outputPath);
+            baseCommand = `pandoc -f markdown -t docx "${absoluteMdPath}" -o "${absoluteOutputPath}"`;
+            // 使用输入文件所在目录作为工作目录
+            const command = CommandBuilder.buildCommand(mdDir, baseCommand);
+            terminal.sendText(command);
+        } else {
+            baseCommand = `pandoc -f markdown -t docx "${mdFileName}" -o "${outputFileName}"`;
+            const command = CommandBuilder.buildCommand(mdDir, baseCommand);
+            terminal.sendText(command);
+        }
 
         return outputPath;
     } catch (error) {
@@ -222,7 +240,8 @@ function buildPdfToTextCommand(
     const pdfFileName = path.basename(pdfPath);
     const outputFileName = path.basename(outputPath);
 
-    return `cd "${pdfDir}" & pdftotext ${args.join(' ')} "${pdfFileName}" "${outputFileName}"`;
+    const baseCommand = `pdftotext ${args.join(' ')} "${pdfFileName}" "${outputFileName}"`;
+    return CommandBuilder.buildCommand(pdfDir, baseCommand);
 }
 
 /**

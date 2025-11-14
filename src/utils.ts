@@ -84,6 +84,21 @@ export class TempFileManager {
  */
 export class FilePathUtils {
     /**
+     * 生成可读的时间戳字符串（格式：YYYYMMDD-HHmmss）
+     * @returns 时间戳字符串，例如：20240115-143025
+     */
+    public static getReadableTimestamp(): string {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        return `${year}${month}${day}-${hours}${minutes}${seconds}`;
+    }
+
+    /**
      * 生成输出文件路径
      * @param inputPath 输入文件路径
      * @param suffix 后缀
@@ -104,6 +119,28 @@ export class FilePathUtils {
         if (!fs.existsSync(dirPath)) {
             fs.mkdirSync(dirPath, { recursive: true });
         }
+    }
+
+    /**
+     * 如果文件已存在，将其备份为带时间戳的.bak文件
+     * @param filePath 文件路径
+     * @param deleteOriginal 是否在备份后删除原文件（默认 false）
+     * @returns 如果文件已存在并已备份，返回备份文件路径；否则返回 null
+     */
+    public static backupFileIfExists(filePath: string, deleteOriginal: boolean = false): string | null {
+        if (fs.existsSync(filePath)) {
+            const timestamp = this.getReadableTimestamp();
+            const dir = path.dirname(filePath);
+            const baseName = path.basename(filePath, path.extname(filePath));
+            const ext = path.extname(filePath);
+            const backupPath = path.join(dir, `${baseName}${ext}-${timestamp}.bak`);
+            fs.copyFileSync(filePath, backupPath);
+            if (deleteOriginal) {
+                fs.unlinkSync(filePath);
+            }
+            return backupPath;
+        }
+        return null;
     }
 }
 
@@ -243,5 +280,100 @@ export class Logger {
 
     public dispose(): void {
         // 不再需要处理配置监听器
+    }
+}
+
+/**
+ * 跨平台命令构建工具
+ */
+export class CommandBuilder {
+    /**
+     * 检测当前 shell 类型
+     * @returns shell 类型：'powershell' | 'cmd' | 'bash' | 'sh' | 'unknown'
+     */
+    private static detectShellType(): 'powershell' | 'cmd' | 'bash' | 'sh' | 'unknown' {
+        const shell = vscode.env.shell;
+        if (!shell) {
+            // 如果无法检测，根据平台推断
+            if (process.platform === 'win32') {
+                // Windows 默认可能是 PowerShell 或 CMD，优先使用兼容性更好的方式
+                return 'cmd';
+            }
+            return 'bash';
+        }
+
+        const shellLower = shell.toLowerCase();
+        if (shellLower.includes('powershell') || shellLower.includes('pwsh')) {
+            return 'powershell';
+        } else if (shellLower.includes('cmd.exe')) {
+            return 'cmd';
+        } else if (shellLower.includes('bash')) {
+            return 'bash';
+        } else if (shellLower.includes('sh')) {
+            return 'sh';
+        }
+
+        // 根据平台推断
+        if (process.platform === 'win32') {
+            return 'cmd';
+        }
+        return 'bash';
+    }
+
+    /**
+     * 转义路径中的特殊字符（用于命令行参数）
+     * @param filePath 文件路径
+     * @param shellType shell 类型
+     * @returns 转义后的路径
+     */
+    private static escapePath(filePath: string, shellType: string): string {
+        // 对于所有 shell，使用双引号包裹路径即可
+        // 但需要转义路径中的双引号
+        const escaped = filePath.replace(/"/g, '\\"');
+        return `"${escaped}"`;
+    }
+
+    /**
+     * 构建跨平台命令
+     * 在指定目录执行命令，兼容 PowerShell、CMD、Bash 等
+     * @param workDir 工作目录
+     * @param command 要执行的命令（不包含 cd 部分）
+     * @returns 完整的跨平台命令字符串
+     */
+    public static buildCommand(workDir: string, command: string): string {
+        const shellType = this.detectShellType();
+        const escapedWorkDir = this.escapePath(workDir, shellType);
+        const escapedCommand = command;
+
+        switch (shellType) {
+            case 'powershell':
+                // PowerShell: cd "dir"; command
+                return `cd ${escapedWorkDir}; ${escapedCommand}`;
+            
+            case 'cmd':
+                // CMD: cd /d "dir" && command
+                // 使用 /d 参数以支持跨驱动器切换
+                return `cd /d ${escapedWorkDir} && ${escapedCommand}`;
+            
+            case 'bash':
+            case 'sh':
+                // Bash/Sh: cd "dir" && command
+                return `cd ${escapedWorkDir} && ${escapedCommand}`;
+            
+            default:
+                // 默认使用 && 分隔符，在大多数 shell 中都支持
+                return `cd ${escapedWorkDir} && ${escapedCommand}`;
+        }
+    }
+
+    /**
+     * 构建使用绝对路径的命令（不需要切换目录）
+     * @param command 命令字符串，其中可以使用 {workDir} 占位符表示工作目录
+     * @param workDir 工作目录（用于替换占位符）
+     * @returns 完整的命令字符串
+     */
+    public static buildCommandWithAbsolutePaths(command: string, workDir: string): string {
+        // 替换占位符
+        return command.replace(/\{workDir\}/g, this.escapePath(workDir, 'unknown'));
     }
 }

@@ -56,12 +56,9 @@ export class ProofreadCommandHandler {
             const proofreadMarkdownFilePath = FilePathUtils.getFilePath(currentFilePath, '.proofread.json', '.md');
             // 不再自动生成差异文件
 
-            // 检查proofreadMarkdownFilePath文件是否存在
-            if (fs.existsSync(proofreadMarkdownFilePath)) {
-                // 备份旧文件，名字追加时间戳
-                const backupFilePath = FilePathUtils.getFilePath(currentFilePath, `.proofread.json-${new Date().getTime()}`, '.md');
-                fs.copyFileSync(proofreadMarkdownFilePath, backupFilePath);
-            }
+            // 如果输出文件已存在，备份旧文件为.bak，然后删除原文件
+            FilePathUtils.backupFileIfExists(outputFilePath, true);
+            FilePathUtils.backupFileIfExists(proofreadMarkdownFilePath, true);
 
             // 获取配置
             const platform = this.configManager.getPlatform();
@@ -508,11 +505,9 @@ export class ProofreadCommandHandler {
             const originalMarkdownFilePath = FilePathUtils.getFilePath(jsonFilePath, '', '.md');
             const proofreadMarkdownFilePath = FilePathUtils.getFilePath(jsonFilePath, '.proofread.json', '.md');
 
-            // 检查proofreadMarkdownFilePath文件是否存在，如果存在则备份
-            if (fs.existsSync(proofreadMarkdownFilePath)) {
-                const backupFilePath = FilePathUtils.getFilePath(jsonFilePath, `.proofread.json-${new Date().getTime()}`, '.md');
-                fs.copyFileSync(proofreadMarkdownFilePath, backupFilePath);
-            }
+            // 如果输出文件已存在，备份旧文件为.bak，然后删除原文件
+            FilePathUtils.backupFileIfExists(outputFilePath, true);
+            FilePathUtils.backupFileIfExists(proofreadMarkdownFilePath, true);
 
             // 获取配置
             const platform = this.configManager.getPlatform();

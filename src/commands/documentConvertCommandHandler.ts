@@ -39,12 +39,10 @@ export class DocumentConvertCommandHandler {
             return;
         }
 
-        // 检查是否已经存在同名的输出文件，存在则添加时间戳
-        let outputPath = FilePathUtils.getFilePath(fileUri[0].fsPath, '', '.md');
-        if (fs.existsSync(outputPath)) {
-            const timestamp = new Date().getTime();
-            outputPath = FilePathUtils.getFilePath(fileUri[0].fsPath, `-${timestamp}`, '.md');
-        }
+        // 生成输出文件路径
+        const outputPath = FilePathUtils.getFilePath(fileUri[0].fsPath, '', '.md');
+        // 如果输出文件已存在，备份旧文件为.bak，并删除原文件以确保 pandoc 能写入新文件
+        FilePathUtils.backupFileIfExists(outputPath, true);
 
         // 等待文件写入完成的辅助函数
         async function waitForFile(filePath: string, maxTries = 50, interval = 200): Promise<boolean> {
@@ -56,7 +54,7 @@ export class DocumentConvertCommandHandler {
         }
 
         try {
-            outputPath = await convertDocxToMarkdown(
+            await convertDocxToMarkdown(
                 fileUri[0].fsPath,
                 mode === '默认模式' ? 'default' : 'markdown_strict',
                 outputPath
@@ -127,12 +125,10 @@ export class DocumentConvertCommandHandler {
             return;
         }
 
-        // 检查是否已经存在同名的输出文件，存在则添加时间戳
-        let outputPath = FilePathUtils.getFilePath(fileUri.fsPath, '', '.docx');
-        if (fs.existsSync(outputPath)) {
-            const timestamp = new Date().getTime();
-            outputPath = FilePathUtils.getFilePath(fileUri.fsPath, `-${timestamp}`, '.docx');
-        }
+        // 生成输出文件路径
+        const outputPath = FilePathUtils.getFilePath(fileUri.fsPath, '', '.docx');
+        // 如果输出文件已存在，备份旧文件为.bak，并删除原文件以确保 pandoc 能写入新文件
+        FilePathUtils.backupFileIfExists(outputPath, true);
 
         // 等待文件写入完成的辅助函数
         async function waitForFile(filePath: string, maxTries = 50, interval = 200): Promise<boolean> {
@@ -144,7 +140,7 @@ export class DocumentConvertCommandHandler {
         }
 
         try {
-            outputPath = await convertMarkdownToDocx(fileUri.fsPath, outputPath);
+            await convertMarkdownToDocx(fileUri.fsPath, outputPath);
 
             // 等待文件写入完成
             const fileReady = await waitForFile(outputPath, 50, 200);
@@ -181,12 +177,10 @@ export class DocumentConvertCommandHandler {
             return;
         }
 
-        // 检查是否已经存在同名的输出文件，存在则添加时间戳
-        let outputPath = FilePathUtils.getFilePath(fileUri[0].fsPath, '', '.md');
-        if (fs.existsSync(outputPath)) {
-            const timestamp = new Date().getTime();
-            outputPath = FilePathUtils.getFilePath(fileUri[0].fsPath, `-${timestamp}`, '.md');
-        }
+        // 生成输出文件路径
+        const outputPath = FilePathUtils.getFilePath(fileUri[0].fsPath, '', '.md');
+        // 如果输出文件已存在，备份旧文件为.bak，并删除原文件以确保 pdftotext 能写入新文件
+        FilePathUtils.backupFileIfExists(outputPath, true);
 
         // 等待文件写入完成的辅助函数
         async function waitForFile(filePath: string, maxTries = 50, interval = 200): Promise<boolean> {
@@ -198,7 +192,7 @@ export class DocumentConvertCommandHandler {
         }
 
         try {
-            outputPath = await convertPdfToMarkdown(fileUri[0].fsPath, outputPath, options);
+            await convertPdfToMarkdown(fileUri[0].fsPath, outputPath, options);
 
             // 等待文件写入完成
             const fileReady = await waitForFile(outputPath, 50, 200);

@@ -562,6 +562,7 @@ export async function processJsonFileAsync(
         onProgressUpdate?: (progressTracker: ProgressTracker) => void;
         token?: vscode.CancellationToken;
         context?: vscode.ExtensionContext;
+        mdFilePath?: string; // 可选的 markdown 文件路径
     } = {}
 ): Promise<ProcessStats> {
     const logger = Logger.getInstance();
@@ -776,7 +777,7 @@ export async function processJsonFileAsync(
         .filter((_: any, i: number) => outputParagraphs[i] === null);
 
     // 生成Markdown文件
-    const mdFilePath = `${jsonOutPath}.md`;
+    const mdFilePath = options.mdFilePath || `${jsonOutPath}.md`;
     const processedParagraphs = outputParagraphs.filter(p => p !== null);
     fs.writeFileSync(mdFilePath, processedParagraphs.join('\n\n'), 'utf8');
 
