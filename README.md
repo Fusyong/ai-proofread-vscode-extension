@@ -245,7 +245,6 @@ Additionally, you can also set your own prompts for other text processing scenar
 1. [ ] bug：并发失效
 2. [ ] 分段（位置：行长众数n，<n-2，n+2）
 3. [ ] 环境变量不能立即更新的问题
-4. [ ] 命令行适配powershell
 5. [ ] 命名实体收集，聚类，绘图
 6. [ ] 数字连续性检查（以Python库相应模块为基础）
 7. [ ] 引文核对

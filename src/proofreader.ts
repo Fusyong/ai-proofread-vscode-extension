@@ -742,11 +742,17 @@ export async function processJsonFileAsync(
             break;
         }
 
-        const slot = await Promise.race(
-            semaphore.map((_, i) =>
-                Promise.resolve(i)
-            )
-        );
+        // 等待一个空闲的槽位
+        let slot: number;
+        while (true) {
+            // 查找空闲槽位
+            slot = semaphore.findIndex(s => s === null);
+            if (slot !== -1) {
+                break; // 找到空闲槽位
+            }
+            // 如果没有空闲槽位，等待任意一个任务完成
+            await Promise.race(semaphore.filter(s => s !== null));
+        }
         
         const promise = processOne(index).finally(() => {
             semaphore[slot] = null;
@@ -755,13 +761,15 @@ export async function processJsonFileAsync(
         semaphore[slot] = promise;
         processingPromises.push(promise);
         
-        await promise;
+        // 不等待当前任务完成，继续处理下一个任务（实现真正的并发）
     }
 
     // 等待所有正在处理的任务完成
     if (token?.isCancellationRequested || progressTracker.isCancellationRequested()) {
         logger.info('用户取消操作，等待已提交的任务完成...');
-        await Promise.allSettled(processingPromises);
+    }
+    await Promise.allSettled(processingPromises);
+    if (token?.isCancellationRequested || progressTracker.isCancellationRequested()) {
         logger.info('已提交的任务已完成');
     }
 

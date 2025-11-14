@@ -56,8 +56,10 @@ export class ProofreadCommandHandler {
             const proofreadMarkdownFilePath = FilePathUtils.getFilePath(currentFilePath, '.proofread.json', '.md');
             // 不再自动生成差异文件
 
-            // 如果输出文件已存在，备份旧文件为.bak，然后删除原文件
-            FilePathUtils.backupFileIfExists(outputFilePath, true);
+            // 如果输出文件已存在，备份旧文件为.bak
+            // JSON 文件不删除，因为需要读取以继续未完成的校对（保留已完成的进度）
+            FilePathUtils.backupFileIfExists(outputFilePath, false);
+            // Markdown 文件删除，因为会被完全重新生成
             FilePathUtils.backupFileIfExists(proofreadMarkdownFilePath, true);
 
             // 获取配置
@@ -505,8 +507,10 @@ export class ProofreadCommandHandler {
             const originalMarkdownFilePath = FilePathUtils.getFilePath(jsonFilePath, '', '.md');
             const proofreadMarkdownFilePath = FilePathUtils.getFilePath(jsonFilePath, '.proofread.json', '.md');
 
-            // 如果输出文件已存在，备份旧文件为.bak，然后删除原文件
-            FilePathUtils.backupFileIfExists(outputFilePath, true);
+            // 如果输出文件已存在，备份旧文件为.bak
+            // JSON 文件不删除，因为需要读取以继续未完成的校对（保留已完成的进度）
+            FilePathUtils.backupFileIfExists(outputFilePath, false);
+            // Markdown 文件删除，因为会被完全重新生成
             FilePathUtils.backupFileIfExists(proofreadMarkdownFilePath, true);
 
             // 获取配置
