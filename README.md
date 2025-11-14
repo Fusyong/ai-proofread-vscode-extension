@@ -275,6 +275,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 ### v0.1.15
 
 - 修复：并发失效问题
+- 修复：内容为空字符串问题（直接返回原内容）
 - 优化：文件转换工具兼容多平台和常用终端
 - 优化：统一文件备份逻辑为备份旧文件为bak
 
