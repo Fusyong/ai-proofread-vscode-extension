@@ -272,6 +272,12 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
+### v0.1.15
+
+- 修复：并发失效问题
+- 优化：文件转换工具兼容多平台和常用终端
+- 优化：统一文件备份逻辑为备份旧文件为bak
+
 ### v0.1.14
 
 - 优化：支持 pdftotext 常用参数，模式、切边、页码等

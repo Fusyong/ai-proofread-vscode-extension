@@ -664,6 +664,23 @@ export async function processJsonFileAsync(
         const referenceText = paragraph.reference || '';
         const contextText = paragraph.context || '';
 
+        // 检查target是否为空字符串（包括空白行、空格等）
+        if (!targetText || targetText.trim() === '') {
+            // 如果target为空，直接原样返回内容作为结果
+            outputParagraphs[index] = targetText;
+            fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
+            
+            // 更新状态为已完成
+            progressTracker.updateProgress(index, 'completed');
+            
+            const skipInfo = `跳过 No. ${index + 1}/${totalCount} (target为空，直接返回原内容)\n${'-'.repeat(40)}\n`;
+            logger.info(skipInfo);
+            if (onProgress) {
+                onProgress(skipInfo);
+            }
+            return;
+        }
+
         // 更新状态为已提交
         progressTracker.updateProgress(index, 'submitted');
 
@@ -833,6 +850,12 @@ export async function proofreadSelection(
     let targetText = selectedText;
     let contextText = '';
     let referenceText = '';
+
+    // 检查target是否为空字符串（包括空白行、空格等）
+    if (!targetText || targetText.trim() === '') {
+        // 如果target为空，直接原样返回内容作为结果
+        return targetText;
+    }
 
     // 如果选择了上下文级别，获取上下文
     if (contextLevel && contextLevel !== '不使用上下文') {
