@@ -194,7 +194,7 @@ export class DeepseekApiClient implements ApiClient {
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
-                
+
                 const response = await axios.post(
                     `${this.baseUrl}/chat/completions`,
                     requestBody,
@@ -212,8 +212,8 @@ export class DeepseekApiClient implements ApiClient {
                 return result;
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                const isNetworkError = errorMessage.includes('fetch failed') || 
-                                     errorMessage.includes('network') || 
+                const isNetworkError = errorMessage.includes('fetch failed') ||
+                                     errorMessage.includes('network') ||
                                      errorMessage.includes('timeout') ||
                                      errorMessage.includes('ECONNRESET') ||
                                      errorMessage.includes('ENOTFOUND') ||
@@ -298,7 +298,7 @@ export class AliyunApiClient implements ApiClient {
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
-                
+
                 const response = await axios.post(
                     `${this.baseUrl}/chat/completions`,
                     requestBody,
@@ -316,8 +316,8 @@ export class AliyunApiClient implements ApiClient {
                 return result;
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                const isNetworkError = errorMessage.includes('fetch failed') || 
-                                     errorMessage.includes('network') || 
+                const isNetworkError = errorMessage.includes('fetch failed') ||
+                                     errorMessage.includes('network') ||
                                      errorMessage.includes('timeout') ||
                                      errorMessage.includes('ECONNRESET') ||
                                      errorMessage.includes('ENOTFOUND') ||
@@ -378,7 +378,7 @@ export class GoogleApiClient implements ApiClient {
 
         const finalTemperature = temperature || config.get<number>('proofread.temperature');
         const disableThinking = config.get<boolean>('proofread.disableThinking', true);
-        
+
         const configObj: any = {
             systemInstruction: getSystemPrompt(context),
         };
@@ -402,7 +402,7 @@ export class GoogleApiClient implements ApiClient {
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
-                
+
                 const response = await this.ai.models.generateContent({
                     model: this.model,
                     config: configObj,
@@ -412,8 +412,8 @@ export class GoogleApiClient implements ApiClient {
                 return response.text || null;
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                const isNetworkError = errorMessage.includes('fetch failed') || 
-                                     errorMessage.includes('network') || 
+                const isNetworkError = errorMessage.includes('fetch failed') ||
+                                     errorMessage.includes('network') ||
                                      errorMessage.includes('timeout') ||
                                      errorMessage.includes('ECONNRESET') ||
                                      errorMessage.includes('ENOTFOUND');
@@ -498,7 +498,7 @@ export class OllamaApiClient implements ApiClient {
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
-                
+
                 const response = await axios.post(
                     `${this.baseUrl}/api/chat`,
                     requestBody,
@@ -515,8 +515,8 @@ export class OllamaApiClient implements ApiClient {
                 return result;
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                const isNetworkError = errorMessage.includes('fetch failed') || 
-                                     errorMessage.includes('network') || 
+                const isNetworkError = errorMessage.includes('fetch failed') ||
+                                     errorMessage.includes('network') ||
                                      errorMessage.includes('timeout') ||
                                      errorMessage.includes('ECONNRESET') ||
                                      errorMessage.includes('ENOTFOUND') ||
@@ -669,10 +669,10 @@ export async function processJsonFileAsync(
             // 如果target为空，直接原样返回内容作为结果
             outputParagraphs[index] = targetText;
             fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
-            
+
             // 更新状态为已完成
             progressTracker.updateProgress(index, 'completed');
-            
+
             const skipInfo = `跳过 No. ${index + 1}/${totalCount} (target为空，直接返回原内容)\n${'-'.repeat(40)}\n`;
             logger.info(skipInfo);
             if (onProgress) {
@@ -716,10 +716,10 @@ export async function processJsonFileAsync(
             if (processedText) {
                 outputParagraphs[index] = processedText;
                 fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
-                
+
                 // 更新状态为已完成
                 progressTracker.updateProgress(index, 'completed');
-                
+
                 const completeInfo = `完成 ${index + 1}/${totalCount} 长度 ${targetText.length} 用时 ${elapsed.toFixed(2)}s\n${'-'.repeat(40)}\n`;
                 logger.info(completeInfo);
                 if (onProgress) {
@@ -728,7 +728,7 @@ export async function processJsonFileAsync(
             } else {
                 // 更新状态为失败
                 progressTracker.updateProgress(index, 'failed', 'API返回空结果');
-                
+
                 const errorInfo = `段落 ${index + 1}/${totalCount}: 处理失败，跳过\n${'-'.repeat(40)}\n`;
                 logger.error(errorInfo);
                 if (onProgress) {
@@ -739,7 +739,7 @@ export async function processJsonFileAsync(
             // 更新状态为失败
             const errorMessage = error instanceof Error ? error.message : String(error);
             progressTracker.updateProgress(index, 'failed', errorMessage);
-            
+
             const errorInfo = `段落 ${index + 1}/${totalCount}: 处理出错 - ${errorMessage}\n${'-'.repeat(40)}\n`;
             logger.error(errorInfo);
             if (onProgress) {
@@ -750,7 +750,7 @@ export async function processJsonFileAsync(
 
     // 并发处理所有段落
     const processingPromises: Promise<void>[] = [];
-    
+
     for (const index of indicesToProcess) {
         // 检查是否已取消
         if (token?.isCancellationRequested || progressTracker.isCancellationRequested()) {
@@ -770,14 +770,14 @@ export async function processJsonFileAsync(
             // 如果没有空闲槽位，等待任意一个任务完成
             await Promise.race(semaphore.filter(s => s !== null));
         }
-        
+
         const promise = processOne(index).finally(() => {
             semaphore[slot] = null;
         });
-        
+
         semaphore[slot] = promise;
         processingPromises.push(promise);
-        
+
         // 不等待当前任务完成，继续处理下一个任务（实现真正的并发）
     }
 
@@ -928,15 +928,6 @@ export async function proofreadSelection(
     })();
 
     let result = await client.proofread(postText, preText, userTemperature, context);
-
-    // 如果校对成功且启用了引号转换，则自动转换引号
-    if (result) {
-        const config = vscode.workspace.getConfiguration('ai-proofread');
-        const shouldConvertQuotes = config.get<boolean>('convertQuotes', false);
-        if (shouldConvertQuotes) {
-            result = convertQuotes(result);
-        }
-    }
 
     return result;
 }

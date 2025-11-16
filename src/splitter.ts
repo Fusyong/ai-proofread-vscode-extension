@@ -221,9 +221,9 @@ export function splitText(
     } else if (options.mode === 'paragraphContext') {
         // 按长度切分，使用前后段落作为上下文
         segments = splitMarkdownByLengthWithParagraphsAsContext(
-            text, 
-            options.cutBy, 
-            options.beforeParagraphs, 
+            text,
+            options.cutBy,
+            options.beforeParagraphs,
             options.afterParagraphs
         );
     } else {
@@ -371,7 +371,7 @@ export function buildTitleBasedContext(
 ): string {
     const lines = text.split('\n');
     const level = contextLevel.charAt(0);
-    
+
     // 从本行开始向上查找最近的指定级别标题
     let startLine = selectionStartLine + 1;
     while (startLine > 0) {
@@ -414,11 +414,11 @@ export function buildParagraphBasedContext(
 ): string {
     // 将文本按行分割
     const textLines = text.split('\n');
-    
+
     // 找到选中文本所在段落的边界
     let paragraphStart = selectionStartLine;
     let paragraphEnd = selectionEndLine;
-    
+
     // 向上查找段落开始
     while (paragraphStart > 0) {
         const prevLine = textLines[paragraphStart - 1];
@@ -428,7 +428,7 @@ export function buildParagraphBasedContext(
         }
         paragraphStart--;
     }
-    
+
     // 向下查找段落结束
     while (paragraphEnd < textLines.length - 1) {
         const nextLine = textLines[paragraphEnd + 1];
@@ -438,11 +438,11 @@ export function buildParagraphBasedContext(
         }
         paragraphEnd++;
     }
-    
+
     // 获取前文段落
     let beforeStart = paragraphStart;
     let beforeCount = 0;
-    
+
     while (beforeCount < beforeParagraphs && beforeStart > 0) {
         // 向上跳过空行
         while (beforeStart > 0 && textLines[beforeStart - 1].trim() === '') {
@@ -454,11 +454,11 @@ export function buildParagraphBasedContext(
         }
         beforeCount++;
     }
-    
+
     // 获取后文段落
     let afterEnd = paragraphEnd;
     let afterCount = 0;
-    
+
     while (afterCount < afterParagraphs && afterEnd < textLines.length - 1) {
         // // 向下跳过空行
         // while (afterEnd < textLines.length - 1 && textLines[afterEnd + 1].trim() === '') {
@@ -470,7 +470,7 @@ export function buildParagraphBasedContext(
         }
         afterCount++;
     }
-    
+
     // 提取上下文文本（包含前后段落）
     const contextStart = Math.max(0, beforeStart);
     const contextEnd = Math.min(textLines.length - 1, afterEnd);
@@ -493,42 +493,154 @@ export function splitMarkdownByLengthWithParagraphsAsContext(
 ): Array<{ context: string; target: string }> {
     // 按长度切分文本
     const pieces = splitTextByLength(text, cutBy);
-    
+
     // 存储结果
     const result: Array<{ context: string; target: string }> = [];
-    
+
+    // 将文本按行分割
+    const textLines = text.split('\n');
+
     // 为每个片段添加前后段落上下文
     pieces.forEach((piece, index) => {
         // 找到当前片段在原文中的位置
         const pieceStart = text.indexOf(piece);
         if (pieceStart === -1) {
-            // 如果找不到片段，使用整个文本作为上下文
+            // 如果找不到片段，使用空上下文
             result.push({
-                context: text,
+                context: '',
                 target: piece
             });
             return;
         }
-        
+
         // 计算片段在文本中的行号范围
         const beforeText = text.substring(0, pieceStart);
-        const startLine = beforeText.split('\n').length - 1;
-        const endLine = startLine + piece.split('\n').length - 1;
-        
-        // 构建上下文
-        const contextText = buildParagraphBasedContext(
-            text,
-            startLine,
-            endLine,
-            beforeParagraphs,
-            afterParagraphs
-        );
-        
+        const targetStartLine = beforeText.split('\n').length - 1;
+        const targetEndLine = targetStartLine + piece.split('\n').length - 1;
+
+        // 找到target所在段落的边界
+        let targetParagraphStart = targetStartLine;
+        let targetParagraphEnd = targetEndLine;
+
+        // 向上查找段落开始
+        while (targetParagraphStart > 0) {
+            const prevLine = textLines[targetParagraphStart - 1];
+            if (prevLine.trim() === '') {
+                break;
+            }
+            targetParagraphStart--;
+        }
+
+        // 向下查找段落结束
+        while (targetParagraphEnd < textLines.length - 1) {
+            const nextLine = textLines[targetParagraphEnd + 1];
+            if (nextLine.trim() === '') {
+                break;
+            }
+            targetParagraphEnd++;
+        }
+
+        // 获取前文段落（排除target所在段落）
+        let beforeStart = targetParagraphStart;
+        let beforeCount = 0;
+        const beforeParagraphsList: string[] = [];
+
+        while (beforeCount < beforeParagraphs && beforeStart > 0) {
+            // 向上跳过空行
+            while (beforeStart > 0 && textLines[beforeStart - 1].trim() === '') {
+                beforeStart--;
+            }
+
+            // 如果已经到文档开头，停止
+            if (beforeStart === 0) {
+                break;
+            }
+
+            // 向上查找段落开始
+            let paraStart = beforeStart;
+            while (paraStart > 0 && textLines[paraStart - 1].trim() !== '') {
+                paraStart--;
+            }
+
+            // 提取段落内容（不包含target所在段落）
+            if (paraStart < targetParagraphStart) {
+                const paraLines = textLines.slice(paraStart, targetParagraphStart);
+                // 移除末尾的空行
+                while (paraLines.length > 0 && paraLines[paraLines.length - 1].trim() === '') {
+                    paraLines.pop();
+                }
+                if (paraLines.length > 0) {
+                    beforeParagraphsList.unshift(paraLines.join('\n'));
+                    beforeCount++;
+                }
+                // 更新beforeStart为当前段落开始，继续向上查找
+                beforeStart = paraStart;
+            } else {
+                // 没有找到前文段落，停止
+                break;
+            }
+        }
+
+        // 获取后文段落（排除target所在段落）
+        let searchStart = targetParagraphEnd;
+        let afterCount = 0;
+        const afterParagraphsList: string[] = [];
+
+        while (afterCount < afterParagraphs && searchStart < textLines.length - 1) {
+            // 向下跳过空行
+            while (searchStart < textLines.length - 1 && textLines[searchStart + 1].trim() === '') {
+                searchStart++;
+            }
+
+            // 如果已经到文档末尾，停止
+            if (searchStart >= textLines.length - 1) {
+                break;
+            }
+
+            // 向下查找段落结束
+            let paraEnd = searchStart + 1;
+            while (paraEnd < textLines.length - 1 && textLines[paraEnd + 1].trim() !== '') {
+                paraEnd++;
+            }
+
+            // 提取段落内容（不包含target所在段落）
+            if (paraEnd > targetParagraphEnd) {
+                const paraStart = searchStart + 1;
+                const paraLines = textLines.slice(paraStart, paraEnd + 1);
+                // 移除开头的空行
+                while (paraLines.length > 0 && paraLines[0].trim() === '') {
+                    paraLines.shift();
+                }
+                if (paraLines.length > 0) {
+                    afterParagraphsList.push(paraLines.join('\n'));
+                    afterCount++;
+                }
+                // 更新searchStart为当前段落结束，继续向下查找下一个段落
+                searchStart = paraEnd;
+            } else {
+                // 没有找到后文段落，停止
+                break;
+            }
+        }
+
+        // 构建带标签的上下文
+        const contextParts: string[] = [];
+
+        if (beforeParagraphsList.length > 0) {
+            contextParts.push(`<before>\n${beforeParagraphsList.join('\n\n')}\n</before>`);
+        }
+
+        if (afterParagraphsList.length > 0) {
+            contextParts.push(`<after>\n${afterParagraphsList.join('\n\n')}\n</after>`);
+        }
+
+        const contextText = contextParts.join('\n\n');
+
         result.push({
             context: contextText,
             target: piece
         });
     });
-    
+
     return result;
 }

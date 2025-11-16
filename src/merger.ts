@@ -4,11 +4,14 @@
 
 import * as fs from 'fs';
 
+export type MergeMode = 'update' | 'concat';
+
 export async function mergeTwoFiles(
     currentFilePath: string,
     sourceFilePath: string,
     targetField: 'target' | 'reference' | 'context',
-    sourceField: 'target' | 'reference' | 'context'
+    sourceField: 'target' | 'reference' | 'context',
+    mergeMode: MergeMode = 'update'
 ): Promise<{ updated: number; total: number }> {
     // 读取当前文件
     const currentContent = JSON.parse(fs.readFileSync(currentFilePath, 'utf8'));
@@ -35,9 +38,19 @@ export async function mergeTwoFiles(
             continue;
         }
 
-        // 如果源字段存在，无论目标字段是否存在，都使用源字段更新或添加目标字段
+        // 如果源字段存在，根据模式处理
         if (sourceItem[sourceField]) {
-            currentItem[targetField] = sourceItem[sourceField];
+            if (mergeMode === 'concat') {
+                // 拼接模式：如果目标字段已存在，则拼接；否则直接设置
+                if (currentItem[targetField] && typeof currentItem[targetField] === 'string') {
+                    currentItem[targetField] = currentItem[targetField] + '\n\n' + sourceItem[sourceField];
+                } else {
+                    currentItem[targetField] = sourceItem[sourceField];
+                }
+            } else {
+                // 更新模式：直接覆盖
+                currentItem[targetField] = sourceItem[sourceField];
+            }
             updated++;
         }
     }

@@ -23,7 +23,7 @@ export class UtilityCommandHandler {
         }
 
         try {
-            // 让用户选择源文件
+            // 让用户选择来源文件
             const sourceFile = await vscode.window.showOpenDialog({
                 canSelectFiles: true,
                 canSelectFolders: false,
@@ -31,7 +31,7 @@ export class UtilityCommandHandler {
                 filters: {
                     'JSON files': ['json']
                 },
-                title: '选择源JSON文件'
+                title: '选择来源JSON文件'
             });
 
             if (!sourceFile || sourceFile.length === 0) {
@@ -51,11 +51,11 @@ export class UtilityCommandHandler {
                 return;
             }
 
-            // 让用户选择源文件中的字段
+            // 让用户选择来源文件中的字段
             const sourceField = await vscode.window.showQuickPick(
                 ['target', 'reference', 'context'],
                 {
-                    placeHolder: '选择源文件中的字段',
+                    placeHolder: '选择来源文件中的字段',
                     ignoreFocusOut: true
                 }
             );
@@ -64,17 +64,35 @@ export class UtilityCommandHandler {
                 return;
             }
 
+            // 让用户选择合并模式
+            const mergeMode = await vscode.window.showQuickPick(
+                [
+                    { label: '更新（覆盖）', value: 'update', description: '用来源字段的值覆盖目标字段' },
+                    { label: '拼接', value: 'concat', description: '将来源字段的内容追加到目标字段后面，中间加空行' }
+                ],
+                {
+                    placeHolder: '选择合并模式',
+                    ignoreFocusOut: true
+                }
+            );
+
+            if (!mergeMode) {
+                return;
+            }
+
             // 执行合并
             const result = await mergeTwoFiles(
                 document.uri.fsPath,
                 sourceFile[0].fsPath,
                 targetField as 'target' | 'reference' | 'context',
-                sourceField as 'target' | 'reference' | 'context'
+                sourceField as 'target' | 'reference' | 'context',
+                mergeMode.value as 'update' | 'concat'
             );
 
             // 显示结果
+            const modeText = mergeMode.value === 'update' ? '更新' : '拼接';
             vscode.window.showInformationMessage(
-                `合并完成！更新了 ${result.updated}/${result.total} 项`
+                `合并完成！${modeText}了 ${result.updated}/${result.total} 项`
             );
         } catch (error) {
             ErrorUtils.showError(error, '合并文件时出错：');
