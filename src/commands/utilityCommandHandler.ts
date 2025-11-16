@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { mergeTwoFiles } from '../merger';
 import { searchSelectionInPDF } from '../pdfSearcher';
 import { convertQuotes } from '../quoteConverter';
+import { detectParagraphsAndAddBlankLines } from '../paragraphDetector';
 import { showDiff } from '../differ';
 import { ErrorUtils, FilePathUtils } from '../utils';
 
@@ -148,6 +149,45 @@ export class UtilityCommandHandler {
             vscode.window.showInformationMessage('引号转换完成！');
         } catch (error) {
             ErrorUtils.showError(error, '转换引号时出错：');
+        }
+    }
+
+    /**
+     * 处理段落检测并添加空行命令
+     */
+    public async handleDetectParagraphsCommand(editor: vscode.TextEditor): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor!');
+            return;
+        }
+
+        try {
+            const document = editor.document;
+            const selection = editor.selection;
+            const text = selection.isEmpty ? document.getText() : document.getText(selection);
+
+            // 始终使用整个文档来计算行长度众数，不管是否选中文本
+            const fullDocumentText = document.getText();
+
+            // 检测段落并添加空行（传入整个文档文本用于计算众数）
+            const processedText = detectParagraphsAndAddBlankLines(text, fullDocumentText);
+
+            // 替换文本
+            await editor.edit(editBuilder => {
+                if (selection.isEmpty) {
+                    const fullRange = new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(document.getText().length)
+                    );
+                    editBuilder.replace(fullRange, processedText);
+                } else {
+                    editBuilder.replace(selection, processedText);
+                }
+            });
+
+            vscode.window.showInformationMessage('段落检测完成，已添加空行！');
+        } catch (error) {
+            ErrorUtils.showError(error, '检测段落时出错：');
         }
     }
 }

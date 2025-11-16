@@ -201,6 +201,16 @@ export function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleConvertQuotesCommand(editor);
         }),
 
+        // 注册段落检测并添加空行命令
+        vscode.commands.registerCommand('ai-proofread.detectParagraphs', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleDetectParagraphsCommand(editor);
+        }),
+
         // 注册重新打开结果面板命令
         vscode.commands.registerCommand('ai-proofread.reopenResultPanel', () => {
             webviewManager.reopenResultPanel(context);

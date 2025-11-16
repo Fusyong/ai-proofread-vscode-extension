@@ -79,6 +79,10 @@
         "title": "AI Proofreader: convert quotes to Chinese"
       },
       {
+        "command": "ai-proofread.detectParagraphs",
+        "title": "AI Proofreader: detect paragraphs and add blank lines"
+      },
+      {
         "command": "ai-proofread.splitFile",
         "title": "AI Proofreader: split file"
       },
@@ -302,6 +306,11 @@
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
 
+        },
+        {
+          "command": "ai-proofread.detectParagraphs",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
         },
         {
           "command": "ai-proofread.diffItWithAnotherFile",
