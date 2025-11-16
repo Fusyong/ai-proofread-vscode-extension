@@ -43,16 +43,17 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 3. 使用说明
 
-### 3.1. 文档转换
+### 3.1. 文档准备
 
 本扩展[默认支持Markdown文档](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_markdown)，其他文档需要先转换为Markdown。此类转换工具很多。本扩展也自带集成方式：
 
+* 纯文本文件只需要把后缀`.txt`改成`.md`即可。
 * docx文档（一种Word文档），可以通过命令面板（Ctrl+Shift+P），使用convert docx to Markdown命令转换后进行校。本功能依赖[多功能文档格式转换工具Pandoc](https://pandoc.org/installing.html)，需要预先正确安装。
 * PDF文档，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。本功能依赖[Xpdf command line tools](https://www.xpdfreader.com/download.html)，需要预先以管理员身份正确安装。
 
-文档转换后有[一些整理技巧](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode)，不过对于校对而言，整理工作通常不是必须的。
+文档转换后有[一些整理技巧](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode)，不过对于使用本扩展进行校对而言，整理工作通常不是必须的。
 
-过多的无效字符，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。请参考上述整理技巧的文章。
+过多的无效字符影响输出速度，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。请参考上述讲整理技巧的文章。
 
 ### 3.2. 文档切分
 
@@ -80,7 +81,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 !!! note 切分文档依赖两种标记
     本扩展默认用户需要校对的文档为[markdown格式](https://www.markdownguide.org/basic-syntax/)，文档切分依赖markdown文档中的两种标记：（1）空行。在markdown中，一个或多个空行表示分段，没有空行的断行在渲染时被忽略，即合并为一段。**至少要有合适的空行，否则无法切分。**（2）各级标题。如`## `开头的是二级标题。
 
-### 3.3. 校对文本选段或JSON文档
+### 3.3. 校对文本选段和JSON文档
 
 校对Markdown文档中选中的片段：
 
@@ -178,10 +179,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 **请特别注意：除自动累加的日志文件和自动备份的`测试.proofread.json`、`测试.proofread.json.md`，其余中间文件，每次操作都将重新生成！如有需要，请自行备份。** 
 
-### 3.8. 其他功能与相关工具
+### 3.8. 其他功能与工具
 
 1. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用PDF查看器SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
-2. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://code.visualstudio.com/shortcuts/keyboard-shortcuts-windows.pdf)，很适合编辑工用作主力编辑器。
+2. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
 3. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
 
 ### 3.9. 注意事项
@@ -241,14 +242,17 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 5. TODO
 
-1. [ ] 加空行分段（位置：行长众数n，<n-2，n+2）
-3. [ ] 命名实体收集，聚类，绘图
-4. [ ] 数字连续性检查（以Python库相应模块为基础）
-5. [ ] 整理勘误表（以Python库句子对齐模块为基础）
+1. [ ] 合并JSON增加拼接功能
+3. [ ] **转换半角引号为全角**，支持JSON文件
+4. [ ] **按长度切分，扩展前后段落为上下文** (Split File with Paragraph Based Context)前后扩展切分，去除target自身，前后段落加标签
+5. [ ] 加空行分段（位置：行长众数n，<n-2，n+2）
+6. [ ] 命名实体收集，聚类，绘图
+7. [ ] 数字连续性检查（以Python库相应模块为基础）
+8. [ ] 整理勘误表（以Python库句子对齐模块为基础）
     1. [ ] 勘误条目聚类
     2. [ ] 增量样例校对模式
     3.  [ ] 人工核准界面
-6.  [ ] 预置更多提示词，包括常用的专项校对
+9.  [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] PDF/OCR纯文本整理
     2. [ ] 练习题就地回答
     3. [ ] 翻译
@@ -256,20 +260,20 @@ Additionally, you can also set your own prompts for other text processing scenar
     5. [ ] 标点符号用法专项校对
     6. [ ] 数字用法专项校对
     7.  [ ] 年代、时间专项校对
-7. [ ] 引文核对（以Python库相应模块为基础）
-8. [ ] 自主发现、提出、校对知识性问题
+10. [ ] 引文核对（以Python库相应模块为基础）
+11. [ ] 自主发现、提出、校对知识性问题
     1.  [ ] 检索、核对互联网资料
     2.  [ ] 检索、核对本地词典（以Python库mdict查询模块为基础）
-9.  [ ] 多平台支持测试
-10. [ ] 内部git版本管理
-11. [ ] 推理模型无法使用的问题（可能单纯是因为运行时间过长）
-12. [ ] 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
-13. [ ] 支持Copilot（尝试过一次，回文说API还没有开放。还需要研究参考项目。）
+12. [ ] 多平台支持测试
+13. [ ] 内部git版本管理
+14. [ ] 推理模型无法使用的问题（可能单纯是因为运行时间过长）
+15. [ ] 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
+16. [ ] 支持Copilot（尝试过一次，回文说API还没有开放。还需要研究参考项目。）
 
 
 ## 6. 更新日志
 
-
+- 优化：只有当校对前后的JSON长度不一时才备份、删除，否则不备份
 - 优化：文档
 
 ### v0.1.15
