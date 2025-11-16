@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -79,8 +79,8 @@
         "title": "AI Proofreader: convert quotes to Chinese"
       },
       {
-        "command": "ai-proofread.detectParagraphs",
-        "title": "AI Proofreader: detect paragraphs and add blank lines"
+        "command": "ai-proofread.formatParagraphs",
+        "title": "AI Proofreader: format paragraphs"
       },
       {
         "command": "ai-proofread.splitFile",
@@ -308,7 +308,7 @@
 
         },
         {
-          "command": "ai-proofread.detectParagraphs",
+          "command": "ai-proofread.formatParagraphs",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
         },

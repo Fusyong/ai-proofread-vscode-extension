@@ -47,9 +47,11 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 本扩展[默认支持Markdown文档](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_markdown)，其他文档需要先转换为Markdown。此类转换工具很多。本扩展也自带集成方式：
 
-* 纯文本文件只需要把后缀`.txt`改成`.md`即可。
+* 纯文本文件只需要把后缀`.txt`改成`.md`即可。TeX类文档，如果标记比较少，也可以这样处理。
 * docx文档（一种Word文档），可以通过命令面板（Ctrl+Shift+P），使用convert docx to Markdown命令转换后进行校。本功能依赖[多功能文档格式转换工具Pandoc](https://pandoc.org/installing.html)，需要预先正确安装。
 * PDF文档，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。本功能依赖[Xpdf command line tools](https://www.xpdfreader.com/download.html)，需要预先以管理员身份正确安装。
+    * 所得文本如果没有使用空行分段，无法切分，可以使用整理段落（format paragraphs）命令添加段后空行。
+    * Markdown中的段内断行是合法的，即使句子被断开，对大模型的影响也不大。当然，也可以用上述命令中的“删除段内分行”选项处理后再校对。
 
 文档转换后有[一些整理技巧](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode)，不过对于使用本扩展进行校对而言，整理工作通常不是必须的。
 
@@ -268,6 +270,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 
 ## 6. 更新日志
+
+### v0.1.17
+
+- 特性：段落整理：在原有段末添加空行基础上，增加了删除段内分行的功能
 
 ### v0.1.16
 
