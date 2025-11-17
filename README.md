@@ -273,6 +273,11 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
+
+### v1.0.0
+
+- !!! caution 设置中的毫秒改为秒
+
 ### v0.1.17
 
 - 特性：段落整理：在原有段末添加空行基础上，增加了删除段内分行的功能
