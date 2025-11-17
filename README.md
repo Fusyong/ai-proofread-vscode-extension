@@ -200,6 +200,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 配置项的意义请参考本文档相关的部分。
 
+> ⚠️ `proofread.retryDelay` 与 `proofread.timeout` 的单位均为 **秒**。扩展会在内部自动转换为毫秒进行 API 调用，升级旧版本后请确认你的设置值。
+
 ### 3.1. 大语言模型
 
 目前支持这些大语言模型服务：

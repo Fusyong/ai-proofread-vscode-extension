@@ -121,8 +121,9 @@ function getSystemPrompt(context?: vscode.ExtensionContext): string {
  * @param defaultValue 默认值（秒）
  * @returns 毫秒数
  */
-function convertSecondsToMilliseconds(value: number, defaultValue: number): number {
-    return value * 1000;
+function convertSecondsToMilliseconds(value: number | undefined, defaultValue: number): number {
+    const seconds = typeof value === 'number' && !Number.isNaN(value) ? value : defaultValue;
+    return seconds * 1000;
 }
 
 /**
@@ -171,8 +172,8 @@ export class DeepseekApiClient implements ApiClient {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
-        const retryDelay = config.get<number>('proofread.retryDelay', 1000);
-        const timeout = config.get<number>('proofread.timeout', 50000);
+        const retryDelay = convertSecondsToMilliseconds(config.get<number>('proofread.retryDelay', 1), 1);
+        const timeout = convertSecondsToMilliseconds(config.get<number>('proofread.timeout', 50), 50);
 
         const messages = [
             { role: 'system', content: getSystemPrompt(context) }
