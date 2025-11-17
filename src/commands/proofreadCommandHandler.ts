@@ -472,20 +472,33 @@ export class ProofreadCommandHandler {
             }
         }
 
+        // 获取超时和重试配置
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const timeout = config.get<number>('proofread.timeout', 50);
+        const retryDelay = config.get<number>('proofread.retryDelay', 1);
+        const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
+
         // 构建确认信息
         const confirmationMessage = [
             '📋 JSON批量校对参数确认',
+            '',
+            '🚨 【重要提示】时间单位已更新为"秒"！',
+            '    • 重试间隔时间、API请求超时时间的单位已从"毫秒"改为"秒"',
+            '    • 请检查您的配置是否正确（建议：重试间隔1秒，超时50秒）',
             '',
             `📁 文件路径: ${jsonFilePath}`,
             `📊 总段落数: ${totalCount}`,
             '',
             '⚙️ 处理参数:',
+            `   • 提示词: ${currentPromptName}`,
             `   • 平台: ${platform}`,
             `   • 模型: ${model}`,
             `   • 温度: ${temperature}`,
             `   • 并发数: ${maxConcurrent}`,
             `   • 请求频率: ${rpm} 次/分钟`,
-            `   • 提示词: ${currentPromptName}`,
+            `   • 请求超时: ${timeout} 秒`,
+            `   • 重试间隔: ${retryDelay} 秒`,
+            `   • 重试次数: ${retryAttempts} 次`,
             '',
             '⚠️ 注意事项:',
             '   • 批处理中使用思考/推理模型极易出错并形成高计费！！！',

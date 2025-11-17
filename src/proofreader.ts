@@ -116,6 +116,16 @@ function getSystemPrompt(context?: vscode.ExtensionContext): string {
 }
 
 /**
+ * 将配置中的时间值（秒）转换为毫秒
+ * @param value 配置值（秒）
+ * @param defaultValue 默认值（秒）
+ * @returns 毫秒数
+ */
+function convertSecondsToMilliseconds(value: number, defaultValue: number): number {
+    return value * 1000;
+}
+
+/**
  * API调用接口
  */
 export interface ApiClient {
@@ -227,7 +237,7 @@ export class DeepseekApiClient implements ApiClient {
 
                 if (isNetworkError) {
                     // 网络错误，进行重试
-                    logger.warn(`网络错误，${retryDelay}ms后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
+                    logger.warn(`网络错误，${(retryDelay / 1000).toFixed(1)}秒后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                 } else {
                     // 非网络错误，不重试
@@ -265,8 +275,8 @@ export class AliyunApiClient implements ApiClient {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
-        const retryDelay = config.get<number>('proofread.retryDelay', 1000);
-        const timeout = config.get<number>('proofread.timeout', 50000);
+        const retryDelay = convertSecondsToMilliseconds(config.get<number>('proofread.retryDelay', 1), 1);
+        const timeout = convertSecondsToMilliseconds(config.get<number>('proofread.timeout', 50), 50);
 
         const messages = [
             { role: 'system', content: getSystemPrompt(context) }
@@ -331,7 +341,7 @@ export class AliyunApiClient implements ApiClient {
 
                 if (isNetworkError) {
                     // 网络错误，进行重试
-                    logger.warn(`网络错误，${retryDelay}ms后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
+                    logger.warn(`网络错误，${(retryDelay / 1000).toFixed(1)}秒后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                 } else {
                     // 非网络错误，不重试
@@ -369,7 +379,7 @@ export class GoogleApiClient implements ApiClient {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
-        const retryDelay = config.get<number>('proofread.retryDelay', 1000);
+        const retryDelay = convertSecondsToMilliseconds(config.get<number>('proofread.retryDelay', 1), 1);
 
         let contents = targetText;
         if(preText) {
@@ -426,7 +436,7 @@ export class GoogleApiClient implements ApiClient {
 
                 if (isNetworkError) {
                     // 网络错误，进行重试
-                    logger.warn(`网络错误，${retryDelay}ms后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
+                    logger.warn(`网络错误，${(retryDelay / 1000).toFixed(1)}秒后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                 } else {
                     // 非网络错误，不重试
@@ -462,8 +472,8 @@ export class OllamaApiClient implements ApiClient {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
-        const retryDelay = config.get<number>('proofread.retryDelay', 1000);
-        const timeout = config.get<number>('proofread.timeout', 300000); // Ollama本地模型默认5分钟超时
+        const retryDelay = convertSecondsToMilliseconds(config.get<number>('proofread.retryDelay', 1), 1);
+        const timeout = convertSecondsToMilliseconds(config.get<number>('proofread.timeout', 300), 300); // Ollama本地模型默认5分钟超时
 
         const messages = [
             { role: 'system', content: getSystemPrompt(context) }
@@ -530,7 +540,7 @@ export class OllamaApiClient implements ApiClient {
 
                 if (isNetworkError) {
                     // 网络错误，进行重试
-                    logger.warn(`网络错误，${retryDelay}ms后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
+                    logger.warn(`网络错误，${(retryDelay / 1000).toFixed(1)}秒后进行第 ${attempt + 1} 次重试: ${errorMessage}`);
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                 } else {
                     // 非网络错误，不重试

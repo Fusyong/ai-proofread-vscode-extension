@@ -172,41 +172,41 @@
           "default": 3,
           "minimum": 1,
           "maximum": 10,
-          "description": "API调用失败时的重试次数"
+          "description": "API调用失败时的重试次数，默认3次"
         },
         "ai-proofread.proofread.retryDelay": {
           "order": 22,
           "type": "number",
-          "default": 1000,
-          "minimum": 100,
-          "maximum": 10000,
-          "description": "重试间隔时间（毫秒）"
+          "default": 1,
+          "minimum": 0.1,
+          "maximum": 10,
+          "description": "重试间隔时间（秒），默认1秒"
         },
         "ai-proofread.proofread.timeout": {
           "order": 23,
           "type": "number",
-          "default": 50000,
-          "minimum": 5000,
-          "maximum": 300000,
-          "description": "API请求超时时间（毫秒）"
+          "default": 50,
+          "minimum": 5,
+          "maximum": 300,
+          "description": "API请求超时时间（秒），默认50秒"
         },
         "ai-proofread.proofread.rpm": {
           "order": 24,
           "type": "number",
           "default": 15,
-          "description": "每分钟最大请求数"
+          "description": "每分钟最大请求数，默认15"
         },
         "ai-proofread.proofread.maxConcurrent": {
           "order": 25,
           "type": "number",
           "default": 3,
-          "description": "最大并发请求数"
+          "description": "最大并发请求数，默认3"
         },
         "ai-proofread.proofread.temperature": {
           "order": 26,
           "type": "number",
           "default": 1.0,
-          "description": "模型温度，取值范围是[0:2)，留空则使用模型默认温度"
+          "description": "模型温度，取值范围是[0:2)，留空则使用模型默认温度，默认1.0"
         },
         "ai-proofread.convertQuotes": {
           "order": 27,
