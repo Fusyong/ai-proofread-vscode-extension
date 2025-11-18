@@ -198,7 +198,13 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 从VS Code界面左下角或扩展界面的⚙️，或从命令面板（Ctrl+Shift+P）查找命令Preferences: Open Settings (UI)都能进入扩展配置界面。
 
-配置项的意义请参考本文档相关的部分。
+配置项的意义请参考本文档相关的部分，以及对应模型的文档。
+
+参考：
+
+* Deepseek[限速](https://api-docs.deepseek.com/zh-cn/quick_start/rate_limit)：没有并发限制，但服务器在高流量时会延迟（需要注意观察）
+* 阿里云百炼平台[限流规则](https://help.aliyun.com/zh/model-studio/rate-limit)：qwen-max系列稳定版的rpm通常为600甚至更高，带日期的快照版通常为60，没有并发限制（建议为10）
+* 谷歌[rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits)
 
 > ⚠️ `proofread.retryDelay` 与 `proofread.timeout` 的单位均为 **秒**。扩展会在内部自动转换为毫秒进行 API 调用，升级旧版本后请确认你的设置值。
 
