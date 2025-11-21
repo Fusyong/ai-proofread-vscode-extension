@@ -193,14 +193,14 @@
         "ai-proofread.proofread.rpm": {
           "order": 24,
           "type": "number",
-          "default": 15,
-          "description": "每分钟最大请求数，默认15"
+          "default": 60,
+          "description": "每分钟最大请求数，默认60。Deepseek无限制，但服务器在高流量时会延迟，请注意观察；阿里云百炼qwen-max系列稳定版的rpm通常为600甚至更高，带日期的快照版通常为60"
         },
         "ai-proofread.proofread.maxConcurrent": {
           "order": 25,
           "type": "number",
-          "default": 3,
-          "description": "最大并发请求数，默认3"
+          "default": 10,
+          "description": "最大并发请求数，默认10"
         },
         "ai-proofread.proofread.temperature": {
           "order": 26,
