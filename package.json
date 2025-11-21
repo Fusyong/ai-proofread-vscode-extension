@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -185,10 +185,10 @@
         "ai-proofread.proofread.timeout": {
           "order": 23,
           "type": "number",
-          "default": 50,
+          "default": 90,
           "minimum": 5,
           "maximum": 300,
-          "description": "API请求超时时间（秒），默认50秒"
+          "description": "API请求超时时间（秒），默认90秒"
         },
         "ai-proofread.proofread.rpm": {
           "order": 24,

@@ -281,6 +281,12 @@ Additionally, you can also set your own prompts for other text processing scenar
 ## 6. 更新日志
 
 
+### v1.0.2
+
+- bug修复
+- 优化：默认并发数改为10、rpm改为600、超时改为90秒
+- 优化：外语校对提示
+
 ### v1.0.0
 
 - !!! caution 设置中的毫秒改为秒
