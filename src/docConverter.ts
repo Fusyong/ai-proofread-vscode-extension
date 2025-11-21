@@ -20,7 +20,7 @@ export interface PdfToTextOptions {
         lastPage?: number;
     };
 
-    // 边距（可选，单位：点）
+    // 边距（可选，单位：pt）
     margins?: {
         left?: number;
         right?: number;
@@ -29,8 +29,8 @@ export interface PdfToTextOptions {
     };
 
     // 布局参数（可选）
-    fixed?: number;  // 字符间距（点），用于 layout/table/lineprinter 模式
-    linespacing?: number;  // 行间距（点），用于 lineprinter 模式
+    fixed?: number;  // 字符间距（pt），用于 layout/table/lineprinter 模式
+    linespacing?: number;  // 行间距（pt），用于 lineprinter 模式
 
     // 其他选项
     nodiag?: boolean;  // 丢弃对角线文本
@@ -158,7 +158,7 @@ export async function convertMarkdownToDocx(mdPath: string, outputPath?: string 
         const mdFileName = path.basename(mdPath);
         const outputDir = path.dirname(outputPath);
         const outputFileName = path.basename(outputPath);
-        
+
         // 如果输出目录与输入目录不同，使用绝对路径
         let baseCommand: string;
         if (path.resolve(mdDir) !== path.resolve(outputDir)) {
