@@ -294,33 +294,33 @@
         {
           "command": "ai-proofread.proofreadSelection",
           "group": "ai-proofread@11",
-          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex)"
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.searchSelectionInPDF",
           "group": "ai-proofread@12",
-          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex)"
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.convertQuotes",
           "group": "ai-proofread@13",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
 
         },
         {
           "command": "ai-proofread.formatParagraphs",
           "group": "ai-proofread@13",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
         },
         {
           "command": "ai-proofread.diffItWithAnotherFile",
           "group": "ai-proofread@14",
-          "when": "resourceLangId == markdown || resourceLangId == json ||resourceLangId == text || resourceLangId == context || resourceLangId == tex"
+          "when": "resourceLangId == json || resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
         },
         {
           "command": "ai-proofread.splitFile",
           "group": "ai-proofread@20",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex"
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
         },
         {
           "command": "ai-proofread.convertMarkdownToDocx",
