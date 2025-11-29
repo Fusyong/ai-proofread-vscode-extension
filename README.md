@@ -283,6 +283,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 ## 6. 更新日志
 
 
+### v1.0.4
+
+- 优化：支持直接从`*.proofread.json.md`反查`*.pdf`
+
 ### v1.0.3
 
 - bug修复
