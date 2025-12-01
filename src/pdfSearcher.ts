@@ -14,7 +14,16 @@ export async function searchSelectionInPDF(editor: vscode.TextEditor): Promise<v
     }
 
     const currentFile = editor.document.uri.fsPath;
-    const pdfPath = FilePathUtils.getFilePath(currentFile, '', '.pdf');
+    // 支持从 文档名.proofread.json.md 反查 文档名.pdf
+    let pdfPath: string;
+    if (currentFile.endsWith('.proofread.json.md')) {
+        // 去掉 .proofread.json.md，添加 .pdf
+        const baseName = currentFile.slice(0, -'.proofread.json.md'.length);
+        pdfPath = baseName + '.pdf';
+    } else {
+        // 原有逻辑：从 文档名.md 反查 文档名.pdf
+        pdfPath = FilePathUtils.getFilePath(currentFile, '', '.pdf');
+    }
 
     if (!fs.existsSync(pdfPath)) {
         vscode.window.showInformationMessage(`未找到对应的PDF文件: ${pdfPath}`);

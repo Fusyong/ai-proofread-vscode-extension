@@ -10,6 +10,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 1. 安装和必要配置
 
+**本文档仅以Windows系统为例**
+
 1. [安装VS Code](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#_1)，用VSCode打开一个空文件夹，通过VS Code界面左侧的扩展按钮打开扩展管理窗口（Ctrl+Shift+X）
 2. 搜索AI Proofreader，点击安装按钮`install`安装
 3. 到大语言模型服务平台（默认为[Deepseek开放平台](https://platform.deepseek.com/)），通过注册、实名认证、充值、生成API秘钥等操作，获得有效的秘钥，复制秘钥
@@ -45,11 +47,11 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ### 3.1. 文档准备
 
-本扩展[默认支持Markdown文档](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_markdown)，其他文档需要先转换为Markdown。此类转换工具很多。本扩展也自带集成方式：
+本扩展[默认支持Markdown文档](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_markdown)，另支持text、ConTeXt、TeX、LaTeX（**对后三者的支持没有经过充分测试**），其他文档需要先转换为Markdown。此类转换工具很多。本扩展也自带集成方式：
 
-* 纯文本文件只需要把后缀`.txt`改成`.md`即可。TeX类文档，如果标记比较少，也可以这样处理。
-* docx文档（一种Word文档），可以通过命令面板（Ctrl+Shift+P），使用convert docx to Markdown命令转换后进行校。本功能依赖[多功能文档格式转换工具Pandoc](https://pandoc.org/installing.html)，需要预先正确安装。
-* PDF文档，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。本功能依赖[Xpdf command line tools](https://www.xpdfreader.com/download.html)，需要预先以管理员身份正确安装。
+* 文本文件只需要把后缀（比如纯文本的`.txt`）改成`.md`即可
+* docx文档（一种Word文档），可以通过命令面板（Ctrl+Shift+P），使用convert docx to Markdown命令转换后进行校。本功能依赖[多功能文档格式转换工具Pandoc](https://pandoc.org/installing.html)，需要预先正确安装（可能需要重启才能生效）。
+* PDF文档，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。本功能依赖[Xpdf command line tools](https://www.xpdfreader.com/download.html)中的`pdftotext.exe`程序，需手动安装（在“系统变量”的Path中添加其所在路径），交流群备用bat辅助安装程序。安装后可能需要重启才能生效。
     * 所得文本如果没有使用空行分段，无法切分，可以使用整理段落（format paragraphs）命令添加段后空行。
     * Markdown中的段内断行是合法的，即使句子被断开，对大模型的影响也不大。当然，也可以用上述命令中的“删除段内分行”选项处理后再校对。
 
@@ -285,6 +287,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
+
+### v1.0.4
+
+- 优化：支持直接从`*.proofread.json.md`反查`*.pdf`
 
 ### v1.0.3
 
