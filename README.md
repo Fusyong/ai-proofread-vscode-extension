@@ -47,21 +47,28 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ### 3.1. 文档准备
 
-本扩展[默认支持Markdown文档](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_markdown)，另支持text、ConTeXt、TeX、LaTeX（**对后三者的支持没有经过充分测试**），其他文档需要先转换为Markdown。此类转换工具很多。本扩展也自带集成方式：
+本扩展[默认支持Markdown文档](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_markdown)，另支持text、ConTeXt、TeX、LaTeX（**对后三者的支持没有经过充分测试**），其他文档需要先转换为Markdown。此类转换工具很多，本扩展集成了两种。
 
-* 文本文件只需要把后缀（比如纯文本的`.txt`）改成`.md`即可
-* docx文档（一种Word文档），可以通过命令面板（Ctrl+Shift+P），使用convert docx to Markdown命令转换后进行校。本功能依赖[多功能文档格式转换工具Pandoc](https://pandoc.org/installing.html)，需要预先正确安装（可能需要重启才能生效）。
-* PDF文档，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。本功能依赖[Xpdf command line tools](https://www.xpdfreader.com/download.html)中的`pdftotext.exe`程序，需手动安装（在“系统变量”的Path中添加其所在路径），交流群备用bat辅助安装程序。安装后可能需要重启才能生效。
-    * 所得文本如果没有使用空行分段，无法切分，可以使用整理段落（format paragraphs）命令添加段后空行。
+处理步骤：
+
+* **文本文件**只需要把后缀（比如纯文本的`.txt`）改成`.md`即可
+* **docx文档**（Word、WPS的通常格式），可以通过命令面板（Ctrl+Shift+P），使用convert docx to Markdown命令转换后进行校。本功能依赖[多功能文档格式转换工具Pandoc](https://pandoc.org/installing.html)，需要预先正确安装。安装后可能需要重启才能生效。
+* **PDF文档**，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。本功能依赖[Xpdf command line tools](https://www.xpdfreader.com/download.html)中的`pdftotext.exe`程序，需手动安装（在“系统变量”的Path中添加其所在路径），交流群备用bat辅助安装程序。安装后可能需要重启才能生效。
+    * 所得文本如果没有使用空行分段，无法切分，可以使用整理段落（format paragraphs）命令中的“段末加空行”选项加以处理。
     * Markdown中的段内断行是合法的，即使句子被断开，对大模型的影响也不大。当然，也可以用上述命令中的“删除段内分行”选项处理后再校对。
 
-文档转换后有[一些整理技巧](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode)，不过对于使用本扩展进行校对而言，整理工作通常不是必须的。
+文档转换后还有[一些整理技巧](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode)，不过对于使用本扩展进行校对而言，其他整理工作通常不是必须的。但是当你希望按篇、章、节、标题等结构来切分、校对，以便保持语境连贯，那么你需要学习更多整理技巧，或者使用其他工具，以便得到有标题的Markdown文档。
 
-过多的无效字符影响输出速度，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。请参考上述讲整理技巧的文章。
+过多的无效字符影响输出速度，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。方正系排版软件可能使用半角标点，校对后通常会被改成全角，你也可以使用相同的方法加以替换，避免干扰。请参考上述讲整理技巧的文章。
+
+!!! caution 批量替换有风险
+    批量查找替换的结果可能超出你的预期，即使你不准备原样使用处理后的文本，也有掩盖错误的风险。补强措施是：先查找全部，复制到一个新文档中确认无误，然后再进行替换。如果替换逻辑较为复杂，替换后还要比较文件（后文会提到），从头到尾确认所有更改。
 
 ### 3.2. 文档切分
 
 我的经验，在一般语言文字和知识校对场景中，大语言模型一次输出六百到八百字会有比较好的效果。因此，一本十来万字的书稿需要切分成三百多段，然后交给大模型校对。
+
+而校对前后一致性，比如多个人名、正文与注释、前后表述的一致性，则需要完整的语境，这时最好按章节切分、校对。
 
 打开markdown文件，在编辑器窗口中打开右键菜单，可以看到切分选项 `AI proofreader: split file`
 
@@ -124,7 +131,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 1. 打开已切分的要校对的 JSON 文件
 2. 打开右键菜单，选择`AI proofreader: Merge Two Files`（或通过命令面板）命令
 3. 选择要合并的文件
-4. 确定要处理的字段和资料来源字段，以及更新（覆盖）模式或拼接模式
+4. 确定要处理的字段和资料来源字段，以及更新（覆盖）模式或拼接模式。比如你想把试题及其答案合并后校对，那么可用拼接模式，拼接到同一个target中。
 
 组织校对语境是一个看起来有些麻烦，但非常有效的工作。比如校对练习册，有必要把练习和答案拼成语境（拼在一个target中更能节省费用）。而对一首古诗的解释如果不可靠，可以用一篇可靠的作为reference。包含人物的内容，则可以用词典中的任务条目作为reference。
 
