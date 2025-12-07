@@ -177,6 +177,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 本扩展计划预置更多提示词，也欢迎用户通过用户群等渠道交流、分享提示词。
 
+本人有一个[开源提示词库](https://github.com/Fusyong/LLM-prompts-from-a-book-editor)，但不是针对本扩展的，改造（对三种标签进行说明）后才能用于本扩展。
+
 ### 3.7. 日志等过程文件
 
 为了让用户能够核验、控制每一个步骤，扩展会以要校对的文档的文件名（以“测试.md”为例）为基础，生成一些中间文件，各自的作用如下：
