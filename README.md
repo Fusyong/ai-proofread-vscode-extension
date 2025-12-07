@@ -33,7 +33,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 1. 打开markdown文档，在每一个段落后添加一个空行（一个或多个空行是md的段落标记），打开右键菜单，使用`AI proofreader: split file`选项，选择切分模式（默认按长度），把当前文档切分为JSON文档，结果会呈现在面板中
 2. 通过结果面板中的“校对JSON文件”按钮，批量校对切分好的片段
 3. 通过结果面板中的“比较前后差异”按钮，可以看到和上文相同的校对结果
-![/result_panel](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscod扩展/result_panel.png) 
+![/result_panel](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/result_panel.png) 
 
 ### 2.3. 尝试所有命令
 
@@ -41,7 +41,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 本扩展的所有功能，则可以通过命令面板（Ctrl+Shift+P）查找、访问：
 
-![所有命令](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscod扩展/command_palette.png)
+![所有命令](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/command_palette.png)
 
 ## 3. 使用说明
 
