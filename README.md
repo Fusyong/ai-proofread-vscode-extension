@@ -56,8 +56,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 * **活文字PDF文档**，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。本功能依赖[Xpdf command line tools](https://www.xpdfreader.com/download.html)中的`pdftotext.exe`程序，需手动安装（在“系统变量”的Path中添加其所在路径），交流群备用bat辅助安装程序。安装后可能需要重启才能生效。
     * 所得文本如果没有使用空行分段，无法切分，可以使用整理段落（format paragraphs）命令中的“段末加空行”选项加以处理。
     * Markdown中的段内断行是合法的，即使句子被断开，对大模型的影响也不大。当然，也可以用上述命令中的“删除段内分行”选项处理后再校对。
-* **死文字PDF**，需要通过OCR处理成活文字PDF、docx、text等后，再如上处理。
-* **方正书版大样文档**，如果有方正智能审校工具，用它处理后即为活文字PDF（没有图），再如上处理。另外，方正书版本身有一些间接导出活文字PDF的办法，但常有各种问题。目前OCR工具已经很成熟，可以先导出死文字PDF，OCR后再如上处理。
+* **死文字PDF**，需要通过OCR处理成活文字PDF、docx、text、Markdown等后进一步处理。QQ交流群中上传了一个OCR命令行工具rapiddoc.exe。加密码限制提取文字的活文字PDF，也如此处理，或尝试用[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)打开后复制文字。
+* **方正书版大样文档**，如果有方正智能审校工具，用它处理后即为活文字PDF（没有图），再进一步处理。另外，方正书版本身有一些间接导出活文字PDF的办法，但有各种问题，常常比不上用OCR工具处理。
 
 文档转换后还有[一些整理技巧](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode)，不过对于使用本扩展进行校对而言，进一步的整理工作通常不是必须的。常见的例外情形是，你希望按篇、章、节、标题等结构来切分、校对，以便保持语境连贯，那么你需要学习更多整理技巧，或者使用其他工具，以便得到有标题的Markdown文档。
 
