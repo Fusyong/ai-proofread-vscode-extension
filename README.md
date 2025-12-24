@@ -33,7 +33,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 1. 打开markdown文档，在每一个段落后添加一个空行（一个或多个空行是md的段落标记），打开右键菜单，使用`AI proofreader: split file`选项，选择切分模式（默认按长度），把当前文档切分为JSON文档，结果会呈现在面板中
 2. 通过结果面板中的“校对JSON文件”按钮，批量校对切分好的片段
 3. 通过结果面板中的“比较前后差异”按钮，可以看到和上文相同的校对结果
-![/result_panel](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscod扩展/result_panel.png) 
+![/result_panel](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/result_panel.png) 
 
 ### 2.3. 尝试所有命令
 
@@ -41,27 +41,36 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 本扩展的所有功能，则可以通过命令面板（Ctrl+Shift+P）查找、访问：
 
-![所有命令](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscod扩展/command_palette.png)
+![所有命令](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/command_palette.png)
 
 ## 3. 使用说明
 
 ### 3.1. 文档准备
 
-本扩展[默认支持Markdown文档](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_markdown)，另支持text、ConTeXt、TeX、LaTeX（**对后三者的支持没有经过充分测试**），其他文档需要先转换为Markdown。此类转换工具很多。本扩展也自带集成方式：
+目前作者端稿件多为docx类。排版端可能导出活文字PDF、死文字PDF（文字转曲转光栅，方正书版常见）、方正书版大样文件（常用于过黑马、方正审校）、纯文本（text，多数排版软件能导出）等。
 
-* 文本文件只需要把后缀（比如纯文本的`.txt`）改成`.md`即可
-* docx文档（一种Word文档），可以通过命令面板（Ctrl+Shift+P），使用convert docx to Markdown命令转换后进行校。本功能依赖[多功能文档格式转换工具Pandoc](https://pandoc.org/installing.html)，需要预先正确安装（可能需要重启才能生效）。
-* PDF文档，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。本功能依赖[Xpdf command line tools](https://www.xpdfreader.com/download.html)中的`pdftotext.exe`程序，需手动安装（在“系统变量”的Path中添加其所在路径），交流群备用bat辅助安装程序。安装后可能需要重启才能生效。
-    * 所得文本如果没有使用空行分段，无法切分，可以使用整理段落（format paragraphs）命令添加段后空行。
+本扩展[默认支持Markdown文档](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_markdown)，另支持text、ConTeXt、TeX、LaTeX（**对后三者的支持没有经过充分测试**），其他文档需要先转换为Markdown。此类转换工具很多，本扩展集成了两种。
+
+* **文本文件**只需要把后缀（比如纯文本的`.txt`）改成`.md`即可
+* **docx文档**（Word、WPS的通常格式），可以通过命令面板（Ctrl+Shift+P），使用convert docx to Markdown命令转换后进行校。本功能依赖[多功能文档格式转换工具Pandoc](https://pandoc.org/installing.html)，需要预先正确安装。安装后可能需要重启才能生效。
+* **活文字PDF文档**，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。本功能依赖[Xpdf command line tools](https://www.xpdfreader.com/download.html)中的`pdftotext.exe`程序，需手动安装（在“系统变量”的Path中添加其所在路径），交流群备用bat辅助安装程序。安装后可能需要重启才能生效。
+    * 所得文本如果没有使用空行分段，无法切分，可以使用整理段落（format paragraphs）命令中的“段末加空行”选项加以处理。
     * Markdown中的段内断行是合法的，即使句子被断开，对大模型的影响也不大。当然，也可以用上述命令中的“删除段内分行”选项处理后再校对。
+* **死文字PDF**，需要通过OCR处理成活文字PDF、docx、text、Markdown等后进一步处理。QQ交流群中上传了一个OCR命令行工具rapiddoc.exe。加密码限制提取文字的活文字PDF，也如此处理，或尝试用[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)打开后复制文字。
+* **方正书版大样文档**，如果有方正智能审校工具，用它处理后即为活文字PDF（没有图），再进一步处理。另外，方正书版本身有一些间接导出活文字PDF的办法，但有各种问题，常常比不上用OCR工具处理。
 
-文档转换后有[一些整理技巧](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode)，不过对于使用本扩展进行校对而言，整理工作通常不是必须的。
+文档转换后还有[一些整理技巧](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode)，不过对于使用本扩展进行校对而言，进一步的整理工作通常不是必须的。常见的例外情形是，你希望按篇、章、节、标题等结构来切分、校对，以便保持语境连贯，那么你需要学习更多整理技巧，或者使用其他工具，以便得到有标题的Markdown文档。
 
-过多的无效字符影响输出速度，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。请参考上述讲整理技巧的文章。
+过多的无效字符影响输出速度，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。方正系排版软件可能使用半角标点，校对后通常会被改成全角，你也可以使用相同的方法加以替换，避免干扰。请参考上述讲整理技巧的文章。
+
+!!! caution 批量替换有风险
+    批量替换的结果可能超出你的预期，即使你不准备原样使用处理后的文本，也有掩盖错误的风险。补强措施是：（一）备份文件。（二）先查找全部，复制到一个新文档中确认无误，然后再进行替换。（三）如果替换逻辑较为复杂，替换后还要比较文件（后文会提到），从头到尾确认所有更改。
 
 ### 3.2. 文档切分
 
 我的经验，在一般语言文字和知识校对场景中，大语言模型一次输出六百到八百字会有比较好的效果。因此，一本十来万字的书稿需要切分成三百多段，然后交给大模型校对。
+
+而校对前后一致性，比如多个人名、正文与注释、前后表述的一致性，则需要完整的语境，这时最好按章节切分、校对。
 
 打开markdown文件，在编辑器窗口中打开右键菜单，可以看到切分选项 `AI proofreader: split file`
 
@@ -124,7 +133,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 1. 打开已切分的要校对的 JSON 文件
 2. 打开右键菜单，选择`AI proofreader: Merge Two Files`（或通过命令面板）命令
 3. 选择要合并的文件
-4. 确定要处理的字段和资料来源字段，以及更新（覆盖）模式或拼接模式
+4. 确定要处理的字段和资料来源字段，以及更新（覆盖）模式或拼接模式。比如你想把试题及其答案合并后校对，那么可用拼接模式，拼接到同一个target中。
 
 组织校对语境是一个看起来有些麻烦，但非常有效的工作。比如校对练习册，有必要把练习和答案拼成语境（拼在一个target中更能节省费用）。而对一首古诗的解释如果不可靠，可以用一篇可靠的作为reference。包含人物的内容，则可以用词典中的任务条目作为reference。
 
@@ -167,6 +176,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 > 3. ……
 
 本扩展计划预置更多提示词，也欢迎用户通过用户群等渠道交流、分享提示词。
+
+本人有一个[开源提示词库](https://github.com/Fusyong/LLM-prompts-from-a-book-editor)，但不是针对本扩展的，改造（对三种标签进行说明）后才能用于本扩展。
 
 ### 3.7. 日志等过程文件
 
@@ -254,10 +265,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 5. TODO
 
-1. [ ] `*.proofread.json.md`反查PDF
-2. [ ] 整理发布提示词库
-3. [ ] 命名实体收集，聚类，绘图
-4.  [ ] 预置更多提示词，包括常用的专项校对
+1.  [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] 典型错误举例校对
         1. [ ] 标点符号用法错误
         2. [ ] 数字用法错误
@@ -268,21 +276,21 @@ Additionally, you can also set your own prompts for other text processing scenar
     4. [ ] 练习题就地回答
     5. [ ] 翻译
     6. [ ] 按小学语文教材标准加拼音
-5. [ ] 取消接口改变的警示
-6. [ ] 数字连续性检查（以Python库相应模块为基础）
-7. [ ] 整理勘误表（以Python库句子对齐模块为基础）
+2. [ ] 取消接口改变的警示
+3. [ ] 数字连续性检查（以Python库相应模块为基础）
+4. [ ] 整理勘误表（以Python库句子对齐模块为基础）
     1. [ ] 勘误条目聚类
     2. [ ] 增量样例校对模式
     3.  [ ] 人工核准界面
-8.  [ ] 引文核对（以Python库相应模块为基础）
-9.  [ ] 自主发现、提出、校对知识性问题
+5.  [ ] 引文核对（以Python库相应模块为基础）
+6.  [ ] 自主发现、提出、校对知识性问题
     1.  [ ] 检索、核对互联网资料
     2.  [ ] 检索、核对本地词典（以Python库mdict查询模块为基础）
-10. [ ] 多平台支持测试
-11. [ ] 内部git版本管理
-12. [ ] 推理模型无法使用的问题（可能单纯是因为运行时间过长）
-13. [ ] 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
-14. [ ] 支持Copilot（尝试过一次，回文说API还没有开放。还需要研究参考项目。）
+7.  [ ] 多平台支持测试
+8.  [ ] 内部git版本管理
+9.  [ ] 推理模型无法使用的问题（可能单纯是因为运行时间过长）
+10. [ ] 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
+11. [ ] 支持Copilot（尝试过一次，回文说API还没有开放。还需要研究参考项目。）
 
 
 ## 6. 更新日志
@@ -291,6 +299,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 ### v1.0.4
 
 - 优化：支持直接从`*.proofread.json.md`反查`*.pdf`
+- 优化：文档
 
 ### v1.0.3
 
