@@ -98,7 +98,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 校对切分好的JSON文档：
 
 1. 打开已切分的 JSON 文件
-2. 通过右键惨带或命令面板选择Proofread File
+2. 通过右键菜单或命令面板选择Proofread File
 3. 显示当前配置请你确认。配置说明见上文。
 4. 在结果面板中有进度、结果等信息。可中途取消校对。下次接着校对，会根据校对结果`文档.proofread.json`文件中的记录，跳过已经完成的部分；如果切分结果`文档.json`与校对结果`文档.proofread.json`条目数不一致，则会提示你手动对齐，或删除结果文档，从头重新校对。
 5. 最后会提示你查看结果：JSON结果、前后差异、日志文件，以及生成差异文件（类似带修改标记的Word文档）。
