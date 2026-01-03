@@ -8,6 +8,9 @@ import * as path from 'path';
 import { showFileDiff, jsDiffJsonFiles } from '../differ';
 import { ErrorUtils, FilePathUtils } from '../utils';
 import { ProgressTracker } from '../progressTracker';
+import { alignSentencesAnchor, getAlignmentStatistics, AlignmentOptions } from '../sentenceAligner';
+import { splitChineseSentencesWithLineNumbers } from '../splitter';
+import { generateHtmlReport } from '../alignmentReportGenerator';
 
 // 接口定义
 export interface SplitResult {
@@ -63,12 +66,12 @@ export class WebviewManager {
         if (!workspaceFolders || workspaceFolders.length === 0) {
             return absolutePath;
         }
-        
+
         const workspaceRoot = workspaceFolders[0].uri.fsPath;
         if (absolutePath.startsWith(workspaceRoot)) {
             return path.relative(workspaceRoot, absolutePath);
         }
-        
+
         return absolutePath;
     }
 
@@ -138,7 +141,7 @@ export class WebviewManager {
 
                 // 更新当前结果
                 this.currentProcessResult = result;
-                
+
                 // 重新生成HTML内容
                 const splitHtml = result.splitResult ? this.generateSplitResultHtml(result.splitResult) : '';
                 const proofreadHtml = result.proofreadResult ? this.generateProofreadResultHtml(result.proofreadResult) : '';
@@ -160,7 +163,7 @@ export class WebviewManager {
     public reopenResultPanel(context: vscode.ExtensionContext): void {
         if (this.currentProcessResult) {
             const panel = this.createWebviewPanel(this.currentProcessResult);
-            
+
             // 监听Webview消息
             panel.webview.onDidReceiveMessage(
                 (message) => this.handleWebviewMessage(message, panel, context),
@@ -194,7 +197,7 @@ export class WebviewManager {
                         const logUri = vscode.Uri.file(splitLogPath);
                         const document = await vscode.workspace.openTextDocument(logUri);
                         const editor = await vscode.window.showTextDocument(document);
-                        
+
                         // 滚动到文件末端
                         const lastLine = document.lineCount - 1;
                         const lastLineLength = document.lineAt(lastLine).text.length;
@@ -233,7 +236,7 @@ export class WebviewManager {
                         const logUri = vscode.Uri.file(proofreadLogPath);
                         const document = await vscode.workspace.openTextDocument(logUri);
                         const editor = await vscode.window.showTextDocument(document);
-                        
+
                         // 滚动到文件末端
                         const lastLine = document.lineCount - 1;
                         const lastLineLength = document.lineAt(lastLine).text.length;
@@ -253,7 +256,7 @@ export class WebviewManager {
                     // 直接生成JSON文件的差异文件
                     const originalJsonPath = this.currentProcessResult?.splitResult?.jsonFilePath;
                     const proofreadJsonFilePath = this.currentProcessResult?.proofreadResult?.outputFilePath;
-                    
+
                     if (originalJsonPath && proofreadJsonFilePath) {
                         try {
                             // 让用户输入每次比较的片段数量
@@ -275,14 +278,14 @@ export class WebviewManager {
 
                             if (segmentCountInput !== undefined) {
                                 const segmentCount = parseInt(segmentCountInput);
-                                
+
                                 // 生成输出文件路径
                                 const outputFile = FilePathUtils.getFilePath(originalJsonPath, '.diff', '.html');
                                 const title = `${path.basename(originalJsonPath)} ↔ ${path.basename(proofreadJsonFilePath)}`;
-                                
+
                                 // 生成差异文件
                                 await jsDiffJsonFiles(originalJsonPath, proofreadJsonFilePath, outputFile, title, segmentCount);
-                                
+
                                 vscode.window.showInformationMessage('差异文件生成完成！');
                             }
                         } catch (error) {
@@ -290,6 +293,17 @@ export class WebviewManager {
                         }
                     } else {
                         vscode.window.showErrorMessage('无法找到原始JSON文件或校对后的JSON文件！');
+                    }
+                    break;
+                case 'generateAlignment':
+                    // 生成句子对齐勘误表
+                    const alignmentOriginalPath = this.currentProcessResult?.proofreadResult?.originalFilePath;
+                    const alignmentMarkdownPath = this.currentProcessResult?.proofreadResult?.markdownFilePath;
+
+                    if (alignmentOriginalPath && alignmentMarkdownPath) {
+                        await this.handleSentenceAlignment(alignmentOriginalPath, alignmentMarkdownPath);
+                    } else {
+                        vscode.window.showErrorMessage('无法找到原始文件或校对后的Markdown文件！');
                     }
                     break;
             }
@@ -400,6 +414,7 @@ export class WebviewManager {
                     ${proofreadResult.logFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadLog\')">查看校对日志</button>' : ''}
                     ${proofreadResult.originalFilePath && proofreadResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadDiff\')">比较前后差异</button>' : ''}
                     ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'generateDiff\')">生成差异文件</button>' : ''}
+                    ${proofreadResult.originalFilePath && proofreadResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'generateAlignment\')">生成勘误表</button>' : ''}
                 </div>
             </div>
         `;
@@ -560,7 +575,7 @@ export class WebviewManager {
                         color: #8A9BA0;
                         cursor: not-allowed;
                     }
-                    
+
                     ${ProgressTracker.generateProgressBarCss()}
                 </style>
             </head>
@@ -568,15 +583,15 @@ export class WebviewManager {
                 <div class="header">
                     <div class="message">${result.message}</div>
                 </div>
-                
+
                 ${splitHtml}
                 ${progressHtml}
                 ${proofreadHtml}
-                
+
 
                 <script>
                     const vscode = acquireVsCodeApi();
-                    
+
                     function handleAction(action) {
                         vscode.postMessage({
                             command: action
@@ -586,5 +601,112 @@ export class WebviewManager {
             </body>
             </html>
         `;
+    }
+
+    /**
+     * 处理句子对齐（生成勘误表）
+     */
+    private async handleSentenceAlignment(fileA: string, fileB: string): Promise<void> {
+        try {
+            // 读取对齐参数配置
+            const config = vscode.workspace.getConfiguration('ai-proofread.alignment');
+            const options: AlignmentOptions = {
+                windowSize: config.get<number>('windowSize', 10),
+                similarityThreshold: config.get<number>('similarityThreshold', 0.6),
+                ngramSize: config.get<number>('ngramSize', 2),
+                offset: config.get<number>('offset', 1),
+                maxWindowExpansion: config.get<number>('maxWindowExpansion', 3),
+                consecutiveFailThreshold: config.get<number>('consecutiveFailThreshold', 3)
+            };
+
+            // 显示进度
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: '正在生成勘误表...',
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ increment: 0, message: '读取文件...' });
+
+                // 读取文件内容
+                const textA = fs.readFileSync(fileA, 'utf8');
+                const textB = fs.readFileSync(fileB, 'utf8');
+
+                progress.report({ increment: 30, message: '切分句子...' });
+
+                // 切分句子并获取行号
+                const sentencesAWithLines = splitChineseSentencesWithLineNumbers(textA, true);
+                const sentencesBWithLines = splitChineseSentencesWithLineNumbers(textB, true);
+
+                // 提取句子列表
+                const sentencesA = sentencesAWithLines.map(([s]) => s);
+                const sentencesB = sentencesBWithLines.map(([s]) => s);
+
+                // 创建行号映射
+                const lineNumbersA = sentencesAWithLines.map(([, startLine]) => startLine);
+                const lineNumbersB = sentencesBWithLines.map(([, startLine]) => startLine);
+
+                progress.report({ increment: 50, message: '执行对齐算法...' });
+
+                // 执行对齐
+                const alignment = alignSentencesAnchor(sentencesA, sentencesB, options);
+
+                progress.report({ increment: 80, message: '添加行号信息...' });
+
+                // 为对齐结果添加行号信息
+                for (const item of alignment) {
+                    // 处理原文行号
+                    if (item.a_indices && item.a_indices.length > 0) {
+                        // 多个句子合并，取首行的行号
+                        item.a_line_numbers = item.a_indices.map(i => lineNumbersA[i]);
+                        item.a_line_number = lineNumbersA[item.a_indices[0]];
+                    } else if (item.a_index !== undefined && item.a_index !== null) {
+                        item.a_line_number = lineNumbersA[item.a_index];
+                        item.a_line_numbers = [lineNumbersA[item.a_index]];
+                    }
+
+                    // 处理校对后行号
+                    if (item.b_indices && item.b_indices.length > 0) {
+                        // 多个句子合并，取首行的行号
+                        item.b_line_numbers = item.b_indices.map(i => lineNumbersB[i]);
+                        item.b_line_number = lineNumbersB[item.b_indices[0]];
+                    } else if (item.b_index !== undefined && item.b_index !== null) {
+                        item.b_line_number = lineNumbersB[item.b_index];
+                        item.b_line_numbers = [lineNumbersB[item.b_index]];
+                    }
+                }
+
+                progress.report({ increment: 90, message: '生成报告...' });
+
+                // 生成HTML报告
+                const stats = getAlignmentStatistics(alignment);
+                const titleA = path.basename(fileA);
+                const titleB = path.basename(fileB);
+
+                // 生成输出文件路径（与文件A同目录）
+                const outputFile = FilePathUtils.getFilePath(fileA, '.alignment', '.html');
+
+                // 计算运行时间（简化处理，使用0）
+                const runtime = 0;
+
+                // 生成HTML报告
+                generateHtmlReport(alignment, outputFile, titleA, titleB, options, runtime);
+
+                progress.report({ increment: 100, message: '完成' });
+
+                // 显示统计信息
+                const statsMessage = `勘误表生成完成！\n` +
+                    `总计: ${stats.total}\n` +
+                    `匹配: ${stats.match}\n` +
+                    `删除: ${stats.delete}\n` +
+                    `新增: ${stats.insert}\n` +
+                    `移出: ${stats.moveout}\n` +
+                    `移入: ${stats.movein}`;
+
+                vscode.window.showInformationMessage(statsMessage + `\n报告已保存至: ${path.basename(outputFile)}`);
+            });
+
+        } catch (error) {
+            ErrorUtils.showError(error, '生成勘误表时出错：');
+        }
     }
 }

@@ -644,3 +644,515 @@ export function splitMarkdownByLengthWithParagraphsAsContext(
 
     return result;
 }
+
+/**
+ * 获取行内句子结尾的完整结束位置（包括所有连续的句末标点和后续的引号/括号）
+ * @param line 当前行
+ * @param pos 当前位置
+ * @returns 句子结尾的结束位置（不包含），如果不是句子结尾则返回pos
+ */
+function getSentenceEndPosInLine(line: string, pos: number): number {
+    if (pos >= line.length) {
+        return pos;
+    }
+
+    const char = line[pos];
+
+    // 基本句末标点
+    if (['。', '！', '？', '…'].includes(char)) {
+        // 先收集所有连续的句末标点（允许多个连用，如 ？！！、……………………）
+        let endPos = pos + 1;
+        while (endPos < line.length && ['。', '！', '？', '…'].includes(line[endPos])) {
+            endPos++;
+        }
+
+        // 然后检查后面是否跟引号、括号等
+        const quoteChars = ['"', '”', "'", '’', '）', ']', '】', '》', '」', '』'];
+        while (endPos < line.length && quoteChars.includes(line[endPos])) {
+            endPos++;
+        }
+
+        // 中文句号总是句子结尾（小数点应该是英文句号.）
+        return endPos;
+    }
+
+    // 英文句号
+    if (char === '.') {
+        // 如果前后都是数字，可能是小数点
+        if (pos > 0 && pos < line.length - 1) {
+            if (/\d/.test(line[pos - 1]) && /\d/.test(line[pos + 1])) {
+                return pos; // 不是句子结尾
+            }
+        }
+        // 如果后面跟的是小写字母或数字，可能不是句子结尾
+        if (pos < line.length - 1) {
+            const nextChar = line[pos + 1];
+            if (/[a-z0-9]/.test(nextChar)) {
+                return pos; // 不是句子结尾
+            }
+        }
+        // 在中文文本中，英文句号也可能是句子结尾
+        if (pos > 0) {
+            const prevChar = line[pos - 1];
+            // 检查前一个字符是否是中文
+            if (/[\u4e00-\u9fff]/.test(prevChar)) {
+                let endPos = pos + 1;
+                // 检查后面是否跟引号、括号等
+                const quoteChars = ['"', '”', "'", '’', '）', ']', '】', '》', '」', '』'];
+                while (endPos < line.length && quoteChars.includes(line[endPos])) {
+                    endPos++;
+                }
+                return endPos;
+            }
+        }
+        // 检查是否是数字后的句号（可能是小数点）
+        if (char === '.' && pos > 0) {
+            const prevChar = line[pos - 1];
+            if (/\d/.test(prevChar) && pos < line.length && /\d/.test(line[pos])) {
+                return pos; // 不是句子结尾
+            }
+        }
+    }
+
+    return pos; // 不是句子结尾
+}
+
+/**
+ * 判断是否是Markdown标题
+ */
+function isMarkdownTitle(line: string): boolean {
+    const stripped = line.trim();
+    if (!stripped.startsWith('#')) {
+        return false;
+    }
+    // 检查格式：## 标题 或 ## 标题（多个#号）
+    if (stripped.length > 1) {
+        return stripped[1] === ' ' || stripped[1] === '#';
+    }
+    return false;
+}
+
+/**
+ * 判断是否是列表项
+ */
+function isListItem(line: string): boolean {
+    const stripped = line.trim();
+    // 无序列表：-、*、+
+    if (stripped.match(/^[-*+]\s/)) {
+        return true;
+    }
+    // 有序列表：数字. 或 数字)
+    if (stripped.match(/^\d+[.)]\s/)) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * 提取列表项的内容部分（去除标记）
+ */
+function extractListContent(line: string): string {
+    const stripped = line.trim();
+    // 无序列表
+    const match1 = stripped.match(/^[-*+]\s+(.+)/);
+    if (match1) {
+        return match1[1].trim();
+    }
+    // 有序列表
+    const match2 = stripped.match(/^\d+[.)]\s+(.+)/);
+    if (match2) {
+        return match2[1].trim();
+    }
+    return stripped;
+}
+
+/**
+ * 判断文本是否以句末标点结尾
+ */
+function endsWithSentencePunct(text: string): boolean {
+    if (!text) {
+        return false;
+    }
+    // 去除末尾可能的引号、括号等
+    text = text.replace(/["”'’)）\]】》」』]+$/, '');
+    if (!text) {
+        return false;
+    }
+    return ['。', '！', '？', '…', '.', '!', '?'].includes(text[text.length - 1]);
+}
+
+/**
+ * 切分中文句子
+ * @param text 要切分的文本
+ * @param preserveFormatting 是否保留格式（如Markdown标记）
+ * @returns 切分后的句子列表
+ */
+export function splitChineseSentences(
+    text: string,
+    preserveFormatting: boolean = true
+): string[] {
+    if (!text || text.trim().length === 0) {
+        return [];
+    }
+
+    const sentences: string[] = [];
+    let currentSentence: string[] = [];
+    let inQuote = false;
+    let quoteChar: string | null = null;
+
+    // 如果保留格式，使用splitlines并保留换行符（类似Python的splitlines(keepends=True)）
+    // Python的splitlines(keepends=True)的行为：
+    // - 每一行（除了最后一行）都会保留换行符
+    // - 如果文本以换行符结尾，最后一行也会保留换行符
+    // - 空行会被保留为'\n'
+    // - 如果文本以换行符结尾，split会产生一个最后的空字符串，需要特殊处理
+    const lines = preserveFormatting
+        ? (() => {
+            const parts = text.split(/\r?\n/);
+            const result: string[] = [];
+            const endsWithNewline = text.endsWith('\n') || text.endsWith('\r\n');
+
+            for (let i = 0; i < parts.length; i++) {
+                if (i < parts.length - 1) {
+                    // 不是最后一部分，添加换行符
+                    result.push(parts[i] + '\n');
+                } else {
+                    // 最后一部分
+                    if (endsWithNewline && parts[i] === '') {
+                        // 文本以换行符结尾且最后一部分是空字符串
+                        // 这表示最后有一个空行，应该保留为'\n'
+                        result.push('\n');
+                    } else {
+                        // 最后一部分非空，或者文本不以换行符结尾
+                        result.push(parts[i]);
+                    }
+                }
+            }
+            return result;
+        })()
+        : [text];
+
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+        const line = lines[lineIdx];
+        const isLastLine = lineIdx === lines.length - 1;
+
+        // 检查是否是标题或列表项
+        const isTitle = preserveFormatting && isMarkdownTitle(line);
+        const isList = preserveFormatting && isListItem(line);
+        const isEmptyLine = !line.trim();
+
+        // 如果遇到空行，且当前句子不为空，则切分
+        if (isEmptyLine && currentSentence.length > 0) {
+            const sentence = currentSentence.join('').trim();
+            if (sentence) {
+                sentences.push(sentence);
+            }
+            currentSentence = [];
+            continue;
+        }
+
+        // 处理标题：标题本身作为一句，即使没有标点
+        if (isTitle) {
+            if (currentSentence.length > 0) {
+                const sentence = currentSentence.join('').trim();
+                if (sentence) {
+                    sentences.push(sentence);
+                }
+                currentSentence = [];
+            }
+            sentences.push(line.trimEnd());
+            continue;
+        }
+
+        // 处理列表项：列表项末尾可能没有标点，但遇到空行或新列表项时切分
+        if (isList) {
+            // 如果当前句子不为空，先保存
+            if (currentSentence.length > 0) {
+                const sentence = currentSentence.join('').trim();
+                if (sentence) {
+                    sentences.push(sentence);
+                }
+                currentSentence = [];
+            }
+
+            // 检查列表项内容是否以句末标点结尾
+            const listContent = extractListContent(line);
+            if (listContent && endsWithSentencePunct(listContent)) {
+                sentences.push(line.trimEnd());
+            } else {
+                // 列表项没有句末标点，先暂存，等待后续内容或空行
+                // line已经包含换行符（因为splitlines(keepends=True)的效果）
+                currentSentence.push(line);
+            }
+            continue;
+        }
+
+        // 普通文本行：逐字符处理
+        let i = 0;
+        while (i < line.length) {
+            const char = line[i];
+            currentSentence.push(char);
+
+            // 处理引号状态
+            const quoteChars = ['“', '”', "‘", '’', '「', '」', '『', '』'];
+            if (quoteChars.includes(char)) {
+                if (!inQuote) {
+                    inQuote = true;
+                    quoteChar = char;
+                } else if (char === quoteChar ||
+                          (['“', '”'].includes(char) && ['“', '”'].includes(quoteChar || ''))) {
+                    inQuote = false;
+                    quoteChar = null;
+                }
+            }
+
+            // 检查是否是句子结尾（不在引号内）
+            if (!inQuote) {
+                const endPos = getSentenceEndPosInLine(line, i);
+                if (endPos > i) {
+                    // 收集从当前位置+1到句子结尾的所有字符（当前位置已添加）
+                    for (let j = i + 1; j < endPos; j++) {
+                        if (j < line.length) {
+                            currentSentence.push(line[j]);
+                        }
+                    }
+                    const sentence = currentSentence.join('').trim();
+                    if (sentence) {
+                        sentences.push(sentence);
+                    }
+                    currentSentence = [];
+                    i = endPos;
+                    continue;
+                }
+            }
+
+            i++;
+        }
+
+        // 注意：line已经包含换行符（因为splitlines(keepends=True)的效果），不需要额外添加
+
+        // 如果当前行以列表项或标题结尾，且下一行是空行或新列表项/标题，则切分
+        if (currentSentence.length > 0 && !isLastLine && preserveFormatting) {
+            const nextLine = lines[lineIdx + 1];
+            if (!nextLine.trim() || isMarkdownTitle(nextLine) || isListItem(nextLine)) {
+                const sentence = currentSentence.join('').trim();
+                if (sentence) {
+                    sentences.push(sentence);
+                }
+                currentSentence = [];
+            }
+        }
+    }
+
+    // 处理最后一句
+    if (currentSentence.length > 0) {
+        const sentence = currentSentence.join('').trim();
+        if (sentence) {
+            sentences.push(sentence);
+        }
+    }
+
+    // Python代码在添加句子时已经检查了if sentence，所以理论上不应该有空句子
+    // 但为了安全起见，我们仍然过滤空句子
+    return sentences.filter(s => s.length > 0);
+}
+
+/**
+ * 切分中文句子并跟踪行号
+ * @param text 要切分的文本
+ * @param preserveFormatting 是否保留格式（如Markdown标记）
+ * @returns 切分后的句子列表，每个元素为 [sentence, startLine, endLine]
+ */
+export function splitChineseSentencesWithLineNumbers(
+    text: string,
+    preserveFormatting: boolean = true
+): Array<[string, number, number]> {
+    if (!text || text.trim().length === 0) {
+        return [];
+    }
+
+    const sentences: Array<[string, number, number]> = [];
+    let currentSentence: string[] = [];
+    let sentenceStartLine = 1; // 当前句子开始的行号（从1开始）
+    let inQuote = false;
+    let quoteChar: string | null = null;
+
+    // 如果保留格式，使用splitlines并保留换行符（类似Python的splitlines(keepends=True)）
+    // Python的splitlines(keepends=True)的行为：
+    // - 每一行（除了最后一行）都会保留换行符
+    // - 如果文本以换行符结尾，最后一行也会保留换行符
+    // - 空行会被保留为'\n'
+    // - 如果文本以换行符结尾，split会产生一个最后的空字符串，需要特殊处理
+    const lines = preserveFormatting
+        ? (() => {
+            const parts = text.split(/\r?\n/);
+            const result: string[] = [];
+            const endsWithNewline = text.endsWith('\n') || text.endsWith('\r\n');
+
+            for (let i = 0; i < parts.length; i++) {
+                if (i < parts.length - 1) {
+                    // 不是最后一部分，添加换行符
+                    result.push(parts[i] + '\n');
+                } else {
+                    // 最后一部分
+                    if (endsWithNewline && parts[i] === '') {
+                        // 文本以换行符结尾且最后一部分是空字符串
+                        // 这表示最后有一个空行，应该保留为'\n'
+                        result.push('\n');
+                    } else {
+                        // 最后一部分非空，或者文本不以换行符结尾
+                        result.push(parts[i]);
+                    }
+                }
+            }
+            return result;
+        })()
+        : [text];
+
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+        const line = lines[lineIdx];
+        const currentLineNumber = lineIdx + 1; // 当前行号（从1开始）
+        const isLastLine = lineIdx === lines.length - 1;
+
+        // 检查是否是标题或列表项
+        const isTitle = preserveFormatting && isMarkdownTitle(line);
+        const isList = preserveFormatting && isListItem(line);
+        const isEmptyLine = !line.trim();
+
+        // 如果遇到空行，且当前句子不为空，则切分
+        if (isEmptyLine && currentSentence.length > 0) {
+            const sentence = currentSentence.join('').trim();
+            if (sentence) {
+                // 句子结束行是上一行（空行之前）
+                const endLine = currentLineNumber > 1 ? currentLineNumber - 1 : 1;
+                sentences.push([sentence, sentenceStartLine, endLine]);
+            }
+            currentSentence = [];
+            continue;
+        }
+
+        // 处理标题：标题本身作为一句，即使没有标点
+        if (isTitle) {
+            if (currentSentence.length > 0) {
+                const sentence = currentSentence.join('').trim();
+                if (sentence) {
+                    // 句子结束行是上一行（标题之前）
+                    const endLine = currentLineNumber > 1 ? currentLineNumber - 1 : 1;
+                    sentences.push([sentence, sentenceStartLine, endLine]);
+                }
+                currentSentence = [];
+            }
+            // 标题本身作为一句
+            const titleText = line.trimEnd();
+            if (titleText) {
+                sentences.push([titleText, currentLineNumber, currentLineNumber]);
+            }
+            continue;
+        }
+
+        // 处理列表项：列表项末尾可能没有标点，但遇到空行或新列表项时切分
+        if (isList) {
+            // 如果当前句子不为空，先保存
+            if (currentSentence.length > 0) {
+                const sentence = currentSentence.join('').trim();
+                if (sentence) {
+                    // 句子结束行是上一行（列表项之前）
+                    const endLine = currentLineNumber > 1 ? currentLineNumber - 1 : 1;
+                    sentences.push([sentence, sentenceStartLine, endLine]);
+                }
+                currentSentence = [];
+            }
+            sentenceStartLine = currentLineNumber;
+
+            // 检查列表项内容是否以句末标点结尾
+            const listContent = extractListContent(line);
+            if (listContent && endsWithSentencePunct(listContent)) {
+                const listText = line.trimEnd();
+                if (listText) {
+                    sentences.push([listText, currentLineNumber, currentLineNumber]);
+                }
+            } else {
+                // 列表项没有句末标点，先暂存，等待后续内容或空行
+                if (currentSentence.length === 0) {
+                    sentenceStartLine = currentLineNumber;
+                }
+                // line已经包含换行符（因为splitlines(keepends=True)的效果）
+                currentSentence.push(line);
+            }
+            continue;
+        }
+
+        // 普通文本行：逐字符处理
+        if (currentSentence.length === 0) {
+            sentenceStartLine = currentLineNumber;
+        }
+
+        let i = 0;
+        while (i < line.length) {
+            const char = line[i];
+            currentSentence.push(char);
+
+            // 处理引号状态
+            const quoteChars = ['“', '”', "‘", '’', '「', '」', '『', '』'];
+            if (quoteChars.includes(char)) {
+                if (!inQuote) {
+                    inQuote = true;
+                    quoteChar = char;
+                } else if (char === quoteChar ||
+                          (['“', '”'].includes(char) && ['“', '”'].includes(quoteChar || ''))) {
+                    inQuote = false;
+                    quoteChar = null;
+                }
+            }
+
+            // 检查是否是句子结尾（不在引号内）
+            if (!inQuote) {
+                const endPos = getSentenceEndPosInLine(line, i);
+                if (endPos > i) {
+                    // 收集从当前位置+1到句子结尾的所有字符（当前位置已添加）
+                    for (let j = i + 1; j < endPos; j++) {
+                        if (j < line.length) {
+                            currentSentence.push(line[j]);
+                        }
+                    }
+                    const sentence = currentSentence.join('').trim();
+                    if (sentence) {
+                        sentences.push([sentence, sentenceStartLine, currentLineNumber]);
+                    }
+                    currentSentence = [];
+                    i = endPos;
+                    continue;
+                }
+            }
+
+            i++;
+        }
+
+        // 注意：line已经包含换行符（因为splitlines(keepends=True)的效果），不需要额外添加
+
+        // 如果当前行以列表项或标题结尾，且下一行是空行或新列表项/标题，则切分
+        if (currentSentence.length > 0 && !isLastLine && preserveFormatting) {
+            const nextLine = lines[lineIdx + 1];
+            if (!nextLine.trim() || isMarkdownTitle(nextLine) || isListItem(nextLine)) {
+                const sentence = currentSentence.join('').trim();
+                if (sentence) {
+                    sentences.push([sentence, sentenceStartLine, currentLineNumber]);
+                }
+                currentSentence = [];
+            }
+        }
+    }
+
+    // 处理最后一句
+    if (currentSentence.length > 0) {
+        const sentence = currentSentence.join('').trim();
+        if (sentence) {
+            // 最后一句结束行是最后一行
+            const lastLineNumber = lines.length;
+            sentences.push([sentence, sentenceStartLine, lastLineNumber]);
+        }
+    }
+
+    // 过滤空句子
+    return sentences.filter(([s]) => s.length > 0);
+}

@@ -115,10 +115,11 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ### 3.4. 比较（diff）校对前后的文件差异
 
-在当前markdown或json界面，使用右键菜单`diff it with another file`，如果当前是markdown则有两种模式：
+在当前markdown或json界面，使用右键菜单`diff it with another file`，如果当前是markdown则有三种模式：
 
-1. 调用vscode内置的diff editor比较。校对面板“前后差异”按钮的功能与此相同。对于长文本，diff editor有段落无法对齐的问题。此时，可以通过加空行或删除空行来帮助对齐。
-2. 用jsdiff生成HTML形式的比较结果文件，类似带修改标记的Word文档。本模式还支持JSON文件，自动拼接JSON一级元素或`target`字段内容进行比较，支持每次比较的片段数量（默认0表示所有片段），生成多个有序的差异文件，避免过长文本无法渲染的问题；校对面板“生成差异文件”按钮的功能与此相同。
+1. 调用vscode内置的diff editor比较校对前后md文件。校对面板“前后差异”按钮的功能与此相同。对于长文本，diff editor有段落无法对齐的问题。此时，可以通过加空行或删除空行来帮助对齐。
+2. 用jsdiff比较两个文件，生成HTML形式的结果，类似带修改标记的Word文档。本模式还支持JSON文件，自动拼接JSON一级元素或`target`字段内容进行比较，支持每次比较的片段数量（默认0表示所有片段），生成多个有序的差异文件，避免过长文本无法渲染的问题；校对面板“生成差异文件”按钮的功能与此相同（**注意：这个按钮使用的也是JSON中的文本，而不是md中的文本**）。
+3. 逐句对齐两个md文件，生成一个有筛选和比较功能的HTML文件，从而可用于制作勘误表。校对面板“生成勘误表”按钮的功能与此相同。
 
 ### 3.5. 合并JSON，组织语境
 
@@ -295,6 +296,9 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
+### v1.1.0
+
+- 特性：`diff it with another file`命令增加功能，支持逐句对齐原始文档和校对后的文档，生成一个有筛选和比较功能的HTML文件，从而可用于制作勘误表
 
 ### v1.0.4
 

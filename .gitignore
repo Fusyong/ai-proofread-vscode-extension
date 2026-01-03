@@ -6,6 +6,7 @@
 # 依赖目录
 node_modules
 .parcel-cache
+__pycache__
 
 # 构建输出
 dist

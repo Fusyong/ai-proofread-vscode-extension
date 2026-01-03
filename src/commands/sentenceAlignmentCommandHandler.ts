@@ -1,154 +1,82 @@
 /**
- * 文件比较命令处理器
+ * 句子对齐命令处理器
  */
 
 import * as vscode from 'vscode';
-import * as path from 'path';
 import * as fs from 'fs';
-import { showFileDiff, jsDiffMarkdown, jsDiffJsonFiles } from '../differ';
-import { FilePathUtils, ErrorUtils } from '../utils';
-import { alignSentencesAnchor, getAlignmentStatistics, AlignmentOptions } from '../sentenceAligner';
+import * as path from 'path';
+import { alignSentencesAnchor, getAlignmentStatistics, AlignmentItem, AlignmentOptions } from '../sentenceAligner';
 import { splitChineseSentencesWithLineNumbers } from '../splitter';
+import { FilePathUtils, ErrorUtils } from '../utils';
 import { generateHtmlReport } from '../alignmentReportGenerator';
 
-export class FileCompareCommandHandler {
+export class SentenceAlignmentCommandHandler {
     /**
-     * 处理比较两个文件命令
+     * 处理句子对齐命令
      */
-    public async handleDiffItWithAnotherFileCommand(editor: vscode.TextEditor): Promise<void> {
-        const currentFile = editor.document.uri.fsPath;
-        const currentLanguageId = editor.document.languageId;
-
-        // 检查当前文件类型
-        if (currentLanguageId !== 'markdown' && currentLanguageId !== 'json') {
-            vscode.window.showInformationMessage('请打开一个markdown或JSON文件！');
-            return;
-        }
-
-        // 句子对齐功能只支持 markdown 文件
-        const isMarkdown = currentLanguageId === 'markdown';
-
-        // 根据文件类型决定比较方式
-        let diffMethod: string;
-        if (currentLanguageId === 'json') {
-            // JSON文件直接使用jsdiff方式
-            diffMethod = '生成jsDiff结果文件';
-        } else {
-            // markdown文件让用户选择比较方式
-            const options = isMarkdown
-                ? ['使用diff编辑器比较', '生成jsDiff结果文件', '对齐句子生成勘误表']
-                : ['使用diff编辑器比较', '生成jsDiff结果文件'];
-
-            const selectedMethod = await vscode.window.showQuickPick(
-                options,
+    public async handleAlignSentencesCommand(
+        editor: vscode.TextEditor | undefined,
+        context: vscode.ExtensionContext
+    ): Promise<void> {
+        try {
+            // 第一个提示界面：选择原文件
+            const proceedA = await vscode.window.showQuickPick(
+                [
+                    { label: '选择原文件', description: '选择需要进行对齐的原文件（文件A）' },
+                    { label: '取消', description: '取消操作' }
+                ],
                 {
-                    placeHolder: '请选择比较方式'
+                    placeHolder: '句子对齐：请选择原文件（文件A）',
+                    ignoreFocusOut: true
                 }
             );
 
-            if (!selectedMethod) {
+            if (!proceedA || proceedA.label === '取消') {
                 return;
             }
-            diffMethod = selectedMethod;
-        }
 
-        // 如果是句子对齐，使用不同的处理逻辑
-        if (diffMethod === '对齐句子生成勘误表') {
-            await this.handleSentenceAlignment(currentFile);
-            return;
-        }
+            // 让用户选择a文件（原文）
+            const fileUrisA = await vscode.window.showOpenDialog({
+                canSelectMany: false,
+                filters: {
+                    'Markdown文件': ['md', 'markdown'],
+                    'Text文件': ['txt'],
+                    '所有文件': ['*']
+                },
+                title: '选择原文件（文件A）'
+            });
 
-        // 根据文件类型设置文件过滤器
-        let filters: { [key: string]: string[] };
-        if (currentLanguageId === 'json') {
-            filters = {
-                'JSON文件': ['json'],
-                '所有文件': ['*']
-            };
-        } else {
-            filters = {
-                'Markdown文件': ['md', 'markdown'],
-                'Context文件': ['tex', 'lmtx'],
-                'Text文件': ['txt'],
-                'Tex文件': ['tex'],
-                '所有文件': ['*']
-            };
-        }
-
-        // 让用户选择第二个文件
-        const fileUris = await vscode.window.showOpenDialog({
-            canSelectMany: false,
-            filters: filters
-        });
-
-        if (!fileUris || fileUris.length === 0) {
-            return;
-        }
-
-        const anotherFile = fileUris[0].fsPath;
-        const anotherLanguageId = path.extname(anotherFile).toLowerCase() === '.json' ? 'json' : 'markdown';
-
-        // 如果两个文件都是JSON，提供特殊选项
-        let segmentCount = 0;
-        if (currentLanguageId === 'json' && anotherLanguageId === 'json') {
-            if (diffMethod === '生成jsDiff结果文件') {
-                // 让用户选择比较的片段数量
-                const segmentInput = await vscode.window.showInputBox({
-                    prompt: '请输入每次比较的片段数量（0表示所有片段）',
-                    value: '0',
-                    validateInput: (value: string) => {
-                        const num = parseInt(value);
-                        if (isNaN(num) || num < 0) {
-                            return '请输入有效的非负数字';
-                        }
-                        return null;
-                    }
-                });
-
-                if (segmentInput === undefined) {
-                    return;
-                }
-                segmentCount = parseInt(segmentInput);
+            if (!fileUrisA || fileUrisA.length === 0) {
+                return;
             }
-        }
 
-        try {
-            if (diffMethod === '使用diff编辑器比较') {
-                await showFileDiff(currentFile, anotherFile);
-            } else {
-                // 在第一个文件的位置生成jsdiff结果文件
-                const outputFile = FilePathUtils.getFilePath(currentFile, '.diff', '.html');
-                const title = `${path.basename(currentFile)} ↔ ${path.basename(anotherFile)}`;
+            const fileA = fileUrisA[0].fsPath;
 
-                if (currentLanguageId === 'json' && anotherLanguageId === 'json') {
-                    // 处理JSON文件比较
-                    await jsDiffJsonFiles(currentFile, anotherFile, outputFile, title, segmentCount);
-                } else {
-                    // 处理普通文件比较
-                    await jsDiffMarkdown(currentFile, anotherFile, outputFile, title);
+            // 第二个提示界面：选择修改后的文件
+            const proceedB = await vscode.window.showQuickPick(
+                [
+                    { label: '选择修改后的文件', description: '选择修改后的文件（文件B）' },
+                    { label: '取消', description: '取消操作' }
+                ],
+                {
+                    placeHolder: '句子对齐：请选择修改后的文件（文件B）',
+                    ignoreFocusOut: true
                 }
-            }
-        } catch (error) {
-            ErrorUtils.showError(error, '比较文件时出错：');
-        }
-    }
+            );
 
-    /**
-     * 处理句子对齐
-     */
-    private async handleSentenceAlignment(fileA: string): Promise<void> {
-        try {
+            if (!proceedB || proceedB.label === '取消') {
+                return;
+            }
+
             // 让用户选择b文件（校对后）
             const fileUrisB = await vscode.window.showOpenDialog({
                 canSelectMany: false,
                 filters: {
                     'Markdown文件': ['md', 'markdown'],
                     'Text文件': ['txt'],
-                    'Context文件': ['tex', 'lmtx'],
-                    'Tex文件': ['tex'],
                     '所有文件': ['*']
                 },
-                title: '选择修改后的文件（文件B）'
+                title: '选择校对后文件（文件B）'
             });
 
             if (!fileUrisB || fileUrisB.length === 0) {
@@ -258,4 +186,5 @@ export class FileCompareCommandHandler {
             ErrorUtils.showError(error, '对齐句子时出错：');
         }
     }
+
 }
