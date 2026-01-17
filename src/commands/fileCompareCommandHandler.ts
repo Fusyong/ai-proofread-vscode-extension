@@ -198,6 +198,9 @@ export class FileCompareCommandHandler {
                 title: '正在对齐句子...',
                 cancellable: false
             }, async (progress) => {
+                // 记录开始时间
+                const startTime = Date.now();
+
                 progress.report({ increment: 0, message: '读取文件...' });
 
                 // 读取文件内容
@@ -250,6 +253,10 @@ export class FileCompareCommandHandler {
 
                 progress.report({ increment: 90, message: '生成报告...' });
 
+                // 计算运行时间（秒）
+                const endTime = Date.now();
+                const runtime = (endTime - startTime) / 1000;
+
                 // 生成HTML报告
                 const stats = getAlignmentStatistics(alignment);
                 const titleA = path.basename(fileA);
@@ -257,9 +264,6 @@ export class FileCompareCommandHandler {
 
                 // 生成输出文件路径（与文件A同目录）
                 const outputFile = FilePathUtils.getFilePath(fileA, '.alignment', '.html');
-
-                // 计算运行时间（简化处理，使用0）
-                const runtime = 0;
 
                 // 生成HTML报告
                 generateHtmlReport(alignment, outputFile, titleA, titleB, options, runtime);

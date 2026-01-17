@@ -101,22 +101,44 @@ export function generateHtmlReport(
             background-color: #f0f0f0;
         }
         .alignment-table tr.match {
-            border-left: 4px solid #27ae60;
+            /* 完全匹配（相似度=1）不使用背景色和border-left */
         }
         .alignment-table tr.match.partial-match {
+            /* 部分匹配使用黄色border-left */
             border-left: 4px solid #f39c12;
+            background-color: inherit;
+        }
+        .alignment-table tr.match.partial-match:hover {
+            /* 部分匹配悬停时使用浅黄色背景 */
+            background-color: rgba(243, 156, 18, 0.3);
         }
         .alignment-table tr.movein {
-            border-left: 4px solid #f39c12;
+            border-left: 4px solid #3498db;
+        }
+        .alignment-table tr.movein:hover {
+            /* movein悬停时使用浅蓝色背景 */
+            background-color: rgba(52, 152, 219, 0.3);
         }
         .alignment-table tr.moveout {
-            border-left: 4px solid #f39c12;
+            border-left: 4px solid #9b59b6;
+        }
+        .alignment-table tr.moveout:hover {
+            /* moveout悬停时使用浅紫色背景 */
+            background-color: rgba(155, 89, 182, 0.3);
         }
         .alignment-table tr.delete {
             border-left: 4px solid #e74c3c;
         }
+        .alignment-table tr.delete:hover {
+            /* delete悬停时使用浅红色背景 */
+            background-color: rgba(231, 76, 60, 0.3);
+        }
         .alignment-table tr.insert {
-            border-left: 4px solid #3498db;
+            border-left: 4px solid #27ae60;
+        }
+        .alignment-table tr.insert:hover {
+            /* insert悬停时使用浅绿色背景 */
+            background-color: rgba(39, 174, 96, 0.3);
         }
         .col-index {
             width: 5%;

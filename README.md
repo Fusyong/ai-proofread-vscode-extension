@@ -296,7 +296,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
-### v1.1.1
+### v1.1.2
 
 - 优化勘误表功能中的句子分切、对齐算法，并允许设定相似度
 

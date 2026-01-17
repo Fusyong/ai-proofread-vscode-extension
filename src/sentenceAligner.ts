@@ -1013,10 +1013,16 @@ function mergeDeleteIntoMatch(
 }
 
 /**
- * 后处理：检测和处理句子移动，创建movein和moveout条目
+ * 后处理：检测和处理句子移动，创建movein和moveout条目（基于b侧id连续性分组）
  * @param alignment 对齐结果
- * @param movementThreshold 移动阈值，a_index和b_index差值超过此值认为是移动（默认2）
+ * @param movementThreshold 保留参数以兼容旧代码，但不再使用
  * @returns 处理后的对齐结果，包含movein和moveout条目
+ * 
+ * 算法：
+ * 1. 只检查b侧id（b_index）的连续性
+ * 2. 把所有连续条目构成的块区分出来
+ * 3. 把条目最少的块移动到大块之间，看是否能拼接为更大的块
+ * 4. 如此循环，直到无法再合并
  */
 function detectAndHandleMovements(
     alignment: AlignmentItem[],
@@ -1026,126 +1032,274 @@ function detectAndHandleMovements(
         return alignment;
     }
 
-    interface MatchItemInfo {
-        item: AlignmentItem;
-        aIdx: number;
-        bIdx: number;
-        pos: number;
+    /**
+     * 获取条目的b_index
+     */
+    function getBIndex(item: AlignmentItem): number | null {
+        if (item.b_indices && item.b_indices.length === 1) {
+            return item.b_indices[0];
+        } else if (item.b_index !== undefined && item.b_index !== null) {
+            return item.b_index;
+        }
+        return null;
     }
 
-    // 第一步：收集所有match项的索引信息，用于上下文判断
-    const matchItems: MatchItemInfo[] = [];
+    /**
+     * 获取条目的a_index
+     */
+    function getAIndex(item: AlignmentItem): number | null {
+        if (item.a_indices && item.a_indices.length === 1) {
+            return item.a_indices[0];
+        } else if (item.a_index !== undefined && item.a_index !== null) {
+            return item.a_index;
+        }
+        return null;
+    }
+
+    // 第一步：收集所有match项，只关注b侧id的连续性
+    type MatchItemTuple = [AlignmentItem, number, number];  // (item, pos, b_idx)
+    const matchItems: MatchItemTuple[] = [];
     for (let pos = 0; pos < alignment.length; pos++) {
         const item = alignment[pos];
         if (item.type === 'match') {
-            // 获取a_index和b_index
-            let aIdx: number | null = null;
-            let bIdx: number | null = null;
-
-            if (item.a_indices && item.a_indices.length === 1) {
-                aIdx = item.a_indices[0];
-            } else if (item.a_index !== undefined && item.a_index !== null) {
-                aIdx = item.a_index;
-            }
-
-            if (item.b_indices && item.b_indices.length === 1) {
-                bIdx = item.b_indices[0];
-            } else if (item.b_index !== undefined && item.b_index !== null) {
-                bIdx = item.b_index;
-            }
-
-            if (aIdx !== null && bIdx !== null) {
-                matchItems.push({ item, aIdx, bIdx, pos });
+            const bIdx = getBIndex(item);
+            if (bIdx !== null) {
+                matchItems.push([item, pos, bIdx]);
             }
         }
     }
 
-    // 第二步：检测移动的match项（考虑相邻关系）
-    interface Movement {
+    if (matchItems.length < 2) {
+        // 少于2个match项，无法判断移动
+        return alignment;
+    }
+
+    // 第二步：根据b_index的连续性分组为块，并预先计算每个块的min/max b_index
+    interface BlockMetadata {
+        minB: number;      // min_b（第一个b_index）
+        maxB: number;      // max_b（最后一个b_index）
+        firstPos: number;  // first_pos
+        lastPos: number;   // last_pos
+    }
+
+    function groupIntoBlocksWithMetadata(matchItems: MatchItemTuple[]): [MatchItemTuple[][], BlockMetadata[]] {
+        if (matchItems.length === 0) {
+            return [[], []];
+        }
+
+        // 按位置排序（只排序一次）
+        const sortedItems = [...matchItems].sort((a, b) => a[1] - b[1]);  // 按pos排序
+
+        const blocks: MatchItemTuple[][] = [];
+        const blockMetadata: BlockMetadata[] = [];
+        let currentBlock: MatchItemTuple[] = [sortedItems[0]];
+
+        for (let i = 1; i < sortedItems.length; i++) {
+            const [, prevPos, prevBIdx] = sortedItems[i - 1];
+            const [, currPos, currBIdx] = sortedItems[i];
+
+            // 检查b_index是否连续（差值=1）
+            if (currBIdx === prevBIdx + 1) {
+                // 连续，加入当前块
+                currentBlock.push(sortedItems[i]);
+            } else {
+                // 不连续，保存当前块并开始新块
+                if (currentBlock.length > 0) {
+                    // 由于块内b_index连续，min就是第一个，max就是最后一个
+                    const firstBIdx = currentBlock[0][2];
+                    const lastBIdx = currentBlock[currentBlock.length - 1][2];
+                    blocks.push(currentBlock);
+                    blockMetadata.push({
+                        minB: firstBIdx,  // min_b（第一个b_index）
+                        maxB: lastBIdx,   // max_b（最后一个b_index）
+                        firstPos: currentBlock[0][1],  // first_pos
+                        lastPos: currentBlock[currentBlock.length - 1][1]  // last_pos
+                    });
+                }
+                currentBlock = [sortedItems[i]];
+            }
+        }
+
+        // 添加最后一个块
+        if (currentBlock.length > 0) {
+            // 由于块内b_index连续，min就是第一个，max就是最后一个
+            const firstBIdx = currentBlock[0][2];
+            const lastBIdx = currentBlock[currentBlock.length - 1][2];
+            blocks.push(currentBlock);
+            blockMetadata.push({
+                minB: firstBIdx,  // min_b（第一个b_index）
+                maxB: lastBIdx,   // max_b（最后一个b_index）
+                firstPos: currentBlock[0][1],  // first_pos
+                lastPos: currentBlock[currentBlock.length - 1][1]  // last_pos
+            });
+        }
+
+        return [blocks, blockMetadata];
+    }
+
+    // 迭代优化：尝试移动小块来合并成更大的块，直到只剩下一个块
+    interface MovementInfo {
         original: AlignmentItem;
         moveout: AlignmentItem;
         movein: AlignmentItem;
+        insertInfo: {
+            moveout_insert_at_a?: number;
+            movein_insert_pos?: number;
+        };
     }
-    const movements: Movement[] = [];
+    const movements: MovementInfo[] = [];
+    const maxIterations = 100;  // 最多迭代100次，避免无限循环
+    let currentMatchItems = matchItems;
 
-    for (let idx = 0; idx < matchItems.length; idx++) {
-        const { item, aIdx, bIdx, pos } = matchItems[idx];
-        const movementDistance = Math.abs(bIdx - aIdx);
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+        const [blocks, blockMetadata] = groupIntoBlocksWithMetadata(currentMatchItems);
 
-        // 基本条件：索引差值必须超过阈值
-        if (movementDistance <= movementThreshold) {
-            continue;
+        if (blocks.length <= 1) {
+            // 只有一个块或没有块，所有条目已连贯
+            break;
         }
 
-        // 关键修复：检查相邻的match项，避免将相邻条目误判为移动
-        let isRealMovement = true;
+        // 找出所有最小的块（条目数最少），可能有多个相同大小的最小块
+        const minBlockSize = Math.min(...blocks.map(block => block.length));
+        const smallestBlocks: Array<[number, MatchItemTuple[]]> = [];
+        for (let idx = 0; idx < blocks.length; idx++) {
+            if (blocks[idx].length === minBlockSize) {
+                smallestBlocks.push([idx, blocks[idx]]);
+            }
+        }
 
-        // 检查前一个match项
-        if (idx > 0) {
-            const prev = matchItems[idx - 1];
-            // 检查在结果列表中的位置是否相邻或接近（中间最多间隔2个非match项）
-            if (pos - prev.pos <= 3) {
-                // 检查a_index和b_index是否连续或接近连续
-                const aIdxDiff = Math.abs(aIdx - prev.aIdx);
-                const bIdxDiff = Math.abs(bIdx - prev.bIdx);
-                // 如果a_index和b_index的差值都较小（<=2），说明是连续的，不应该判断为移动
-                if (aIdxDiff <= 2 && bIdxDiff <= 2) {
-                    isRealMovement = false;
+        // 尝试处理每个最小块，找到一个可以合并的
+        let merged = false;
+        for (const [smallestBlockIdx, smallestBlock] of smallestBlocks) {
+            // 使用预先计算的元数据
+            const { minB: smallestMinB, maxB: smallestMaxB, firstPos: smallestFirstPos, lastPos: smallestLastPos } = blockMetadata[smallestBlockIdx];
+
+            let bestInsertPos: number | null = null;
+            let bestMergedSize = 0;  // 合并后形成的连续块大小
+
+            // 首先检查是否可以插入到两个块之间（形成更大的连续块）
+            // 优化：使用预先计算的元数据，避免重复计算min/max
+            for (let prevBlockIdx = 0; prevBlockIdx < blockMetadata.length; prevBlockIdx++) {
+                if (prevBlockIdx === smallestBlockIdx) {
+                    continue;
+                }
+
+                const { minB: prevMinB, maxB: prevMaxB, firstPos: prevFirstPos, lastPos: prevLastPos } = blockMetadata[prevBlockIdx];
+
+                // 检查prev_block是否可以接在smallest之前
+                if (prevMaxB + 1 !== smallestMinB) {
+                    continue;
+                }
+
+                // 查找可以接在smallest之后的块
+                for (let nextBlockIdx = 0; nextBlockIdx < blockMetadata.length; nextBlockIdx++) {
+                    if (nextBlockIdx === smallestBlockIdx || nextBlockIdx === prevBlockIdx) {
+                        continue;
+                    }
+
+                    const { minB: nextMinB, maxB: nextMaxB, firstPos: nextFirstPos } = blockMetadata[nextBlockIdx];
+
+                    // 检查是否可以插入到prev_block和next_block之间
+                    if (smallestMaxB + 1 === nextMinB) {
+                        // 可以插入到两个块之间，形成更大的连续块
+                        const insertPos = nextFirstPos;
+                        const mergedSize = blocks[prevBlockIdx].length + smallestBlock.length + blocks[nextBlockIdx].length;
+                        if (mergedSize > bestMergedSize) {
+                            bestInsertPos = insertPos;
+                            bestMergedSize = mergedSize;
+                        }
+                    }
                 }
             }
-        }
 
-        // 检查后一个match项（如果前一个检查已经判断不是移动，则跳过）
-        if (isRealMovement && idx < matchItems.length - 1) {
-            const next = matchItems[idx + 1];
-            // 检查在结果列表中的位置是否相邻或接近
-            if (next.pos - pos <= 3) {
-                // 检查a_index和b_index是否连续或接近连续
-                const aIdxDiff = Math.abs(next.aIdx - aIdx);
-                const bIdxDiff = Math.abs(next.bIdx - bIdx);
-                // 如果a_index和b_index的差值都较小（<=2），说明是连续的，不应该判断为移动
-                if (aIdxDiff <= 2 && bIdxDiff <= 2) {
-                    isRealMovement = false;
+            // 如果没有找到可以插入到两个块之间的位置，检查是否可以与单个块合并
+            if (bestInsertPos === null) {
+                for (let targetBlockIdx = 0; targetBlockIdx < blockMetadata.length; targetBlockIdx++) {
+                    if (targetBlockIdx === smallestBlockIdx) {
+                        continue;
+                    }
+
+                    const { minB: targetMinB, maxB: targetMaxB, firstPos: targetFirstPos, lastPos: targetLastPos } = blockMetadata[targetBlockIdx];
+
+                    // 检查是否可以合并（最小块的b_index范围与目标块的b_index范围相邻）
+                    let mergedSize = 0;
+                    let insertPos: number | null = null;
+
+                    if (smallestMaxB + 1 === targetMinB) {
+                        // 最小块在目标块之前，可以合并
+                        insertPos = targetFirstPos;
+                        mergedSize = smallestBlock.length + blocks[targetBlockIdx].length;
+                    } else if (targetMaxB + 1 === smallestMinB) {
+                        // 最小块在目标块之后，可以合并
+                        insertPos = targetLastPos + 1;
+                        mergedSize = smallestBlock.length + blocks[targetBlockIdx].length;
+                    }
+
+                    if (insertPos !== null && mergedSize > bestMergedSize) {
+                        bestInsertPos = insertPos;
+                        bestMergedSize = mergedSize;
+                    }
                 }
             }
+
+            // 如果找到了最佳插入位置，创建movein/moveout
+            if (bestInsertPos !== null) {
+                for (const [item, pos, bIdx] of smallestBlock) {
+                    const aIdx = getAIndex(item);
+                    if (aIdx === null) {
+                        continue;
+                    }
+
+                    let originalSimilarity = item.similarity;
+                    if (originalSimilarity === undefined || originalSimilarity === null) {
+                        originalSimilarity = 0.0;
+                    } else {
+                        originalSimilarity = Number(originalSimilarity);
+                    }
+
+                    // 创建moveout和movein
+                    const moveoutItem: AlignmentItem = {
+                        ...item,
+                        type: 'moveout',
+                        similarity: originalSimilarity,
+                        a_index: aIdx,
+                        b_index: bIdx,
+                    };
+                    // 保留所有字段（已在展开运算符中处理）
+
+                    const moveinItem: AlignmentItem = {
+                        ...item,
+                        type: 'movein',
+                        similarity: originalSimilarity,
+                        a_index: aIdx,
+                        b_index: bIdx,
+                    };
+                    // 保留所有字段（已在展开运算符中处理）
+
+                    movements.push({
+                        original: item,
+                        moveout: moveoutItem,
+                        movein: moveinItem,
+                        insertInfo: {
+                            moveout_insert_at_a: aIdx,  // moveout在原位置
+                            movein_insert_pos: bestInsertPos,  // movein插入到目标位置
+                        }
+                    });
+                }
+
+                merged = true;
+                // 从match_items中移除已处理的项，以便下次迭代时不再处理
+                // 使用位置集合来快速查找和移除
+                const smallestPositions = new Set(smallestBlock.map(([, pos]) => pos));
+                currentMatchItems = currentMatchItems.filter(([, pos]) => !smallestPositions.has(pos));
+                // 找到一个可以合并的块后，跳出循环，继续下一次迭代
+                break;
+            }
         }
 
-        // 只有当确实是真正的移动时才创建movein和moveout条目
-        if (isRealMovement) {
-            // 检测到移动，创建movein和moveout条目
-            // 获取原始相似度值，确保正确传递
-            let originalSimilarity = item.similarity;
-            if (originalSimilarity === undefined || originalSimilarity === null) {
-                originalSimilarity = 0.0;
-            } else {
-                originalSimilarity = Number(originalSimilarity);
-            }
-
-            // moveout：在原位置（a_idx），显示原文和校对后（表示从这里移出）
-            const moveoutItem: AlignmentItem = {
-                type: 'moveout',
-                a: item.a,
-                b: item.b,  // 保留对侧句子
-                similarity: originalSimilarity,
-                a_index: aIdx,
-                b_index: bIdx,  // 保留b_index用于显示
-            };
-
-            // movein：在新位置（b_idx），显示原文和校对后（表示移入到这里）
-            const moveinItem: AlignmentItem = {
-                type: 'movein',
-                a: item.a,  // 保留对侧句子
-                b: item.b,
-                similarity: originalSimilarity,
-                a_index: aIdx,  // 保留a_index用于显示
-                b_index: bIdx,
-            };
-
-            movements.push({
-                original: item,
-                moveout: moveoutItem,
-                movein: moveinItem
-            });
+        if (!merged) {
+            // 无法再合并，退出循环
+            break;
         }
     }
 
@@ -1154,38 +1308,81 @@ function detectAndHandleMovements(
         return alignment;
     }
 
-    // 第二步：构建新的结果列表
-    // 对于移动的match项，替换为movein和moveout
-    // movein保持A的顺序（在原位置），moveout保持B的顺序（在新位置）
-
-    // 创建移动项的映射（使用Map存储原始项的引用）
-    const matchToMovements = new Map<AlignmentItem, [AlignmentItem, AlignmentItem]>();
+    // 第三步：构建新的结果列表
+    // 创建移动项的映射（使用WeakMap存储原始项的引用，但TypeScript中无法使用id()，改用Map）
+    const matchToMovements = new Map<AlignmentItem, [AlignmentItem, AlignmentItem, MovementInfo['insertInfo']]>();
     for (const movement of movements) {
-        matchToMovements.set(movement.original, [movement.moveout, movement.movein]);
+        matchToMovements.set(movement.original, [movement.moveout, movement.movein, movement.insertInfo]);
     }
 
-    // 第一遍：处理A的顺序（创建moveout项，在原位置）
+    // 第一遍：处理A的顺序（替换match项，并插入需要额外插入的moveout）
+    // 收集需要额外插入的moveout项（基于位置）
+    const moveoutInsertions: { [key: number]: AlignmentItem[] } = {};
+    for (const movement of movements) {
+        if ('moveout_insert_pos' in movement.insertInfo) {
+            // 需要额外插入的moveout（基于位置）
+            const pos = (movement.insertInfo as any).moveout_insert_pos;
+            if (!(pos in moveoutInsertions)) {
+                moveoutInsertions[pos] = [];
+            }
+            moveoutInsertions[pos].push(movement.moveout);
+        }
+    }
+
     const resultAOrder: AlignmentItem[] = [];
-    for (const item of alignment) {
+    for (let pos = 0; pos < alignment.length; pos++) {
+        const item = alignment[pos];
+        // 先插入需要在此位置插入的moveout项
+        if (pos in moveoutInsertions) {
+            resultAOrder.push(...moveoutInsertions[pos]);
+        }
+
+        // 然后处理当前项
         const movementsForItem = matchToMovements.get(item);
         if (movementsForItem) {
-            // 这是移动的match项，替换为moveout（在原位置）
-            const [moveout] = movementsForItem;
-            resultAOrder.push(moveout);
+            // 这是移动的match项，根据情况替换为moveout或movein
+            const [moveout, movein, insertInfo] = movementsForItem;
+            // 判断应该替换为什么：
+            // - 如果moveout_insert_pos存在，说明moveout需要插入到后面，当前位置应该替换为movein（a异常、b正常的情况）
+            // - 如果movein_insert_pos存在，说明movein需要插入到后面，当前位置应该替换为moveout（a正常、b异常的情况）
+            // - 如果都不存在，说明是双侧异常的情况，需要根据具体情况处理
+            if ('moveout_insert_pos' in insertInfo) {
+                // a异常、b正常：当前位置替换为movein
+                resultAOrder.push(movein);
+            } else if ('movein_insert_pos' in insertInfo) {
+                // a正常、b异常：当前位置替换为moveout
+                resultAOrder.push(moveout);
+            } else {
+                // 双侧异常的情况，默认替换为moveout（这种情况应该很少）
+                resultAOrder.push(moveout);
+            }
         } else {
             resultAOrder.push(item);
         }
     }
 
-    // 第二遍：处理B的顺序（插入movein项）
-    // 需要找到每个movein应该插入的位置（按b_index排序）
-    const moveinItems: Array<[number, AlignmentItem]> = [];
-    for (const movement of movements) {
-        const bIdx = movement.movein.b_index!;
-        moveinItems.push([bIdx, movement.movein]);
+    // 处理末尾插入的moveout
+    if (alignment.length in moveoutInsertions) {
+        resultAOrder.push(...moveoutInsertions[alignment.length]);
     }
 
-    // 按b_index排序movein项
+    // 第二遍：处理B的顺序（插入movein项）
+    // 收集所有需要额外插入的movein项（已经在当前位置的movein不需要再插入）
+    type MoveinItemTuple = [number, AlignmentItem, boolean];  // (insert_pos或b_index, movein, is_position_based)
+    const moveinItems: MoveinItemTuple[] = [];
+    for (const movement of movements) {
+        if ('movein_insert_pos' in movement.insertInfo) {
+            // 基于位置的插入（a正常、b异常的情况，movein需要插入到后面）
+            moveinItems.push([movement.insertInfo.movein_insert_pos!, movement.movein, true]);
+        } else if ('movein_insert_at_b' in movement.insertInfo) {
+            // 基于b_index的插入（这种情况应该很少，因为movein_insert_at_b通常意味着movein已经在当前位置）
+            // 但为了兼容性，仍然处理
+            moveinItems.push([(movement.insertInfo as any).movein_insert_at_b, movement.movein, false]);
+        }
+        // 如果只有moveout_insert_pos，说明movein已经在当前位置替换了，不需要再插入
+    }
+
+    // 按插入位置或b_index排序
     moveinItems.sort((a, b) => a[0] - b[0]);
 
     // 创建b_index到结果位置的映射
@@ -1201,24 +1398,30 @@ function detectAndHandleMovements(
         }
     }
 
-    // 优化：预先计算所有movein项应该插入的位置
-    // 使用字典存储：位置 -> [movein项列表]
+    // 预先计算所有movein项应该插入的位置
     const insertions: { [key: number]: AlignmentItem[] } = {};
 
-    for (const [bIdx, movein] of moveinItems) {
-        // 找到movein应该插入的位置
-        let insertPos = resultAOrder.length;  // 默认插入到末尾
+    for (const [insertKey, movein, isPositionBased] of moveinItems) {
+        let insertPos: number;
+        if (isPositionBased) {
+            // 基于位置的插入（直接使用位置）
+            insertPos = insertKey;
+        } else {
+            // 基于b_index的插入（需要查找位置）
+            const bIdx = insertKey;
+            insertPos = resultAOrder.length;  // 默认插入到末尾
 
-        if (bIdx > 0) {
-            let prevBIdx = bIdx - 1;
-            if (prevBIdx in bIdxToPos) {
-                insertPos = bIdxToPos[prevBIdx] + 1;
-            } else {
-                // 前一句也是新增的，继续往前找（最多查找10次，避免无限循环）
-                for (let pIdx = prevBIdx; pIdx >= Math.max(-1, prevBIdx - 10); pIdx--) {
-                    if (pIdx in bIdxToPos) {
-                        insertPos = bIdxToPos[pIdx] + 1;
-                        break;
+            if (bIdx > 0) {
+                let prevBIdx = bIdx - 1;
+                if (prevBIdx in bIdxToPos) {
+                    insertPos = bIdxToPos[prevBIdx] + 1;
+                } else {
+                    // 前一句也是新增的，继续往前找（最多查找10次，避免无限循环）
+                    for (let pIdx = prevBIdx; pIdx >= Math.max(-1, prevBIdx - 10); pIdx--) {
+                        if (pIdx in bIdxToPos) {
+                            insertPos = bIdxToPos[pIdx] + 1;
+                            break;
+                        }
                     }
                 }
             }
@@ -1231,7 +1434,7 @@ function detectAndHandleMovements(
         insertions[insertPos].push(movein);
     }
 
-    // 优化：一次性构建结果，避免频繁insert
+    // 一次性构建结果，避免频繁insert
     const result: AlignmentItem[] = [];
     for (let pos = 0; pos <= resultAOrder.length; pos++) {  // +1 用于处理末尾插入
         // 先添加当前位置的movein项（如果有）
