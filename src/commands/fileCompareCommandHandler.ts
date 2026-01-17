@@ -42,7 +42,7 @@ export class FileCompareCommandHandler {
             const selectedMethod = await vscode.window.showQuickPick(
                 options,
                 {
-                    placeHolder: '请选择比较方式'
+                    placeHolder: '请选择要比较的第二个方式'
                 }
             );
 
@@ -159,9 +159,33 @@ export class FileCompareCommandHandler {
 
             // 读取对齐参数配置
             const config = vscode.workspace.getConfiguration('ai-proofread.alignment');
+            const defaultSimilarityThreshold = config.get<number>('similarityThreshold', 0.6);
+
+            // 让用户输入相似度阈值
+            const similarityThresholdInput = await vscode.window.showInputBox({
+                prompt: '请输入相似度阈值（0-1之间，用于判断句子是否匹配）',
+                value: defaultSimilarityThreshold.toString(),
+                validateInput: (value: string) => {
+                    const num = parseFloat(value);
+                    if (isNaN(num)) {
+                        return '请输入有效的数字';
+                    }
+                    if (num < 0 || num > 1) {
+                        return '相似度阈值必须在0-1之间';
+                    }
+                    return null;
+                }
+            });
+
+            if (similarityThresholdInput === undefined) {
+                return; // 用户取消
+            }
+
+            const similarityThreshold = parseFloat(similarityThresholdInput);
+
             const options: AlignmentOptions = {
                 windowSize: config.get<number>('windowSize', 10),
-                similarityThreshold: config.get<number>('similarityThreshold', 0.6),
+                similarityThreshold: similarityThreshold,
                 ngramSize: config.get<number>('ngramSize', 2),
                 offset: config.get<number>('offset', 1),
                 maxWindowExpansion: config.get<number>('maxWindowExpansion', 3),

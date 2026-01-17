@@ -360,9 +360,17 @@ export function alignSentencesAnchor(
         ngramSize
     );
 
+    // 后处理：在一定的序号上下范围内处理不相邻的DELETE和INSERT
+    const resultAfterNonAdjacentRematch = rematchNonAdjacentDeleteInsert(
+        resultAfterRematch,
+        similarityThreshold,
+        ngramSize,
+        windowSize  // 使用窗口大小作为索引范围
+    );
+
     // 后处理：将单独的DELETE项合并到相邻的MATCH组中
     const resultAfterMerge = mergeDeleteIntoMatch(
-        resultAfterRematch,
+        resultAfterNonAdjacentRematch,
         ngramSize
     );
 
@@ -684,6 +692,189 @@ function rematchDeleteInsertSequences(
             // 其他类型的项（MATCH等），直接添加
             result.push(currentItem);
             i++;
+        }
+    }
+
+    return result;
+}
+
+/**
+ * 后处理：在一定的序号上下范围内处理不相邻的DELETE和INSERT
+ * @param alignment 对齐结果（已经过相邻匹配处理）
+ * @param similarityThreshold 相似度阈值
+ * @param ngramSize n-gram大小
+ * @param indexRange 序号范围，用于判断DELETE和INSERT是否在合理范围内（默认10）
+ * @returns 优化后的对齐结果
+ */
+function rematchNonAdjacentDeleteInsert(
+    alignment: AlignmentItem[],
+    similarityThreshold: number = 0.6,
+    ngramSize: number = 2,
+    indexRange: number = 10
+): AlignmentItem[] {
+    if (alignment.length === 0) {
+        return alignment;
+    }
+
+    // 第一步：收集所有的DELETE和INSERT项，记录它们在结果中的位置和原始索引
+    interface DeleteItem {
+        pos: number;
+        item: AlignmentItem;
+        aIdx: number;
+    }
+    interface InsertItem {
+        pos: number;
+        item: AlignmentItem;
+        bIdx: number;
+    }
+
+    const deleteItems: DeleteItem[] = [];
+    const insertItems: InsertItem[] = [];
+
+    for (let pos = 0; pos < alignment.length; pos++) {
+        const item = alignment[pos];
+        if (item.type === 'delete') {
+            // 获取a_index
+            let aIdx: number | null = null;
+            if (item.a_indices && item.a_indices.length === 1) {
+                aIdx = item.a_indices[0];
+            } else if (item.a_index !== undefined && item.a_index !== null) {
+                aIdx = item.a_index;
+            }
+
+            if (aIdx !== null) {
+                deleteItems.push({ pos, item, aIdx });
+            }
+        } else if (item.type === 'insert') {
+            // 获取b_index
+            let bIdx: number | null = null;
+            if (item.b_indices && item.b_indices.length === 1) {
+                bIdx = item.b_indices[0];
+            } else if (item.b_index !== undefined && item.b_index !== null) {
+                bIdx = item.b_index;
+            }
+
+            if (bIdx !== null) {
+                insertItems.push({ pos, item, bIdx });
+            }
+        }
+    }
+
+    if (deleteItems.length === 0 || insertItems.length === 0) {
+        // 没有DELETE或INSERT，直接返回
+        return alignment;
+    }
+
+    // 第二步：尝试匹配不相邻的DELETE和INSERT
+    // 对于每个DELETE，在一定的范围内查找INSERT
+    const matchedPairs: Array<[number, number, number]> = [];  // [(delete_pos, insert_pos, similarity), ...]
+    const deleteMatched = new Set<number>();  // 已匹配的DELETE位置
+    const insertMatched = new Set<number>();  // 已匹配的INSERT位置
+
+    // 按a_index排序DELETE项，按b_index排序INSERT项
+    deleteItems.sort((a, b) => a.aIdx - b.aIdx);
+    insertItems.sort((a, b) => a.bIdx - b.bIdx);
+
+    for (const { pos: dPos, item: dItem, aIdx: dAIdx } of deleteItems) {
+        if (deleteMatched.has(dPos)) {
+            continue;
+        }
+
+        let bestInsert: InsertItem | null = null;
+        let bestSimilarity = 0.0;
+        let bestInsertPos: number | null = null;
+
+        // 在INSERT项中查找匹配
+        for (const { pos: insPos, item: insItem, bIdx: insBIdx } of insertItems) {
+            if (insertMatched.has(insPos)) {
+                continue;
+            }
+
+            // 判断是否在合理范围内
+            // 方法1：基于原始索引的差值（如果a_index和b_index接近，说明可能是同一内容）
+            const indexDiff = Math.abs(dAIdx - insBIdx);
+
+            // 方法2：基于在结果列表中的位置差值
+            const positionDiff = Math.abs(dPos - insPos);
+
+            // 如果索引差值或位置差值在范围内，尝试匹配
+            if (indexDiff <= indexRange || positionDiff <= indexRange) {
+                // 计算相似度
+                if (dItem.a && insItem.b) {
+                    const sentA = normalizeSentence(dItem.a);
+                    const sentB = normalizeSentence(insItem.b);
+                    const similarity = jaccardSimilarity(sentA, sentB, ngramSize);
+
+                    if (similarity > bestSimilarity && similarity >= similarityThreshold) {
+                        bestSimilarity = similarity;
+                        bestInsert = { pos: insPos, item: insItem, bIdx: insBIdx };
+                        bestInsertPos = insPos;
+                    }
+                }
+            }
+        }
+
+        // 如果找到匹配，记录
+        if (bestInsert !== null && bestInsertPos !== null) {
+            matchedPairs.push([dPos, bestInsertPos, bestSimilarity]);
+            deleteMatched.add(dPos);
+            insertMatched.add(bestInsertPos);
+        }
+    }
+
+    // 如果没有找到匹配，直接返回原结果
+    if (matchedPairs.length === 0) {
+        return alignment;
+    }
+
+    // 第三步：构建新的结果列表，将匹配的DELETE和INSERT替换为MATCH
+    const result: AlignmentItem[] = [];
+    const deleteMatchedPositions = new Set(matchedPairs.map(([dPos]) => dPos));
+    const insertMatchedPositions = new Set(matchedPairs.map(([, insPos]) => insPos));
+    const matchItemsByDeletePos = new Map<number, AlignmentItem>();  // {delete_pos: match_item}
+
+    // 创建匹配项
+    for (const [dPos, insPos, sim] of matchedPairs) {
+        const dItem = alignment[dPos];
+        const insItem = alignment[insPos];
+
+        // 收集索引
+        let aIndices = dItem.a_indices || [];
+        if (aIndices.length === 0 && dItem.a_index !== undefined && dItem.a_index !== null) {
+            aIndices = [dItem.a_index];
+        }
+
+        let bIndices = insItem.b_indices || [];
+        if (bIndices.length === 0 && insItem.b_index !== undefined && insItem.b_index !== null) {
+            bIndices = [insItem.b_index];
+        }
+
+        const matchItem: AlignmentItem = {
+            type: 'match',
+            a: dItem.a,
+            b: insItem.b,
+            similarity: sim,
+            a_indices: aIndices,
+            b_indices: bIndices
+        };
+        matchItemsByDeletePos.set(dPos, matchItem);
+    }
+
+    // 构建结果：按照原始顺序，将匹配的项替换为MATCH
+    for (let pos = 0; pos < alignment.length; pos++) {
+        const item = alignment[pos];
+        if (deleteMatchedPositions.has(pos)) {
+            // DELETE已匹配，添加MATCH项
+            const matchItem = matchItemsByDeletePos.get(pos);
+            if (matchItem) {
+                result.push(matchItem);
+            }
+        } else if (insertMatchedPositions.has(pos)) {
+            // INSERT已匹配，跳过（MATCH项已在对应的DELETE位置添加）
+            // pass
+        } else {
+            // 其他项，直接添加
+            result.push(item);
         }
     }
 

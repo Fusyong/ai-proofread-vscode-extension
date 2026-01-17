@@ -158,20 +158,22 @@ export function generateHtmlReport(
         }
         .filter-controls {
             background-color: #ecf0f1;
-            padding: 15px;
+            padding: 12px 15px;
             border-radius: 5px;
             margin-bottom: 15px;
             border: 1px solid #bdc3c7;
             display: flex;
-            gap: 20px;
+            gap: 15px;
             align-items: center;
             flex-wrap: nowrap;
+            overflow-x: auto;
         }
         .filter-group {
             display: flex;
             align-items: center;
-            gap: 10px;
-            flex: 0 1 auto;
+            gap: 8px;
+            flex: 0 0 auto;
+            white-space: nowrap;
         }
         .filter-label {
             font-weight: bold;
@@ -183,18 +185,19 @@ export function generateHtmlReport(
         }
         .filter-buttons {
             display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+            gap: 6px;
+            flex-wrap: nowrap;
         }
         .filter-btn {
-            padding: 6px 12px;
+            padding: 5px 10px;
             border: 2px solid #3498db;
             background-color: white;
             color: #3498db;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             transition: all 0.2s;
+            white-space: nowrap;
         }
         .filter-btn:hover {
             background-color: #e8f4f8;
@@ -205,31 +208,33 @@ export function generateHtmlReport(
         }
         .filter-input-group {
             display: flex;
-            gap: 10px;
+            gap: 6px;
             align-items: center;
+            white-space: nowrap;
         }
         .filter-input {
-            padding: 6px 10px;
+            padding: 5px 8px;
             border: 1px solid #bdc3c7;
             border-radius: 4px;
-            font-size: 13px;
-            width: 80px;
+            font-size: 12px;
+            width: 70px;
         }
         .filter-search {
-            padding: 6px 10px;
+            padding: 5px 10px;
             border: 1px solid #bdc3c7;
             border-radius: 4px;
-            font-size: 13px;
-            width: 200px;
+            font-size: 12px;
+            width: 180px;
         }
         .filter-reset {
-            padding: 6px 15px;
+            padding: 5px 12px;
             background-color: #e74c3c;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
+            white-space: nowrap;
         }
         .filter-reset:hover {
             background-color: #c0392b;

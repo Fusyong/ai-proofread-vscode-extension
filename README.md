@@ -296,6 +296,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
+### v1.1.1
+
+- 优化勘误表功能中的句子分切、对齐算法，并允许设定相似度
+
 ### v1.1.0
 
 - 特性：`diff it with another file`命令增加功能，支持逐句对齐原始文档和校对后的文档，生成一个有筛选和比较功能的HTML文件，从而可用于制作勘误表
