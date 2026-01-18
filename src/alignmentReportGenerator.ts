@@ -188,6 +188,11 @@ export function generateHtmlReport(
             margin-bottom: 15px;
             border: 1px solid #bdc3c7;
             display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .filter-row {
+            display: flex;
             gap: 15px;
             align-items: center;
             flex-wrap: nowrap;
@@ -249,7 +254,10 @@ export function generateHtmlReport(
             border: 1px solid #bdc3c7;
             border-radius: 4px;
             font-size: 12px;
-            width: 180px;
+        }
+        .filter-search.index-filter {
+            flex: 1;
+            min-width: 200px;
         }
         .filter-reset {
             padding: 5px 12px;
@@ -271,6 +279,10 @@ export function generateHtmlReport(
             margin-bottom: 10px;
         }
         .alignment-table tr.hidden {
+            display: none;
+        }
+        .alignment-table th.hidden,
+        .alignment-table td.hidden {
             display: none;
         }
         .stats-summary {
@@ -321,68 +333,51 @@ export function generateHtmlReport(
         <p style="font-size: 13px; margin-top: 10px; opacity: 0.9;">
             相似度算法: ${algorithmName} | 阈值: ${threshold.toFixed(2)} | N-gram大小: ${ngramSize} | 运行时间: ${runtime.toFixed(2)}秒
         </p>
-    </div>
-    <div class="stats-summary">
-    <div class="stats-grid">
-            <h3>统计信息：</h3>
-            <div class="stat-item">
-                <div class="stat-value">${stats.match}</div>
-                <div class="stat-label">MATCH</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">${stats.delete}</div>
-                <div class="stat-label">DELETE</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">${stats.insert}</div>
-                <div class="stat-label">INSERT</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">${stats.movein}</div>
-                <div class="stat-label">MOVEIN</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">${stats.moveout}</div>
-                <div class="stat-label">MOVEOUT</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">${stats.total}</div>
-                <div class="stat-label">总计</div>
-            </div>
-        </div>
+        <p style="font-size: 13px; margin-top: 8px; opacity: 0.9;">
+            统计信息: MATCH ${stats.match} | DELETE ${stats.delete} | INSERT ${stats.insert} | MOVEIN ${stats.movein} | MOVEOUT ${stats.moveout} | 总计 ${stats.total}
+        </p>
     </div>
     <div class="alignment-results">
         <div class="filter-controls">
-            <div class="filter-group">
-                <label class="filter-label">类型：</label>
-                <div class="filter-buttons">
-                    <button class="filter-btn active" data-type="all" onclick="filterByType('all')">全部</button>
-                    <button class="filter-btn active" data-type="match" onclick="filterByType('match')">MATCH</button>
-                    <button class="filter-btn active" data-type="movein" onclick="filterByType('movein')">MOVEIN</button>
-                    <button class="filter-btn active" data-type="moveout" onclick="filterByType('moveout')">MOVEOUT</button>
-                    <button class="filter-btn active" data-type="delete" onclick="filterByType('delete')">DELETE</button>
-                    <button class="filter-btn active" data-type="insert" onclick="filterByType('insert')">INSERT</button>
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label class="filter-label">类型：</label>
+                    <div class="filter-buttons">
+                        <button class="filter-btn active" data-type="all" onclick="filterByType('all')">全部</button>
+                        <button class="filter-btn active" data-type="match" onclick="filterByType('match')">MATCH</button>
+                        <button class="filter-btn active" data-type="movein" onclick="filterByType('movein')">MOVEIN</button>
+                        <button class="filter-btn active" data-type="moveout" onclick="filterByType('moveout')">MOVEOUT</button>
+                        <button class="filter-btn active" data-type="delete" onclick="filterByType('delete')">DELETE</button>
+                        <button class="filter-btn active" data-type="insert" onclick="filterByType('insert')">INSERT</button>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">列显示：</label>
+                    <div class="filter-buttons">
+                        <button class="filter-btn active" data-col="type" onclick="toggleColumn('type')">类型</button>
+                        <button class="filter-btn active" data-col="similarity" onclick="toggleColumn('similarity')">相似度</button>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">相似度：</label>
+                    <div class="filter-input-group">
+                        <input type="number" class="filter-input" id="minSimilarity" placeholder="最小" min="0" max="1" step="0.01" oninput="applyFilters()">
+                        <span>至</span>
+                        <input type="number" class="filter-input" id="maxSimilarity" placeholder="最大" min="0" max="1" step="0.01" oninput="applyFilters()">
+                    </div>
                 </div>
             </div>
-            <div class="filter-group">
-                <label class="filter-label">相似度：</label>
-                <div class="filter-input-group">
-                    <input type="number" class="filter-input" id="minSimilarity" placeholder="最小值" min="0" max="1" step="0.01" oninput="applyFilters()">
-                    <span>至</span>
-                    <input type="number" class="filter-input" id="maxSimilarity" placeholder="最大值" min="0" max="1" step="0.01" oninput="applyFilters()">
+            <div class="filter-row">
+                <div class="filter-group" style="flex: 1;">
+                    <label class="filter-label">序号：</label>
+                    <input type="text" class="filter-search index-filter" id="indexFilter" placeholder="如: 1,2,5-20,80-" oninput="applyFilters()" title="支持格式: 1,2,5-20,80- (注意：筛选条件无法保存)">
                 </div>
-            </div>
-            <div class="filter-group">
-                <label class="filter-label">序号：</label>
-                <div class="filter-input-group">
-                    <input type="text" class="filter-search" id="indexFilter" placeholder="如: 1,2,5-20,80-" oninput="applyFilters()" title="支持格式: 1,2,5-20,80- (注意：筛选条件无法保存)">
-                </div>
-            </div>
-            <div class="filter-group">
-                <label class="filter-label">搜索：</label>
-                <div class="filter-input-group">
-                    <input type="text" class="filter-search" id="searchText" placeholder="在左右文本中搜索..." oninput="applyFilters()" title="注意：筛选条件无法保存">
-                    <button class="filter-reset" onclick="resetFilters()">重置</button>
+                <div class="filter-group" style="flex: 1;">
+                    <label class="filter-label">搜索：</label>
+                    <div class="filter-input-group" style="flex: 1;">
+                        <input type="text" class="filter-search" id="searchText" placeholder="在左右文本中搜索..." oninput="applyFilters()" title="注意：筛选条件无法保存" style="flex: 1;">
+                        <button class="filter-reset" onclick="resetFilters()">重置</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -485,6 +480,12 @@ export function generateHtmlReport(
             'insert': true
         };
 
+        // 列显示状态
+        const columnVisibility = {
+            'type': true,
+            'similarity': true
+        };
+
         // 类型筛选函数
         function filterByType(type) {
             const btn = document.querySelector(\`[data-type="\${type}"]\`);
@@ -511,6 +512,33 @@ export function generateHtmlReport(
             }
 
             applyFilters();
+        }
+
+        // 切换列显示/隐藏
+        function toggleColumn(columnName) {
+            const btn = document.querySelector(\`[data-col="\${columnName}"]\`);
+            columnVisibility[columnName] = !columnVisibility[columnName];
+            btn.classList.toggle('active', columnVisibility[columnName]);
+
+            // 切换表头
+            const headerCells = document.querySelectorAll(\`.alignment-table thead th.col-\${columnName}\`);
+            headerCells.forEach(cell => {
+                if (columnVisibility[columnName]) {
+                    cell.classList.remove('hidden');
+                } else {
+                    cell.classList.add('hidden');
+                }
+            });
+
+            // 切换表格数据列
+            const dataCells = document.querySelectorAll(\`.alignment-table tbody td.col-\${columnName}\`);
+            dataCells.forEach(cell => {
+                if (columnVisibility[columnName]) {
+                    cell.classList.remove('hidden');
+                } else {
+                    cell.classList.add('hidden');
+                }
+            });
         }
 
         // 解析序号筛选字符串
@@ -642,6 +670,16 @@ export function generateHtmlReport(
             document.getElementById('maxSimilarity').value = '';
             document.getElementById('searchText').value = '';
             document.getElementById('indexFilter').value = '';
+
+            // 重置列显示状态
+            columnVisibility['type'] = true;
+            columnVisibility['similarity'] = true;
+            document.querySelectorAll('.filter-btn[data-col]').forEach(btn => {
+                btn.classList.add('active');
+            });
+            document.querySelectorAll('.alignment-table th.hidden, .alignment-table td.hidden').forEach(cell => {
+                cell.classList.remove('hidden');
+            });
 
             applyFilters();
         }

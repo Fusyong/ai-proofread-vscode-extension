@@ -295,10 +295,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
-### v1.1.3
+### v1.1.4
 
 - 优化：优化勘误表相关的句子分切、对齐算法，并允许设定相似度
-- 特性：勘误表增加序号筛选功能，即可挑出保留的条目
+- 特性：勘误表增加多种筛选功能，如序号筛选，即可挑出要保留的条目
 
 ### v1.1.0
 
