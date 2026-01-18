@@ -13,3 +13,7 @@ test
 *.psd
 *.vsix
 *.proofread.log
+__pycache__/**
+**/__pycache__/**
+*.pyc
+*.py

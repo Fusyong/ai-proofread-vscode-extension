@@ -45,6 +45,9 @@ export function generateHtmlReport(
     const ngramSize = options.ngramSize || 2;
     const algorithmName = '锚点算法';
 
+    // 获取统计信息
+    const stats = getAlignmentStatistics(alignment);
+
     const htmlLines: string[] = [];
 
     // HTML头部
@@ -239,7 +242,7 @@ export function generateHtmlReport(
             border: 1px solid #bdc3c7;
             border-radius: 4px;
             font-size: 12px;
-            width: 70px;
+            width: 40px;
         }
         .filter-search {
             padding: 5px 10px;
@@ -270,6 +273,44 @@ export function generateHtmlReport(
         .alignment-table tr.hidden {
             display: none;
         }
+        .stats-summary {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #bdc3c7;
+        }
+        .stats-summary h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+        .stats-grid {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: flex-start;
+            overflow-x: auto;
+        }
+        .stat-item {
+            text-align: center;
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+            line-height: 1.2;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 4px;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/diff@7.0.0/dist/diff.min.js"></script>
 </head>
@@ -281,10 +322,39 @@ export function generateHtmlReport(
             相似度算法: ${algorithmName} | 阈值: ${threshold.toFixed(2)} | N-gram大小: ${ngramSize} | 运行时间: ${runtime.toFixed(2)}秒
         </p>
     </div>
+    <div class="stats-summary">
+    <div class="stats-grid">
+            <h3>统计信息：</h3>
+            <div class="stat-item">
+                <div class="stat-value">${stats.match}</div>
+                <div class="stat-label">MATCH</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${stats.delete}</div>
+                <div class="stat-label">DELETE</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${stats.insert}</div>
+                <div class="stat-label">INSERT</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${stats.movein}</div>
+                <div class="stat-label">MOVEIN</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${stats.moveout}</div>
+                <div class="stat-label">MOVEOUT</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${stats.total}</div>
+                <div class="stat-label">总计</div>
+            </div>
+        </div>
+    </div>
     <div class="alignment-results">
         <div class="filter-controls">
             <div class="filter-group">
-                <label class="filter-label">类型筛选：</label>
+                <label class="filter-label">类型：</label>
                 <div class="filter-buttons">
                     <button class="filter-btn active" data-type="all" onclick="filterByType('all')">全部</button>
                     <button class="filter-btn active" data-type="match" onclick="filterByType('match')">MATCH</button>
@@ -295,7 +365,7 @@ export function generateHtmlReport(
                 </div>
             </div>
             <div class="filter-group">
-                <label class="filter-label">相似度范围：</label>
+                <label class="filter-label">相似度：</label>
                 <div class="filter-input-group">
                     <input type="number" class="filter-input" id="minSimilarity" placeholder="最小值" min="0" max="1" step="0.01" oninput="applyFilters()">
                     <span>至</span>
@@ -303,10 +373,16 @@ export function generateHtmlReport(
                 </div>
             </div>
             <div class="filter-group">
-                <label class="filter-label">文本搜索：</label>
+                <label class="filter-label">序号：</label>
                 <div class="filter-input-group">
-                    <input type="text" class="filter-search" id="searchText" placeholder="在左右文本中搜索..." oninput="applyFilters()">
-                    <button class="filter-reset" onclick="resetFilters()">重置筛选</button>
+                    <input type="text" class="filter-search" id="indexFilter" placeholder="如: 1,2,5-20,80-" oninput="applyFilters()" title="支持格式: 1,2,5-20,80- (注意：筛选条件无法保存)">
+                </div>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">搜索：</label>
+                <div class="filter-input-group">
+                    <input type="text" class="filter-search" id="searchText" placeholder="在左右文本中搜索..." oninput="applyFilters()" title="注意：筛选条件无法保存">
+                    <button class="filter-reset" onclick="resetFilters()">重置</button>
                 </div>
             </div>
         </div>
@@ -328,8 +404,9 @@ export function generateHtmlReport(
         const itemType = item.type;
         const similarityValue = item.similarity ?? 0;
         const similarityText = similarityValue > 0 ? similarityValue.toFixed(2) : '';
-        const needsDiff = (itemType === 'match' && similarityValue < 1.0) || itemType === 'movein' || itemType === 'moveout';
-        const needsDiffAttr = needsDiff ? 'data-needs-diff="true"' : '';
+        // 所有条目无条件应用jsdiff，不管相似度如何
+        const needsDiff = true;
+        const needsDiffAttr = 'data-needs-diff="true"';
         const partialMatchClass = (itemType === 'match' && similarityValue < 1.0) ? ' partial-match' : '';
 
         const textA = item.a || '';
@@ -436,12 +513,74 @@ export function generateHtmlReport(
             applyFilters();
         }
 
+        // 解析序号筛选字符串
+        // 支持格式: 1,2,5-20,80- (单个数字、范围、起始范围)
+        // 忽略空格，兼容中英文逗号
+        function parseIndexFilter(filterText, maxRowIndex) {
+            if (!filterText || !filterText.trim()) {
+                return null; // 空字符串表示不过滤
+            }
+
+            const allowedIndices = new Set();
+            // 替换中文逗号为英文逗号，去除所有空格
+            const normalized = filterText.replace(/，/g, ',').replace(/\s+/g, '');
+
+            if (!normalized) {
+                return null;
+            }
+
+            // 按逗号分割
+            const parts = normalized.split(',');
+
+            for (const part of parts) {
+                if (!part) continue; // 跳过空部分
+
+                if (part.includes('-')) {
+                    // 处理范围
+                    const rangeParts = part.split('-');
+                    if (rangeParts.length === 2) {
+                        const start = rangeParts[0] ? parseInt(rangeParts[0], 10) : null;
+                        const end = rangeParts[1] ? parseInt(rangeParts[1], 10) : null;
+
+                        if (start !== null && !isNaN(start)) {
+                            if (end !== null && !isNaN(end)) {
+                                // 完整范围: 5-20
+                                for (let i = start; i <= end && i <= maxRowIndex; i++) {
+                                    if (i >= 1) {
+                                        allowedIndices.add(i);
+                                    }
+                                }
+                            } else {
+                                // 起始范围: 80- (从80开始到最大序号)
+                                for (let i = start; i <= maxRowIndex; i++) {
+                                    if (i >= 1) {
+                                        allowedIndices.add(i);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // 单个数字
+                    const num = parseInt(part, 10);
+                    if (!isNaN(num) && num >= 1 && num <= maxRowIndex) {
+                        allowedIndices.add(num);
+                    }
+                }
+            }
+
+            return allowedIndices.size > 0 ? allowedIndices : null;
+        }
+
         // 应用所有筛选条件
         function applyFilters() {
             const rows = document.querySelectorAll('.alignment-table tbody tr');
+            const maxRowIndex = rows.length;
             const minSimilarity = parseFloat(document.getElementById('minSimilarity').value) || 0;
             const maxSimilarity = parseFloat(document.getElementById('maxSimilarity').value) || 1;
             const searchText = document.getElementById('searchText').value.toLowerCase().trim();
+            const indexFilterText = document.getElementById('indexFilter').value.trim();
+            const allowedIndices = parseIndexFilter(indexFilterText, maxRowIndex);
 
             let visibleCount = 0;
 
@@ -456,7 +595,11 @@ export function generateHtmlReport(
                 const textB = (row.dataset.textB || '').toLowerCase();
                 const textMatch = !searchText || textA.includes(searchText) || textB.includes(searchText);
 
-                const shouldShow = typeMatch && similarityMatch && textMatch;
+                // 序号筛选
+                const rowIdx = parseInt(row.dataset.rowIdx, 10);
+                const indexMatch = !allowedIndices || allowedIndices.has(rowIdx);
+
+                const shouldShow = typeMatch && similarityMatch && textMatch && indexMatch;
 
                 if (shouldShow) {
                     row.classList.remove('hidden');
@@ -498,6 +641,7 @@ export function generateHtmlReport(
             document.getElementById('minSimilarity').value = '';
             document.getElementById('maxSimilarity').value = '';
             document.getElementById('searchText').value = '';
+            document.getElementById('indexFilter').value = '';
 
             applyFilters();
         }
@@ -712,7 +856,37 @@ export function generateHtmlReport(
             });
         }
 
+        // 显示筛选条件无法保存的提示
+        function showFilterWarning() {
+            // 检查是否已经显示过提示
+            if (sessionStorage.getItem('filterWarningShown') === 'true') {
+                return;
+            }
+
+            // 创建提示元素
+            const warningDiv = document.createElement('div');
+            warningDiv.style.cssText = 'background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-bottom: 15px; color: #856404; font-size: 13px;';
+            warningDiv.innerHTML = '<strong>提示：</strong>筛选条件（类型、相似度、序号、文本搜索）无法保存，刷新页面后会重置。如需保存筛选结果，请使用浏览器的打印功能或截图。';
+
+            // 添加关闭按钮
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '×';
+            closeBtn.style.cssText = 'float: right; background: none; border: none; font-size: 20px; cursor: pointer; color: #856404; padding: 0 5px;';
+            closeBtn.onclick = function() {
+                warningDiv.remove();
+                sessionStorage.setItem('filterWarningShown', 'true');
+            };
+            warningDiv.insertBefore(closeBtn, warningDiv.firstChild);
+
+            // 插入到筛选控件之前
+            const filterControls = document.querySelector('.filter-controls');
+            if (filterControls && filterControls.parentNode) {
+                filterControls.parentNode.insertBefore(warningDiv, filterControls);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            showFilterWarning();
             applyFilters();
             initialRender();
             setupIntersectionObserver();

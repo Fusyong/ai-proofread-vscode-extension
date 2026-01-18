@@ -13,12 +13,6 @@ import { DocumentConvertCommandHandler } from './commands/documentConvertCommand
 import { UtilityCommandHandler } from './commands/utilityCommandHandler';
 
 
-
-
-
-
-
-
 export function activate(context: vscode.ExtensionContext) {
     const logger = Logger.getInstance();
     const configManager = ConfigManager.getInstance();

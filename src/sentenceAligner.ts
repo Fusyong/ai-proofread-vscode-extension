@@ -23,6 +23,8 @@ export interface AlignmentItem {
     b_line_number?: number;        // 校对后行号
     a_line_numbers?: number[];     // 原文行号列表
     b_line_numbers?: number[];     // 校对后行号列表
+    original_b_index?: number | null;  // 原始b_index（用于moveout项）
+    original_a_index?: number | null;  // 原始a_index（用于movein项）
 }
 
 /**
@@ -643,6 +645,65 @@ function rematchDeleteInsertSequences(
                         a_indices: aIndices,
                         b_indices: bIndices
                     };
+
+                    // 保留行号信息（从原始项中收集）
+                    const aLineNumbers: number[] = [];
+                    const bLineNumbers: number[] = [];
+
+                    // 处理A侧行号
+                    if (dCandidate.originalItems) {
+                        // 合并的句子，从多个原始项中收集行号
+                        for (const origItem of dCandidate.originalItems) {
+                            if (origItem) {
+                                if (origItem.a_line_numbers && origItem.a_line_numbers.length > 0) {
+                                    aLineNumbers.push(...origItem.a_line_numbers);
+                                } else if (origItem.a_line_number !== undefined && origItem.a_line_number !== null) {
+                                    aLineNumbers.push(origItem.a_line_number);
+                                }
+                            }
+                        }
+                    } else if (dCandidate.originalItem) {
+                        // 单个句子
+                        const origItem = dCandidate.originalItem;
+                        if (origItem.a_line_numbers && origItem.a_line_numbers.length > 0) {
+                            aLineNumbers.push(...origItem.a_line_numbers);
+                        } else if (origItem.a_line_number !== undefined && origItem.a_line_number !== null) {
+                            aLineNumbers.push(origItem.a_line_number);
+                        }
+                    }
+
+                    // 处理B侧行号
+                    if (insCandidate.originalItems) {
+                        // 合并的句子，从多个原始项中收集行号
+                        for (const origItem of insCandidate.originalItems) {
+                            if (origItem) {
+                                if (origItem.b_line_numbers && origItem.b_line_numbers.length > 0) {
+                                    bLineNumbers.push(...origItem.b_line_numbers);
+                                } else if (origItem.b_line_number !== undefined && origItem.b_line_number !== null) {
+                                    bLineNumbers.push(origItem.b_line_number);
+                                }
+                            }
+                        }
+                    } else if (insCandidate.originalItem) {
+                        // 单个句子
+                        const origItem = insCandidate.originalItem;
+                        if (origItem.b_line_numbers && origItem.b_line_numbers.length > 0) {
+                            bLineNumbers.push(...origItem.b_line_numbers);
+                        } else if (origItem.b_line_number !== undefined && origItem.b_line_number !== null) {
+                            bLineNumbers.push(origItem.b_line_number);
+                        }
+                    }
+
+                    // 设置行号信息
+                    if (aLineNumbers.length > 0) {
+                        matchItem.a_line_numbers = aLineNumbers;
+                        matchItem.a_line_number = aLineNumbers[0];
+                    }
+                    if (bLineNumbers.length > 0) {
+                        matchItem.b_line_numbers = bLineNumbers;
+                        matchItem.b_line_number = bLineNumbers[0];
+                    }
+
                     // 使用第一个DELETE索引作为键
                     matchItems.push([dCandidate.indices[0], matchItem]);
                 }
@@ -857,6 +918,26 @@ function rematchNonAdjacentDeleteInsert(
             a_indices: aIndices,
             b_indices: bIndices
         };
+
+        // 保留行号信息
+        // 处理A侧行号
+        if (dItem.a_line_numbers && dItem.a_line_numbers.length > 0) {
+            matchItem.a_line_numbers = dItem.a_line_numbers;
+            matchItem.a_line_number = dItem.a_line_numbers[0];
+        } else if (dItem.a_line_number !== undefined && dItem.a_line_number !== null) {
+            matchItem.a_line_number = dItem.a_line_number;
+            matchItem.a_line_numbers = [dItem.a_line_number];
+        }
+
+        // 处理B侧行号
+        if (insItem.b_line_numbers && insItem.b_line_numbers.length > 0) {
+            matchItem.b_line_numbers = insItem.b_line_numbers;
+            matchItem.b_line_number = insItem.b_line_numbers[0];
+        } else if (insItem.b_line_number !== undefined && insItem.b_line_number !== null) {
+            matchItem.b_line_number = insItem.b_line_number;
+            matchItem.b_line_numbers = [insItem.b_line_number];
+        }
+
         matchItemsByDeletePos.set(dPos, matchItem);
     }
 
@@ -1258,14 +1339,17 @@ function detectAndHandleMovements(
                     }
 
                     // 创建moveout和movein
+                    // 显式保留所有字段，并添加original_b_index和original_a_index
                     const moveoutItem: AlignmentItem = {
                         ...item,
                         type: 'moveout',
                         similarity: originalSimilarity,
                         a_index: aIdx,
                         b_index: bIdx,
+                        original_b_index: bIdx,  // 保留原始b_index
+                        // 显式保留所有字段：a_indices, b_indices, a_line_number, b_line_number, 
+                        // a_line_numbers, b_line_numbers, id, group_id, offset等（通过展开运算符保留）
                     };
-                    // 保留所有字段（已在展开运算符中处理）
 
                     const moveinItem: AlignmentItem = {
                         ...item,
@@ -1273,8 +1357,10 @@ function detectAndHandleMovements(
                         similarity: originalSimilarity,
                         a_index: aIdx,
                         b_index: bIdx,
+                        original_a_index: aIdx,  // 保留原始a_index
+                        // 显式保留所有字段：a_indices, b_indices, a_line_number, b_line_number, 
+                        // a_line_numbers, b_line_numbers, id, group_id, offset等（通过展开运算符保留）
                     };
-                    // 保留所有字段（已在展开运算符中处理）
 
                     movements.push({
                         original: item,

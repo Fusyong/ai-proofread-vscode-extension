@@ -279,10 +279,9 @@ Additionally, you can also set your own prompts for other text processing scenar
     6. [ ] 按小学语文教材标准加拼音
 2. [ ] 取消接口改变的警示
 3. [ ] 数字连续性检查（以Python库相应模块为基础）
-4. [ ] 整理勘误表（以Python库句子对齐模块为基础）
-    1. [ ] 勘误条目聚类
-    2. [ ] 增量样例校对模式
-    3.  [ ] 人工核准界面
+4. [ ] 句子对齐/勘误表
+    1. [ ] 支持筛选条目（填入条目id）
+    2. [ ] 显示空行
 5.  [ ] 引文核对（以Python库相应模块为基础）
 6.  [ ] 自主发现、提出、校对知识性问题
     1.  [ ] 检索、核对互联网资料
@@ -296,9 +295,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
-### v1.1.2
+### v1.1.3
 
-- 优化勘误表功能中的句子分切、对齐算法，并允许设定相似度
+- 优化：优化勘误表相关的句子分切、对齐算法，并允许设定相似度
+- 特性：勘误表增加序号筛选功能，即可挑出保留的条目
 
 ### v1.1.0
 

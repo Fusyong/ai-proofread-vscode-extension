@@ -42,7 +42,7 @@ export class FileCompareCommandHandler {
             const selectedMethod = await vscode.window.showQuickPick(
                 options,
                 {
-                    placeHolder: '请选择要比较的第二个方式'
+                    placeHolder: '请选择比较方式'
                 }
             );
 
