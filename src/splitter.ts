@@ -644,3 +644,416 @@ export function splitMarkdownByLengthWithParagraphsAsContext(
 
     return result;
 }
+
+/**
+ * 判断是否是Markdown标题（内部辅助函数）
+ */
+function _isMarkdownTitle(line: string): boolean {
+    const stripped = line.trimStart();
+    if (!stripped.startsWith('#')) {
+        return false;
+    }
+    // 检查格式：## 标题 或 ## 标题（多个#号）
+    if (stripped.length > 1) {
+        return stripped[1] === ' ' || stripped[1] === '#';
+    }
+    return false;
+}
+
+/**
+ * 判断是否是列表项（内部辅助函数）
+ */
+function _isListItem(line: string): boolean {
+    const stripped = line.trimStart();
+    // 无序列表：-、*、+
+    if (stripped.startsWith('- ') || stripped.startsWith('* ') || stripped.startsWith('+ ')) {
+        return true;
+    }
+    // 有序列表：数字. 或 数字)
+    if (/^\d+[.)]\s+/.test(stripped)) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * 简化版中文句子切分（按句末标点和连续换行切分，保留所有空白字符）
+ *
+ * 适用于纯文本，不考虑Markdown格式、列表项等特殊情况。
+ * 连续两个以上的换行（忽略行中空白字符）视作句子结束标记。
+ *
+ * 基于Python版本的split_chinese_sentences_simple实现
+ *
+ * @param text 要切分的文本
+ * @returns 切分后的句子列表（保留所有空白字符，包括首尾换行符）
+ */
+export function splitChineseSentencesSimple(text: string): string[] {
+    // 规范化换行符：将 \r\n 转换为 \n，与Python版本保持一致
+    // Python的open()在文本模式下会自动规范化换行符
+    text = text.replace(/\r\n/g, '\n');
+
+    // 句子结尾模式：
+    // 1. 句末标点：[。！？…]+ 后面可能跟引号、括号等
+    // 2. 英文句号（需要排除小数点等情况）
+    // 3. 连续两个以上的换行（忽略行中空白字符）：\n[\s]*\n+
+    const pattern = /([。！？…]+[""'')）\]】」』]*)|([.!?]+[""'')）\]】」』]*)|(\n(\s*\n)+)/g;
+
+    const sentences: string[] = [];
+    let lastEnd = 0;
+    let match: RegExpExecArray | null;
+
+    // 重置正则表达式的lastIndex
+    pattern.lastIndex = 0;
+
+    while ((match = pattern.exec(text)) !== null) {
+        let endPos = match.index + match[0].length;
+
+        // 检查是否是小数点或缩写
+        if (match[2]) {  // 英文标点
+            // 检查前后是否是数字
+            if (endPos > 0 && endPos <= text.length && text[endPos - 1] === '.') {
+                const prevPos = match.index - 1;
+                if (prevPos >= 0 && /\d/.test(text[prevPos])) {
+                    if (endPos < text.length && /\d/.test(text[endPos])) {
+                        continue;  // 是小数点，跳过
+                    }
+                }
+            }
+        }
+
+        // 如果是句末标点（不是连续换行），需要包含后面的换行符和空行
+        // 直到遇到下一个非空行
+        if (match[1] || match[2]) {  // 句末标点
+            // 从endPos开始，查找后面的换行符和空行
+            let trailingPos = endPos;
+            while (trailingPos < text.length) {
+                // 检查当前位置是否是换行符
+                if (text[trailingPos] === '\n') {
+                    trailingPos += 1;
+                    // 检查后面是否还有空行（只包含空白字符的行）
+                    // 查找下一个换行符或非空白字符
+                    let tempPos = trailingPos;
+                    while (tempPos < text.length && (text[tempPos] === ' ' || text[tempPos] === '\t')) {
+                        tempPos += 1;
+                    }
+                    // 如果下一个字符是换行符，说明是空行，继续包含
+                    if (tempPos < text.length && text[tempPos] === '\n') {
+                        trailingPos = tempPos + 1;
+                        continue;
+                    }
+                    // 如果下一个字符是非空白字符，停止
+                    else if (tempPos < text.length && !/\s/.test(text[tempPos])) {
+                        break;
+                    }
+                    // 如果到达文本末尾，停止
+                    else {
+                        break;
+                    }
+                } else {
+                    // 不是换行符，停止
+                    break;
+                }
+            }
+
+            // 更新endPos以包含后面的换行符和空行
+            endPos = trailingPos;
+        }
+
+        // 提取句子
+        const sentence = text.substring(lastEnd, endPos);
+        if (sentence) {
+            sentences.push(sentence);
+        }
+        lastEnd = endPos;
+    }
+
+    // 添加最后一句
+    if (lastEnd < text.length) {
+        const sentence = text.substring(lastEnd);
+        if (sentence) {
+            sentences.push(sentence);
+        }
+    }
+
+    return sentences;
+}
+
+/**
+ * 将中文文本按句子切分（基于splitChineseSentencesSimple，增加Markdown特殊处理）
+ *
+ * 特殊处理：
+ * 1. Markdown标题作为一句，不切分
+ * 2. Markdown列表中每一项作为一句，不切分
+ * 3. 其他文本使用splitChineseSentencesSimple进行切分
+ * 4. 保留所有空白字符（包括首尾换行符），任何时候都保持原文不变
+ *
+ * 基于Python版本的split_chinese_sentences实现
+ *
+ * @param text 要切分的文本
+ * @returns 切分后的句子列表（保留所有空白字符）
+ */
+export function splitChineseSentences(text: string): string[] {
+    if (!text || !text.trim()) {
+        return [];
+    }
+
+    // 规范化换行符：将 \r\n 转换为 \n，与Python版本保持一致
+    // Python的open()在文本模式下会自动规范化换行符
+    text = text.replace(/\r\n/g, '\n');
+
+    // 按行分割，保留换行符（类似Python的splitlines(keepends=True)）
+    // 注意：需要保留原始的换行符（\r\n 或 \n），不能统一转换为 \n
+    const lines: string[] = [];
+    let lastIndex = 0;
+    const newlineRegex = /\r?\n/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = newlineRegex.exec(text)) !== null) {
+        // 提取从上次位置到当前换行符之前的内容，加上换行符本身
+        const lineContent = text.substring(lastIndex, match.index + match[0].length);
+        lines.push(lineContent);
+        lastIndex = match.index + match[0].length;
+    }
+    // 添加最后一部分（如果有）
+    if (lastIndex < text.length) {
+        lines.push(text.substring(lastIndex));
+    } else if (text.endsWith('\n') || text.endsWith('\r\n')) {
+        // 如果文本以换行符结尾，且最后一部分是空字符串
+        // 这表示最后有一个空行，应该保留
+        const lastNewline = text.match(/\r?\n$/);
+        if (lastNewline && lastIndex === text.length - lastNewline[0].length) {
+            lines.push(lastNewline[0]);
+        }
+    }
+
+    const sentences: string[] = [];
+    const currentText: string[] = [];  // 收集普通文本（非标题、非列表项）
+
+    let i = 0;
+    while (i < lines.length) {
+        const line = lines[i];
+        const isTitle = _isMarkdownTitle(line);
+        const isListItem = _isListItem(line);
+
+        // 处理Markdown标题：作为完整句子
+        if (isTitle) {
+            // 先处理之前收集的普通文本
+            if (currentText.length > 0) {
+                const textChunk = currentText.join('');
+                const chunkSentences = splitChineseSentencesSimple(textChunk);
+                sentences.push(...chunkSentences);
+                currentText.length = 0;  // 清空数组
+            }
+
+            // 标题本身作为一句，包含后面的空行
+            let titleSentence = line;
+            // 检查后面的行是否是空行，如果是，包含它们
+            let j = i + 1;
+            while (j < lines.length) {
+                const nextLine = lines[j];
+                // 如果下一行是空行（只包含空白字符），包含它
+                if (!nextLine.trim()) {
+                    titleSentence += nextLine;
+                    j += 1;
+                } else {
+                    // 遇到非空行，停止
+                    break;
+                }
+            }
+            sentences.push(titleSentence);
+            i = j;  // 跳过已处理的行
+            continue;
+        }
+
+        // 处理Markdown列表项：每一项作为完整句子
+        if (isListItem) {
+            // 先处理之前收集的普通文本
+            if (currentText.length > 0) {
+                const textChunk = currentText.join('');
+                const chunkSentences = splitChineseSentencesSimple(textChunk);
+                sentences.push(...chunkSentences);
+                currentText.length = 0;  // 清空数组
+            }
+
+            // 列表项本身作为一句，包含后面的空行
+            let listSentence = line;
+            // 检查后面的行是否是空行，如果是，包含它们
+            let j = i + 1;
+            while (j < lines.length) {
+                const nextLine = lines[j];
+                // 如果下一行是空行（只包含空白字符），包含它
+                if (!nextLine.trim()) {
+                    listSentence += nextLine;
+                    j += 1;
+                } else {
+                    // 遇到非空行，停止
+                    break;
+                }
+            }
+            sentences.push(listSentence);
+            i = j;  // 跳过已处理的行
+            continue;
+        }
+
+        // 普通文本：收集起来，稍后统一处理
+        currentText.push(line);
+        i += 1;
+    }
+
+    // 处理剩余的普通文本
+    if (currentText.length > 0) {
+        const textChunk = currentText.join('');
+        const chunkSentences = splitChineseSentencesSimple(textChunk);
+        sentences.push(...chunkSentences);
+    }
+
+    // 过滤空句子（但保留只包含空白字符的句子）
+    return sentences.filter(s => s.length > 0);
+}
+
+/**
+ * 在原文中查找每个句子的位置并计算行号（内部辅助函数）
+ *
+ * @param text 原始文本
+ * @param sentences 句子列表（按顺序）
+ * @returns (sentence, start_line, end_line) 列表
+ */
+function _findSentencePositions(text: string, sentences: string[]): Array<[string, number, number]> {
+    // 预先计算每行的起始字符位置
+    const lines = text.split('\n');
+    const lineStarts: number[] = [];  // 每行在原始文本中的起始字符位置
+    let currentPos = 0;
+    for (const line of lines) {
+        lineStarts.push(currentPos);
+        currentPos += line.length + 1;  // +1 for the newline character
+    }
+
+    const result: Array<[string, number, number]> = [];
+    let searchStart = 0;  // 从上次找到的位置之后开始搜索
+
+    for (const sentence of sentences) {
+        if (!sentence) {
+            continue;
+        }
+
+        // 在原文中查找句子（从searchStart位置开始）
+        let pos = text.indexOf(sentence, searchStart);
+
+        if (pos === -1) {
+            // 如果找不到，尝试去掉首尾空白字符再找
+            const sentenceStripped = sentence.trim();
+            if (sentenceStripped) {
+                pos = text.indexOf(sentenceStripped, searchStart);
+                if (pos !== -1) {
+                    // 找到了，但需要调整位置以匹配原始句子（包含空白字符）
+                    // 这里简化处理：使用找到的位置
+                }
+            }
+        }
+
+        if (pos === -1) {
+            // 仍然找不到，跳过这个句子（或使用默认值）
+            // 为了健壮性，尝试在整个文本中查找
+            pos = text.indexOf(sentence);
+            if (pos === -1) {
+                // 如果还是找不到，跳过
+                continue;
+            }
+        }
+
+        // 计算行号：使用句子中第一个非空白字符的位置
+        // 因为句子开头可能包含前导换行符，这些换行符属于前一行
+        // 我们需要找到句子中第一个非空白字符来确定句子真正开始的行号
+        let sentenceStartPos = pos;
+        for (let i = 0; i < sentence.length; i++) {
+            const char = sentence[i];
+            if (!/\s/.test(char)) {  // 找到第一个非空白字符
+                sentenceStartPos = pos + i;
+                break;
+            }
+        }
+        // 如果句子只包含空白字符，sentenceStartPos 保持为 pos（句子开头的位置）
+
+        // 计算行号
+        const startLine = _getLineNumber(sentenceStartPos, lineStarts);
+        const endPos = pos + sentence.length - 1;
+        const endLine = _getLineNumber(endPos, lineStarts);
+
+        result.push([sentence, startLine, endLine]);
+
+        // 更新搜索起始位置（从当前句子结束位置之后开始）
+        searchStart = pos + sentence.length;
+    }
+
+    return result;
+}
+
+/**
+ * 根据字符位置和行起始位置列表，计算行号（从1开始）（内部辅助函数）
+ *
+ * @param pos 字符位置
+ * @param lineStarts 每行在原始文本中的起始字符位置列表
+ * @returns 行号（从1开始）
+ */
+function _getLineNumber(pos: number, lineStarts: number[]): number {
+    if (lineStarts.length === 0) {
+        return 1;
+    }
+
+    // 使用二分查找
+    let left = 0;
+    let right = lineStarts.length - 1;
+    let lineNumber = 1;
+
+    while (left <= right) {
+        const mid = Math.floor((left + right) / 2);
+        if (lineStarts[mid] <= pos) {
+            lineNumber = mid + 1;
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+
+    return lineNumber;
+}
+
+/**
+ * 将中文文本按句子切分，并跟踪每个句子在原始文本中的行号
+ *
+ * 基于 splitChineseSentences 或 splitChineseSentencesSimple 的结果，
+ * 然后在原文中查找每个句子的位置并计算行号。
+ *
+ * 基于Python版本的split_chinese_sentences_with_line_numbers实现
+ *
+ * @param text 要切分的文本
+ * @param useSimple 是否使用 splitChineseSentencesSimple，默认false
+ * @returns 切分后的句子列表，每个元素为 [sentence, startLine, endLine]
+ *   - sentence: 切分后的句子文本
+ *   - startLine: 句子开头所在的行号（从1开始）
+ *   - endLine: 句子结尾所在的行号（从1开始）
+ */
+export function splitChineseSentencesWithLineNumbers(
+    text: string,
+    useSimple: boolean = false
+): Array<[string, number, number]> {
+    if (!text || !text.trim()) {
+        return [];
+    }
+
+    // 规范化换行符：将 \r\n 转换为 \n，与Python版本保持一致
+    // Python的open()在文本模式下会自动规范化换行符
+    text = text.replace(/\r\n/g, '\n');
+
+    // 先获取句子列表
+    const sentences = useSimple
+        ? splitChineseSentencesSimple(text)
+        : splitChineseSentences(text);
+
+    if (sentences.length === 0) {
+        return [];
+    }
+
+    // 在原文中查找每个句子的位置并计算行号
+    return _findSentencePositions(text, sentences);
+}

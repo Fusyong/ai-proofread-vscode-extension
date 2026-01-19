@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.0.4",
+  "version": "1.1.4",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -286,6 +286,42 @@
             ]
           },
           "description": "设置给大语言模型提示词及其名称。提示词中应对要处理的目标文本（target）、参考资料（reference）、上下文（context）进行说明。也可以通过命令管理"
+        },
+        "ai-proofread.alignment.windowSize": {
+          "order": 37,
+          "type": "number",
+          "default": 10,
+          "description": "句子对齐（生成勘误表）：搜索窗口大小（锚点左右各N个句子）"
+        },
+        "ai-proofread.alignment.similarityThreshold": {
+          "order": 38,
+          "type": "number",
+          "default": 0.6,
+          "description": "句子对齐（生成勘误表）：相似度阈值（0-1）"
+        },
+        "ai-proofread.alignment.ngramSize": {
+          "order": 39,
+          "type": "number",
+          "default": 2,
+          "description": "句子对齐（生成勘误表）：N-gram大小"
+        },
+        "ai-proofread.alignment.offset": {
+          "order": 40,
+          "type": "number",
+          "default": 1,
+          "description": "句子对齐（生成勘误表）：锚点偏移量"
+        },
+        "ai-proofread.alignment.maxWindowExpansion": {
+          "order": 41,
+          "type": "number",
+          "default": 3,
+          "description": "句子对齐（生成勘误表）：最大窗口扩展倍数"
+        },
+        "ai-proofread.alignment.consecutiveFailThreshold": {
+          "order": 42,
+          "type": "number",
+          "default": 3,
+          "description": "句子对齐（生成勘误表）：连续失败阈值"
         }
       }
     },
