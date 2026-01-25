@@ -319,6 +319,11 @@ export class ProofreadCommandHandler {
                 }
             );
 
+            // 如果用户按 ESC 取消，立即中断
+            if (contextBuildMethod === undefined) {
+                return;
+            }
+
             let contextLevel: string | undefined;
             let beforeParagraphs: number = 0;
             let afterParagraphs: number = 0;
@@ -336,6 +341,10 @@ export class ProofreadCommandHandler {
                         return null;
                     }
                 });
+                // 如果用户按 ESC 取消，立即中断
+                if (beforeParagraphsInput === undefined) {
+                    return;
+                }
                 beforeParagraphs = beforeParagraphsInput ? parseInt(beforeParagraphsInput) : 2;
 
                 // 选择后文增加段落个数
@@ -350,6 +359,10 @@ export class ProofreadCommandHandler {
                         return null;
                     }
                 });
+                // 如果用户按 ESC 取消，立即中断
+                if (afterParagraphsInput === undefined) {
+                    return;
+                }
                 afterParagraphs = afterParagraphsInput ? parseInt(afterParagraphsInput) : 2;
 
                 contextLevel = '前后增加段落';
@@ -362,6 +375,10 @@ export class ProofreadCommandHandler {
                         ignoreFocusOut: true
                     }
                 );
+                // 如果用户按 ESC 取消，立即中断
+                if (contextLevel === undefined) {
+                    return;
+                }
             }
 
             let referenceFile: vscode.Uri[] | undefined;
@@ -373,6 +390,11 @@ export class ProofreadCommandHandler {
                 }
             );
 
+            // 如果用户按 ESC 取消，立即中断
+            if (useReference === undefined) {
+                return;
+            }
+
             if (useReference === '是') {
                 referenceFile = await vscode.window.showOpenDialog({
                     canSelectFiles: true,
@@ -383,6 +405,10 @@ export class ProofreadCommandHandler {
                     },
                     title: '选择参考文件'
                 });
+                // 如果用户按 ESC 取消，立即中断
+                if (referenceFile === undefined) {
+                    return;
+                }
             }
 
             // 让用户选择温度
@@ -397,6 +423,32 @@ export class ProofreadCommandHandler {
                     return null;
                 }
             });
+
+            // 如果用户按 ESC 取消，立即中断
+            if (userTemperature === undefined) {
+                return;
+            }
+
+            // 让用户选择提示词重复模式
+            const repetitionMode = await vscode.window.showQuickPick([
+                { label: '不重复', value: 'none', description: '不启用重复功能' },
+                { label: '仅重复目标文档', value: 'target', description: '只重复要修改的目标文档（target）' },
+                { label: '重复完整对话流程', value: 'all', description: '重复参考文档、语境和目标文档（完整对话流程）' }
+            ], {
+                placeHolder: '选择提示词重复模式（基于谷歌研究：重复提示词可提高准确度）',
+                ignoreFocusOut: true
+            });
+
+            // 如果用户按 ESC 取消，立即中断
+            if (repetitionMode === undefined) {
+                return;
+            }
+
+            // 获取用户选择的重复模式（不更新配置，仅作为参数传递）
+            let actualRepetitionMode: 'none' | 'target' | 'all' | undefined = undefined;
+            if (repetitionMode) {
+                actualRepetitionMode = repetitionMode.value as 'none' | 'target' | 'all';
+            }
 
             // 显示进度
             await vscode.window.withProgress({
@@ -416,7 +468,10 @@ export class ProofreadCommandHandler {
                         contextLevel,
                         referenceFile,
                         userTemperature ? parseFloat(userTemperature) : undefined,
-                        context
+                        context,
+                        beforeParagraphs,
+                        afterParagraphs,
+                        actualRepetitionMode
                     );
 
                     if (result) {
@@ -429,10 +484,28 @@ export class ProofreadCommandHandler {
                             }
                         }
 
+                        // 获取提示词重复模式显示名称（用于日志）
+                        const repetitionModeNames: { [key: string]: string } = {
+                            'none': '不重复',
+                            'target': '仅重复目标文档',
+                            'all': '重复完整对话流程'
+                        };
+                        const repetitionModeName = actualRepetitionMode ? repetitionModeNames[actualRepetitionMode] || '不重复' : '不重复';
+
                         // 把参数和校对结果写入日志文件
                         const logFilePath = FilePathUtils.getFilePath(editor.document.uri.fsPath, '.proofread', '.log');
-                        const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${result}\n${'='.repeat(50)}\n\n`;
+                        const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nRepetitionMode: ${repetitionModeName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${result}\n${'='.repeat(50)}\n\n`;
                         fs.appendFileSync(logFilePath, logMessage, 'utf8');
+
+                        // 显示信息消息，包含提示词重复模式（使用键名）
+                        const targetLength = editor.document.getText(editor.selection).length;
+                        const contextLength = contextLevel ? '已设置' : 'none';
+                        const referenceLength = referenceFile ? '已设置' : 'none';
+                        vscode.window.showInformationMessage(
+                            `校对完成 | Prompt: ${currentPromptName.slice(0, 4)}… Rep. ${actualRepetitionMode} | ` +
+                            `Context: R. ${referenceLength}, C. ${contextLength}, T. ${targetLength} | ` +
+                            `Model: ${platform}, ${model}, T. ${userTemperature}`
+                        );
 
                         // 显示差异
                         await showDiff(context, originalText, result, fileExt, false);
@@ -478,19 +551,34 @@ export class ProofreadCommandHandler {
         const retryDelay = config.get<number>('proofread.retryDelay', 1);
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
 
+        // 获取提示词重复模式
+        const repetitionMode = config.get<string>('proofread.promptRepetition', 'none');
+        const repetitionModeNames: { [key: string]: string } = {
+            'none': '不重复',
+            'target': '仅重复目标文档（target）',
+            'all': '重复完整对话流程（reference + context + target）'
+        };
+        const repetitionModeName = repetitionModeNames[repetitionMode] || '不重复';
+
+        // 计算token和费用提示
+        let tokenWarning = '';
+        if (repetitionMode === 'target') {
+            tokenWarning = '   ⚠️ 提示词重复模式：仅重复target，会增加输入token';
+        } else if (repetitionMode === 'all') {
+            tokenWarning = '   ⚠️ 提示词重复模式：重复完整对话流程，会增加输入token';
+        }
+
         // 构建确认信息
         const confirmationMessage = [
             '📋 JSON批量校对参数确认',
-            '',
-            '🚨 【重要提示】时间单位已更新为"秒"！',
-            '    • 重试间隔时间、API请求超时时间的单位已从"毫秒"改为"秒"',
-            '    • 请检查您的配置是否正确（建议：重试间隔1秒，超时50秒）',
             '',
             `📁 文件路径: ${jsonFilePath}`,
             `📊 总段落数: ${totalCount}`,
             '',
             '⚙️ 处理参数:',
             `   • 提示词: ${currentPromptName}`,
+            `   • 提示词重复模式: ${repetitionModeName}`,
+            tokenWarning ? tokenWarning : '',
             `   • 平台: ${platform}`,
             `   • 模型: ${model}`,
             `   • 温度: ${temperature}`,
@@ -501,13 +589,14 @@ export class ProofreadCommandHandler {
             `   • 重试次数: ${retryAttempts} 次`,
             '',
             '⚠️ 注意事项:',
-            '   • 批处理中使用思考/推理模型极易出错并形成高计费！！！',
+            '   • 💰批处理中使用思考/推理模型极易出错并形成高计费！！！',
+            '   • 💰重复提示词会增加输入token，但可能提高校对准确度。如果API支持缓存（如Deepseek），重复内容可能享受缓存命中的低价',
             '   • 处理过程中可以随时取消',
             '   • 已处理的段落会跳过',
             '   • 结果会实时保存到输出文件',
             '',
             '是否确认开始批量校对？'
-        ].join('\n');
+        ].filter(line => line !== '').join('\n');
 
         const result = await vscode.window.showInformationMessage(
             confirmationMessage,

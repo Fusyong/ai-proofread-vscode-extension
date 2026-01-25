@@ -904,7 +904,7 @@ export function generateHtmlReport(
             // 创建提示元素
             const warningDiv = document.createElement('div');
             warningDiv.style.cssText = 'background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-bottom: 15px; color: #856404; font-size: 13px;';
-            warningDiv.innerHTML = '<strong>提示：</strong>筛选条件（类型、相似度、序号、文本搜索）无法保存，刷新页面后会重置。如需保存筛选结果，请使用浏览器的打印功能或截图。';
+            warningDiv.innerHTML = '<strong>提示：</strong>筛选条件无法保存，刷新、重新打开后会重置。可以自行保存你的筛选条件，如条目列表；或复制筛选结果到Word文档中进一步处理；或通过浏览器打印为PDF。';
 
             // 添加关闭按钮
             const closeBtn = document.createElement('button');

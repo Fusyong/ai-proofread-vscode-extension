@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.1.4",
+  "version": "1.2.0",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -208,64 +208,24 @@
           "default": 1.0,
           "description": "模型温度，取值范围是[0:2)，留空则使用模型默认温度，默认1.0"
         },
-        "ai-proofread.convertQuotes": {
+        "ai-proofread.proofread.promptRepetition": {
           "order": 27,
-          "type": "boolean",
-          "default": false,
-          "description": "是否在校对后自动将拉丁半角引号转换为中文全角引号"
-        },
-        "ai-proofread.defaultSplitLength": {
-          "order": 28,
-          "type": "number",
-          "default": 600,
-          "minimum": 50,
-          "description": "默认的文本切分长度（字符数）"
-        },
-        "ai-proofread.defaultTitleLevels": {
-          "order": 29,
-          "type": "array",
-          "items": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 6
-          },
-          "default": [
-            2
+          "type": "string",
+          "enum": [
+            "none",
+            "target",
+            "all"
           ],
-          "description": "默认的标题切分级别（例如：[1,2] 表示按一级和二级标题切分）"
-        },
-        "ai-proofread.titleAndLengthSplit.threshold": {
-          "order": 30,
-          "type": "number",
-          "default": 1000,
-          "description": "标题加长度切分：段落长度阈值，超过此长度的段落将被切分"
-        },
-        "ai-proofread.titleAndLengthSplit.minLength": {
-          "order": 31,
-          "type": "number",
-          "default": 120,
-          "description": "标题加长度切分：最小长度，小于此长度的段落将被合并"
-        },
-        "ai-proofread.proofread.defaultContextLevel": {
-          "order": 32,
-          "type": "number",
-          "default": 0,
-          "description": "校对选中文本时，默认使用的标题级别作为上下文范围（0表示不使用）"
-        },
-        "ai-proofread.paragraphContextSplit.beforeParagraphs": {
-          "order": 34,
-          "type": "number",
-          "default": 1,
-          "description": "段落上下文切分模式：前文段落数"
-        },
-        "ai-proofread.paragraphContextSplit.afterParagraphs": {
-          "order": 35,
-          "type": "number",
-          "default": 1,
-          "description": "段落上下文切分模式：后文段落数"
+          "enumDescriptions": [
+            "不重复",
+            "仅重复要修改的目标文档（target）",
+            "重复参考文档、语境和目标文档（完整对话流程）"
+          ],
+          "default": "none",
+          "description": "提示词重复模式（基于谷歌研究：重复提示词可提高准确度。注意：会增加输入token，但可能提高校对准确度）"
         },
         "ai-proofread.prompts": {
-          "order": 36,
+          "order": 28,
           "type": "array",
           "default": [],
           "items": {
@@ -287,41 +247,103 @@
           },
           "description": "设置给大语言模型提示词及其名称。提示词中应对要处理的目标文本（target）、参考资料（reference）、上下文（context）进行说明。也可以通过命令管理"
         },
+        "ai-proofread.convertQuotes": {
+          "order": 40,
+          "type": "boolean",
+          "default": false,
+          "description": "是否在校对后自动将拉丁半角引号转换为中文全角引号"
+        },
+        "ai-proofread.defaultSplitLength": {
+          "order": 41,
+          "type": "number",
+          "default": 600,
+          "minimum": 50,
+          "description": "默认的文本切分长度（字符数）"
+        },
+        "ai-proofread.defaultTitleLevels": {
+          "order": 42,
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "default": [
+            2
+          ],
+          "description": "默认的标题切分级别（例如：[1,2] 表示按一级和二级标题切分）"
+        },
+        "ai-proofread.titleAndLengthSplit.threshold": {
+          "order": 43,
+          "type": "number",
+          "default": 1000,
+          "description": "标题加长度切分：段落长度阈值，超过此长度的段落将被切分"
+        },
+        "ai-proofread.titleAndLengthSplit.minLength": {
+          "order": 44,
+          "type": "number",
+          "default": 120,
+          "description": "标题加长度切分：最小长度，小于此长度的段落将被合并"
+        },
+        "ai-proofread.proofread.defaultContextLevel": {
+          "order": 45,
+          "type": "number",
+          "default": 0,
+          "description": "校对选中文本时，默认使用的标题级别作为上下文范围（0表示不使用）"
+        },
+        "ai-proofread.paragraphContextSplit.beforeParagraphs": {
+          "order": 46,
+          "type": "number",
+          "default": 1,
+          "description": "段落上下文切分模式：前文段落数"
+        },
+        "ai-proofread.paragraphContextSplit.afterParagraphs": {
+          "order": 47,
+          "type": "number",
+          "default": 1,
+          "description": "段落上下文切分模式：后文段落数"
+        },
         "ai-proofread.alignment.windowSize": {
-          "order": 37,
+          "order": 48,
           "type": "number",
           "default": 10,
           "description": "句子对齐（生成勘误表）：搜索窗口大小（锚点左右各N个句子）"
         },
         "ai-proofread.alignment.similarityThreshold": {
-          "order": 38,
+          "order": 49,
           "type": "number",
           "default": 0.6,
           "description": "句子对齐（生成勘误表）：相似度阈值（0-1）"
         },
         "ai-proofread.alignment.ngramSize": {
-          "order": 39,
+          "order": 50,
           "type": "number",
           "default": 2,
           "description": "句子对齐（生成勘误表）：N-gram大小"
         },
         "ai-proofread.alignment.offset": {
-          "order": 40,
+          "order": 51,
           "type": "number",
           "default": 1,
           "description": "句子对齐（生成勘误表）：锚点偏移量"
         },
         "ai-proofread.alignment.maxWindowExpansion": {
-          "order": 41,
+          "order": 52,
           "type": "number",
           "default": 3,
           "description": "句子对齐（生成勘误表）：最大窗口扩展倍数"
         },
         "ai-proofread.alignment.consecutiveFailThreshold": {
-          "order": 42,
+          "order": 53,
           "type": "number",
           "default": 3,
           "description": "句子对齐（生成勘误表）：连续失败阈值"
+        },
+        "ai-proofread.debug.enableConsoleLog": {
+          "order": 90,
+          "type": "boolean",
+          "default": false,
+          "description": "启用调试日志输出到控制台（会影响性能，仅在调试时启用。也可通过环境变量 AI_PROOFREAD_DEBUG=true 启用）"
         }
       }
     },
