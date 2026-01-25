@@ -180,7 +180,21 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 本人有一个[开源提示词库](https://github.com/Fusyong/LLM-prompts-from-a-book-editor)，但不是针对本扩展的，改造（对三种标签进行说明）后才能用于本扩展。
 
-### 3.7. 日志等过程文件
+### 3.7. 提示词重复功能
+
+支持基于谷歌研究的提示词重复功能，以提高准确度。其原理是：重复用户输入（reference、context、target），让模型在真正处理时已经获得全局信息，从而获得更好的上下文理解。
+
+**重复模式**：在设置中配置 `ai-proofread.proofread.promptRepetition` 选项：
+- **不重复**（none，默认）：不启用重复功能
+- **仅重复目标文档**（target）：只重复要修改的目标文档
+- **重复完整对话流程**（all）：重复参考文档、语境和目标文档，保持完整的对话流程，效果最好但成本最高
+
+**注意事项**：
+- 会增加输入token，重复部分翻倍，输出token不变。如果API支持缓存（如Deepseek），重复部分可能享受缓存命中的低价
+- 重复发生在可并行化的prefill阶段，不增加延迟
+- 建议先在少量文本上测试效果，再决定是否启用。经初步测试，对于较长的文本效果更好
+
+### 3.8. 日志等过程文件
 
 为了让用户能够核验、控制每一个步骤，扩展会以要校对的文档的文件名（以“测试.md”为例）为基础，生成一些中间文件，各自的作用如下：
 
@@ -195,25 +209,12 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 **请特别注意：除自动累加的日志文件和提示备份的`测试.proofread.json`、自动备份的`测试.proofread.json.md`，其余中间文件，每次操作都将重新生成！如有需要，请自行备份。** 
 
-### 3.8. 其他功能与工具
+### 3.9. 其他功能与工具
 
 1. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用PDF查看器SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
 2. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
 3. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
 
-### 3.9. 提示词重复功能（实验性）
-
-支持基于谷歌研究的提示词重复功能，以提高准确度。其原理是：重复用户输入（reference、context、target），让模型在处理第一遍时就能关注到第二遍的所有token，从而获得更好的上下文理解。根据谷歌研究，在70个测试中赢了47个，零损失；适用于Gemini、GPT、Claude、Deepseek等模型。
-
-**注意事项**：
-- 会增加输入token，重复部分翻倍，输出token不变。如果API支持缓存（如Deepseek），重复内容可能享受缓存命中的低价
-- 重复发生在可并行化的prefill阶段，不增加延迟
-- 建议先在少量文本上测试效果，再决定是否启用
-
-**重复模式**：在设置中配置 `ai-proofread.proofread.promptRepetition` 选项：
-- **不重复**（none，默认）：不启用重复功能
-- **仅重复目标文档**（target）：只重复要修改的目标文档（target），适合不需要参考文档和上下文的情况
-- **重复完整对话流程**（all）：重复参考文档、语境和目标文档，保持完整的对话流程，效果最好但成本最高
 
 ### 3.10. 注意事项
 
@@ -279,11 +280,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
     默认为1
 
-## 5. 提示词重复功能说明
-
-本扩展实现了基于谷歌研究的提示词重复功能。详细分析报告请参考 [PROMPT_REPETITION_ANALYSIS.md](./PROMPT_REPETITION_ANALYSIS.md)。
-
-## 6. TODO
+## 5. TODO
 
 1.  [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] 典型错误举例校对
@@ -311,7 +308,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 10. [ ] 支持Copilot（尝试过一次，回文说API还没有开放。还需要研究参考项目。）
 
 
-## 7. 更新日志
+## 6. 更新日志
 
 ### v1.2.0
 
@@ -444,7 +441,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 - 修复了并发请求数的默认值问题
 - 完善了错误处理和用户提示
 
-## 8. 开发命令
+## 7. 开发命令
 
 ```bash
 # 安装依赖
