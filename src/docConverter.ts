@@ -403,7 +403,7 @@ export async function collectPdfToTextOptions(): Promise<PdfToTextOptions | unde
 
         if (setMargins === '是') {
             const left = await vscode.window.showInputBox({
-                prompt: '左边距（点，留空跳过）',
+                prompt: '左边距（pt，留空跳过）',
                 placeHolder: '例如：10',
                 ignoreFocusOut: true,
                 validateInput: (value) => {
@@ -417,7 +417,7 @@ export async function collectPdfToTextOptions(): Promise<PdfToTextOptions | unde
             if (left === undefined) return undefined;
 
             const right = await vscode.window.showInputBox({
-                prompt: '右边距（点，留空跳过）',
+                prompt: '右边距（pt，留空跳过）',
                 placeHolder: '例如：10',
                 ignoreFocusOut: true,
                 validateInput: (value) => {
@@ -431,7 +431,7 @@ export async function collectPdfToTextOptions(): Promise<PdfToTextOptions | unde
             if (right === undefined) return undefined;
 
             const top = await vscode.window.showInputBox({
-                prompt: '上边距（点，留空跳过）',
+                prompt: '上边距（pt，留空跳过）',
                 placeHolder: '例如：10',
                 ignoreFocusOut: true,
                 validateInput: (value) => {
@@ -445,7 +445,7 @@ export async function collectPdfToTextOptions(): Promise<PdfToTextOptions | unde
             if (top === undefined) return undefined;
 
             const bottom = await vscode.window.showInputBox({
-                prompt: '下边距（点，留空跳过）',
+                prompt: '下边距（pt，留空跳过）',
                 placeHolder: '例如：10',
                 ignoreFocusOut: true,
                 validateInput: (value) => {
