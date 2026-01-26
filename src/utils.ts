@@ -253,9 +253,17 @@ export class ConfigManager {
  */
 export class Logger {
     private static instance: Logger;
+    private debugEnabled: boolean = false;
 
     private constructor() {
-        // 不再需要监听配置变化
+        // 检查是否启用调试模式（通过环境变量或配置）
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        this.debugEnabled = config.get<boolean>('debug.enableConsoleLog', false);
+
+        // 也检查环境变量（开发时使用）
+        if (process.env.AI_PROOFREAD_DEBUG === 'true') {
+            this.debugEnabled = true;
+        }
     }
 
     public static getInstance(): Logger {
@@ -269,13 +277,38 @@ export class Logger {
         console.log(`[INFO] ${message}`);
     }
 
-
     public error(message: string, error?: any): void {
         console.error(`[ERROR] ${message}`, error);
     }
 
     public warn(message: string): void {
         console.warn(`[WARN] ${message}`);
+    }
+
+    /**
+     * 调试日志（仅在启用调试模式时输出）
+     * 使用此方法可以避免在生产环境中的性能损失
+     * @param message 调试消息
+     * @param data 可选的数据对象（会被JSON.stringify序列化）
+     */
+    public debug(message: string, data?: any): void {
+        if (this.debugEnabled) {
+            if (data !== undefined) {
+                console.log(`[DEBUG] ${message}`, JSON.stringify(data, null, 2));
+            } else {
+                console.log(`[DEBUG] ${message}`);
+            }
+        }
+    }
+
+    /**
+     * 调试日志（直接输出，不进行JSON序列化）
+     * 用于输出简单字符串，避免序列化开销
+     */
+    public debugSimple(message: string): void {
+        if (this.debugEnabled) {
+            console.log(`[DEBUG] ${message}`);
+        }
     }
 
     public dispose(): void {
@@ -349,17 +382,17 @@ export class CommandBuilder {
             case 'powershell':
                 // PowerShell: cd "dir"; command
                 return `cd ${escapedWorkDir}; ${escapedCommand}`;
-            
+
             case 'cmd':
                 // CMD: cd /d "dir" && command
                 // 使用 /d 参数以支持跨驱动器切换
                 return `cd /d ${escapedWorkDir} && ${escapedCommand}`;
-            
+
             case 'bash':
             case 'sh':
                 // Bash/Sh: cd "dir" && command
                 return `cd ${escapedWorkDir} && ${escapedCommand}`;
-            
+
             default:
                 // 默认使用 && 分隔符，在大多数 shell 中都支持
                 return `cd ${escapedWorkDir} && ${escapedCommand}`;

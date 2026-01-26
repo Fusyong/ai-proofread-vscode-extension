@@ -18,14 +18,14 @@ dotenv.config();
 
 // 内置的系统提示词
 let DEFAULT_SYSTEM_PROMPT = `
-<proofreader-system-setting version="0.0.1">
+<proofreader-system-setting version="0.1.0">
 <role-setting>
 
 你是一位精通中文的校对专家、语言文字专家，像杜永道等专家那样，能准确地发现文章的语言文字问题。
 
 你的语感也非常好，通过朗读就能感受到句子是否自然，是否潜藏问题。
 
-你知识渊博，能发现文中的事实错误。
+你知识渊博，能发现文中的事实错误和百科知识错误。
 
 你工作细致、严谨，当你发现潜在的问题时，你会通过维基百科、《现代汉语词典》《辞海》等各种权威工具书来核对；如果涉及古代汉语和古代文化，你会专门查阅中华书局、上海古籍出版社等权威出版社出版的古籍，以及《王力古汉语字典》《汉语大词典》《辞源》《辞海》等工具书。
 
@@ -41,7 +41,8 @@ let DEFAULT_SYSTEM_PROMPT = `
 
 工作步骤是：
 
-1. 一句一句地仔细阅读甚至朗读每一句话，找出句子中可能存在的问题并改正；可能的问题有：
+1. 先对照着阅读一遍所有材料，了解整体情况和目标文本的问题所在。
+2. 再一句一句地仔细阅读目标文本，甚至朗读每一句话，找出句子中可能存在的问题并改正；可能的问题有：
     1. 汉字错误，如错误的形近字、同音和音近字，简体字和繁体字混用，异体字，等等；
     2. 词语错误，如生造的词语、不规范的异形词，等等；
     3. 句子的语法错误；
@@ -53,16 +54,16 @@ let DEFAULT_SYSTEM_PROMPT = `
     9. 语序错误；
     10. 古诗文和引文跟权威、通行的版本不一致；
     11. 等等；
-2. 即使句子没有明显的错误，如果朗读过程中你感觉有下面的问题，也说明句子可能有错误，也要加以改正：
+3. 即使句子没有明显的错误，如果朗读过程中你感觉有下面的问题，也说明句子可能有错误，也要加以改正：
     1. 句子不自然、不顺当；
-    2. 如果让你表达同一个意思，你通常不会这么说；
-3. 再整体检查如下错误并改正：
+    2. 如果让你表达同一个意思，你通常不会这么说，而是使用另一种更自然的表达；
+4. 再整体检查如下错误并改正：
     1. 逻辑错误；
     2. 章法错误；
     3. 事实错误；
     4. 前后文不一致的问题；
-4. 核对参考资料和上下文中的信息，对照上下文中的格式，如果发现有错误或不一致，也要加以改正。
-5. 对于外文文本，同样参照上面的要求，并结合该文种的校对惯例进行校对。
+5. 核对参考资料和上下文中的信息，对照上下文中的格式，如果发现有错误或不一致，也要加以改正。
+6. 对于外文文本，同样参照上面的要求，并结合该文种的校对惯例进行校对。
 
 </task>
 <output-format>
@@ -128,10 +129,28 @@ function convertSecondsToMilliseconds(value: number | undefined, defaultValue: n
 }
 
 /**
+ * 提示词重复模式
+ */
+type PromptRepetitionMode = 'none' | 'target' | 'all';
+
+/**
+ * 获取提示词重复模式
+ * @returns 重复模式：'none'不重复，'target'仅重复target，'all'重复完整对话流程
+ */
+function getPromptRepetitionMode(): PromptRepetitionMode {
+    const config = vscode.workspace.getConfiguration('ai-proofread');
+    const mode = config.get<string>('proofread.promptRepetition', 'none');
+    if (mode === 'target' || mode === 'all') {
+        return mode as PromptRepetitionMode;
+    }
+    return 'none';
+}
+
+/**
  * API调用接口
  */
 export interface ApiClient {
-    proofread(targetText: string, preText?: string, temperature?: number | null, context?: vscode.ExtensionContext): Promise<string | null>;
+    proofread(targetText: string, preText?: string, temperature?: number | null, context?: vscode.ExtensionContext, repetitionMode?: PromptRepetitionMode): Promise<string | null>;
 }
 
 /**
@@ -169,7 +188,7 @@ export class DeepseekApiClient implements ApiClient {
     }
 
     // 使用 Deepseek API 进行校对
-    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
+    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext, repetitionMode?: PromptRepetitionMode): Promise<string | null> {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
@@ -180,6 +199,10 @@ export class DeepseekApiClient implements ApiClient {
             { role: 'system', content: getSystemPrompt(context) }
         ];
 
+        // 使用传入的重复模式，如果没有则从配置读取
+        const actualRepetitionMode = repetitionMode || getPromptRepetitionMode();
+
+        // 构建第一轮对话
         if (preText) {
             messages.push(
                 { role: 'assistant', content: '' },
@@ -192,6 +215,28 @@ export class DeepseekApiClient implements ApiClient {
             { role: 'user', content: targetText }
         );
 
+        // 根据重复模式添加重复内容
+        if (actualRepetitionMode === 'target') {
+            // 仅重复target
+            messages.push(
+                { role: 'assistant', content: '' },
+                { role: 'user', content: targetText }
+            );
+        } else if (actualRepetitionMode === 'all') {
+            // 重复完整对话流程（preText + targetText）
+            if (preText) {
+                messages.push(
+                    { role: 'assistant', content: '' },
+                    { role: 'user', content: preText }
+                );
+            }
+
+            messages.push(
+                { role: 'assistant', content: '' },
+                { role: 'user', content: targetText }
+            );
+        }
+
         const finalTemperature = temperature || config.get<number>('proofread.temperature');
         const requestBody: any = {
             model: this.model,
@@ -202,6 +247,11 @@ export class DeepseekApiClient implements ApiClient {
             requestBody.temperature = finalTemperature;
         } else {
         }
+
+        // 打印完整对话到控制台（调试用，仅在启用调试模式时输出）
+        logger.debug('='.repeat(80));
+        logger.debug('[DeepseekApiClient] 完整对话内容:', requestBody);
+        logger.debug('='.repeat(80));
 
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
@@ -273,7 +323,7 @@ export class AliyunApiClient implements ApiClient {
     }
 
     // 使用阿里云百炼 API 进行校对
-    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
+    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext, repetitionMode?: PromptRepetitionMode): Promise<string | null> {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
@@ -284,6 +334,10 @@ export class AliyunApiClient implements ApiClient {
             { role: 'system', content: getSystemPrompt(context) }
         ];
 
+        // 使用传入的重复模式，如果没有则从配置读取
+        const actualRepetitionMode = repetitionMode || getPromptRepetitionMode();
+
+        // 构建第一轮对话
         if (preText) {
             messages.push(
                 { role: 'assistant', content: '' },
@@ -296,6 +350,28 @@ export class AliyunApiClient implements ApiClient {
             { role: 'user', content: targetText }
         );
 
+        // 根据重复模式添加重复内容
+        if (actualRepetitionMode === 'target') {
+            // 仅重复target
+            messages.push(
+                { role: 'assistant', content: '' },
+                { role: 'user', content: targetText }
+            );
+        } else if (actualRepetitionMode === 'all') {
+            // 重复完整对话流程（preText + targetText）
+            if (preText) {
+                messages.push(
+                    { role: 'assistant', content: '' },
+                    { role: 'user', content: preText }
+                );
+            }
+
+            messages.push(
+                { role: 'assistant', content: '' },
+                { role: 'user', content: targetText }
+            );
+        }
+
         const finalTemperature = temperature || config.get<number>('proofread.temperature');
         const requestBody: any = {
             model: this.model,
@@ -306,6 +382,11 @@ export class AliyunApiClient implements ApiClient {
             requestBody.temperature = finalTemperature;
         } else {
         }
+
+        // 打印完整对话到控制台（调试用，仅在启用调试模式时输出）
+        logger.debug('='.repeat(80));
+        logger.debug('[AliyunApiClient] 完整对话内容:', requestBody);
+        logger.debug('='.repeat(80));
 
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
@@ -377,15 +458,28 @@ export class GoogleApiClient implements ApiClient {
     }
 
     // 使用 Google API 进行校对
-    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
+    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext, repetitionMode?: PromptRepetitionMode): Promise<string | null> {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
         const retryDelay = convertSecondsToMilliseconds(config.get<number>('proofread.retryDelay', 1), 1);
 
+        // Google API将preText和targetText合并为一个contents
+        // 为了保持与其他API客户端的一致性（先preText后targetText），这里先preText后targetText
         let contents = targetText;
         if(preText) {
-            contents = [contents, preText].join('\n\n');
+            contents = [preText, contents].join('\n\n');
+        }
+
+        // 使用传入的重复模式，如果没有则从配置读取
+        const actualRepetitionMode = repetitionMode || getPromptRepetitionMode();
+        if (actualRepetitionMode === 'target') {
+            // 仅重复target
+            contents = [contents, targetText].join('\n\n');
+        } else if (actualRepetitionMode === 'all') {
+            // 重复完整对话内容（preText + targetText）
+            const repeatedContents = preText ? [preText, targetText].join('\n\n') : targetText;
+            contents = [contents, repeatedContents].join('\n\n');
         }
 
         const finalTemperature = temperature || config.get<number>('proofread.temperature');
@@ -410,6 +504,16 @@ export class GoogleApiClient implements ApiClient {
                 thinkingBudget: 0 // 1表示启用思考，0表示禁用思考
             };
         }
+
+        // 打印完整对话到控制台（调试用，仅在启用调试模式时输出）
+        logger.debug('='.repeat(80));
+        logger.debug('[GoogleApiClient] 完整对话内容:', {
+            systemInstruction: configObj.systemInstruction,
+            contents: contents,
+            temperature: configObj.temperature,
+            thinkingConfig: configObj.thinkingConfig
+        });
+        logger.debug('='.repeat(80));
 
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
@@ -470,7 +574,7 @@ export class OllamaApiClient implements ApiClient {
     }
 
     // 使用 Ollama API 进行校对
-    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext): Promise<string | null> {
+    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext, repetitionMode?: PromptRepetitionMode): Promise<string | null> {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
@@ -481,6 +585,10 @@ export class OllamaApiClient implements ApiClient {
             { role: 'system', content: getSystemPrompt(context) }
         ];
 
+        // 使用传入的重复模式，如果没有则从配置读取
+        const actualRepetitionMode = repetitionMode || getPromptRepetitionMode();
+
+        // 构建第一轮对话
         if (preText) {
             messages.push(
                 { role: 'assistant', content: '' },
@@ -492,6 +600,28 @@ export class OllamaApiClient implements ApiClient {
             { role: 'assistant', content: '' },
             { role: 'user', content: targetText }
         );
+
+        // 根据重复模式添加重复内容
+        if (actualRepetitionMode === 'target') {
+            // 仅重复target
+            messages.push(
+                { role: 'assistant', content: '' },
+                { role: 'user', content: targetText }
+            );
+        } else if (actualRepetitionMode === 'all') {
+            // 重复完整对话流程（preText + targetText）
+            if (preText) {
+                messages.push(
+                    { role: 'assistant', content: '' },
+                    { role: 'user', content: preText }
+                );
+            }
+
+            messages.push(
+                { role: 'assistant', content: '' },
+                { role: 'user', content: targetText }
+            );
+        }
 
         const finalTemperature = temperature || config.get<number>('proofread.temperature');
         const requestBody: any = {
@@ -506,6 +636,11 @@ export class OllamaApiClient implements ApiClient {
             };
         } else {
         }
+
+        // 打印完整对话到控制台（调试用，仅在启用调试模式时输出）
+        logger.debug('='.repeat(80));
+        logger.debug('[OllamaApiClient] 完整对话内容:', requestBody);
+        logger.debug('='.repeat(80));
 
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
@@ -721,6 +856,15 @@ export async function processJsonFileAsync(
         const startTime = Date.now();
         await rateLimiter.wait();
 
+        // 打印完整对话信息到控制台（调试用，仅在启用调试模式时输出）
+        logger.debug('='.repeat(80));
+        logger.debug(`[JSON批量校对] 段落 No. ${index + 1}/${totalCount}:`, {
+            preText: preText || '(空)',
+            targetText: labeledTargetText,
+            temperature: temperature
+        });
+        logger.debug('='.repeat(80));
+
         try {
             const processedText = await client.proofread(labeledTargetText, preText, temperature, context);
             const elapsed = (Date.now() - startTime) / 1000;
@@ -838,6 +982,9 @@ export async function processJsonFileAsync(
  * @param referenceFile 参考文件
  * @param userTemperature 用户指定的温度
  * @param context 扩展上下文
+ * @param beforeParagraphs 前文段落数
+ * @param afterParagraphs 后文段落数
+ * @param repetitionMode 提示词重复模式（可选，覆盖配置）
  * @returns 校对后的文本
  */
 export async function proofreadSelection(
@@ -850,7 +997,8 @@ export async function proofreadSelection(
     userTemperature?: number,
     context?: vscode.ExtensionContext,
     beforeParagraphs?: number,
-    afterParagraphs?: number
+    afterParagraphs?: number,
+    repetitionMode?: PromptRepetitionMode
 ): Promise<string | null> {
     // 获取选中的文本
     const selectedText = editor.document.getText(selection);
@@ -872,17 +1020,18 @@ export async function proofreadSelection(
     // 如果选择了上下文级别，获取上下文
     if (contextLevel && contextLevel !== '不使用上下文') {
         const fullText = editor.document.getText();
-        // 切分成段落
-        const lines = fullText.split(/\n/);
         const selectionStartLine = selection.start.line;
         const selectionEndLine = selection.end.line;
 
         if (contextLevel === '前后增加段落') {
             // 使用抽象的前后段落上下文构建函数
+            // 使用字符位置而不是行号，以便精确处理选中文本
+            const selectionStart = editor.document.offsetAt(selection.start);
+            const selectionEnd = editor.document.offsetAt(selection.end);
             contextText = buildParagraphBasedContext(
                 fullText,
-                selectionStartLine,
-                selectionEndLine,
+                selectionStart,
+                selectionEnd,
                 beforeParagraphs || 1,
                 afterParagraphs || 1
             );
@@ -918,11 +1067,18 @@ export async function proofreadSelection(
         }
     }
 
+    // 获取提示词重复模式（使用传入的参数，如果没有则从配置读取）
+    const actualRepetitionMode = repetitionMode || getPromptRepetitionMode();
+
     // 显示校对信息
     const targetLength = targetText.length;
     const contextLength = contextText.length;
     const referenceLength = referenceText.length;
-    vscode.window.showInformationMessage(`Prompt: ${currentPromptName.slice(0, 4)}…; Context: T. ${targetLength}, C. ${contextLength}, R. ${referenceLength}; Model: ${platform}, ${model}, T. ${userTemperature}`);
+    vscode.window.showInformationMessage(
+        `Prompt: ${currentPromptName.slice(0, 4)}… Rep. ${actualRepetitionMode} | ` +
+        `Context: R. ${referenceLength}, C. ${contextLength}, T. ${targetLength} | ` +
+        `Model: ${platform}, ${model}, T. ${userTemperature}`
+    );
 
     // 调用API进行校对
     const client = (() => {
@@ -939,7 +1095,7 @@ export async function proofreadSelection(
         }
     })();
 
-    let result = await client.proofread(postText, preText, userTemperature, context);
+    let result = await client.proofread(postText, preText, userTemperature, context, actualRepetitionMode);
 
     return result;
 }
