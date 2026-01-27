@@ -3,6 +3,8 @@
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { mergeTwoFiles } from '../merger';
 import { searchSelectionInPDF } from '../pdfSearcher';
 import { convertQuotes } from '../quoteConverter';
@@ -81,6 +83,22 @@ export class UtilityCommandHandler {
                 return;
             }
 
+            // 询问是否更新对应的Markdown文件（默认是）
+            const updateMarkdown = await vscode.window.showQuickPick(
+                [
+                    { label: '是', value: true, description: '更新对应的Markdown文件' },
+                    { label: '否', value: false, description: '不更新Markdown文件' }
+                ],
+                {
+                    placeHolder: '是否更新对应的Markdown文件？',
+                    ignoreFocusOut: true
+                }
+            );
+
+            if (updateMarkdown === undefined) {
+                return; // 用户取消
+            }
+
             // 执行合并
             const result = await mergeTwoFiles(
                 document.uri.fsPath,
@@ -92,12 +110,62 @@ export class UtilityCommandHandler {
 
             // 显示结果
             const modeText = mergeMode.value === 'update' ? '更新' : '拼接';
-            vscode.window.showInformationMessage(
-                `合并完成！${modeText}了 ${result.updated}/${result.total} 项`
-            );
+            let message = `合并完成！${modeText}了 ${result.updated}/${result.total} 项`;
+
+            // 如果用户选择更新Markdown文件，则执行更新
+            if (updateMarkdown.value) {
+                try {
+                    await this.updateMarkdownFileFromJson(document.uri.fsPath, targetField as 'target' | 'reference' | 'context');
+                    message += '，已更新对应的Markdown文件';
+                } catch (error) {
+                    ErrorUtils.showError(error, '更新Markdown文件时出错：');
+                }
+            }
+
+            vscode.window.showInformationMessage(message);
         } catch (error) {
             ErrorUtils.showError(error, '合并文件时出错：');
         }
+    }
+
+    /**
+     * 从JSON文件更新对应的Markdown文件
+     * @param jsonFilePath JSON文件路径
+     * @param fieldName 要使用的字段名（target、reference或context）
+     */
+    private async updateMarkdownFileFromJson(
+        jsonFilePath: string,
+        fieldName: 'target' | 'reference' | 'context'
+    ): Promise<void> {
+        // 读取合并后的JSON文件
+        const jsonContent = JSON.parse(fs.readFileSync(jsonFilePath, 'utf8'));
+
+        // 确保是数组
+        if (!Array.isArray(jsonContent)) {
+            throw new Error('JSON文件必须是数组格式');
+        }
+
+        // 将JSON数组转换为Markdown（使用指定字段）
+        const markdownContent = jsonContent
+            .map((item: any) => {
+                if (typeof item === 'object' && item !== null && item[fieldName]) {
+                    return item[fieldName];
+                }
+                return '';
+            })
+            .filter((text: string) => text.trim() !== '') // 过滤空内容
+            .join('\n\n');
+
+        // 生成对应的Markdown文件路径（x.json -> x.md）
+        const dir = path.dirname(jsonFilePath);
+        const baseName = path.basename(jsonFilePath, path.extname(jsonFilePath));
+        const markdownFilePath = path.join(dir, `${baseName}.md`);
+
+        // 备份原有的Markdown文件（如果存在）
+        FilePathUtils.backupFileIfExists(markdownFilePath, false);
+
+        // 写入新的Markdown文件
+        fs.writeFileSync(markdownFilePath, markdownContent, 'utf8');
     }
 
     /**
