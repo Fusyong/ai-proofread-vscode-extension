@@ -70,8 +70,8 @@ export class UtilityCommandHandler {
             // 让用户选择合并模式
             const mergeMode = await vscode.window.showQuickPick(
                 [
-                    { label: '更新（覆盖）', value: 'update', description: '用来源字段的值覆盖目标字段' },
-                    { label: '拼接', value: 'concat', description: '将来源字段的内容追加到目标字段后面，中间加空行' }
+                    { label: '拼接', value: 'concat', description: '将来源字段的内容追加到目标字段后面，中间加空行' },
+                    { label: '更新（覆盖）', value: 'update', description: '用来源字段的值覆盖目标字段' }
                 ],
                 {
                     placeHolder: '选择合并模式',

@@ -135,7 +135,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 1. 打开已切分的要校对的 JSON 文件
 2. 打开右键菜单，选择`AI proofreader: Merge Two Files`（或通过命令面板）命令
 3. 选择要合并的文件
-4. 确定要处理的字段和资料来源字段，以及更新（覆盖）模式或拼接模式。比如你想把试题及其答案合并后校对，那么可用拼接模式，拼接到同一个target中。
+4. 确定要处理的字段和资料来源字段，以及拼接模式或更新（覆盖）模式。比如你想把试题及其答案合并后校对，那么可用拼接模式，拼接到同一个target中。
 5. 确定是否更新对应的Markdown文件（默认是），更新时会备份原文件。
 
 组织校对语境是一个看起来有些麻烦，但非常有效的工作。比如校对练习册，有必要把练习和答案拼成语境（拼在一个target中更能节省费用）。而对一首古诗的解释如果不可靠，可以用一篇可靠的作为reference。包含人物的内容，则可以用词典中的任务条目作为reference。
@@ -313,9 +313,9 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
-### v1.2.1
+### v1.2.2
 
-- 优化：合并JSON功能增加更新对应的Markdown文件的功能
+- 优化：合并JSON功能，默认改为“拼接模式”；增加更新对应的Markdown文件的功能
 
 ### v1.2.0
 
