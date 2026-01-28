@@ -205,6 +205,16 @@ export function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleFormatParagraphsCommand(editor);
         }),
 
+        // 注册根据目录标记标题命令
+        vscode.commands.registerCommand('ai-proofread.markTitlesFromToc', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleMarkTitlesFromTocCommand(editor);
+        }),
+
         // 注册重新打开结果面板命令
         vscode.commands.registerCommand('ai-proofread.reopenResultPanel', () => {
             webviewManager.reopenResultPanel(context);

@@ -83,6 +83,10 @@
         "title": "AI Proofreader: format paragraphs"
       },
       {
+        "command": "ai-proofread.markTitlesFromToc",
+        "title": "AI Proofreader: mark titles from table of contents"
+      },
+      {
         "command": "ai-proofread.splitFile",
         "title": "AI Proofreader: split file"
       },
@@ -369,6 +373,11 @@
           "command": "ai-proofread.formatParagraphs",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
+          "command": "ai-proofread.markTitlesFromToc",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown"
         },
         {
           "command": "ai-proofread.diffItWithAnotherFile",

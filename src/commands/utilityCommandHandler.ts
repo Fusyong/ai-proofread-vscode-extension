@@ -11,6 +11,7 @@ import { convertQuotes } from '../quoteConverter';
 import { formatParagraphs } from '../paragraphDetector';
 import { showDiff } from '../differ';
 import { ErrorUtils, FilePathUtils } from '../utils';
+import { parseToc, markTitles, TocItem } from '../titleMarker';
 
 export class UtilityCommandHandler {
     /**
@@ -303,6 +304,100 @@ export class UtilityCommandHandler {
             vscode.window.showInformationMessage(message);
         } catch (error) {
             ErrorUtils.showError(error, '整理段落时出错：');
+        }
+    }
+
+    /**
+     * 处理根据目录标记标题命令
+     */
+    public async handleMarkTitlesFromTocCommand(editor: vscode.TextEditor): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor!');
+            return;
+        }
+
+        try {
+            const document = editor.document;
+
+            // 让用户选择目录文件
+            const tocFile = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                filters: {
+                    'Markdown files': ['md'],
+                    'All files': ['*']
+                },
+                title: '选择目录文件（.目录.md 或包含目录的 Markdown 文件）'
+            });
+
+            if (!tocFile || tocFile.length === 0) {
+                return;
+            }
+
+            // 让用户输入起始标题级别
+            const baseLevelInput = await vscode.window.showInputBox({
+                prompt: '请输入起始标题级别（1-6，默认为1）',
+                placeHolder: '1',
+                value: '1',
+                validateInput: (value) => {
+                    const num = parseInt(value, 10);
+                    if (isNaN(num)) {
+                        return '请输入有效的数字';
+                    }
+                    if (num < 1 || num > 6) {
+                        return '标题级别必须在 1-6 之间';
+                    }
+                    return null;
+                }
+            });
+
+            if (baseLevelInput === undefined) {
+                return; // 用户取消
+            }
+
+            const baseLevel = parseInt(baseLevelInput, 10) || 1;
+
+            // 读取目录文件内容
+            const tocContent = fs.readFileSync(tocFile[0].fsPath, 'utf8');
+
+            // 解析目录（使用用户指定的起始级别）
+            const tocItems = parseToc(tocContent, 4, baseLevel);
+
+            if (tocItems.length === 0) {
+                vscode.window.showWarningMessage('目录文件中没有找到有效的目录项！');
+                return;
+            }
+
+            // 获取当前文档的文本行
+            const textLines = document.getText().split('\n');
+
+            // 标记标题
+            const [markedLines, notFound] = markTitles(textLines, tocItems);
+
+            // 如果有未找到的目录项，显示警告
+            if (notFound.length > 0) {
+                const notFoundList = notFound
+                    .map(item => `- ${item.name} (级别: ${item.level})`)
+                    .join('\n');
+                
+                const message = `标记完成！但有 ${notFound.length} 个目录项未找到（起始级别: ${baseLevel}）：\n${notFoundList}`;
+                vscode.window.showWarningMessage(message);
+            } else {
+                vscode.window.showInformationMessage(`标记完成！成功标记了 ${tocItems.length} 个标题（起始级别: ${baseLevel}）。`);
+            }
+
+            // 替换文档内容
+            const fullRange = new vscode.Range(
+                document.positionAt(0),
+                document.positionAt(document.getText().length)
+            );
+
+            await editor.edit(editBuilder => {
+                editBuilder.replace(fullRange, markedLines.join('\n'));
+            });
+        } catch (error) {
+            ErrorUtils.showError(error, '标记标题时出错：');
         }
     }
 }
