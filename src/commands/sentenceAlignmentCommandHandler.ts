@@ -93,7 +93,8 @@ export class SentenceAlignmentCommandHandler {
                 ngramSize: config.get<number>('ngramSize', 2),
                 offset: config.get<number>('offset', 1),
                 maxWindowExpansion: config.get<number>('maxWindowExpansion', 3),
-                consecutiveFailThreshold: config.get<number>('consecutiveFailThreshold', 3)
+                consecutiveFailThreshold: config.get<number>('consecutiveFailThreshold', 3),
+                removeInnerWhitespace: config.get<boolean>('removeInnerWhitespace', true)
             };
 
             // 显示进度

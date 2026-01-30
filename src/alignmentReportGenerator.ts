@@ -79,9 +79,11 @@ export function generateHtmlReport(
             padding: 15px;
             border-radius: 5px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-x: auto;
         }
         .alignment-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
             margin-top: 10px;
         }
@@ -182,11 +184,12 @@ export function generateHtmlReport(
             white-space: pre-wrap;
             word-wrap: break-word;
         }
-        .col-sentence-a {
-            width: 42.5%;
-        }
+        .col-sentence-a,
         .col-sentence-b {
             width: 42.5%;
+            word-break: break-all;
+            overflow-wrap: anywhere;
+            min-width: 0;
         }
         .item-header {
             font-weight: bold;

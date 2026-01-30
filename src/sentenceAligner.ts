@@ -37,6 +37,7 @@ export interface AlignmentOptions {
     offset?: number;                        // 锚点偏移量，默认1
     maxWindowExpansion?: number;            // 最大窗口扩展倍数，默认3
     consecutiveFailThreshold?: number;      // 连续失败阈值，默认3
+    removeInnerWhitespace?: boolean;        // 相似度计算时是否删除句中空白字符，默认 true
 }
 
 /**
@@ -107,17 +108,16 @@ function jaccardSimilarity(textA: string, textB: string, n: number = 2): number 
 }
 
 /**
- * 标准化句子（用于相似度计算）
+ * 标准化句子（用于相似度计算）：删除前后空白；可选删除句中空白
  * @param sentence 原始句子
+ * @param removeInnerWhitespace 是否删除句中空白字符，默认 true
  * @returns 标准化后的句子
  */
-function normalizeSentence(sentence: string): string {
-    // 去除首尾空白
+function normalizeSentence(sentence: string, removeInnerWhitespace: boolean = true): string {
     let s = sentence.trim();
-    // 统一全角空格为半角空格
-    s = s.replace(/\u3000/g, ' ');
-    // 合并多个连续空格为一个
-    s = s.replace(/ +/g, ' ');
+    if (removeInnerWhitespace) {
+        s = s.replace(/\s/g, '');
+    }
     return s;
 }
 
@@ -139,7 +139,8 @@ export function alignSentencesAnchor(
         ngramSize = 2,
         offset = 1,
         maxWindowExpansion = 3,
-        consecutiveFailThreshold = 3
+        consecutiveFailThreshold = 3,
+        removeInnerWhitespace = true
     } = options;
 
     const n = sentencesA.length;
@@ -161,7 +162,7 @@ export function alignSentencesAnchor(
 
     // 按照A文件的顺序处理
     while (aIdx < n) {
-        const sentA = normalizeSentence(sentencesA[aIdx]);
+        const sentA = normalizeSentence(sentencesA[aIdx], removeInnerWhitespace);
 
         // 动态调整搜索窗口：如果连续失败，逐步扩大窗口
         if (consecutiveFails >= consecutiveFailThreshold) {
@@ -191,7 +192,7 @@ export function alignSentencesAnchor(
                 continue;
             }
 
-            const sentB = normalizeSentence(sentencesB[bIdx]);
+            const sentB = normalizeSentence(sentencesB[bIdx], removeInnerWhitespace);
             const similarity = jaccardSimilarity(sentA, sentB, ngramSize);
 
             if (similarity > bestSimilarity) {
@@ -221,7 +222,7 @@ export function alignSentencesAnchor(
                     continue;
                 }
 
-                const sentB = normalizeSentence(sentencesB[bIdx]);
+                const sentB = normalizeSentence(sentencesB[bIdx], removeInnerWhitespace);
                 const similarity = jaccardSimilarity(sentA, sentB, ngramSize);
 
                 if (similarity > bestSimilarity) {
@@ -359,7 +360,8 @@ export function alignSentencesAnchor(
     const resultAfterRematch = rematchDeleteInsertSequences(
         result,
         similarityThreshold,
-        ngramSize
+        ngramSize,
+        removeInnerWhitespace
     );
 
     // 后处理：在一定的序号上下范围内处理不相邻的DELETE和INSERT
@@ -367,13 +369,15 @@ export function alignSentencesAnchor(
         resultAfterRematch,
         similarityThreshold,
         ngramSize,
-        windowSize  // 使用窗口大小作为索引范围
+        windowSize,  // 使用窗口大小作为索引范围
+        removeInnerWhitespace
     );
 
     // 后处理：将单独的DELETE项合并到相邻的MATCH组中
     const resultAfterMerge = mergeDeleteIntoMatch(
         resultAfterNonAdjacentRematch,
-        ngramSize
+        ngramSize,
+        removeInnerWhitespace
     );
 
     // 后处理：检测和处理句子移动，创建movein和moveout条目
@@ -494,7 +498,8 @@ function generateMergedCandidates(
 function rematchDeleteInsertSequences(
     alignment: AlignmentItem[],
     similarityThreshold: number = 0.6,
-    ngramSize: number = 2
+    ngramSize: number = 2,
+    removeInnerWhitespace: boolean = true
 ): AlignmentItem[] {
     if (alignment.length === 0) {
         return alignment;
@@ -563,8 +568,8 @@ function rematchDeleteInsertSequences(
                         }
 
                         if (dCandidate.text && insCandidate.text) {
-                            const sentA = normalizeSentence(dCandidate.text);
-                            const sentB = normalizeSentence(insCandidate.text);
+                            const sentA = normalizeSentence(dCandidate.text, removeInnerWhitespace);
+                            const sentB = normalizeSentence(insCandidate.text, removeInnerWhitespace);
                             const similarity = jaccardSimilarity(sentA, sentB, ngramSize);
 
                             if (similarity > bestSimilarity && similarity >= similarityThreshold) {
@@ -771,7 +776,8 @@ function rematchNonAdjacentDeleteInsert(
     alignment: AlignmentItem[],
     similarityThreshold: number = 0.6,
     ngramSize: number = 2,
-    indexRange: number = 10
+    indexRange: number = 10,
+    removeInnerWhitespace: boolean = true
 ): AlignmentItem[] {
     if (alignment.length === 0) {
         return alignment;
@@ -862,8 +868,8 @@ function rematchNonAdjacentDeleteInsert(
             if (indexDiff <= indexRange || positionDiff <= indexRange) {
                 // 计算相似度
                 if (dItem.a && insItem.b) {
-                    const sentA = normalizeSentence(dItem.a);
-                    const sentB = normalizeSentence(insItem.b);
+                    const sentA = normalizeSentence(dItem.a, removeInnerWhitespace);
+                    const sentB = normalizeSentence(insItem.b, removeInnerWhitespace);
                     const similarity = jaccardSimilarity(sentA, sentB, ngramSize);
 
                     if (similarity > bestSimilarity && similarity >= similarityThreshold) {
@@ -970,7 +976,8 @@ function rematchNonAdjacentDeleteInsert(
  */
 function mergeDeleteIntoMatch(
     alignment: AlignmentItem[],
-    ngramSize: number = 2
+    ngramSize: number = 2,
+    removeInnerWhitespace: boolean = true
 ): AlignmentItem[] {
     if (alignment.length === 0) {
         return alignment;
@@ -1000,8 +1007,8 @@ function mergeDeleteIntoMatch(
                 const prevA = prevItem.a;
                 const prevB = prevItem.b;
                 const mergedA = prevA + currentItem.a;
-                const sentA = normalizeSentence(mergedA);
-                const sentB = normalizeSentence(prevB);
+                const sentA = normalizeSentence(mergedA, removeInnerWhitespace);
+                const sentB = normalizeSentence(prevB, removeInnerWhitespace);
                 const newSimilarity = jaccardSimilarity(sentA, sentB, ngramSize);
 
                 // 如果新相似度高于原相似度，则合并
@@ -1021,8 +1028,8 @@ function mergeDeleteIntoMatch(
                 nextItem.a &&
                 nextItem.b) {
                 const mergedA = currentItem.a + nextItem.a;
-                const sentA = normalizeSentence(mergedA);
-                const sentB = normalizeSentence(nextItem.b);
+                const sentA = normalizeSentence(mergedA, removeInnerWhitespace);
+                const sentB = normalizeSentence(nextItem.b, removeInnerWhitespace);
                 const newSimilarity = jaccardSimilarity(sentA, sentB, ngramSize);
 
                 // 如果新相似度高于原相似度，则合并

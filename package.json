@@ -316,7 +316,7 @@
         "ai-proofread.alignment.similarityThreshold": {
           "order": 49,
           "type": "number",
-          "default": 0.6,
+          "default": 0.4,
           "description": "句子对齐（生成勘误表）：相似度阈值（0-1）"
         },
         "ai-proofread.alignment.ngramSize": {
@@ -342,6 +342,12 @@
           "type": "number",
           "default": 3,
           "description": "句子对齐（生成勘误表）：连续失败阈值"
+        },
+        "ai-proofread.alignment.removeInnerWhitespace": {
+          "order": 54,
+          "type": "boolean",
+          "default": true,
+          "description": "句子对齐（生成勘误表）：相似度计算时是否忽略句中空白字符（默认是）。仅当通过命令面板等不弹窗方式执行对齐时使用此配置"
         },
         "ai-proofread.debug.enableConsoleLog": {
           "order": 90,

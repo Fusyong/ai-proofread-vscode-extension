@@ -634,13 +634,28 @@ export class WebviewManager {
 
             const similarityThreshold = parseFloat(similarityThresholdInput);
 
+            // 让用户选择相似度计算时是否删除句中空白字符
+            const removeInnerWhitespaceChoice = await vscode.window.showQuickPick(
+                [
+                    { label: '是（默认）', description: '删除句中空白，仅用字面比较', value: true },
+                    { label: '否', description: '保留句中空白参与比较', value: false }
+                ],
+                {
+                    placeHolder: '相似度计算时是否删除句中空白字符？',
+                    title: '句中空白',
+                    ignoreFocusOut: true
+                }
+            );
+            const removeInnerWhitespace = removeInnerWhitespaceChoice?.value ?? true;
+
             const options: AlignmentOptions = {
                 windowSize: config.get<number>('windowSize', 10),
                 similarityThreshold: similarityThreshold,
                 ngramSize: config.get<number>('ngramSize', 2),
                 offset: config.get<number>('offset', 1),
                 maxWindowExpansion: config.get<number>('maxWindowExpansion', 3),
-                consecutiveFailThreshold: config.get<number>('consecutiveFailThreshold', 3)
+                consecutiveFailThreshold: config.get<number>('consecutiveFailThreshold', 3),
+                removeInnerWhitespace
             };
 
             // 显示进度
