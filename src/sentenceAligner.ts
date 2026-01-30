@@ -37,7 +37,7 @@ export interface AlignmentOptions {
     offset?: number;                        // 锚点偏移量，默认1
     maxWindowExpansion?: number;            // 最大窗口扩展倍数，默认3
     consecutiveFailThreshold?: number;      // 连续失败阈值，默认3
-    removeInnerWhitespace?: boolean;        // 相似度计算时是否删除句中空白字符，默认 true
+    removeInnerWhitespace?: boolean;        // 相似度计算时是否忽略句中空白字符，默认 true
 }
 
 /**
@@ -108,9 +108,9 @@ function jaccardSimilarity(textA: string, textB: string, n: number = 2): number 
 }
 
 /**
- * 标准化句子（用于相似度计算）：删除前后空白；可选删除句中空白
+ * 标准化句子（用于相似度计算）：忽略前后空白；可选忽略句中空白
  * @param sentence 原始句子
- * @param removeInnerWhitespace 是否删除句中空白字符，默认 true
+ * @param removeInnerWhitespace 是否忽略句中空白字符，默认 true
  * @returns 标准化后的句子
  */
 function normalizeSentence(sentence: string, removeInnerWhitespace: boolean = true): string {
@@ -1105,7 +1105,7 @@ function mergeDeleteIntoMatch(
  * @param alignment 对齐结果
  * @param movementThreshold 保留参数以兼容旧代码，但不再使用
  * @returns 处理后的对齐结果，包含movein和moveout条目
- * 
+ *
  * 算法：
  * 1. 只检查b侧id（b_index）的连续性
  * 2. 把所有连续条目构成的块区分出来
@@ -1354,7 +1354,7 @@ function detectAndHandleMovements(
                         a_index: aIdx,
                         b_index: bIdx,
                         original_b_index: bIdx,  // 保留原始b_index
-                        // 显式保留所有字段：a_indices, b_indices, a_line_number, b_line_number, 
+                        // 显式保留所有字段：a_indices, b_indices, a_line_number, b_line_number,
                         // a_line_numbers, b_line_numbers, id, group_id, offset等（通过展开运算符保留）
                     };
 
@@ -1365,7 +1365,7 @@ function detectAndHandleMovements(
                         a_index: aIdx,
                         b_index: bIdx,
                         original_a_index: aIdx,  // 保留原始a_index
-                        // 显式保留所有字段：a_indices, b_indices, a_line_number, b_line_number, 
+                        // 显式保留所有字段：a_indices, b_indices, a_line_number, b_line_number,
                         // a_line_numbers, b_line_numbers, id, group_id, offset等（通过展开运算符保留）
                     };
 

@@ -634,14 +634,14 @@ export class WebviewManager {
 
             const similarityThreshold = parseFloat(similarityThresholdInput);
 
-            // 让用户选择相似度计算时是否删除句中空白字符
+            // 让用户选择相似度计算时是否忽略句中空白字符
             const removeInnerWhitespaceChoice = await vscode.window.showQuickPick(
                 [
-                    { label: '是（默认）', description: '删除句中空白，仅用字面比较', value: true },
+                    { label: '是（默认）', description: '忽略句中空白，仅用字面比较', value: true },
                     { label: '否', description: '保留句中空白参与比较', value: false }
                 ],
                 {
-                    placeHolder: '相似度计算时是否删除句中空白字符？',
+                    placeHolder: '相似度计算时是否忽略句中空白字符？',
                     title: '句中空白',
                     ignoreFocusOut: true
                 }
