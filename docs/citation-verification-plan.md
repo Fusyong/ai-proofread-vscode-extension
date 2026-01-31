@@ -135,14 +135,14 @@
 | **前后空白** | 去掉 |
 | **句中空白 / 句内分行** | **默认**去掉（可配置保留） |
 | **标点** | **默认**保留（可配置去掉） |
-| **阿拉伯数字** | **默认**保留（可配置去掉） |
-| **拉丁字符** | **默认**保留（可配置去掉） |
+| **阿拉伯数字** | **默认**保留（句子对齐功能中默认配置为保留；引文核对功能中默认配置为去掉） |
+| **拉丁字符** | **默认**保留（句子对齐功能中默认配置为保留；引文核对功能中默认配置为去掉） |
 
-**配置**：句中空白由 `removeInnerWhitespace` 控制（默认 `true`，即去掉）；标点、数字、拉丁由配置项控制：`ai-proofread.citation.normalizeIgnorePunctuation`（默认 `false`）、`ai-proofread.citation.normalizeIgnoreDigits`（默认 `false`）、`ai-proofread.citation.normalizeIgnoreLatin`（默认 `false`），即默认均保留。
+**配置**：句中空白由对齐配置 `removeInnerWhitespace` 控制（默认去掉）。标点共用 `ai-proofread.citation.normalizeIgnorePunctuation`（默认 `false`，即保留）。数字与拉丁**按功能区分**：**句子对齐**使用 `ai-proofread.alignment.normalizeIgnoreDigits` / `normalizeIgnoreLatin`（默认 `false`，即保留）；**引文核对**使用 `ai-proofread.citation.normalizeIgnoreDigits` / `normalizeIgnoreLatin`（默认 `true`，即去掉）。
 
 **适用范围**：上述规则同时用于 (1) 对齐功能（sentenceAligner）的相似度计算；(2) 引文核对的文献预处理写入 SQLite 的 `normalized` 与 `len_norm`；(3) 引文句在匹配前的现场归一化。对齐与引文共用同一归一化函数，保证行为一致。
 
-**实现**：提供**统一归一化函数**（如 `similarity.ts` 的 `normalizeForSimilarity(text, options)`），内部顺序：trim → 可选去句中空白（默认去）→ 按配置去标点（默认不去）→ 按配置去数字（默认不去）→ 按配置去拉丁字符（默认不去）。分句仍在**原始文本**上做，归一化只作用于「分句后的句子文本」用于比对与长度计算。
+**实现**：提供**统一归一化函数**（如 `similarity.ts` 的 `normalizeForSimilarity(text, options)`），内部顺序：trim → 可选去句中空白（默认去）→ 按配置去标点（默认不去）→ 按配置去数字 → 按配置去拉丁字符。分句仍在**原始文本**上做，归一化只作用于「分句后的句子文本」用于比对与长度计算。**对齐**调用时从 `ai-proofread.alignment` 读取数字/拉丁（默认保留）；**引文核对**调用时从 `ai-proofread.citation` 读取数字/拉丁（默认去掉）。
 
 ---
 

@@ -658,8 +658,8 @@ export class WebviewManager {
                 consecutiveFailThreshold: config.get<number>('consecutiveFailThreshold', 3),
                 removeInnerWhitespace,
                 removePunctuation: citationConfig.get<boolean>('normalizeIgnorePunctuation', false),
-                removeDigits: citationConfig.get<boolean>('normalizeIgnoreDigits', false),
-                removeLatin: citationConfig.get<boolean>('normalizeIgnoreLatin', false)
+                removeDigits: config.get<boolean>('normalizeIgnoreDigits', false),
+                removeLatin: config.get<boolean>('normalizeIgnoreLatin', false)
             };
 
             // 显示进度

@@ -357,6 +357,18 @@
           "default": true,
           "description": "句子对齐（生成勘误表）：相似度计算时是否忽略句中空白字符（默认是）。仅当通过命令面板等不弹窗方式执行对齐时使用此配置"
         },
+        "ai-proofread.alignment.normalizeIgnoreDigits": {
+          "order": 54.1,
+          "type": "boolean",
+          "default": false,
+          "description": "句子对齐（生成勘误表）归一化：是否去掉阿拉伯数字（默认否，即保留）"
+        },
+        "ai-proofread.alignment.normalizeIgnoreLatin": {
+          "order": 54.2,
+          "type": "boolean",
+          "default": false,
+          "description": "句子对齐（生成勘误表）归一化：是否去掉拉丁字符（默认否，即保留）"
+        },
         "ai-proofread.citation.referencesPath": {
           "order": 55,
           "type": "string",
@@ -372,14 +384,14 @@
         "ai-proofread.citation.normalizeIgnoreDigits": {
           "order": 57,
           "type": "boolean",
-          "default": false,
-          "description": "引文核对/对齐共用归一化：是否去掉阿拉伯数字（默认否，即保留）"
+          "default": true,
+          "description": "引文核对归一化：是否去掉阿拉伯数字（默认是，即去掉）"
         },
         "ai-proofread.citation.normalizeIgnoreLatin": {
           "order": 58,
           "type": "boolean",
-          "default": false,
-          "description": "引文核对/对齐共用归一化：是否去掉拉丁字符（默认否，即保留）"
+          "default": true,
+          "description": "引文核对归一化：是否去掉拉丁字符（默认是，即去掉）"
         },
         "ai-proofread.debug.enableConsoleLog": {
           "order": 90,
