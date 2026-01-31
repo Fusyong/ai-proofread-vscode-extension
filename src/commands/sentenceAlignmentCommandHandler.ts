@@ -85,8 +85,9 @@ export class SentenceAlignmentCommandHandler {
 
             const fileB = fileUrisB[0].fsPath;
 
-            // 读取对齐参数配置
+            // 读取对齐参数配置（归一化与引文核对共用 citation 配置）
             const config = vscode.workspace.getConfiguration('ai-proofread.alignment');
+            const citationConfig = vscode.workspace.getConfiguration('ai-proofread.citation');
             const options: AlignmentOptions = {
                 windowSize: config.get<number>('windowSize', 10),
                 similarityThreshold: config.get<number>('similarityThreshold', 0.6),
@@ -94,7 +95,10 @@ export class SentenceAlignmentCommandHandler {
                 offset: config.get<number>('offset', 1),
                 maxWindowExpansion: config.get<number>('maxWindowExpansion', 3),
                 consecutiveFailThreshold: config.get<number>('consecutiveFailThreshold', 3),
-                removeInnerWhitespace: config.get<boolean>('removeInnerWhitespace', true)
+                removeInnerWhitespace: config.get<boolean>('removeInnerWhitespace', true),
+                removePunctuation: citationConfig.get<boolean>('normalizeIgnorePunctuation', false),
+                removeDigits: citationConfig.get<boolean>('normalizeIgnoreDigits', false),
+                removeLatin: citationConfig.get<boolean>('normalizeIgnoreLatin', false)
             };
 
             // 显示进度

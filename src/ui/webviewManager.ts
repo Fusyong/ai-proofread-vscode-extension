@@ -648,6 +648,7 @@ export class WebviewManager {
             );
             const removeInnerWhitespace = removeInnerWhitespaceChoice?.value ?? true;
 
+            const citationConfig = vscode.workspace.getConfiguration('ai-proofread.citation');
             const options: AlignmentOptions = {
                 windowSize: config.get<number>('windowSize', 10),
                 similarityThreshold: similarityThreshold,
@@ -655,7 +656,10 @@ export class WebviewManager {
                 offset: config.get<number>('offset', 1),
                 maxWindowExpansion: config.get<number>('maxWindowExpansion', 3),
                 consecutiveFailThreshold: config.get<number>('consecutiveFailThreshold', 3),
-                removeInnerWhitespace
+                removeInnerWhitespace,
+                removePunctuation: citationConfig.get<boolean>('normalizeIgnorePunctuation', false),
+                removeDigits: citationConfig.get<boolean>('normalizeIgnoreDigits', false),
+                removeLatin: citationConfig.get<boolean>('normalizeIgnoreLatin', false)
             };
 
             // 显示进度

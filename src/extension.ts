@@ -219,6 +219,14 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.reopenResultPanel', () => {
             webviewManager.reopenResultPanel(context);
         }),
+
+        // 引文核对：占位命令（后续接入视图与索引）
+        vscode.commands.registerCommand('ai-proofread.citation.openView', () => {
+            vscode.window.showInformationMessage('引文核对视图将在后续阶段接入。');
+        }),
+        vscode.commands.registerCommand('ai-proofread.citation.rebuildIndex', () => {
+            vscode.window.showInformationMessage('引文参考文献索引将在后续阶段接入。');
+        }),
     ];
 
     context.subscriptions.push(...disposables, configManager);

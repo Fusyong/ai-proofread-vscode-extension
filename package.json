@@ -93,6 +93,14 @@
       {
         "command": "ai-proofread.reopenResultPanel",
         "title": "AI Proofreader: reopen result panel"
+      },
+      {
+        "command": "ai-proofread.citation.openView",
+        "title": "AI Proofreader: open citation verification view"
+      },
+      {
+        "command": "ai-proofread.citation.rebuildIndex",
+        "title": "AI Proofreader: rebuild citation reference index"
       }
     ],
     "configuration": {
@@ -348,6 +356,30 @@
           "type": "boolean",
           "default": true,
           "description": "句子对齐（生成勘误表）：相似度计算时是否忽略句中空白字符（默认是）。仅当通过命令面板等不弹窗方式执行对齐时使用此配置"
+        },
+        "ai-proofread.citation.referencesPath": {
+          "order": 55,
+          "type": "string",
+          "default": "",
+          "description": "引文核对：参考文献根路径，支持 ${workspaceFolder} 或绝对路径，如 test/references"
+        },
+        "ai-proofread.citation.normalizeIgnorePunctuation": {
+          "order": 56,
+          "type": "boolean",
+          "default": false,
+          "description": "引文核对/对齐共用归一化：是否去掉标点（默认否，即保留）"
+        },
+        "ai-proofread.citation.normalizeIgnoreDigits": {
+          "order": 57,
+          "type": "boolean",
+          "default": false,
+          "description": "引文核对/对齐共用归一化：是否去掉阿拉伯数字（默认否，即保留）"
+        },
+        "ai-proofread.citation.normalizeIgnoreLatin": {
+          "order": 58,
+          "type": "boolean",
+          "default": false,
+          "description": "引文核对/对齐共用归一化：是否去掉拉丁字符（默认否，即保留）"
         },
         "ai-proofread.debug.enableConsoleLog": {
           "order": 90,
