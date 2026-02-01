@@ -1,9 +1,11 @@
 .vscode/**
 .vscode-test/**
 src/**
+docs/**
 .gitignore
 .parcel-cache
 node_modules
+dist/sql-wasm.[0-9a-f]*.js
 **/tsconfig.json
 **/.eslintrc.json
 **/*.map

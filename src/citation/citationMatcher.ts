@@ -28,8 +28,8 @@ export interface BlockMatchResult {
     matches: BlockMatchCandidate[];
 }
 
-const DEFAULT_LEN_DELTA = 10;
-const NGRAM_SIZE = 2;
+const DEFAULT_LEN_DELTA_RATIO = 0.2;
+const DEFAULT_NGRAM_SIZE = 2;
 /** 比较时去掉省略号（用于相似度）；每次新建正则避免 global 状态 */
 function normalizedWithoutEllipsis(normalized: string): string {
     return normalized.replace(/\u2026+|\.{2,}/g, '');
@@ -73,16 +73,18 @@ export async function matchCitationsToReferences(
     blocks: CitationBlockWithSentences[],
     refStore: ReferenceStore,
     options: {
-        lenDelta?: number;
+        lenDeltaRatio?: number;
         similarityThreshold?: number;
         matchesPerCitation?: number;
+        ngramSize?: number;
         cancelToken?: vscode.CancellationToken;
         progress?: (message: string, current: number, total: number) => void;
     } = {}
 ): Promise<BlockMatchResult[]> {
-    const lenDelta = options.lenDelta ?? DEFAULT_LEN_DELTA;
+    const lenDeltaRatio = options.lenDeltaRatio ?? DEFAULT_LEN_DELTA_RATIO;
     const threshold = options.similarityThreshold ?? 0.4;
     const maxMatches = Math.max(1, Math.floor(options.matchesPerCitation ?? 2));
+    const ngramSize = Math.max(1, Math.floor(options.ngramSize ?? DEFAULT_NGRAM_SIZE));
     const cancelToken = options.cancelToken;
     const progress = options.progress;
 
@@ -104,12 +106,12 @@ export async function matchCitationsToReferences(
 
         for (const anchorIdx of anchorIndices) {
             const anchor = sents[anchorIdx];
-            const candidates = await refStore.getCandidatesByLength(anchor.lenNorm, lenDelta);
+            const candidates = await refStore.getCandidatesByLength(anchor.lenNorm, lenDeltaRatio);
             const anchorNorm = normalizedWithoutEllipsis(anchor.normalized);
             let bestRef: RefSentenceRow | undefined;
             let bestScore = 0;
             for (const ref of candidates) {
-                const score = jaccardSimilarity(anchorNorm, normalizedWithoutEllipsis(ref.normalized), NGRAM_SIZE);
+                const score = jaccardSimilarity(anchorNorm, normalizedWithoutEllipsis(ref.normalized), ngramSize);
                 if (score > bestScore) {
                     bestScore = score;
                     bestRef = ref;
@@ -131,7 +133,7 @@ export async function matchCitationsToReferences(
                 const rIdx = refIdx - anchorIdx + i;
                 const refSent = refOrdered[rIdx];
                 const citNorm = normalizedWithoutEllipsis(sents[i].normalized);
-                const sim = jaccardSimilarity(citNorm, normalizedWithoutEllipsis(refSent.normalized), NGRAM_SIZE);
+                const sim = jaccardSimilarity(citNorm, normalizedWithoutEllipsis(refSent.normalized), ngramSize);
                 scores.push(sim);
             }
             const avg = scores.reduce((a, x) => a + x, 0) / scores.length;

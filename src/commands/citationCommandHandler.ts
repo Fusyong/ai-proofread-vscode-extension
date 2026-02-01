@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ReferenceStore, getCitationNormalizeOptions } from '../citation';
-import { collectAllCitations, splitCitationBlocksIntoSentences } from '../citation';
+import { collectAllCitations, splitCitationBlocksIntoSentences, type CitationEntry } from '../citation';
 import { matchCitationsToReferences } from '../citation/citationMatcher';
 import { focusCitationView } from '../citation/citationView';
 import type { CitationTreeDataProvider } from '../citation/citationTreeProvider';
@@ -14,57 +14,20 @@ import type { CitationTreeNode } from '../citation/citationTreeProvider';
 import { showDiff } from '../differ';
 import { searchTextInPDF } from '../pdfSearcher';
 
-const OUTPUT_CHANNEL_NAME = '引文核对';
+const CITATION_VIEW_BASE_TITLE = 'Citation';
 
 export class CitationCommandHandler {
-    private outputChannel: vscode.OutputChannel | null = null;
-
     constructor(
         private context: vscode.ExtensionContext,
         private citationTreeProvider: CitationTreeDataProvider | null = null,
         private citationTreeView: vscode.TreeView<CitationTreeNode> | null = null
     ) {}
 
-    private getOutputChannel(): vscode.OutputChannel {
-        if (!this.outputChannel) {
-            this.outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
+    /** 更新引文 TreeView 标题栏显示的条目数量 */
+    private updateCitationViewTitle(entryCount: number): void {
+        if (this.citationTreeView) {
+            this.citationTreeView.title = `${CITATION_VIEW_BASE_TITLE} (${entryCount})`;
         }
-        return this.outputChannel;
-    }
-
-    /** 测试引文收集：对当前文档收集引文并分句，输出到「引文核对」输出通道 */
-    async handleTestCollectorCommand(): Promise<void> {
-        const doc = vscode.window.activeTextEditor?.document;
-        if (!doc) {
-            vscode.window.showWarningMessage('请先打开要核对的文档。');
-            return;
-        }
-        const ch = this.getOutputChannel();
-        ch.clear();
-        ch.show();
-        ch.appendLine(`=== 引文收集测试：${doc.fileName} ===`);
-        const entries = collectAllCitations(doc);
-        ch.appendLine(`共收集到 ${entries.length} 个引文块。`);
-        for (let i = 0; i < entries.length; i++) {
-            const e = entries[i];
-            ch.appendLine(`\n[${i + 1}] ${e.type} L${e.startLine}-${e.endLine} ${e.confidence ?? 'citation'}${e.reason ? ` (${e.reason})` : ''}`);
-            ch.appendLine(`  "${e.text.slice(0, 80)}${e.text.length > 80 ? '...' : ''}"`);
-            if (e.footnoteMarker) ch.appendLine(`  注码: ${e.footnoteMarker}`);
-        }
-        const opts = getCitationNormalizeOptions();
-        const blocks = splitCitationBlocksIntoSentences(entries, opts);
-        let sentenceCount = 0;
-        for (const blk of blocks) {
-            sentenceCount += blk.sentences.length;
-        }
-        ch.appendLine(`\n分句后共 ${sentenceCount} 条引文句。`);
-        for (const blk of blocks) {
-            ch.appendLine(`  块 ${blk.entry.startLine}-${blk.entry.endLine}: ${blk.sentences.length} 句`);
-            for (const s of blk.sentences) {
-                ch.appendLine(`    句 ${s.sentenceIndex + 1} L${s.startLine}-${s.endLine} lenNorm=${s.lenNorm}: "${s.text.slice(0, 50)}${s.text.length > 50 ? '...' : ''}"`);
-            }
-        }
-        ch.appendLine('\n=== 测试结束 ===');
     }
 
     async handleRebuildIndexCommand(): Promise<void> {
@@ -124,6 +87,7 @@ export class CitationCommandHandler {
             vscode.window.showWarningMessage('请先在设置中配置并确保「引文核对：参考文献根路径」存在，然后执行「重建引文索引」。');
             if (this.citationTreeProvider) {
                 this.citationTreeProvider.refresh([], null);
+                this.updateCitationViewTitle(0);
                 await focusCitationView();
             }
             return;
@@ -134,11 +98,12 @@ export class CitationCommandHandler {
             const opts = getCitationNormalizeOptions();
             const blocks = splitCitationBlocksIntoSentences(entries, opts);
             const config = vscode.workspace.getConfiguration('ai-proofread.citation');
-            const lenDelta = config.get<number>('lenDelta', 10);
+            const lenDeltaRatio = config.get<number>('lenDeltaRatio', 0.2);
             const matchesPerCitation = config.get<number>('matchesPerCitation', 2);
 
             const alignmentConfig = vscode.workspace.getConfiguration('ai-proofread.alignment');
             const similarityThreshold = alignmentConfig.get<number>('similarityThreshold', 0.4);
+            const ngramSize = alignmentConfig.get<number>('ngramSize', 2);
             const blockResults = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
@@ -147,9 +112,10 @@ export class CitationCommandHandler {
                 },
                 async (progress, cancelToken) => {
                     return matchCitationsToReferences(blocks, refStore, {
-                        lenDelta,
+                        lenDeltaRatio,
                         similarityThreshold,
                         matchesPerCitation,
+                        ngramSize,
                         cancelToken,
                         progress: (msg, cur, total) => progress.report({ message: msg, increment: total > 0 ? (100 / total) : 0 })
                     });
@@ -158,6 +124,7 @@ export class CitationCommandHandler {
 
             if (this.citationTreeProvider) {
                 this.citationTreeProvider.refresh(blockResults, doc.uri);
+                this.updateCitationViewTitle(blockResults.length);
                 await focusCitationView();
             }
         } catch (e) {
@@ -165,6 +132,94 @@ export class CitationCommandHandler {
             vscode.window.showErrorMessage(`引文核对失败: ${msg}`);
             if (this.citationTreeProvider) {
                 this.citationTreeProvider.refresh([], null);
+                this.updateCitationViewTitle(0);
+            }
+        }
+    }
+
+    /** 核对选中引文：用当前选中的文本作为一条引文，走现有匹配逻辑，结果展示在 Citation 树中 */
+    async handleVerifySelectionCommand(): Promise<void> {
+        const editor = vscode.window.activeTextEditor;
+        const doc = editor?.document;
+        if (!doc || !editor.selection || editor.selection.isEmpty) {
+            vscode.window.showWarningMessage('请先选中要核对的引文文本。');
+            return;
+        }
+        const refStore = ReferenceStore.getInstance(this.context);
+        const root = refStore.getReferencesRoot();
+        if (!root || !fs.existsSync(root)) {
+            vscode.window.showWarningMessage('请先在设置中配置并确保「引文核对：参考文献根路径」存在，然后执行「重建引文索引」。');
+            if (this.citationTreeProvider) {
+                this.citationTreeProvider.refresh([], null);
+                this.updateCitationViewTitle(0);
+                await focusCitationView();
+            }
+            return;
+        }
+        const range = editor.selection;
+        let text = doc.getText(range);
+        text = text.split('\n').map((line) => line.replace(/^[\s>]+/, '')).join('\n').replace(/^\s+/, '');
+        if (!text.trim()) {
+            vscode.window.showWarningMessage('选中的内容为空。');
+            return;
+        }
+        const startLine = range.start.line + 1;
+        const endLine = range.end.line + 1;
+        /** 去除左侧空格和 > 后的文本作为原始引文，后续与全文引文一致：分句、归一化、匹配 */
+        const entry: CitationEntry = {
+            uri: doc.uri,
+            text,
+            startLine,
+            endLine,
+            range,
+            type: 'quote',
+            confidence: 'citation'
+        };
+        try {
+            const opts = getCitationNormalizeOptions();
+            const blocks = splitCitationBlocksIntoSentences([entry], opts);
+            if (blocks.length === 0) {
+                vscode.window.showInformationMessage('选中文本分句后无有效句子，无法匹配。');
+                if (this.citationTreeProvider) {
+                    this.citationTreeProvider.refresh([], doc.uri);
+                    this.updateCitationViewTitle(0);
+                    await focusCitationView();
+                }
+                return;
+            }
+            const config = vscode.workspace.getConfiguration('ai-proofread.citation');
+            const lenDeltaRatio = config.get<number>('lenDeltaRatio', 0.2);
+            const matchesPerCitation = config.get<number>('matchesPerCitation', 2);
+            const alignmentConfig = vscode.workspace.getConfiguration('ai-proofread.alignment');
+            const similarityThreshold = alignmentConfig.get<number>('similarityThreshold', 0.4);
+            const ngramSize = alignmentConfig.get<number>('ngramSize', 2);
+            const blockResults = await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: '核对选中引文',
+                    cancellable: true
+                },
+                async (progress, cancelToken) =>
+                    matchCitationsToReferences(blocks, refStore, {
+                        lenDeltaRatio,
+                        similarityThreshold,
+                        matchesPerCitation,
+                        ngramSize,
+                        cancelToken,
+                        progress: (msg) => progress.report({ message: msg })
+                    })
+            );
+            if (this.citationTreeProvider) {
+                this.citationTreeProvider.refresh(blockResults, doc.uri);
+                this.updateCitationViewTitle(blockResults.length);
+                await focusCitationView();
+            }
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            vscode.window.showErrorMessage(`核对选中引文失败: ${msg}`);
+            if (this.citationTreeProvider) {
+                this.citationTreeProvider.refresh([], null);
+                this.updateCitationViewTitle(0);
             }
         }
     }
@@ -173,7 +228,7 @@ export class CitationCommandHandler {
     async handleShowDiffCommand(nodeOrItem?: CitationTreeNode | { id?: string }): Promise<void> {
         const data = this.getSelectedMatchData(nodeOrItem);
         if (!data) {
-            vscode.window.showWarningMessage('请在引文核对视图中选中一条匹配结果（文献名 + 相似度）后再执行「查看 diff」。');
+            vscode.window.showWarningMessage('请在引文核对视图中选中一条匹配结果后再执行「diff citations vs references」。');
             return;
         }
         const refText = data.refFragment.map((r) => r.content).join('\n');
@@ -188,7 +243,7 @@ export class CitationCommandHandler {
             );
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
-            vscode.window.showErrorMessage(`查看 diff 失败: ${msg}`);
+            vscode.window.showErrorMessage(`diff citations vs references failed: ${msg}`);
         }
     }
 
@@ -196,7 +251,7 @@ export class CitationCommandHandler {
     async handleSearchInPdfCommand(nodeOrItem?: CitationTreeNode | { id?: string }): Promise<void> {
         const data = this.getSelectedMatchData(nodeOrItem);
         if (!data) {
-            vscode.window.showWarningMessage('请在引文核对视图中选中一条匹配结果后再执行「在 PDF 中搜索」。');
+            vscode.window.showWarningMessage('请在引文核对视图中选中一条匹配结果后再执行「search citation in PDF」。');
             return;
         }
         const refStore = ReferenceStore.getInstance(this.context);

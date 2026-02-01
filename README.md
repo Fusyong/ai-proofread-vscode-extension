@@ -219,8 +219,9 @@ Additionally, you can also set your own prompts for other text processing scenar
 ### 3.7. 其他功能与工具
 
 1. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用PDF查看器SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
-2. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
-3. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
+2. **引文核对**：指定本地文献库根目录（Markdown格式，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。
+3. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
+4. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
 
 
 ### 3.8. 注意事项
@@ -289,10 +290,13 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 5. TODO
 
-1. [ ] 勘误表改为JSON加web viewer
-2. [ ] 选中引文后核对
-3. [ ] 测试Markdown模式的句子切分函数
-4. [ ] 预置更多提示词，包括常用的专项校对
+1. [ ] 简化换行符问题
+2. [ ] 在线引文核对
+    1. [ ] 读秀，
+    2. [ ] 中华经典古籍库，
+    3. [ ] 识典故古籍
+3. [ ] 勘误表改为JSON加web viewer
+5. [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] 典型错误举例校对
         1. [ ] 标点符号用法错误
         2. [ ] 数字用法错误
@@ -303,19 +307,23 @@ Additionally, you can also set your own prompts for other text processing scenar
     4. [ ] 练习题就地回答
     5. [ ] 翻译
     6. [ ] 按小学语文教材标准加拼音
-5. [ ] 数字连续性检查（以Python库相应模块为基础）
-6. [ ] 引文核对（以Python库相应模块为基础）
-7. [ ] 自主发现、提出、校对知识性问题
+6. [ ] 数字连续性检查（以Python库相应模块为基础）
+7. [ ] 引文核对（以Python库相应模块为基础）
+8. [ ] 自主发现、提出、校对知识性问题
     1. [ ] 检索、核对互联网资料
     2. [ ] 检索、核对本地词典（以Python库mdict查询模块为基础）
-8.  [ ] 多平台支持测试
-9.  [ ] 内部git版本管理
-10. [ ] 推理模型无法使用的问题（可能单纯是因为运行时间过长）
-11. [ ] 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
-12. [ ] 支持Copilot（尝试过一次，回文说API还没有开放。还需要研究参考项目。）
+9.  [ ] 多平台支持测试
+10. [ ] 内部git版本管理
+11. [ ] 推理模型无法使用的问题（可能单纯是因为运行时间过长）
+12. [ ] 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
+13. [ ] 支持Copilot（尝试过一次，回文说API还没有开放。还需要研究参考项目。）
 
 
 ## 6. 更新日志
+
+### v1.4.0
+
+- 特性：增加基于本地文献库（Markdown格式，可附带同名PDF以便反查）的引文核对功能，选中引文核对，或全文自动收集引文后核对
 
 ### v1.3.1
 

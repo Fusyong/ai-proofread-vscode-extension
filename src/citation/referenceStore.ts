@@ -68,31 +68,31 @@ type SqlJsStatic = {
     Database: new (data?: Uint8Array) => SqlJsDatabase;
 };
 
-let sqlJsInit: (() => Promise<SqlJsStatic>) | null = null;
+/** 按 distDir 缓存，避免同一 dist 重复加载 */
+let sqlJsInitByDir: Map<string, () => Promise<SqlJsStatic>> = new Map();
 
-function getSqlJs(): Promise<SqlJsStatic> {
-    if (sqlJsInit) return sqlJsInit();
-    sqlJsInit = async (): Promise<SqlJsStatic> => {
-        // 使用 require 加载，使 Parcel 将 sql.js 视为外部依赖，避免打包时改写 module.exports
-        const sqlJsModule = require('sql.js');
+/**
+ * 从扩展 dist 目录加载 sql.js（构建时由 copy-sqljs-dist 复制 sql-wasm.js + sql-wasm.wasm）。
+ * @param distDir 扩展的 dist 目录绝对路径（建议 context.extensionPath + '/dist'），打包后不含 node_modules 时由此定位 sql-wasm 文件
+ */
+function getSqlJs(distDir: string): Promise<SqlJsStatic> {
+    let init = sqlJsInitByDir.get(distDir);
+    if (init) return init();
+    init = async (): Promise<SqlJsStatic> => {
+        const sqlWasmPath = path.join(distDir, 'sql-wasm.js');
+        const sqlJsModule = require(sqlWasmPath);
         const initSqlJs =
             (typeof sqlJsModule === 'function' ? sqlJsModule : null) ??
             (typeof sqlJsModule?.default === 'function' ? sqlJsModule.default : null) ??
             (typeof (sqlJsModule as { Module?: unknown })?.Module === 'function' ? (sqlJsModule as { Module: () => Promise<SqlJsStatic> }).Module : null);
         if (typeof initSqlJs !== 'function') {
-            throw new Error('sql.js: 无法获取 initSqlJs 函数，请确认 sql.js 已正确安装');
+            throw new Error('sql.js: 无法获取 initSqlJs 函数，请确认已执行 copy-sqljs-dist 并将 sql-wasm.js 复制到 dist/');
         }
-        // 不使用 require.resolve，避免 Parcel 打包时将其替换导致运行时报错
-        const distWasmDir = __dirname;
-        const nodeModulesSqlJsDist = path.join(__dirname, '..', '..', 'node_modules', 'sql.js', 'dist');
-        const locateFile = (file: string): string => {
-            const inDist = path.join(distWasmDir, file);
-            if (fs.existsSync(inDist)) return inDist;
-            return path.join(nodeModulesSqlJsDist, file);
-        };
+        const locateFile = (file: string): string => path.join(distDir, file);
         return initSqlJs({ locateFile });
     };
-    return sqlJsInit();
+    sqlJsInitByDir.set(distDir, init);
+    return init();
 }
 
 /**
@@ -178,7 +178,8 @@ export class ReferenceStore {
             this.dbPath = '';
         }
         if (this.db) return this.db;
-        const SQL = await getSqlJs();
+        const distDir = path.join(this.context.extensionPath, 'dist');
+        const SQL = await getSqlJs(distDir);
         const dir = path.dirname(wantPath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         let data: Uint8Array | undefined;
@@ -338,14 +339,16 @@ export class ReferenceStore {
 
     /**
      * 按长度过滤获取候选文献句（用于相似度匹配）
+     * @param lenNorm 锚点句的归一化长度
+     * @param deltaRatio 允许偏离的比例，如 0.2 表示 ±20%
      */
     async getCandidatesByLength(
         lenNorm: number,
-        delta: number = 10
+        deltaRatio: number = 0.2
     ): Promise<RefSentenceRow[]> {
         const db = await this.ensureDb();
-        const low = Math.max(0, lenNorm - delta);
-        const high = lenNorm + delta;
+        const low = Math.max(0, Math.floor(lenNorm * (1 - deltaRatio)));
+        const high = Math.ceil(lenNorm * (1 + deltaRatio));
         const result = db.exec(
             `SELECT id, file_path, paragraph_idx, sentence_idx, content, normalized, len_norm, start_line, end_line FROM ${TABLE_NAME} WHERE len_norm BETWEEN ${low} AND ${high}`
         );

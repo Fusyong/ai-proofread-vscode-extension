@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -96,23 +96,23 @@
       },
       {
         "command": "ai-proofread.citation.openView",
-        "title": "AI Proofreader: Check Citations"
+        "title": "AI Proofreader: verify citations"
       },
       {
         "command": "ai-proofread.citation.rebuildIndex",
-        "title": "AI Proofreader: rebuild citation reference index"
+        "title": "AI Proofreader: build citation reference index"
       },
       {
-        "command": "ai-proofread.citation.testCollector",
-        "title": "AI Proofreader: test citation collector (current document)"
+        "command": "ai-proofread.citation.verifySelection",
+        "title": "AI Proofreader: verify selected citation"
       },
       {
         "command": "ai-proofread.citation.showDiff",
-        "title": "查看 diff（引文 vs 文献）"
+        "title": "AI Proofreader: diff citations vs references"
       },
       {
         "command": "ai-proofread.citation.searchInPdf",
-        "title": "在 PDF 中搜索该段"
+        "title": "AI Proofreader: search citation in PDF"
       }
     ],
     "configuration": {
@@ -343,7 +343,7 @@
           "order": 50,
           "type": "number",
           "default": 2,
-          "description": "句子对齐（生成勘误表）：N-gram大小"
+          "description": "N-gram 大小，用于相似度计算。影响句子对齐（勘误表）与引文核对。默认 2（bigram）。"
         },
         "ai-proofread.alignment.offset": {
           "order": 51,
@@ -411,23 +411,36 @@
           "default": true,
           "description": "引文核对归一化：是否去掉 Markdown 注码 [^1] 和上标注码 ^1^（默认是，即去掉）"
         },
-        "ai-proofread.citation.topK": {
+        "ai-proofread.citation.lenDeltaRatio": {
           "order": 60,
           "type": "number",
-          "default": 5,
-          "description": "引文核对：每条引文句保留的候选匹配数量（Top-K）"
-        },
-        "ai-proofread.citation.lenDelta": {
-          "order": 61,
-          "type": "number",
-          "default": 10,
-          "description": "引文核对：长度过滤区间，候选句 len_norm 在 [citation_len - delta, citation_len + delta] 内"
+          "default": 0.2,
+          "minimum": 0.01,
+          "maximum": 1,
+          "description": "引文核对：候选文献句长度允许偏离锚点句的比例。0.2 表示 ±20%，只把长度在「锚点×0.8」到「锚点×1.2」之间的文献句当作候选；越大候选越多、越慢，越小越快、可能漏匹配。"
         },
         "ai-proofread.citation.matchesPerCitation": {
-          "order": 62,
+          "order": 61,
           "type": "number",
           "default": 2,
           "description": "引文核对：每条引文显示的文献匹配数量（按相似度取前 N 条），默认 2"
+        },
+        "ai-proofread.citation.minCitationLength": {
+          "order": 62,
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "description": "有效引文的最小长度（字符数）。仅当「忽略的引文」包含“过短的引文”时，小于此长度的引文会被忽略。默认 5。"
+        },
+        "ai-proofread.citation.ignoredCitationTypes": {
+          "order": 63,
+          "type": "array",
+          "default": ["short"],
+          "description": "忽略的引文类型，不列入树视图。可选：\"short\" 过短的引文（长度小于「有效引文的最小长度」）、\"noFootnote\" 末尾没有注释标记的引文（无 [^1]、^1^、①② 等注码）。默认只忽略过短的引文。",
+          "items": {
+            "type": "string",
+            "enum": ["short", "noFootnote"]
+          }
         },
         "ai-proofread.debug.enableConsoleLog": {
           "order": 90,
@@ -466,6 +479,11 @@
         },
         {
           "command": "ai-proofread.searchSelectionInPDF",
+          "group": "ai-proofread@12",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.citation.verifySelection",
           "group": "ai-proofread@12",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
@@ -515,10 +533,10 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "compile": "parcel build src/extension.ts --no-source-maps && npm run copy-wasm",
+    "compile": "parcel build src/extension.ts --no-source-maps && npm run copy-sqljs-dist",
     "watch": "parcel watch src/extension.ts --no-source-maps",
-    "package": "parcel build src/extension.ts --no-source-maps --no-cache && npm run copy-wasm",
-    "copy-wasm": "node -e \"const fs=require('fs'),p=require('path'); fs.copyFileSync(p.join('node_modules','sql.js','dist','sql-wasm.wasm'), p.join('dist','sql-wasm.wasm'));\"",
+    "package": "parcel build src/extension.ts --no-source-maps --no-cache && npm run copy-sqljs-dist",
+    "copy-sqljs-dist": "node -e \"const fs=require('fs'),p=require('path'); const src=p.join('node_modules','sql.js','dist'), dst='dist'; fs.copyFileSync(p.join(src,'sql-wasm.js'), p.join(dst,'sql-wasm.js')); fs.copyFileSync(p.join(src,'sql-wasm.wasm'), p.join(dst,'sql-wasm.wasm'));\"",
     "lint": "eslint src --ext ts",
     "package-vsix": "npx vsce package",
     "publish": "npx vsce publish"

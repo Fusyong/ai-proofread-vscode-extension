@@ -278,14 +278,23 @@ export function collectBlockquoteCitations(document: vscode.TextDocument): Citat
     return entries;
 }
 
-/** 合并引号与块引用，并标记可能非引文 */
+/** 合并引号与块引用，并标记可能非引文；按配置忽略过短或末尾无注码的引文，不列入结果 */
 export function collectAllCitations(document: vscode.TextDocument): CitationEntry[] {
     const quoted = collectQuotedCitations(document);
     const blockquote = collectBlockquoteCitations(document);
+    const config = vscode.workspace.getConfiguration('ai-proofread.citation');
+    const minLen = Math.max(0, config.get<number>('minCitationLength', 5));
+    const ignoredTypes = new Set(
+        config.get<string[]>('ignoredCitationTypes', ['short']).filter((s): s is 'short' | 'noFootnote' =>
+            s === 'short' || s === 'noFootnote'
+        )
+    );
     const merged: CitationEntry[] = [];
     const seen = new Set<string>();
 
     for (const e of [...quoted, ...blockquote]) {
+        if (ignoredTypes.has('short') && e.text.trim().length < minLen) continue;
+        if (ignoredTypes.has('noFootnote') && !e.footnoteMarker) continue;
         const key = `${e.startLine}-${e.endLine}-${e.text.slice(0, 20)}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -296,23 +305,16 @@ export function collectAllCitations(document: vscode.TextDocument): CitationEntr
     return merged.sort((a, b) => a.startLine - b.startLine);
 }
 
-const MIN_CITATION_LENGTH = 4;
-
-/** 常见非引文前缀（可配置扩展）：以这些开头时标为 likely_not */
-const NON_CITATION_PREFIXES = ['第', '图', '表', '注：', '注:', '不是引文'];
-
 function applyConfidence(entry: CitationEntry): CitationEntry {
     const t = entry.text.trim();
-    if (t.length < MIN_CITATION_LENGTH) {
-        return { ...entry, confidence: 'likely_not', reason: `长度小于 ${MIN_CITATION_LENGTH} 字` };
+    const config = vscode.workspace.getConfiguration('ai-proofread.citation');
+    const minLen = Math.max(0, config.get<number>('minCitationLength', 5));
+    if (t.length < minLen) {
+        return { ...entry, confidence: 'likely_not', reason: `长度小于 ${minLen} 字` };
     }
     const digitsPunct = (t.match(/[\d０-９\p{P}\s]/gu) ?? []).join('').length;
     if (t.length > 0 && digitsPunct / t.length >= 0.9) {
         return { ...entry, confidence: 'likely_not', reason: '绝大部分为数字或标点' };
-    }
-    const prefix = NON_CITATION_PREFIXES.find((p) => t.startsWith(p));
-    if (prefix) {
-        return { ...entry, confidence: 'likely_not', reason: `以非引文前缀「${prefix}」开头` };
     }
     return { ...entry, confidence: 'citation' };
 }

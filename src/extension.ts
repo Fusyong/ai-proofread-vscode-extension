@@ -231,8 +231,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.citation.rebuildIndex', async () => {
             await citationHandler.handleRebuildIndexCommand();
         }),
-        vscode.commands.registerCommand('ai-proofread.citation.testCollector', async () => {
-            await citationHandler.handleTestCollectorCommand();
+        vscode.commands.registerCommand('ai-proofread.citation.verifySelection', async () => {
+            await citationHandler.handleVerifySelectionCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.citation.showDiff', (nodeOrItem?: unknown) => {
             citationHandler.handleShowDiffCommand(nodeOrItem as import('./citation/citationTreeProvider').CitationTreeNode | { id?: string } | undefined);

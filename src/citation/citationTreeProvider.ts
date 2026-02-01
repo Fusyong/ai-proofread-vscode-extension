@@ -8,7 +8,8 @@ import * as path from 'path';
 import type { BlockMatchResult, BlockMatchCandidate } from './citationMatcher';
 import type { RefSentenceRow } from './referenceStore';
 
-const PREVIEW_LEN = 36;
+/** 引文/文献条目在树中显示时截取的字数 */
+const PREVIEW_LEN = 15;
 
 export type CitationTreeBlockNode = { kind: 'block'; data: BlockMatchResult; blockIndex: number };
 export type CitationTreeMatchNode = { kind: 'match'; data: BlockMatchCandidate; blockIndex: number; matchIndex: number };
@@ -40,23 +41,34 @@ export class CitationTreeDataProvider implements vscode.TreeDataProvider<Citatio
         if (element.kind === 'block') {
             const entry = element.data.block.entry;
             const label = `L${entry.startLine}-${entry.endLine} ${this.preview(entry.text)}`;
-            const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.Expanded);
+            const hasMatches = element.data.matches.length > 0;
+            const item = new vscode.TreeItem(
+                label,
+                hasMatches ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None
+            );
             item.id = `block:${element.blockIndex}`;
-            const firstMatch = element.data.matches[0];
+            const matches = element.data.matches;
             item.description = entry.confidence === 'likely_not'
                 ? '可能非引文'
-                : (firstMatch ? `${(firstMatch.score * 100).toFixed(0)}% ${path.basename(firstMatch.file_path)}` : (entry.footnoteMarker ?? ''));
+                : (matches.length > 0 ? matches.map((m) => `${(m.score * 100).toFixed(0)}%`).join(' ') : (entry.footnoteMarker ?? ''));
             item.tooltip = entry.text;
             item.contextValue = 'citationBlock';
-            item.iconPath = entry.type === 'blockquote' ? new vscode.ThemeIcon('quote') : new vscode.ThemeIcon('text-size');
+            item.iconPath = entry.footnoteMarker
+                ? new vscode.ThemeIcon('bookmark')
+                : (entry.type === 'blockquote' ? new vscode.ThemeIcon('quote') : new vscode.ThemeIcon('text-size'));
             return item;
         }
         const match = element.data;
         const fileName = path.basename(match.file_path);
-        const item = new vscode.TreeItem(`${fileName} ${(match.score * 100).toFixed(0)}%`, vscode.TreeItemCollapsibleState.None);
-        item.id = `match:${element.blockIndex}:${element.matchIndex}`;
-        item.description = match.file_path;
+        const first = match.refFragment[0];
+        const last = match.refFragment.length > 0 ? match.refFragment[match.refFragment.length - 1] : first;
+        const startLine = first?.start_line ?? 0;
+        const endLine = last?.end_line ?? 0;
         const refText = match.refFragment.map((r) => r.content).join('');
+        const preview = refText.length > PREVIEW_LEN ? refText.slice(0, PREVIEW_LEN) + '…' : refText;
+        const label = `L${startLine}-${endLine} ${preview} ${(match.score * 100).toFixed(0)}% ${fileName}`;
+        const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+        item.id = `match:${element.blockIndex}:${element.matchIndex}`;
         item.tooltip = refText;
         item.contextValue = 'citationMatch';
         return item;
