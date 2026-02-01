@@ -96,7 +96,7 @@
       },
       {
         "command": "ai-proofread.citation.openView",
-        "title": "AI Proofreader: open citation verification view"
+        "title": "AI Proofreader: Check Citations"
       },
       {
         "command": "ai-proofread.citation.rebuildIndex",
@@ -105,6 +105,14 @@
       {
         "command": "ai-proofread.citation.testCollector",
         "title": "AI Proofreader: test citation collector (current document)"
+      },
+      {
+        "command": "ai-proofread.citation.showDiff",
+        "title": "查看 diff（引文 vs 文献）"
+      },
+      {
+        "command": "ai-proofread.citation.searchInPdf",
+        "title": "在 PDF 中搜索该段"
       }
     ],
     "configuration": {
@@ -397,6 +405,30 @@
           "default": true,
           "description": "引文核对归一化：是否去掉拉丁字符（默认是，即去掉）"
         },
+        "ai-proofread.citation.normalizeIgnoreFootnoteMarkers": {
+          "order": 59,
+          "type": "boolean",
+          "default": true,
+          "description": "引文核对归一化：是否去掉 Markdown 注码 [^1] 和上标注码 ^1^（默认是，即去掉）"
+        },
+        "ai-proofread.citation.topK": {
+          "order": 60,
+          "type": "number",
+          "default": 5,
+          "description": "引文核对：每条引文句保留的候选匹配数量（Top-K）"
+        },
+        "ai-proofread.citation.lenDelta": {
+          "order": 61,
+          "type": "number",
+          "default": 10,
+          "description": "引文核对：长度过滤区间，候选句 len_norm 在 [citation_len - delta, citation_len + delta] 内"
+        },
+        "ai-proofread.citation.matchesPerCitation": {
+          "order": 62,
+          "type": "number",
+          "default": 2,
+          "description": "引文核对：每条引文显示的文献匹配数量（按相似度取前 N 条），默认 2"
+        },
         "ai-proofread.debug.enableConsoleLog": {
           "order": 90,
           "type": "boolean",
@@ -405,7 +437,27 @@
         }
       }
     },
+    "views": {
+      "explorer": [
+        {
+          "id": "ai-proofread.citation",
+          "name": "Citation"
+        }
+      ]
+    },
     "menus": {
+      "view/item/context": [
+        {
+          "command": "ai-proofread.citation.showDiff",
+          "group": "citation@1",
+          "when": "view == ai-proofread.citation && viewItem == citationMatch"
+        },
+        {
+          "command": "ai-proofread.citation.searchInPdf",
+          "group": "citation@2",
+          "when": "view == ai-proofread.citation && viewItem == citationMatch"
+        }
+      ],
       "editor/context": [
         {
           "command": "ai-proofread.proofreadSelection",
@@ -463,9 +515,10 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "compile": "parcel build src/extension.ts --no-source-maps",
+    "compile": "parcel build src/extension.ts --no-source-maps && npm run copy-wasm",
     "watch": "parcel watch src/extension.ts --no-source-maps",
-    "package": "parcel build src/extension.ts --no-source-maps --no-cache",
+    "package": "parcel build src/extension.ts --no-source-maps --no-cache && npm run copy-wasm",
+    "copy-wasm": "node -e \"const fs=require('fs'),p=require('path'); fs.copyFileSync(p.join('node_modules','sql.js','dist','sql-wasm.wasm'), p.join('dist','sql-wasm.wasm'));\"",
     "lint": "eslint src --ext ts",
     "package-vsix": "npx vsce package",
     "publish": "npx vsce publish"
@@ -494,7 +547,8 @@
     "main": {
       "context": "node",
       "includeNodeModules": {
-        "vscode": false
+        "vscode": false,
+        "sql.js": false
       },
       "sourceMap": false,
       "outputFormat": "commonjs"

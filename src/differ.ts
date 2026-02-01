@@ -13,18 +13,21 @@ import { TempFileManager } from './utils';
  * @param originalText 原始文本
  * @param proofreadText 校对后的文本
  * @param fileExt 文件扩展名
+ * @param preview 是否在预览模式打开
+ * @param title diff 编辑器窗口标题，默认 "Original ↔ Processed"
  */
 export async function showDiff(
     context: vscode.ExtensionContext,
     originalText: string,
     proofreadText: string,
     fileExt: string,
-    preview: boolean = true
+    preview: boolean = true,
+    title: string = 'Original ↔ Processed'
 ): Promise<void> {
     const tempFileManager = TempFileManager.getInstance(context);
     const originalUri = await tempFileManager.createTempFile(originalText, fileExt);
     const proofreadUri = await tempFileManager.createTempFile(proofreadText, fileExt);
-    await openDiffView(originalUri, proofreadUri, preview);
+    await openDiffView(originalUri, proofreadUri, preview, title);
 }
 
 /**
@@ -43,16 +46,19 @@ export async function showFileDiff(
 }
 
 /**
- * 打开diff视图
- * @param originalUri 原始文件URI
- * @param proofreadUri 校对后的文件URI
+ * 打开 diff 视图
+ * @param originalUri 左侧文件 URI
+ * @param proofreadUri 右侧文件 URI
+ * @param preview 是否预览模式
+ * @param title 窗口标题
  */
 async function openDiffView(
     originalUri: vscode.Uri,
     proofreadUri: vscode.Uri,
-    preview: boolean = true
+    preview: boolean = true,
+    title: string = 'Original ↔ Processed'
 ): Promise<void> {
-    await vscode.commands.executeCommand('vscode.diff', originalUri, proofreadUri, 'Original ↔ Processed', { preview: preview });
+    await vscode.commands.executeCommand('vscode.diff', originalUri, proofreadUri, title, { preview });
 }
 
 /**

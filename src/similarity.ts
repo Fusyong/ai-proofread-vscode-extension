@@ -11,24 +11,32 @@ export interface NormalizeForSimilarityOptions {
     removeInnerWhitespace?: boolean;
     /** 是否去掉标点，默认 false（保留） */
     removePunctuation?: boolean;
-    /** 是否去掉阿拉伯数字，默认 false（保留） */
+    /** 是否去掉阿拉伯数字（含带圈数字①②③等），默认 false（保留） */
     removeDigits?: boolean;
     /** 是否去掉拉丁字符，默认 false（保留） */
     removeLatin?: boolean;
+    /** 是否去掉 Markdown 注码 [^1][^abc] 和上标注码 ^1^ ^abc^，默认 false（保留） */
+    removeFootnoteMarkers?: boolean;
 }
 
 /** 标点字符正则（中英文常见标点，Unicode 标点类别） */
 const PUNCTUATION_REGEX = /\p{P}/gu;
 
-/** 阿拉伯数字：半角 0-9、全角 ０-９ */
-const DIGITS_REGEX = /[\d０-９]/g;
+/** 阿拉伯数字：半角 0-9、全角 ０-９、带圈数字 ①②③ ⑴⑵ ㊀㊉ 等 */
+const DIGITS_REGEX = /[\d０-９\u2460-\u2473\u2474-\u2487\u2488-\u249B\u24EA\u24F5-\u24FE\u3280-\u3289]/g;
 
 /** 拉丁字符：半角 A-Za-z、全角 Ａ-Ｚａ-ｚ */
 const LATIN_REGEX = /[A-Za-zＡ-Ｚａ-ｚ]/g;
 
+/** Markdown 脚注 [^1] [^abc] */
+const MARKDOWN_FOOTNOTE_RE = /\[\^[^\]]*\]/g;
+/** 上标注码 ^1^ ^abc^ */
+const SUPERSCRIPT_MARKER_RE = /\^[^^]+\^/g;
+
 /**
  * 统一归一化（用于相似度与长度过滤）
- * 规则：前后空白去掉；句中空白/句内分行默认去掉（可配置保留）；标点/数字/拉丁字符默认保留（均可配置去掉）。
+ * 规则：前后空白去掉；句中空白/句内分行默认去掉（可配置保留）；标点/数字/拉丁/注码默认保留（均可配置去掉）。
+ * 数字含带圈数字①②③；注码含 Markdown 脚注 [^1] 与上标 ^1^。
  *
  * @param text 原始句子
  * @param options 选项，未传则使用默认
@@ -42,10 +50,14 @@ export function normalizeForSimilarity(
         removeInnerWhitespace = true,
         removePunctuation = false,
         removeDigits = false,
-        removeLatin = false
+        removeLatin = false,
+        removeFootnoteMarkers = false
     } = options;
 
     let s = text.trim();
+    if (removeFootnoteMarkers) {
+        s = s.replace(MARKDOWN_FOOTNOTE_RE, '').replace(SUPERSCRIPT_MARKER_RE, '');
+    }
     if (removeInnerWhitespace) {
         s = s.replace(/\s/g, '');
     }

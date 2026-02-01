@@ -39,7 +39,8 @@ export class TempFileManager {
     public async createTempFile(content: string, ext: string): Promise<vscode.Uri> {
         const tempDir = this.getTempDir();
         const timestamp = Date.now();
-        const fileUri = vscode.Uri.joinPath(tempDir, `temp-${timestamp}${ext}`);
+        const random = Math.random().toString(36).slice(2, 10);
+        const fileUri = vscode.Uri.joinPath(tempDir, `temp-${timestamp}-${random}${ext}`);
 
         // 确保临时目录存在
         try {

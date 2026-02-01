@@ -12,6 +12,7 @@ import { FileCompareCommandHandler } from './commands/fileCompareCommandHandler'
 import { DocumentConvertCommandHandler } from './commands/documentConvertCommandHandler';
 import { UtilityCommandHandler } from './commands/utilityCommandHandler';
 import { CitationCommandHandler } from './commands/citationCommandHandler';
+import { registerCitationView } from './citation/citationView';
 
 
 export function activate(context: vscode.ExtensionContext) {
@@ -29,7 +30,8 @@ export function activate(context: vscode.ExtensionContext) {
     const fileCompareHandler = new FileCompareCommandHandler();
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
-    const citationHandler = new CitationCommandHandler(context);
+    const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
+    const citationHandler = new CitationCommandHandler(context, citationTreeProvider, citationTreeView);
 
     // 设置校对JSON文件的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, context: vscode.ExtensionContext) => {
@@ -231,6 +233,12 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('ai-proofread.citation.testCollector', async () => {
             await citationHandler.handleTestCollectorCommand();
+        }),
+        vscode.commands.registerCommand('ai-proofread.citation.showDiff', (nodeOrItem?: unknown) => {
+            citationHandler.handleShowDiffCommand(nodeOrItem as import('./citation/citationTreeProvider').CitationTreeNode | { id?: string } | undefined);
+        }),
+        vscode.commands.registerCommand('ai-proofread.citation.searchInPdf', (nodeOrItem?: unknown) => {
+            citationHandler.handleSearchInPdfCommand(nodeOrItem as import('./citation/citationTreeProvider').CitationTreeNode | { id?: string } | undefined);
         }),
     ];
 
