@@ -11,6 +11,7 @@ import { ProofreadCommandHandler } from './commands/proofreadCommandHandler';
 import { FileCompareCommandHandler } from './commands/fileCompareCommandHandler';
 import { DocumentConvertCommandHandler } from './commands/documentConvertCommandHandler';
 import { UtilityCommandHandler } from './commands/utilityCommandHandler';
+import { CitationCommandHandler } from './commands/citationCommandHandler';
 
 
 export function activate(context: vscode.ExtensionContext) {
@@ -28,6 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
     const fileCompareHandler = new FileCompareCommandHandler();
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
+    const citationHandler = new CitationCommandHandler(context);
 
     // 设置校对JSON文件的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, context: vscode.ExtensionContext) => {
@@ -220,12 +222,15 @@ export function activate(context: vscode.ExtensionContext) {
             webviewManager.reopenResultPanel(context);
         }),
 
-        // 引文核对：占位命令（后续接入视图与索引）
+        // 引文核对
         vscode.commands.registerCommand('ai-proofread.citation.openView', () => {
-            vscode.window.showInformationMessage('引文核对视图将在后续阶段接入。');
+            citationHandler.handleOpenViewCommand();
         }),
-        vscode.commands.registerCommand('ai-proofread.citation.rebuildIndex', () => {
-            vscode.window.showInformationMessage('引文参考文献索引将在后续阶段接入。');
+        vscode.commands.registerCommand('ai-proofread.citation.rebuildIndex', async () => {
+            await citationHandler.handleRebuildIndexCommand();
+        }),
+        vscode.commands.registerCommand('ai-proofread.citation.testCollector', async () => {
+            await citationHandler.handleTestCollectorCommand();
         }),
     ];
 

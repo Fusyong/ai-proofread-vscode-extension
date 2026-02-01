@@ -101,6 +101,10 @@
       {
         "command": "ai-proofread.citation.rebuildIndex",
         "title": "AI Proofreader: rebuild citation reference index"
+      },
+      {
+        "command": "ai-proofread.citation.testCollector",
+        "title": "AI Proofreader: test citation collector (current document)"
       }
     ],
     "configuration": {
@@ -469,7 +473,8 @@
   "dependencies": {
     "@google/genai": "^0.7.0",
     "axios": "^1.8.4",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "sql.js": "^1.10.0"
   },
   "devDependencies": {
     "@eslint/config-array": "^0.19.2",

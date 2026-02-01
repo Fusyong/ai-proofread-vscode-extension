@@ -703,10 +703,10 @@ export function splitChineseSentencesSimple(text: string): string[] {
     text = text.replace(/\r\n/g, '\n');
 
     // 句子结尾模式：
-    // 1. 句末标点：[。！？…]+ 后面可能跟引号、括号等
+    // 1. 句末标点：[。！？…]+ 后面可能跟引号、括号等（含弯引号 ""'' 与直引号 " ' U+201d U+2019，后引号归属上一句）
     // 2. 英文句号（需要排除小数点等情况）
     // 3. 连续两个以上的换行（忽略行中空白字符）：\n[\s]*\n+
-    const pattern = /([。！？…]+[""'')）\]】」』]*)|([.!?]+[""'')）\]】」』]*)|(\n(\s*\n)+)/g;
+    const pattern = /([。！？…]+["')）\]】」』\u201d\u2019]*)|([.!?]+["')）\]】」』\u201d\u2019]*)|(\n(\s*\n)+)/g;
 
     const sentences: string[] = [];
     let lastEnd = 0;
