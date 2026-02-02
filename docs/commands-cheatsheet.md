@@ -47,12 +47,35 @@
 
 ## 二、典型业务流程（Mermaid 图）
 
-### 2.1 从零到校对结果：整体流程
+### 2.1 两种校对方式
+
+```mermaid
+flowchart LR
+    subgraph 方式二["长文档校对"]
+        L1[打开 Markdown]
+        L2[split file <br> 切分文件]
+        L3[得到 JSON]
+        L4[proofread file <br> 批量校对文件]
+        L5[结果面板 / diff / 勘误表]
+        L1 --> L2 --> L3 --> L4 --> L5
+    end
+
+    subgraph 方式一["选段校对"]
+        S1[打开 Markdown]
+        S2[选中一段文字]
+        S3[proofread selection <br> 校对选中]
+        S4[查看 diff 结果]
+        S1 --> S2 --> S3 --> S4
+    end
+
+```
+
+### 2.2 长文档校对整体流程
 
 ```mermaid
 flowchart TB
     subgraph 准备["📄 文档准备"]
-        A[原始稿：docx / PDF / 纯文本]
+        A[原始稿：docx / PDF / text / TeX / LaTeX / ComTeXt]
         B[convert docx to markdown <br> Word 转 Markdown]
         C[convert PDF to markdown <br> PDF 转 Markdown]
         D[format paragraphs / mark titles <br> 整理段落 / 标记标题]
@@ -65,9 +88,9 @@ flowchart TB
     end
 
     subgraph 切分["✂️ 文档切分"]
-        E --> F[split file  <br> 选模式 切分文件]
-        F --> G[按长度 / 按标题 / 按标题+长度 / 带上下文]
-        G --> H[得到 文件名.json + 文件名.json.md]
+        E --> F[split file  <br> 选择模式切分文件]
+        F --> G[按长度 / 按标题 / 按标题 + 长度 / 带上下文]
+        G --> H[得到 filename.json + filename.json.md]
     end
 
     subgraph 语境["🔗 可选：组织语境"]
@@ -76,9 +99,9 @@ flowchart TB
     end
 
     subgraph 校对["✏️ 校对"]
-        J --> K[proofread file <br> 批量校对文件]
+        J --> K[proofread file <br> 校对JSON文件]
         H --> K
-        K --> L[得到 <br> 文件名.proofread.json <br> 文件名.proofread.json.md 等]
+        K --> L[得到 filename.proofread.json filename.proofread.json.md 等]
     end
 
     subgraph 查看["👀 查看结果"]
@@ -92,27 +115,6 @@ flowchart TB
     校对 --> 查看
 ```
 
-### 2.2 两种校对方式
-
-```mermaid
-flowchart LR
-    subgraph 方式一["选段校对"]
-        S1[打开 Markdown]
-        S2[选中一段文字]
-        S3[proofread selection <br> 校对选中]
-        S4[查看 diff 结果]
-        S1 --> S2 --> S3 --> S4
-    end
-
-    subgraph 方式二["长文档批量"]
-        L1[打开 Markdown]
-        L2[split file <br> 切分文件]
-        L3[得到 JSON]
-        L4[proofread file <br> 批量校对文件]
-        L5[结果面板 / diff / 勘误表]
-        L1 --> L2 --> L3 --> L4 --> L5
-    end
-```
 
 ### 2.3 切分模式选择（决策简图）
 
@@ -133,7 +135,7 @@ flowchart TD
     WithParaCtx --> Out
 ```
 
-### 2.4 比较与勘误
+### 2.4 比较与生成勘误表/审校记录
 
 ```mermaid
 flowchart TD
