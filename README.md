@@ -290,12 +290,13 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 5. TODO
 
-1. [ ] 简化换行符问题
-2. [ ] 在线引文核对
+1. [ ] 人看的的相似度使用编辑距离
+2. [ ] 简化换行符问题
+3. [ ] 在线引文核对
     1. [ ] 读秀，
     2. [ ] 中华经典古籍库，
     3. [ ] 识典故古籍
-3. [ ] 勘误表改为JSON加web viewer
+4. [ ] 勘误表改为JSON加web viewer
 5. [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] 典型错误举例校对
         1. [ ] 标点符号用法错误
