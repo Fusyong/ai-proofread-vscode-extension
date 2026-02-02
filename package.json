@@ -32,11 +32,11 @@
       },
       {
         "command": "ai-proofread.splitFileWithTitleContext",
-        "title": "AI Proofreader: split with title based context"
+        "title": "AI Proofreader: split by length with title context"
       },
       {
         "command": "ai-proofread.splitFileWithParagraphContext",
-        "title": "AI Proofreader: split with paragraph based context"
+        "title": "AI Proofreader: split by length with paragraph context"
       },
       {
         "command": "ai-proofread.splitFileByTitleAndLength",
@@ -108,11 +108,11 @@
       },
       {
         "command": "ai-proofread.citation.showDiff",
-        "title": "AI Proofreader: diff citations vs references"
+        "title": "diff citations vs references"
       },
       {
         "command": "ai-proofread.citation.searchInPdf",
-        "title": "AI Proofreader: search citation in PDF"
+        "title": "search citation in PDF"
       }
     ],
     "configuration": {
