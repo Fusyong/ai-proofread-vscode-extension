@@ -52,22 +52,21 @@
 ```mermaid
 flowchart LR
     subgraph 方式二["长文档校对"]
-        L1[打开 Markdown]
-        L2[split file <br> 切分文件]
-        L3[得到 JSON]
-        L4[proofread file <br> 批量校对文件]
-        L5[结果面板 / diff / 勘误表]
+        L1["打开 Markdown"]
+        L2["split file <br> 切分文件"]
+        L3["得到 JSON"]
+        L4["proofread file <br> 批量校对文件"]
+        L5["结果面板 / diff / 勘误表"]
         L1 --> L2 --> L3 --> L4 --> L5
     end
 
     subgraph 方式一["选段校对"]
-        S1[打开 Markdown]
-        S2[选中一段文字]
-        S3[proofread selection <br> 校对选中]
-        S4[查看 diff 结果]
+        S1["打开 Markdown"]
+        S2["选中一段文字"]
+        S3["proofread selection <br> 校对选中"]
+        S4["查看 diff 结果"]
         S1 --> S2 --> S3 --> S4
     end
-
 ```
 
 ### 2.2 长文档校对整体流程
@@ -75,11 +74,11 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph 准备["📄 文档准备"]
-        A[原始稿：docx / PDF / text / TeX / LaTeX / ComTeXt]
-        B[convert docx to markdown <br> Word 转 Markdown]
-        C[convert PDF to markdown <br> PDF 转 Markdown]
-        D[format paragraphs / mark titles <br> 整理段落 / 标记标题]
-        E[可校对之 Markdown]
+        A["原始稿：docx / PDF / text / TeX / LaTeX / ComTeXt"]
+        B["convert docx to markdown <br> Word 转 Markdown"]
+        C["convert PDF to markdown <br> PDF 转 Markdown"]
+        D["format paragraphs / mark titles <br> 整理段落 / 标记标题"]
+        E["可校对之 Markdown"]
         A --> B
         A --> C
         B --> E
@@ -88,25 +87,25 @@ flowchart TB
     end
 
     subgraph 切分["✂️ 文档切分"]
-        E --> F[split file  <br> 选择模式切分文件]
-        F --> G[按长度 / 按标题 / 按标题 + 长度 / 带上下文]
-        G --> H[得到 filename.json + filename.json.md]
+        E --> F["split file <br> 选择模式切分文件"]
+        F --> G["按长度 / 按标题 / 按标题 + 长度 / 带上下文"]
+        G --> H["得到 filename.json + filename.json.md"]
     end
 
     subgraph 语境["🔗 可选：组织语境"]
-        H --> I[merge two files <br> 合并两个文件]
-        I --> J[并入或更新 target / context / reference （目标文本 / 语境 / 参考资料）]
+        H --> I["merge two files <br> 合并两个文件"]
+        I --> J["并入或更新 target / context / reference （目标文本 / 语境 / 参考资料）"]
     end
 
     subgraph 校对["✏️ 校对"]
-        J --> K[proofread file <br> 校对JSON文件]
+        J --> K["proofread file <br> 校对JSON文件"]
         H --> K
-        K --> L[得到 filename.proofread.json filename.proofread.json.md 等]
+        K --> L["得到 filename.proofread.json filename.proofread.json.md 等"]
     end
 
     subgraph 查看["👀 查看结果"]
-        L --> M[diff it with another file <br> 与另一文件比较差异]
-        L --> N[结果面板：前后差异 / 勘误表 / HTML]
+        L --> M["diff it with another file <br> 与另一文件比较差异"]
+        L --> N["结果面板：前后差异 / 勘误表 / HTML"]
     end
 
     准备 --> 切分
@@ -120,15 +119,15 @@ flowchart TB
 
 ```mermaid
 flowchart TD
-    Start[我要切分 Markdown] --> Q1{有标题结构?}
-    Q1 -->|无| ByLen[按长度切分 <br> split by length]
-    Q1 -->|有| Q2{题下段落长度合适?}
-    Q2 -->|是，且不太长| ByTitle[按标题切分 <br> split by title]
-    Q2 -->|长短不一| ByTitleLen[按标题+长度 <br> split by title and length]
-    Q2 -->|需要整章作语境| WithTitleCtx[带标题范围上下文 <br> split by length with title context]
-    Q1 -->|有，只需前后段语境| WithParaCtx[带前后段落上下文 <br> split by length with paragraph context]
+    Start["我要切分 Markdown"] --> Q1{"有标题结构?"}
+    Q1 -->|无| ByLen["按长度切分 <br> split by length"]
+    Q1 -->|有| Q2{"题下段落长度合适?"}
+    Q2 -->|是，且不太长| ByTitle["按标题切分 <br> split by title"]
+    Q2 -->|长短不一| ByTitleLen["按标题+长度 <br> split by title and length"]
+    Q2 -->|需要整章作语境| WithTitleCtx["带标题范围上下文 <br> split by length with title context"]
+    Q1 -->|有，只需前后段语境| WithParaCtx["带前后段落上下文 <br> split by length with paragraph context"]
 
-    ByLen --> Out[得到 .json + .json.md]
+    ByLen --> Out["得到 .json + .json.md"]
     ByTitle --> Out
     ByTitleLen --> Out
     WithTitleCtx --> Out
@@ -139,21 +138,21 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Diff[与另一文件比较差异 <br> diff it with another file] --> Mode{选择模式}
-    Mode -->|VS Code 内置| A[左右对比 diff]
-    Mode -->|jsdiff HTML| B[生成带修改标记的 HTML <br> 可打印 PDF]
-    Mode -->|逐句对齐| C[生成勘误表 HTML <br> 可筛选、对比]
+    Diff["与另一文件比较差异 <br> diff it with another file"] --> Mode{"选择模式"}
+    Mode -->|VS Code 内置| A["左右对比 diff"]
+    Mode -->|jsdiff HTML| B["生成带修改标记的 HTML <br> 可打印 PDF"]
+    Mode -->|逐句对齐| C["生成勘误表 HTML <br> 可筛选、对比"]
 ```
 
 ### 2.5 引文核对流程
 
 ```mermaid
 flowchart LR
-    A[设置文献库路径] --> B[build citation reference index <br> 建立文献索引]
-    B --> C[verify citations / verify selected citation <br> 全文核对引文 / 核对选中引文]
-    C --> D[在 Citation 视图中查看]
-    D --> E[diff citations vs references <br> 引文与文献对比]
-    D --> F[search citation in PDF <br> 在 PDF 中查该引文]
+    A["设置文献库路径"] --> B["build citation reference index <br> 建立文献索引"]
+    B --> C["verify citations / verify selected citation <br> 全文核对引文 / 核对选中引文"]
+    C --> D["在 Citation 视图中查看"]
+    D --> E["diff citations vs references <br> 引文与文献对比"]
+    D --> F["search citation in PDF <br> 在 PDF 中查该引文"]
 ```
 
 ---
