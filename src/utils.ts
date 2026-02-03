@@ -6,6 +6,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
+ * 将任意换行符统一为 LF（\n）。
+ * - \r\n（CRLF）→ \n
+ * - 单独 \r（旧版 Mac）→ \n
+ * 用于所有「从外部取得文本」的入口处，保证后续 split('\n')、行间长度 +1 等逻辑正确。
+ * @param text 原始文本（可能含 CRLF 或 \r）
+ * @returns 仅含 LF 的文本
+ */
+export function normalizeLineEndings(text: string): string {
+    return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+/**
  * 临时文件管理工具
  */
 export class TempFileManager {

@@ -1,11 +1,13 @@
 /**
  * 引文收集：引号内文本、块引用（>），分句与可能非引文标记
  * 计划见 docs/citation-verification-plan.md 阶段 2
+ * 换行符：入口处统一使用 normalizeLineEndings，内部仅按 LF 按行处理。
  */
 
 import * as vscode from 'vscode';
 import { splitChineseSentencesWithLineNumbers, splitChineseSentencesSimple } from '../splitter';
 import { normalizeForSimilarity, NormalizeForSimilarityOptions } from '../similarity';
+import { normalizeLineEndings } from '../utils';
 
 /** 引文条目（块级） */
 export interface CitationEntry {
@@ -243,7 +245,8 @@ export function collectQuotedCitations(document: vscode.TextDocument): CitationE
 /** 收集连续以 > 开头的块引用 */
 export function collectBlockquoteCitations(document: vscode.TextDocument): CitationEntry[] {
     const entries: CitationEntry[] = [];
-    const lines = document.getText().split(/\r?\n/);
+    const text = normalizeLineEndings(document.getText());
+    const lines = text.split('\n');
     let i = 0;
     while (i < lines.length) {
         const line = lines[i];
@@ -327,7 +330,7 @@ export function splitCitationBlocksIntoSentences(
     const result: CitationBlockWithSentences[] = [];
     for (let b = 0; b < entries.length; b++) {
         const entry = entries[b];
-        const text = entry.text.replace(/\r\n/g, '\n');
+        const text = normalizeLineEndings(entry.text);
         const sentencesWithLines = splitChineseSentencesWithLineNumbers(text, true);
         const sentences: CitationSentence[] = [];
         const lineOffset = entry.startLine - 1; // 块内行号 1-based → 文档行 0-based 的偏移

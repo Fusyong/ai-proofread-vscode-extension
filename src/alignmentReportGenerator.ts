@@ -581,6 +581,7 @@ export function generateHtmlReport(
             remarkInputs.forEach(function(ta) {
                 ta.addEventListener('input', function() { resizeRemarkInput(ta); });
             });
+            // 粘贴内容可能含 CRLF，生成的前端脚本用 /\\r?\\n/ 输出为 /\r?\n/ 以正确按行分割
             document.addEventListener('paste', function(e) {
                 const el = e.target;
                 if (!el || !el.classList || !el.classList.contains('remark-input')) return;

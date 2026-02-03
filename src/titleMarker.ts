@@ -1,7 +1,10 @@
 /**
  * 标题标记工具
  * 根据目录表在Markdown文本中寻找标题并添加标记
+ * 换行符约定：入口处统一使用 normalizeLineEndings，内部仅按 LF 按行处理。
  */
+
+import { normalizeLineEndings } from './utils';
 
 export interface TocItem {
     name: string;
@@ -37,6 +40,7 @@ export function parseToc(
     indentLevel: number = 4,
     baseLevel: number = 1
 ): TocItem[] {
+    content = normalizeLineEndings(content);
     const lines = content.split('\n');
     const tocItems: TocItem[] = [];
 

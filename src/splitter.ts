@@ -1,9 +1,11 @@
 /**
  * 文本切分工具模块
-*/
+ * 换行符约定：所有接受外部文本的入口处统一调用 normalizeLineEndings，内部仅使用 LF (\n)。
+ */
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { normalizeLineEndings } from './utils';
 
 /**
  * 将文本大致按长度切分（在指定长度前后最近一个空行处）
@@ -12,10 +14,11 @@ import * as path from 'path';
  * @returns 切分后的文本列表
  */
 export function splitTextByLength(text: string, cutBy: number = 600): string[] {
+    text = normalizeLineEndings(text);
     // 如果长度小于50，则按50字切分
     cutBy = Math.max(50, cutBy);
 
-    // 按行分割文本
+    // 按行分割文本（已统一为 LF，行间仅 \n）
     const lines = text.split('\n');
 
     // 存储切分后的文本
@@ -50,7 +53,8 @@ export function splitTextByLength(text: string, cutBy: number = 600): string[] {
  * @returns 切分后的文本列表
  */
 export function splitMarkdownByTitle(text: string, levels: number[] = [2]): string[] {
-    // 按行分割文本
+    text = normalizeLineEndings(text);
+    // 按行分割文本（已统一为 LF）
     const lines = text.split('\n');
 
     // 存储切分后的段落
@@ -205,6 +209,7 @@ export function splitText(
     markdownOutput: string;
     segments: Array<{ target: string; context?: string }>;
 } {
+    text = normalizeLineEndings(text);
     let segments: Array<{ target: string; context?: string }>;
 
     if (options.mode === 'length') {
@@ -275,7 +280,8 @@ export async function handleFileSplit(
         minSegmentLength: number;
     };
 }> {
-    const text = fs.readFileSync(filePath, 'utf8');
+    const rawText = fs.readFileSync(filePath, 'utf8');
+    const text = normalizeLineEndings(rawText);
     const currentFileDir = path.dirname(filePath);
     const baseFileName = path.basename(filePath, path.extname(filePath));
 
@@ -369,6 +375,7 @@ export function buildTitleBasedContext(
     selectionEndLine: number,
     contextLevel: string
 ): string {
+    text = normalizeLineEndings(text);
     const lines = text.split('\n');
     const level = contextLevel.charAt(0);
 
@@ -412,7 +419,8 @@ export function buildParagraphBasedContext(
     beforeParagraphs: number = 2,
     afterParagraphs: number = 2
 ): string {
-    // 将文本按行分割
+    text = normalizeLineEndings(text);
+    // 将文本按行分割（已统一为 LF，行间 +1 即换行符）
     const textLines = text.split('\n');
 
     // 计算选中文本的行号范围
@@ -465,7 +473,7 @@ export function buildParagraphBasedContext(
         // 找到段落开始的字符位置
         let paragraphStartPos = 0;
         for (let i = 0; i < paragraphStart; i++) {
-            paragraphStartPos += textLines[i].length + 1; // +1 for newline
+            paragraphStartPos += textLines[i].length + 1; // +1 为换行符 \n（已统一为 LF）
         }
 
         // 如果选中文本开始位置大于段落开始位置，说明前面有文字
@@ -529,7 +537,7 @@ export function buildParagraphBasedContext(
         for (let i = 0; i <= paragraphEnd; i++) {
             paragraphEndPos += textLines[i].length;
             if (i < paragraphEnd) {
-                paragraphEndPos += 1; // +1 for newline
+                paragraphEndPos += 1; // +1 为换行符 \n（已统一为 LF）
             }
         }
 
@@ -615,6 +623,7 @@ export function splitMarkdownByLengthWithParagraphsAsContext(
     beforeParagraphs: number = 1,
     afterParagraphs: number = 1
 ): Array<{ context: string; target: string }> {
+    text = normalizeLineEndings(text);
     // 按长度切分文本
     const pieces = splitTextByLength(text, cutBy);
 
@@ -698,9 +707,7 @@ function _isListItem(line: string): boolean {
  * @returns 切分后的句子列表（保留所有空白字符，包括首尾换行符）
  */
 export function splitChineseSentencesSimple(text: string): string[] {
-    // 规范化换行符：将 \r\n 转换为 \n，与Python版本保持一致
-    // Python的open()在文本模式下会自动规范化换行符
-    text = text.replace(/\r\n/g, '\n');
+    text = normalizeLineEndings(text);
 
     // 句子结尾模式：
     // 1. 句末标点：[。！？…]+ 后面可能跟引号、括号等（含弯引号 ""'' 与直引号 " ' U+201d U+2019，后引号归属上一句）
@@ -807,33 +814,19 @@ export function splitChineseSentences(text: string): string[] {
         return [];
     }
 
-    // 规范化换行符：将 \r\n 转换为 \n，与Python版本保持一致
-    // Python的open()在文本模式下会自动规范化换行符
-    text = text.replace(/\r\n/g, '\n');
-
-    // 按行分割，保留换行符（类似Python的splitlines(keepends=True)）
-    // 注意：需要保留原始的换行符（\r\n 或 \n），不能统一转换为 \n
+    text = normalizeLineEndings(text);
+    // 按行分割并保留每行末尾的 \n（类似 Python splitlines(keepends=True)）；内部已统一为 LF
     const lines: string[] = [];
     let lastIndex = 0;
-    const newlineRegex = /\r?\n/g;
-    let match: RegExpExecArray | null;
-
-    while ((match = newlineRegex.exec(text)) !== null) {
-        // 提取从上次位置到当前换行符之前的内容，加上换行符本身
-        const lineContent = text.substring(lastIndex, match.index + match[0].length);
-        lines.push(lineContent);
-        lastIndex = match.index + match[0].length;
+    let idx: number;
+    while ((idx = text.indexOf('\n', lastIndex)) !== -1) {
+        lines.push(text.substring(lastIndex, idx + 1));
+        lastIndex = idx + 1;
     }
-    // 添加最后一部分（如果有）
     if (lastIndex < text.length) {
         lines.push(text.substring(lastIndex));
-    } else if (text.endsWith('\n') || text.endsWith('\r\n')) {
-        // 如果文本以换行符结尾，且最后一部分是空字符串
-        // 这表示最后有一个空行，应该保留
-        const lastNewline = text.match(/\r?\n$/);
-        if (lastNewline && lastIndex === text.length - lastNewline[0].length) {
-            lines.push(lastNewline[0]);
-        }
+    } else if (text.endsWith('\n')) {
+        lines.push('\n');
     }
 
     const sentences: string[] = [];
@@ -929,13 +922,13 @@ export function splitChineseSentences(text: string): string[] {
  * @returns (sentence, start_line, end_line) 列表
  */
 function _findSentencePositions(text: string, sentences: string[]): Array<[string, number, number]> {
-    // 预先计算每行的起始字符位置
+    // 调用方已对 text 做 normalizeLineEndings，此处仅含 LF，行间长度为 1
     const lines = text.split('\n');
-    const lineStarts: number[] = [];  // 每行在原始文本中的起始字符位置
+    const lineStarts: number[] = [];
     let currentPos = 0;
     for (const line of lines) {
         lineStarts.push(currentPos);
-        currentPos += line.length + 1;  // +1 for the newline character
+        currentPos += line.length + 1;  // +1 为换行符 \n
     }
 
     const result: Array<[string, number, number]> = [];
@@ -1051,9 +1044,7 @@ export function splitChineseSentencesWithLineNumbers(
         return [];
     }
 
-    // 规范化换行符：将 \r\n 转换为 \n，与Python版本保持一致
-    // Python的open()在文本模式下会自动规范化换行符
-    text = text.replace(/\r\n/g, '\n');
+    text = normalizeLineEndings(text);
 
     // 先获取句子列表
     const sentences = useSimple

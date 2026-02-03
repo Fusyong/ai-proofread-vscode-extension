@@ -1,7 +1,10 @@
 /**
  * 段落整理工具模块
  * 用于从PDF导出的硬换行文本中整理段落格式（添加空行、删除段内分行等）
+ * 换行符约定：入口处统一使用 normalizeLineEndings，内部仅按 LF 按行处理。
  */
+
+import { normalizeLineEndings } from './utils';
 
 /**
  * 段落整理选项
@@ -28,13 +31,17 @@ export function formatParagraphs(
     if (!text || text.trim() === '') {
         return text;
     }
+    text = normalizeLineEndings(text);
+    if (fullDocumentText !== undefined && fullDocumentText !== '') {
+        fullDocumentText = normalizeLineEndings(fullDocumentText);
+    }
 
     // 如果只需要删除段内分行，不需要段落分析，直接处理
     if (options.addBlankLines === false && options.removeLineBreaks === true) {
         return removeLineBreaksInParagraphs(text);
     }
 
-    // 将文本按行分割
+    // 将文本按行分割（已统一为 LF）
     const lines = text.split('\n');
     if (lines.length === 0) {
         return text;
