@@ -15,7 +15,7 @@ export interface TocItem {
  */
 export function cleanTitle(title: string): string {
     // 移除空格、数字、英文字母、方括号、花括号、点号、脱字符、数字序号等
-    return title.trim().replace(/(\[\s*\^[\da-zA-Z]+\s*\])|([\s\.…\d①②③④⑤⑥⑦⑧⑨⑩])|(\d+\s*$)/g, '');
+    return title.trim().replace(/(\[\s*\^[\da-zA-Z]+\s*\])|([\s\.…\d①②③④⑤⑥⑦⑧⑨⑩•·])|(\d+\s*$)/g, '');
 }
 
 /**
