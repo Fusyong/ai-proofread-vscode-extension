@@ -23,8 +23,8 @@
 | AI Proofreader: split by length | 按长度切分，输入目标字符数 |
 | AI Proofreader: split by title | 按标题切分，输入标题级别（如 1,2） |
 | AI Proofreader: split by title and length | 按标题+长度：题下过长则再切、过短则合并 |
-| AI Proofreader: split with title based context | 按长度切分，并为每段配上所在标题范围的上下文（注意 token 费用） |
-| AI Proofreader: split with paragraph based context | 按长度切分，并为每段配上前后段落作为上下文（注意 token 费用） |
+| AI Proofreader: split by length with title context | 按长度切分，并为每段配上所在标题范围的上下文（注意 token 费用） |
+| AI Proofreader: split by length with paragraph context | 按长度切分，并为每段配上前后段落作为上下文（注意 token 费用） |
 | **合并与校对** | |
 | AI Proofreader: merge two files | 合并两个 JSON：把语境/参考资料并入校对用 JSON |
 | AI Proofreader: proofread selection | 校对当前选中的文本（选段校对） |
@@ -40,8 +40,8 @@
 | AI Proofreader: build citation reference index | 建立本地文献库索引（引文核对前需先执行） |
 | AI Proofreader: verify citations | 打开引文核对视图，批量核对全文引文 |
 | AI Proofreader: verify selected citation | 核对当前选中的引文 |
-| AI Proofreader: diff citations vs references | 对比引文与文献差异（在引文视图中对单项使用） |
-| AI Proofreader: search citation in PDF | 在文献 PDF 中搜索该条引文（在引文视图中对单项使用） |
+| diff citations vs references | 对比引文与文献差异（在引文视图中对单项使用） |
+| search citation in PDF | 在文献 PDF 中搜索该条引文（在引文视图中对单项使用） |
 
 ---
 
@@ -123,8 +123,8 @@ flowchart TD
     Q1 -->|有| Q2{题下段落长度合适?}
     Q2 -->|是，且不太长| ByTitle[按标题切分 <br> split by title]
     Q2 -->|长短不一| ByTitleLen[按标题+长度 <br> split by title and length]
-    Q2 -->|需要整章作语境| WithTitleCtx[带标题范围上下文 <br> split with title based context]
-    Q1 -->|有，只需前后段语境| WithParaCtx[带前后段落上下文 <br> split with paragraph based context]
+    Q2 -->|需要整章作语境| WithTitleCtx[带标题范围上下文 <br> split by length with title context]
+    Q1 -->|有，只需前后段语境| WithParaCtx[带前后段落上下文 <br> split by length with paragraph context]
 
     ByLen --> Out[得到 .json + .json.md]
     ByTitle --> Out
