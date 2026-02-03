@@ -1,6 +1,7 @@
 /**
  * 参考文献存储：扫描、分句、归一化、SQLite 索引
  * 计划见 docs/citation-verification-plan.md 阶段 1
+ * 换行符：读入文件后统一用 normalizeLineEndings 再分句。
  */
 
 import * as vscode from 'vscode';
@@ -8,6 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { splitChineseSentencesWithLineNumbers } from '../splitter';
 import { normalizeForSimilarity, NormalizeForSimilarityOptions } from '../similarity';
+import { normalizeLineEndings } from '../utils';
 
 /** 文献句记录（与 SQLite 表对应） */
 export interface ReferenceSentence {
@@ -306,7 +308,7 @@ export class ReferenceStore {
             } catch {
                 continue;
             }
-            const normalizedContent = content.replace(/\r\n/g, '\n');
+            const normalizedContent = normalizeLineEndings(content);
             const sentencesWithLines = splitChineseSentencesWithLineNumbers(normalizedContent, true);
             for (let s = 0; s < sentencesWithLines.length; s++) {
                 const [sentence, startLine, endLine] = sentencesWithLines[s];

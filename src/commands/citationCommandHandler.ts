@@ -13,6 +13,7 @@ import type { CitationTreeDataProvider } from '../citation/citationTreeProvider'
 import type { CitationTreeNode } from '../citation/citationTreeProvider';
 import { showDiff } from '../differ';
 import { searchTextInPDF } from '../pdfSearcher';
+import { normalizeLineEndings } from '../utils';
 
 const CITATION_VIEW_BASE_TITLE = 'Citation';
 
@@ -157,7 +158,7 @@ export class CitationCommandHandler {
             return;
         }
         const range = editor.selection;
-        let text = doc.getText(range);
+        let text = normalizeLineEndings(doc.getText(range));
         text = text.split('\n').map((line) => line.replace(/^[\s>]+/, '')).join('\n').replace(/^\s+/, '');
         if (!text.trim()) {
             vscode.window.showWarningMessage('选中的内容为空。');

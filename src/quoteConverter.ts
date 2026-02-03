@@ -1,6 +1,9 @@
 /**
  * 引号转换工具模块
+ * 换行符约定：入口处统一使用 normalizeLineEndings，内部仅按 LF 处理段落分隔。
  */
+
+import { normalizeLineEndings } from './utils';
 
 /**
  * 将拉丁半角引号转换为中文全角引号
@@ -8,6 +11,7 @@
  * @returns 转换后的文本
  */
 export function convertQuotes(text: string): string {
+    text = normalizeLineEndings(text);
     // 定义引号映射，拉丁半角双引号和单引号都转换为中文全角引号
     const quoteMap = {
         '"': '“”', // 双引号

@@ -1,7 +1,10 @@
 /**
  * 标题标记工具
  * 根据目录表在Markdown文本中寻找标题并添加标记
+ * 换行符约定：入口处统一使用 normalizeLineEndings，内部仅按 LF 按行处理。
  */
+
+import { normalizeLineEndings } from './utils';
 
 export interface TocItem {
     name: string;
@@ -9,13 +12,20 @@ export interface TocItem {
 }
 
 /**
- * 清理标题，以便比较是否一致
+ * 清理标题，以便比较目录表和正文中的标题是否一致
  * @param title 原始标题
  * @returns 清理后的标题
  */
 export function cleanTitle(title: string): string {
-    // 移除空格、数字、英文字母、方括号、花括号、点号、脱字符、数字序号等
-    return title.trim().replace(/(\[\s*\^[\da-zA-Z]+\s*\])|([\s\.…\d①②③④⑤⑥⑦⑧⑨⑩])|(\d+\s*$)/g, '');
+    // 移除常见的无关标记，使得不同来源的标题可以更好地对应对比
+    // 移除 Markdown 脚注
+    // 移除上标注码
+    // 移除空白字符、点号、省略号、数字、带圈序号、间隔号、项目符号等杂项
+    return title
+        .replace(/\[\s*\^[\da-zA-Z]+\s*\]/g, '')  // 移除脚注码，如 [^1] [^abc]
+        .replace(/\^[\da-zA-Z]+\^/g, '')          // 移除上标注码，如 ^1^ ^abc^
+        .replace(/[\s\.…\d\u2460-\u2473\u3251-\u325F]/g, '') // 移除杂项符号：空白字符、点号、省略号、数字、带圈序号①-㉟
+        .trim();
 }
 
 /**
@@ -30,6 +40,7 @@ export function parseToc(
     indentLevel: number = 4,
     baseLevel: number = 1
 ): TocItem[] {
+    content = normalizeLineEndings(content);
     const lines = content.split('\n');
     const tocItems: TocItem[] = [];
 

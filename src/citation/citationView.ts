@@ -1,6 +1,7 @@
 /**
  * 引文核对视图注册与交互
  * 计划见 docs/citation-verification-plan.md 阶段 4、5
+ * 换行符：文档位置用 raw，查找/比较用 normalizeLineEndings(raw)，再用 normIndexToRawIndex 映射回 raw 索引。
  */
 
 import * as vscode from 'vscode';
@@ -8,6 +9,7 @@ import * as path from 'path';
 import { CitationTreeDataProvider } from './citationTreeProvider';
 import type { CitationTreeNode } from './citationTreeProvider';
 import { ReferenceStore } from './referenceStore';
+import { normalizeLineEndings } from '../utils';
 
 const VIEW_ID = 'ai-proofread.citation';
 
@@ -74,11 +76,11 @@ function handleSelectNode(
                         return;
                     }
                     const raw = doc.getText();
-                    const norm = raw.replace(/\r\n/g, '\n');
+                    const norm = normalizeLineEndings(raw);
                     const firstContent = first?.content ?? '';
                     const lastContent = last?.content ?? firstContent;
-                    const firstNorm = firstContent.replace(/\r\n/g, '\n');
-                    const lastNorm = lastContent.replace(/\r\n/g, '\n');
+                    const firstNorm = normalizeLineEndings(firstContent);
+                    const lastNorm = normalizeLineEndings(lastContent);
                     const idxFirst = norm.indexOf(firstNorm);
                     if (idxFirst < 0) {
                         editor.revealRange(new vscode.Range(0, 0, 0, 0), vscode.TextEditorRevealType.InCenter);
@@ -102,7 +104,7 @@ function handleSelectNode(
     }
 }
 
-/** 将「规范化字符串」（\r\n 已替换为 \n）中的索引映射回原始字符串中的字符索引 */
+/** 将「规范化字符串」（normalizeLineEndings 后）中的字符索引映射回原始字符串中的字符索引 */
 function normIndexToRawIndex(raw: string, normIndex: number): number {
     let rawIdx = 0;
     let normIdx = 0;

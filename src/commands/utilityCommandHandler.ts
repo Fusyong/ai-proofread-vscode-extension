@@ -10,7 +10,7 @@ import { searchSelectionInPDF } from '../pdfSearcher';
 import { convertQuotes } from '../quoteConverter';
 import { formatParagraphs } from '../paragraphDetector';
 import { showDiff } from '../differ';
-import { ErrorUtils, FilePathUtils } from '../utils';
+import { ErrorUtils, FilePathUtils, normalizeLineEndings } from '../utils';
 import { parseToc, markTitles, TocItem } from '../titleMarker';
 
 export class UtilityCommandHandler {
@@ -358,10 +358,8 @@ export class UtilityCommandHandler {
 
             const baseLevel = parseInt(baseLevelInput, 10) || 1;
 
-            // 读取目录文件内容
+            // 读取目录文件内容（parseToc 内部会做换行符规范化）
             const tocContent = fs.readFileSync(tocFile[0].fsPath, 'utf8');
-
-            // 解析目录（使用用户指定的起始级别）
             const tocItems = parseToc(tocContent, 4, baseLevel);
 
             if (tocItems.length === 0) {
@@ -369,8 +367,9 @@ export class UtilityCommandHandler {
                 return;
             }
 
-            // 获取当前文档的文本行
-            const textLines = document.getText().split('\n');
+            // 获取当前文档文本并统一换行符后按行分割
+            const fullText = document.getText();
+            const textLines = normalizeLineEndings(fullText).split('\n');
 
             // 标记标题
             const [markedLines, notFound] = markTitles(textLines, tocItems);
@@ -387,14 +386,15 @@ export class UtilityCommandHandler {
                 vscode.window.showInformationMessage(`标记完成！成功标记了 ${tocItems.length} 个标题（起始级别: ${baseLevel}）。`);
             }
 
-            // 替换文档内容
+            // 替换文档内容，写回时使用文档当前的换行符以保持用户习惯
             const fullRange = new vscode.Range(
                 document.positionAt(0),
-                document.positionAt(document.getText().length)
+                document.positionAt(fullText.length)
             );
+            const eol = document.eol === vscode.EndOfLineSequence.CrLf ? '\r\n' : '\n';
 
             await editor.edit(editBuilder => {
-                editBuilder.replace(fullRange, markedLines.join('\n'));
+                editBuilder.replace(fullRange, markedLines.join(eol));
             });
         } catch (error) {
             ErrorUtils.showError(error, '标记标题时出错：');
