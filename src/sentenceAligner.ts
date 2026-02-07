@@ -324,8 +324,15 @@ export function alignSentencesAnchor(
     );
 
     // 后处理：将单独的DELETE项合并到相邻的MATCH组中
-    const resultAfterMerge = mergeDeleteIntoMatch(
+    const resultAfterMergeDelete = mergeDeleteIntoMatch(
         resultAfterNonAdjacentRematch,
+        ngramSize,
+        normalizeOpts
+    );
+
+    // 后处理：将单独的INSERT项合并到相邻的MATCH组中（与 delete 合并对称，处理 b 侧）
+    const resultAfterMerge = mergeInsertIntoMatch(
+        resultAfterMergeDelete,
         ngramSize,
         normalizeOpts
     );
@@ -1036,6 +1043,172 @@ function mergeDeleteIntoMatch(
                         nextItem.a_indices = [currentItem.a_index, ...(nextItem.a_indices || [])];
                     }
                     // 跳过当前DELETE
+                    i++;
+                    continue;
+                }
+            }
+        }
+
+        // 其他情况，直接添加
+        result.push(currentItem);
+        i++;
+    }
+
+    return result;
+}
+
+/**
+ * 后处理：将单独的INSERT项合并到相邻的MATCH组中（与 mergeDeleteIntoMatch 对称，处理 b 侧）
+ * @param alignment 对齐结果
+ * @param ngramSize n-gram大小
+ * @returns 优化后的对齐结果
+ */
+function mergeInsertIntoMatch(
+    alignment: AlignmentItem[],
+    ngramSize: number = 2,
+    normalizeOpts: NormalizeForSimilarityOptions = {}
+): AlignmentItem[] {
+    if (alignment.length === 0) {
+        return alignment;
+    }
+
+    const result: AlignmentItem[] = [];
+    let i = 0;
+
+    while (i < alignment.length) {
+        const currentItem = alignment[i];
+
+        // 如果是单独的INSERT项，尝试合并到相邻的MATCH
+        if (currentItem.type === 'insert' && currentItem.b) {
+            // 检查前一个和后一个项
+            const prevItem = i > 0 ? alignment[i - 1] : null;
+            const nextItem = i < alignment.length - 1 ? alignment[i + 1] : null;
+
+            let bestMatch: AlignmentItem | null = null;
+            let bestSimilarity = 0.0;
+            let mergeDirection: 'prev' | 'next' | null = null;
+
+            // 尝试合并到前一个MATCH（INSERT 的 b 追加到前一个 MATCH 的 b 后）
+            if (prevItem &&
+                prevItem.type === 'match' &&
+                prevItem.a &&
+                prevItem.b) {
+                const prevA = prevItem.a;
+                const prevB = prevItem.b;
+                const mergedB = prevB + currentItem.b;
+                const sentA = normalizeForSimilarity(prevA, normalizeOpts);
+                const sentB = normalizeForSimilarity(mergedB, normalizeOpts);
+                const newSimilarity = jaccardSimilarity(sentA, sentB, ngramSize);
+
+                const prevSim = prevItem.similarity ?? 0.0;
+                // 结构条件：若归一化后 insert.b 是 prevMatch.a 的后缀，也允许合并（与“合并到下一 MATCH”的前缀条件对称）
+                const normInsertBPrev = normalizeForSimilarity(currentItem.b, normalizeOpts);
+                const insertIsSuffixOfPrevA = normInsertBPrev.length > 0 && sentA.endsWith(normInsertBPrev);
+
+                if (newSimilarity > prevSim || insertIsSuffixOfPrevA) {
+                    const simToUse = newSimilarity > prevSim ? newSimilarity : Math.max(newSimilarity, prevSim);
+                    if (insertIsSuffixOfPrevA || simToUse > bestSimilarity) {
+                        bestSimilarity = simToUse;
+                        bestMatch = prevItem;
+                        mergeDirection = 'prev';
+                    }
+                }
+            }
+
+            // 尝试合并到后一个MATCH（INSERT 的 b 拼到后一个 MATCH 的 b 前）
+            if (nextItem &&
+                nextItem.type === 'match' &&
+                nextItem.a &&
+                nextItem.b) {
+                const mergedB = currentItem.b + nextItem.b;
+                const sentA = normalizeForSimilarity(nextItem.a, normalizeOpts);
+                const sentB = normalizeForSimilarity(mergedB, normalizeOpts);
+                const newSimilarity = jaccardSimilarity(sentA, sentB, ngramSize);
+
+                const nextSim = nextItem.similarity ?? 0.0;
+                // 与 DELETE 合并对称：DELETE 时下一 MATCH 的 b 已包含 delete 的 a（完整句），相似度必然高；
+                // INSERT 时下一 MATCH 的 a 已包含 insert 的 b，仅靠相似度可能不升反降。
+                // 若归一化后 insert.b 是 nextMatch.a 的前缀，则允许合并。
+                const normInsertB = normalizeForSimilarity(currentItem.b, normalizeOpts);
+                const insertIsPrefixOfNextA = normInsertB.length > 0 && sentA.startsWith(normInsertB);
+
+                if (newSimilarity > nextSim || insertIsPrefixOfNextA) {
+                    const simToUse = newSimilarity > nextSim ? newSimilarity : Math.max(newSimilarity, nextSim);
+                    if (insertIsPrefixOfNextA || simToUse > bestSimilarity) {
+                        bestSimilarity = simToUse;
+                        bestMatch = nextItem;
+                        mergeDirection = 'next';
+                    }
+                }
+            }
+
+            // 如果找到可以合并的MATCH，进行合并
+            if (bestMatch !== null && mergeDirection !== null) {
+                if (mergeDirection === 'prev') {
+                    // 合并到前一个MATCH，更新 result 中最后一个项（前一个MATCH）
+                    if (result.length > 0 && result[result.length - 1].type === 'match') {
+                        const last = result[result.length - 1];
+                        last.b = last.b! + currentItem.b!;
+                        last.similarity = bestSimilarity;
+                        const insertBIndices = currentItem.b_indices || [];
+                        if (insertBIndices.length > 0) {
+                            if (!last.b_indices) {
+                                last.b_indices = [];
+                            }
+                            last.b_indices.push(...insertBIndices);
+                        } else if (currentItem.b_index !== undefined && currentItem.b_index !== null) {
+                            if (!last.b_indices) {
+                                last.b_indices = [];
+                            }
+                            last.b_indices.push(currentItem.b_index);
+                        }
+                        // 合并 b 侧行号
+                        if (currentItem.b_line_numbers && currentItem.b_line_numbers.length > 0) {
+                            if (!last.b_line_numbers) {
+                                last.b_line_numbers = last.b_line_number !== undefined && last.b_line_number !== null
+                                    ? [last.b_line_number] : [];
+                            }
+                            last.b_line_numbers.push(...currentItem.b_line_numbers);
+                        } else if (currentItem.b_line_number !== undefined && currentItem.b_line_number !== null) {
+                            if (!last.b_line_numbers) {
+                                last.b_line_numbers = last.b_line_number !== undefined && last.b_line_number !== null
+                                    ? [last.b_line_number] : [];
+                            }
+                            last.b_line_numbers.push(currentItem.b_line_number);
+                        }
+                    }
+                    i++;
+                    continue;
+                } else {
+                    // mergeDirection === 'next'：合并到后一个MATCH
+                    nextItem.b = currentItem.b! + nextItem.b!;
+                    nextItem.similarity = bestSimilarity;
+                    const insertBIndices = currentItem.b_indices || [];
+                    if (insertBIndices.length > 0) {
+                        if (!nextItem.b_indices) {
+                            nextItem.b_indices = [];
+                        }
+                        nextItem.b_indices = [...insertBIndices, ...(nextItem.b_indices || [])];
+                    } else if (currentItem.b_index !== undefined && currentItem.b_index !== null) {
+                        if (!nextItem.b_indices) {
+                            nextItem.b_indices = [];
+                        }
+                        nextItem.b_indices = [currentItem.b_index, ...(nextItem.b_indices || [])];
+                    }
+                    // 合并 b 侧行号（prepend）
+                    if (currentItem.b_line_numbers && currentItem.b_line_numbers.length > 0) {
+                        if (!nextItem.b_line_numbers) {
+                            nextItem.b_line_numbers = nextItem.b_line_number !== undefined && nextItem.b_line_number !== null
+                                ? [nextItem.b_line_number] : [];
+                        }
+                        nextItem.b_line_numbers = [...currentItem.b_line_numbers, ...(nextItem.b_line_numbers || [])];
+                    } else if (currentItem.b_line_number !== undefined && currentItem.b_line_number !== null) {
+                        if (!nextItem.b_line_numbers) {
+                            nextItem.b_line_numbers = nextItem.b_line_number !== undefined && nextItem.b_line_number !== null
+                                ? [nextItem.b_line_number] : [];
+                        }
+                        nextItem.b_line_numbers = [currentItem.b_line_number, ...(nextItem.b_line_numbers || [])];
+                    }
                     i++;
                     continue;
                 }

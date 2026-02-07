@@ -404,9 +404,9 @@ export function generateHtmlReport(
                 <div class="filter-group">
                     <label class="filter-label">相似度：</label>
                     <div class="filter-input-group">
-                        <input type="number" class="filter-input" id="minSimilarity" placeholder="最小" min="0" max="1" step="0.01" oninput="applyFilters()">
+                        <input type="number" class="filter-input" id="minSimilarity" placeholder="最小" min="0" max="1" step="0.01" oninput="applyFiltersIfDefined()">
                         <span>至</span>
-                        <input type="number" class="filter-input" id="maxSimilarity" placeholder="最大" min="0" max="1" step="0.01" oninput="applyFilters()">
+                        <input type="number" class="filter-input" id="maxSimilarity" placeholder="最大" min="0" max="1" step="0.01" oninput="applyFiltersIfDefined()">
                     </div>
                 </div>
                 <div class="filter-group print-option">
@@ -419,12 +419,12 @@ export function generateHtmlReport(
             <div class="filter-row">
                 <div class="filter-group" style="flex: 1;">
                     <label class="filter-label">序号：</label>
-                    <input type="text" class="filter-search index-filter" id="indexFilter" placeholder="如: 1,2,5-20,80-" oninput="applyFilters()" title="支持格式: 1,2,5-20,80- (注意：筛选条件无法保存)">
+                    <input type="text" class="filter-search index-filter" id="indexFilter" placeholder="如: 1,2,5-20,80-" oninput="applyFiltersIfDefined()" title="支持格式: 1,2,5-20,80- (注意：筛选条件无法保存)">
                 </div>
                 <div class="filter-group" style="flex: 1;">
                     <label class="filter-label">搜索：</label>
                     <div class="filter-input-group" style="flex: 1;">
-                        <input type="text" class="filter-search" id="searchText" placeholder="在左右文本中搜索..." oninput="applyFilters()" title="注意：筛选条件无法保存" style="flex: 1;">
+                        <input type="text" class="filter-search" id="searchText" placeholder="在左右文本中搜索..." oninput="applyFiltersIfDefined()" title="注意：筛选条件无法保存" style="flex: 1;">
                         <button class="filter-reset" onclick="resetFilters()">重置</button>
                     </div>
                 </div>
@@ -521,6 +521,7 @@ export function generateHtmlReport(
     </div>
 
     <script>
+        function applyFiltersIfDefined() { if (typeof applyFilters === 'function') applyFilters(); }
         // 类型筛选状态
         const typeFilters = {
             'all': true,
@@ -581,13 +582,13 @@ export function generateHtmlReport(
             remarkInputs.forEach(function(ta) {
                 ta.addEventListener('input', function() { resizeRemarkInput(ta); });
             });
-            // 粘贴内容可能含 CRLF，生成的前端脚本用 /\\r?\\n/ 输出为 /\r?\n/ 以正确按行分割
+            // 粘贴内容可能含 CRLF，按 \\r\\n 或 \\n 或 \\r 分割（避免正则中的 ? 在旧引擎中报 Unexpected token）
             document.addEventListener('paste', function(e) {
                 const el = e.target;
                 if (!el || !el.classList || !el.classList.contains('remark-input')) return;
                 const text = (e.clipboardData || window.clipboardData).getData('text');
                 if (!text) return;
-                var lines = text.split(/\\r?\\n/).map(function(s) { return s.trim(); });
+                var lines = text.split(/\\r\\n|\\n|\\r/).map(function(s) { return s.trim(); });
                 if (lines.length <= 1) return;
                 e.preventDefault();
                 var rowIdx = parseInt(el.getAttribute('data-row-idx'), 10);

@@ -725,15 +725,17 @@ export function splitChineseSentencesSimple(text: string): string[] {
     while ((match = pattern.exec(text)) !== null) {
         let endPos = match.index + match[0].length;
 
-        // 检查是否是小数点或缩写
+        // 检查是否是小数点、列表序号或缩写
         if (match[2]) {  // 英文标点
-            // 检查前后是否是数字
             if (endPos > 0 && endPos <= text.length && text[endPos - 1] === '.') {
                 const prevPos = match.index - 1;
                 if (prevPos >= 0 && /\d/.test(text[prevPos])) {
+                    // 前一个是数字：可能是小数点，也可能是列表序号 1. 2.
                     if (endPos < text.length && /\d/.test(text[endPos])) {
-                        continue;  // 是小数点，跳过
+                        continue;  // 后也是数字，是小数点，跳过
                     }
+                    // 后不是数字（空格、换行、汉字等），视为列表序号，不在句号处切分
+                    continue;
                 }
             }
         }
