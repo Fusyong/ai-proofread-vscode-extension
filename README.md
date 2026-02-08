@@ -219,9 +219,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 ### 3.7. 其他功能与工具
 
 1. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用PDF查看器SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
-2. **引文核对**：指定本地文献库根目录（Markdown格式，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。
-3. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
-4. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
+2. **字词检查**：命令`check words`。基于词典和通用规范汉字表等规范数据和自定义（正则）替换表的提示与替换功能，主要字词检查和基于个人积累专项检查，潜力很大。其正则替换表与TextPro类似，计划逐步兼容。
+3. **引文核对**：指定本地文献库根目录（Markdown格式，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。
+4. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
+5. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
 
 
 ### 3.8. 注意事项
@@ -328,6 +329,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 ### v1.5.0
 
 - 特性：字词检查，包括异体/繁体字、异形词
+- 特性：仿TextPro风格的给予批量自定义（正则）替换表的提示与替换
 - 文档：在docs中增加了commands-cheatsheet.md，包含业务逻辑、命令的便览图标
 - 优化：优化了分行符的处理方式，改动有点大，是否有负面影响需要观察
 
