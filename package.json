@@ -113,6 +113,26 @@
       {
         "command": "ai-proofread.citation.searchInPdf",
         "title": "search citation in PDF"
+      },
+      {
+        "command": "ai-proofread.checkWords",
+        "title": "AI Proofreader: check words"
+      },
+      {
+        "command": "ai-proofread.wordCheck.prevOccurrence",
+        "title": "上一处"
+      },
+      {
+        "command": "ai-proofread.wordCheck.nextOccurrence",
+        "title": "下一处"
+      },
+      {
+        "command": "ai-proofread.wordCheck.showNotes",
+        "title": "查看说明"
+      },
+      {
+        "command": "ai-proofread.wordCheck.revealCurrentAndAdvance",
+        "title": "下一处"
       }
     ],
     "configuration": {
@@ -455,6 +475,10 @@
         {
           "id": "ai-proofread.citation",
           "name": "Citation"
+        },
+        {
+          "id": "ai-proofread.wordCheck",
+          "name": "CheckWords"
         }
       ]
     },
@@ -469,6 +493,21 @@
           "command": "ai-proofread.citation.searchInPdf",
           "group": "citation@2",
           "when": "view == ai-proofread.citation && viewItem == citationMatch"
+        },
+        {
+          "command": "ai-proofread.wordCheck.prevOccurrence",
+          "group": "wordCheck@1",
+          "when": "view == ai-proofread.wordCheck && viewItem == wordCheckEntry"
+        },
+        {
+          "command": "ai-proofread.wordCheck.nextOccurrence",
+          "group": "wordCheck@1",
+          "when": "view == ai-proofread.wordCheck && viewItem == wordCheckEntry"
+        },
+        {
+          "command": "ai-proofread.wordCheck.showNotes",
+          "group": "wordCheck@2",
+          "when": "view == ai-proofread.wordCheck && viewItem == wordCheckEntry"
         }
       ],
       "editor/context": [

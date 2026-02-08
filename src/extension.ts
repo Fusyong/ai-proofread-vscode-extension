@@ -13,6 +13,7 @@ import { DocumentConvertCommandHandler } from './commands/documentConvertCommand
 import { UtilityCommandHandler } from './commands/utilityCommandHandler';
 import { CitationCommandHandler } from './commands/citationCommandHandler';
 import { registerCitationView } from './citation/citationView';
+import { WordCheckCommandHandler } from './commands/wordCheckCommandHandler';
 
 
 export function activate(context: vscode.ExtensionContext) {
@@ -32,6 +33,8 @@ export function activate(context: vscode.ExtensionContext) {
     const utilityHandler = new UtilityCommandHandler();
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
     const citationHandler = new CitationCommandHandler(context, citationTreeProvider, citationTreeView);
+    const wordCheckHandler = new WordCheckCommandHandler(context);
+    wordCheckHandler.registerView();
 
     // 设置校对JSON文件的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, context: vscode.ExtensionContext) => {
@@ -240,6 +243,11 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.citation.searchInPdf', (nodeOrItem?: unknown) => {
             citationHandler.handleSearchInPdfCommand(nodeOrItem as import('./citation/citationTreeProvider').CitationTreeNode | { id?: string } | undefined);
         }),
+        vscode.commands.registerCommand('ai-proofread.checkWords', () => wordCheckHandler.handleCheckWordsCommand()),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.prevOccurrence', () => wordCheckHandler.handlePrevOccurrenceCommand()),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.nextOccurrence', () => wordCheckHandler.handleNextOccurrenceCommand()),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.showNotes', () => wordCheckHandler.handleShowNotesCommand()),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.revealCurrentAndAdvance', () => wordCheckHandler.handleRevealCurrentAndAdvanceCommand()),
     ];
 
     context.subscriptions.push(...disposables, configManager);

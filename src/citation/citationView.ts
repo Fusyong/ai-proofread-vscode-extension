@@ -47,9 +47,10 @@ function handleSelectNode(
     refStore: ReferenceStore
 ): void {
     const docUri = provider.getDocumentUri();
+    const opts = { preserveFocus: true };
     if (node.kind === 'block') {
         if (docUri && node.data.block.entry.range) {
-            vscode.window.showTextDocument(docUri, { selection: node.data.block.entry.range }).then(
+            vscode.window.showTextDocument(docUri, { selection: node.data.block.entry.range, ...opts }).then(
                 (editor) => editor.revealRange(node.data.block.entry.range!, vscode.TextEditorRevealType.InCenter)
             );
         }
@@ -63,7 +64,7 @@ function handleSelectNode(
             : match.file_path;
         const uri = vscode.Uri.file(refPath);
         vscode.workspace.openTextDocument(uri).then(
-            (doc) => vscode.window.showTextDocument(doc).then(
+            (doc) => vscode.window.showTextDocument(doc, opts).then(
                 (editor) => {
                     const first = match.refFragment[0];
                     const last = match.refFragment.length > 0 ? match.refFragment[match.refFragment.length - 1] : first;
