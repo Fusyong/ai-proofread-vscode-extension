@@ -2,7 +2,7 @@
 
 ## 一、需求与数据
 
-### 1.1 数据来源（`data/xh7_tables.json`）
+### 1.1 数据来源（`data/dict7.json`）
 
 - **五类字词表**（键：需要提示的字词 → 值：更好的字词）：
   - `variant_to_standard`：异形词 → 标准形
@@ -37,7 +37,7 @@
 src/
   xh7/
     types.ts              # 五类表名、条目类型、扫描结果类型
-    tableLoader.ts        # 加载并解析 xh7_tables.json，按表名取字典
+    tableLoader.ts        # 加载并解析 dict7.json，按表名取字典
     documentScanner.ts    # 对当前文档全文扫描，返回「词 → 出现位置[]」
     wordCheckTreeProvider.ts  # TreeView 数据：仅一级条目，无子节点
     wordCheckView.ts      # 注册 TreeView、选中回调、聚焦视图
@@ -47,7 +47,7 @@ src/
 ```
 
 - **types**：统一表名常量、`CheckType` 枚举、`WordEntry`（variant, preferred）、`Occurrence`（range, index）、`ScanResult` 等。
-- **tableLoader**：**懒加载** — 首次需要时再读取 `extensionContext.asAbsolutePath('data/xh7_tables.json')`，解析 JSON 并缓存；暴露 `getDict(type: CheckType): Record<string, string>` 和 `getNotes(preferred: string): { raw?: string[]; usage?: string[] }`。不在扩展 activate 时同步读大文件。
+- **tableLoader**：**懒加载** — 首次需要时再读取 `extensionContext.asAbsolutePath('data/dict7.json')`，解析 JSON 并缓存；暴露 `getDict(type: CheckType): Record<string, string>` 和 `getNotes(preferred: string): { raw?: string[]; usage?: string[] }`。不在扩展 activate 时同步读大文件。
 - **documentScanner**：接收文档全文 + 某表的字典；在**异步/后台**中遍历字典每个 key 查找出现位置，返回 `Map<variant, { preferred, ranges: Range[] }>`。用 `document.positionAt(offset)` 转成 `vscode.Range`。扫描过程放在 `withProgress` 或可取消任务中，避免长时间占用主线程。
 - **wordCheckTreeProvider**：  
   - **仅一级节点**：每个「需要提示的词：更好的词」一条，description 显示「出现次数」；`contextValue: 'wordCheckEntry'`。**无子节点**，不展开每一处。  
@@ -119,7 +119,7 @@ src/
 
 ### 4.4 懒加载与不阻塞编辑器
 
-- **数据懒加载**：`xh7_tables.json` 在**首次执行「检查字词」或首次需要 getDict/getNotes 时**再加载并缓存；不在 `activate()` 里同步读取，避免拖慢扩展启动与编辑器响应。
+- **数据懒加载**：`dict7.json` 在**首次执行「检查字词」或首次需要 getDict/getNotes 时**再加载并缓存；不在 `activate()` 里同步读取，避免拖慢扩展启动与编辑器响应。
 - **扫描不阻塞**：执行「检查字词」时，将「加载表 + 全文扫描」放在 `vscode.window.withProgress({ location: ProgressLocation.Notification, title: '字词检查', cancellable: true })` 中执行；扫描循环内可配合 `cancelToken` 和适度 `setImmediate`/分块，避免单次长时间占用主线程，保证输入、滚动等不卡顿。
 - **TreeView 不阻塞**：Provider 的 `getChildren(element)`、`getTreeItem(element)` 仅基于**已缓存的扫描结果数组**做过滤/映射，不进行文件 I/O、不重新扫描、不执行重计算；数据在扫描完成后一次性写入 Provider，Tree 只做展示。VS Code 会按需懒加载可见节点，条目再多也只渲染当前展开的。
 - **注释懒加载**：tooltip 所需简短注释可在 `getTreeItem` 中从已缓存的 notes 数据读取（内存），或首次展开时由 notesResolver 从缓存取；「查看说明」仅在用户点击时再取完整内容并打开 Webview，不在 Tree 渲染时预加载。
@@ -150,6 +150,6 @@ src/
 - 在 **extension.ts** 中：  
   - 调用 `registerWordCheckView(context)` 得到 provider 与 treeView。  
   - 实例化 `WordCheckCommandHandler(context, provider, treeView)`，在 `context.subscriptions` 中注册 `checkWords`、`prevOccurrence`、`nextOccurrence`、`showNotes`。  
-- 数据文件路径：使用 `context.asAbsolutePath('data/xh7_tables.json')`，打包时通过 `.vscodeignore` 确保 `data/xh7_tables.json` 被包含（若需发布）。
+- 数据文件路径：使用 `context.asAbsolutePath('data/dict7.json')`，打包时通过 `.vscodeignore` 确保 `data/dict7.json` 被包含（若需发布）。
 
 按上述模块逐步实现，可保持与 Citation 功能类似的风格，并便于后续扩展（如导出报告、批量替换建议等）。

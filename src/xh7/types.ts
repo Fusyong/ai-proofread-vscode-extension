@@ -5,13 +5,15 @@
 
 import type { Range } from 'vscode';
 
-/** 五类检查类型，对应 xh7_tables.json 中的五个字典键 */
+/** 检查类型：dict7 五类 + 通用规范汉字表(tgscc) 两类 */
 export type CheckType =
     | 'variant_to_standard'
     | 'variant_to_preferred'
     | 'single_char_traditional_to_standard'
     | 'single_char_yitihuabiao_to_standard'
-    | 'single_char_yiti_other_to_standard';
+    | 'single_char_yiti_other_to_standard'
+    | 'tgscc_traditional_to_simplified'
+    | 'tgscc_variant_to_simplified';
 
 /** 表名常量，与 JSON 键一致 */
 export const CHECK_TYPE_KEYS: CheckType[] = [
@@ -20,6 +22,8 @@ export const CHECK_TYPE_KEYS: CheckType[] = [
     'single_char_traditional_to_standard',
     'single_char_yitihuabiao_to_standard',
     'single_char_yiti_other_to_standard',
+    'tgscc_traditional_to_simplified',
+    'tgscc_variant_to_simplified',
 ];
 
 /** 用于 QuickPick 多选（复选框样式）的显示标签 */
@@ -29,6 +33,8 @@ export const CHECK_TYPE_LABELS: Record<CheckType, string> = {
     single_char_traditional_to_standard: '繁体字→标准',
     single_char_yitihuabiao_to_standard: '异体字(表内)→标准',
     single_char_yiti_other_to_standard: '异体字(表外)→标准',
+    tgscc_traditional_to_simplified: '繁体字→通用规范字',
+    tgscc_variant_to_simplified: '异体字→通用规范字',
 };
 
 /** 单条扫描结果：需要提示的词、更好的词、在文档中的出现位置 */

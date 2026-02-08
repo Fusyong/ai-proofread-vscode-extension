@@ -26,7 +26,7 @@ export class WordCheckTreeDataProvider implements vscode.TreeDataProvider<WordCh
         const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
         item.id = `${element.variant}|${element.preferred}`;
         item.description = ` ${count}`;
-        const shortNotes = getShortNotesForPreferred(element.preferred);
+        const shortNotes = getShortNotesForPreferred(element.preferred, element.variant);
         item.tooltip = shortNotes ? `${label}\n\n${shortNotes}` : label;
         item.contextValue = 'wordCheckEntry';
         // 双击/激活条目时：先揭示当前处再前进（单击时 selection 已把索引置 0，故第一次激活定位第一处，再次激活定位下一处）

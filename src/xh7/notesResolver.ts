@@ -23,9 +23,10 @@ function joinNotes(notes: WordCheckNotes): string {
 
 /**
  * 简短版注释，用于 TreeItem.tooltip（截断至 TOOLTIP_MAX_LEN，过长加「… 详见说明」）
+ * @param variant 可选，用于 tgscc 按「需要提示的词」取 notes
  */
-export function getShortNotesForPreferred(preferred: string): string {
-    const notes = getNotes(preferred);
+export function getShortNotesForPreferred(preferred: string, variant?: string): string {
+    const notes = getNotes(preferred, variant);
     const full = joinNotes(notes);
     if (!full) return '';
     const plain = stripHtml(full);
@@ -35,9 +36,10 @@ export function getShortNotesForPreferred(preferred: string): string {
 
 /**
  * 完整版注释，用于「查看说明」Webview（可保留 HTML）
+ * @param variant 可选，用于 tgscc 按「需要提示的词」取 notes
  */
-export function getFullNotesForPreferred(preferred: string): { raw: string[]; usage: string[] } {
-    const notes = getNotes(preferred);
+export function getFullNotesForPreferred(preferred: string, variant?: string): { raw: string[]; usage: string[] } {
+    const notes = getNotes(preferred, variant);
     return {
         raw: notes.raw ?? [],
         usage: notes.usage ?? [],
@@ -48,7 +50,7 @@ export function getFullNotesForPreferred(preferred: string): { raw: string[]; us
  * 将完整注释格式化为 HTML 片段，供 Webview 展示
  */
 export function formatFullNotesAsHtml(preferred: string, variant: string): string {
-    const { raw, usage } = getFullNotesForPreferred(preferred);
+    const { raw, usage } = getFullNotesForPreferred(preferred, variant);
     const sections: string[] = [];
     if (raw.length > 0) {
         sections.push('<h4>字形/原始说明</h4>', '<div class="notes">' + raw.join('<br/>') + '</div>');

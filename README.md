@@ -292,10 +292,9 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 1. [ ] 常见错词、正则检查；词典词表提示（表外词、低频词、相关词）
     1. [x] 词典收集
-    2. [ ] 校对网收集
-    3. [ ] 现代汉语常用词表
-    4. [ ] 通用规范汉字表检查
-2. [ ] 人看的的相似度使用编辑距离
+    2. [x] 通用规范汉字表检查
+    3. [ ] 校对网等收集
+2. [ ] 人看的相似度使用编辑距离
 3. [ ] 在线引文核对
     1. [ ] 读秀，
     2. [ ] 中华经典古籍库，
@@ -325,6 +324,12 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 
 ## 6. 更新日志
+
+### v1.5.0
+
+- 特性：字词检查，包括异体/繁体字、异形词
+- 文档：在docs中增加了commands-cheatsheet.md，包含业务逻辑、命令的便览图标
+- 优化：优化了分行符的处理方式，改动有点大，是否有负面影响需要观察
 
 ### v1.4.0
 
