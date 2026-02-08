@@ -133,6 +133,14 @@
       {
         "command": "ai-proofread.wordCheck.revealCurrentAndAdvance",
         "title": "下一处"
+      },
+      {
+        "command": "ai-proofread.wordCheck.applyReplaceForEntry",
+        "title": "应用替换（当前条目）"
+      },
+      {
+        "command": "ai-proofread.manageCustomTables",
+        "title": "AI Proofreader: 管理自定义替换表"
       }
     ],
     "configuration": {
@@ -467,6 +475,18 @@
           "type": "boolean",
           "default": false,
           "description": "启用调试日志输出到控制台（会影响性能，仅在调试时启用。也可通过环境变量 AI_PROOFREAD_DEBUG=true 启用）"
+        },
+        "ai-proofread.wordCheck.replacePrefix": {
+          "order": 91,
+          "type": "string",
+          "default": "",
+          "description": "字词检查：应用替换时，替换结果前附加的标记（如【）。Ctrl+Enter 应用替换时使用此配置。"
+        },
+        "ai-proofread.wordCheck.replaceSuffix": {
+          "order": 92,
+          "type": "string",
+          "default": "",
+          "description": "字词检查：应用替换时，替换结果后附加的标记（如】）。Ctrl+Enter 应用替换时使用此配置。"
         }
       }
     },
@@ -507,6 +527,18 @@
         {
           "command": "ai-proofread.wordCheck.showNotes",
           "group": "wordCheck@2",
+          "when": "view == ai-proofread.wordCheck && viewItem == wordCheckEntry"
+        },
+        {
+          "command": "ai-proofread.wordCheck.applyReplaceForEntry",
+          "group": "wordCheck@2",
+          "when": "view == ai-proofread.wordCheck && viewItem == wordCheckEntry"
+        }
+      ],
+      "keybindings": [
+        {
+          "command": "ai-proofread.wordCheck.applyReplaceForEntry",
+          "key": "ctrl+enter",
           "when": "view == ai-proofread.wordCheck && viewItem == wordCheckEntry"
         }
       ],

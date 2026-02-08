@@ -48,12 +48,14 @@ export function getFullNotesForPreferred(preferred: string, variant?: string): {
 
 /**
  * 将完整注释格式化为 HTML 片段，供 Webview 展示
+ * @param rawComment 自定义表条目的行内注释，与预置 raw 合并展示
  */
-export function formatFullNotesAsHtml(preferred: string, variant: string): string {
+export function formatFullNotesAsHtml(preferred: string, variant: string, rawComment?: string): string {
     const { raw, usage } = getFullNotesForPreferred(preferred, variant);
+    const rawMerged = rawComment ? [rawComment, ...raw] : raw;
     const sections: string[] = [];
-    if (raw.length > 0) {
-        sections.push('<h4>字形/原始说明</h4>', '<div class="notes">' + raw.join('<br/>') + '</div>');
+    if (rawMerged.length > 0) {
+        sections.push('<h4>字形/原始说明</h4>', '<div class="notes">' + rawMerged.join('<br/>') + '</div>');
     }
     if (usage.length > 0) {
         sections.push('<h4>用法说明</h4>', '<div class="notes">' + usage.join('<br/>') + '</div>');

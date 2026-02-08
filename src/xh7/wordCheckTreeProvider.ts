@@ -27,7 +27,11 @@ export class WordCheckTreeDataProvider implements vscode.TreeDataProvider<WordCh
         item.id = `${element.variant}|${element.preferred}`;
         item.description = ` ${count}`;
         const shortNotes = getShortNotesForPreferred(element.preferred, element.variant);
-        item.tooltip = shortNotes ? `${label}\n\n${shortNotes}` : label;
+        const withCustom =
+            element.rawComment != null
+                ? element.rawComment + (shortNotes ? '\n\n' + shortNotes : '')
+                : shortNotes;
+        item.tooltip = withCustom ? `${label}\n\n${withCustom}` : label;
         item.contextValue = 'wordCheckEntry';
         // 双击/激活条目时：先揭示当前处再前进（单击时 selection 已把索引置 0，故第一次激活定位第一处，再次激活定位下一处）
         item.command = { command: 'ai-proofread.wordCheck.revealCurrentAndAdvance', title: '下一处' };

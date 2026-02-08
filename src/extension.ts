@@ -248,6 +248,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.wordCheck.nextOccurrence', () => wordCheckHandler.handleNextOccurrenceCommand()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.showNotes', () => wordCheckHandler.handleShowNotesCommand()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.revealCurrentAndAdvance', () => wordCheckHandler.handleRevealCurrentAndAdvanceCommand()),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.applyReplaceForEntry', () => wordCheckHandler.handleApplyReplaceForEntryCommand()),
+        vscode.commands.registerCommand('ai-proofread.manageCustomTables', () => wordCheckHandler.handleManageCustomTablesCommand()),
     ];
 
     context.subscriptions.push(...disposables, configManager);

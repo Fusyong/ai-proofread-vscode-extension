@@ -1,23 +1,15 @@
 /**
  * 检查字词：对当前文档全文扫描，找出表中词条的出现位置
  * 规划见 docs/xh7-word-check-plan.md
- * 按「先长后短」排序 key（词表有长度差异，字表均一字），且占用区间不重叠：已匹配的字符不再参与更短 key 的匹配。
+ * 文档无分词，采用纯字面匹配；按「先长后短」排序 key，占用区间不重叠。
  */
 
 import * as vscode from 'vscode';
 import type { WordCheckEntry } from './types';
 
-/** 正则特殊字符转义 */
+/** 正则元字符转义，用于字面匹配 */
 function escapeRegex(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * 全词匹配：前后不能是「字」（字母、数字、中文等），避免「人才」匹配到「人才库」
- */
-function buildWordBoundaryRegex(variant: string): RegExp {
-    const escaped = escapeRegex(variant);
-    return new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, 'gu');
 }
 
 /** 已占用的区间（文档偏移，左闭右开） */
@@ -66,7 +58,7 @@ export function scanDocument(
         const preferred = dict[variant];
         if (!preferred) continue;
 
-        const re = buildWordBoundaryRegex(variant);
+        const re = new RegExp(escapeRegex(variant), 'gu');
         const ranges: vscode.Range[] = [];
         let m: RegExpExecArray | null;
         re.lastIndex = 0;

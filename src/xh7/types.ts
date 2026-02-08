@@ -45,6 +45,33 @@ export interface WordCheckEntry {
     preferred: string;
     /** 在文档中的出现位置（vscode.Range 数组） */
     ranges: Range[];
+    /** 自定义表规则的行内注释，供 tooltip / 查看说明 使用 */
+    rawComment?: string;
+}
+
+/** 自定义替换表：解析后单条规则（与文件行一一对应） */
+export interface CustomRule {
+    find: string;
+    replace: string;
+    rawComment?: string;
+}
+
+/** 自定义替换表（正则）：编译后单条规则，用于扫描 */
+export interface CompiledCustomRule {
+    regex: RegExp;
+    replaceTemplate: string;
+    rawComment?: string;
+}
+
+/** 自定义表缓存单元 */
+export interface CustomTable {
+    id: string;
+    name: string;
+    filePath?: string;
+    enabled: boolean;
+    isRegex: boolean;
+    rules: CustomRule[];
+    compiled?: CompiledCustomRule[];
 }
 
 /** 一次检查的完整结果：当前类型 + 条目列表 */
