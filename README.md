@@ -322,11 +322,12 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
-### v1.5.1
+### v1.5.2
 
 - 特性：根据词典检查字词，包括异体/繁体字、异形词等
 - 特性：根据《通用规范汉字表》检查字词，包括异体/繁体字、异形词等
 - 特性：自定义替换表检查，仿TextPro风格的给予批量自定义（正则）替换表的提示与替换
+- 优化：提示词管理器改用treeview，与字词检查类型/表、结果一致
 - 文档：在docs中增加了commands-cheatsheet.md，包含业务逻辑、命令的便览图标
 - 优化：优化了分行符的处理方式，改动有点大，是否有负面影响需要观察
 
