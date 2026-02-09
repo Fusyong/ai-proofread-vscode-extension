@@ -35,10 +35,11 @@ function saveOrder(context: vscode.ExtensionContext, keyOrder: string, order: st
     context.workspaceState.update(keyOrder, order);
 }
 
+/** 未保存过时默认只选中第一条 */
 function getSelectedIds(context: vscode.ExtensionContext, keySelected: string, defaultOrder?: CheckType[]): CheckType[] {
     const raw = context.workspaceState.get<string[]>(keySelected);
     if (Array.isArray(raw) && raw.length > 0) return raw as CheckType[];
-    return defaultOrder ? [...defaultOrder] : [];
+    return defaultOrder?.length ? [defaultOrder[0]] : [];
 }
 
 function saveSelectedIds(context: vscode.ExtensionContext, keySelected: string, ids: string[]): void {

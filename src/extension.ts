@@ -14,6 +14,7 @@ import { UtilityCommandHandler } from './commands/utilityCommandHandler';
 import { CitationCommandHandler } from './commands/citationCommandHandler';
 import { registerCitationView } from './citation/citationView';
 import { WordCheckCommandHandler } from './commands/wordCheckCommandHandler';
+import { registerPromptsView, type PromptTreeItem } from './promptsView';
 
 
 export function activate(context: vscode.ExtensionContext) {
@@ -37,6 +38,9 @@ export function activate(context: vscode.ExtensionContext) {
     wordCheckHandler.registerView();
     wordCheckHandler.registerCustomTablesView();
     wordCheckHandler.registerCheckTypesViews();
+
+    const promptManager = PromptManager.getInstance(context);
+    const { provider: promptsTreeProvider } = registerPromptsView(context, promptManager);
 
     // 设置校对JSON文件的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, context: vscode.ExtensionContext) => {
@@ -139,14 +143,26 @@ export function activate(context: vscode.ExtensionContext) {
             await proofreadHandler.handleProofreadSelectionCommand(editor, context);
         }),
 
-        // 注册提示词管理命令
+        // 注册提示词管理命令（聚焦 TreeView）
         vscode.commands.registerCommand('ai-proofread.managePrompts', () => {
             PromptManager.getInstance(context).managePrompts();
         }),
 
-        // 注册选择提示词命令
-        vscode.commands.registerCommand('ai-proofread.selectPrompt', () => {
-            PromptManager.getInstance(context).selectPrompt();
+        vscode.commands.registerCommand('ai-proofread.prompts.new', async () => {
+            await promptManager.addPrompt();
+            promptsTreeProvider.refresh();
+        }),
+        vscode.commands.registerCommand('ai-proofread.prompts.edit', async (el: PromptTreeItem) => {
+            if (el?.prompt) {
+                await promptManager.editPrompt(el.prompt);
+                promptsTreeProvider.refresh();
+            }
+        }),
+        vscode.commands.registerCommand('ai-proofread.prompts.delete', async (el: PromptTreeItem) => {
+            if (el?.id && el.prompt) {
+                await promptManager.deletePrompt(el.id);
+                promptsTreeProvider.refresh();
+            }
         }),
 
         // 注册合并文件命令

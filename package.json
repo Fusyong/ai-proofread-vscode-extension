@@ -16,11 +16,19 @@
     "commands": [
       {
         "command": "ai-proofread.managePrompts",
-        "title": "AI Proofreader: set prompts"
+        "title": "AI Proofreader: manage prompts"
       },
       {
-        "command": "ai-proofread.selectPrompt",
-        "title": "AI Proofreader: select prompt"
+        "command": "ai-proofread.prompts.new",
+        "title": "新建提示词"
+      },
+      {
+        "command": "ai-proofread.prompts.edit",
+        "title": "编辑"
+      },
+      {
+        "command": "ai-proofread.prompts.delete",
+        "title": "删除"
       },
       {
         "command": "ai-proofread.splitFileByLength",
@@ -521,29 +529,50 @@
     "views": {
       "explorer": [
         {
-          "id": "ai-proofread.citation",
-          "name": "Citation"
-        },
-        {
-          "id": "ai-proofread.wordCheck",
-          "name": "CheckWords"
-        },
-        {
-          "id": "ai-proofread.customTables",
-          "name": "替换表"
+          "id": "ai-proofread.prompts",
+          "name": "prompts"
         },
         {
           "id": "ai-proofread.dictCheckTypes",
-          "name": "词典检查类型"
+          "name": "dict checks"
         },
         {
           "id": "ai-proofread.tgsccCheckTypes",
-          "name": "通规检查类型"
+          "name": "tgscc checks"
+        },
+        {
+          "id": "ai-proofread.customTables",
+          "name": "custom checks"
+        },
+        {
+          "id": "ai-proofread.wordCheck",
+          "name": "check words"
+        },
+        {
+          "id": "ai-proofread.citation",
+          "name": "citations"
         }
       ]
     },
     "menus": {
+      "view/title": [
+        {
+          "command": "ai-proofread.prompts.new",
+          "when": "view == ai-proofread.prompts",
+          "group": "navigation"
+        }
+      ],
       "view/item/context": [
+        {
+          "command": "ai-proofread.prompts.edit",
+          "group": "prompts@1",
+          "when": "view == ai-proofread.prompts && viewItem == promptUser"
+        },
+        {
+          "command": "ai-proofread.prompts.delete",
+          "group": "prompts@1",
+          "when": "view == ai-proofread.prompts && viewItem == promptUser"
+        },
         {
           "command": "ai-proofread.dictCheckTypes.moveUp",
           "group": "dictCheckTypes@1",

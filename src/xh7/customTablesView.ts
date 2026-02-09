@@ -29,8 +29,12 @@ function saveOrder(context: vscode.ExtensionContext, order: string[]): void {
     context.workspaceState.update(KEY_TABLE_ORDER, order);
 }
 
+/** 未保存过时默认只选中第一条（按 order 顺序） */
 function getSelectedIds(context: vscode.ExtensionContext): string[] {
-    return context.workspaceState.get<string[]>(KEY_LAST_SELECTED_TABLE_IDS) ?? [];
+    const raw = context.workspaceState.get<string[]>(KEY_LAST_SELECTED_TABLE_IDS);
+    if (Array.isArray(raw) && raw.length > 0) return raw;
+    const order = getOrder(context);
+    return order.length > 0 ? [order[0]] : [];
 }
 
 function saveSelectedIds(context: vscode.ExtensionContext, ids: string[]): void {
