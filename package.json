@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -138,10 +138,38 @@
         "command": "ai-proofread.wordCheck.applyReplaceForEntry",
         "title": "应用替换（当前条目）"
       },
-      {
-        "command": "ai-proofread.manageCustomTables",
-        "title": "AI Proofreader: 管理自定义替换表"
-      }
+        {
+          "command": "ai-proofread.manageCustomTables",
+          "title": "AI Proofreader: 管理自定义替换表"
+        },
+        {
+          "command": "ai-proofread.customTables.delete",
+          "title": "删除"
+        },
+        {
+          "command": "ai-proofread.customTables.moveUp",
+          "title": "上移"
+        },
+        {
+          "command": "ai-proofread.customTables.moveDown",
+          "title": "下移"
+        },
+        {
+          "command": "ai-proofread.dictCheckTypes.moveUp",
+          "title": "上移"
+        },
+        {
+          "command": "ai-proofread.dictCheckTypes.moveDown",
+          "title": "下移"
+        },
+        {
+          "command": "ai-proofread.tgsccCheckTypes.moveUp",
+          "title": "上移"
+        },
+        {
+          "command": "ai-proofread.tgsccCheckTypes.moveDown",
+          "title": "下移"
+        }
     ],
     "configuration": {
       "title": "AI Proofread",
@@ -499,11 +527,58 @@
         {
           "id": "ai-proofread.wordCheck",
           "name": "CheckWords"
+        },
+        {
+          "id": "ai-proofread.customTables",
+          "name": "替换表"
+        },
+        {
+          "id": "ai-proofread.dictCheckTypes",
+          "name": "词典检查类型"
+        },
+        {
+          "id": "ai-proofread.tgsccCheckTypes",
+          "name": "通规检查类型"
         }
       ]
     },
     "menus": {
       "view/item/context": [
+        {
+          "command": "ai-proofread.dictCheckTypes.moveUp",
+          "group": "dictCheckTypes@1",
+          "when": "view == ai-proofread.dictCheckTypes"
+        },
+        {
+          "command": "ai-proofread.dictCheckTypes.moveDown",
+          "group": "dictCheckTypes@1",
+          "when": "view == ai-proofread.dictCheckTypes"
+        },
+        {
+          "command": "ai-proofread.tgsccCheckTypes.moveUp",
+          "group": "tgsccCheckTypes@1",
+          "when": "view == ai-proofread.tgsccCheckTypes"
+        },
+        {
+          "command": "ai-proofread.tgsccCheckTypes.moveDown",
+          "group": "tgsccCheckTypes@1",
+          "when": "view == ai-proofread.tgsccCheckTypes"
+        },
+        {
+          "command": "ai-proofread.customTables.delete",
+          "group": "customTables@1",
+          "when": "view == ai-proofread.customTables && viewItem == customTableUser"
+        },
+        {
+          "command": "ai-proofread.customTables.moveUp",
+          "group": "customTables@2",
+          "when": "view == ai-proofread.customTables"
+        },
+        {
+          "command": "ai-proofread.customTables.moveDown",
+          "group": "customTables@2",
+          "when": "view == ai-proofread.customTables"
+        },
         {
           "command": "ai-proofread.citation.showDiff",
           "group": "citation@1",

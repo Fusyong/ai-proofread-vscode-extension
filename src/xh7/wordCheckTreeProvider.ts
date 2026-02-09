@@ -14,7 +14,7 @@ export class WordCheckTreeDataProvider implements vscode.TreeDataProvider<WordCh
     private entries: WordCheckEntry[] = [];
     private documentUri: vscode.Uri | null = null;
 
-    refresh(entries: WordCheckEntry[], documentUri: vscode.Uri | null): void {
+    refresh(entries: WordCheckEntry[], documentUri: vscode.Uri | null, _runLabel?: string): void {
         this.entries = entries;
         this.documentUri = documentUri;
         this._onDidChangeTreeData.fire();
@@ -25,7 +25,12 @@ export class WordCheckTreeDataProvider implements vscode.TreeDataProvider<WordCh
         const count = element.ranges.length;
         const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
         item.id = `${element.variant}|${element.preferred}`;
-        item.description = ` ${count}`;
+        const countDesc = count > 0 ? `${count}` : '';
+        item.description = element.checkTypeLabel
+            ? countDesc
+                ? `${countDesc} · ${element.checkTypeLabel}`
+                : element.checkTypeLabel
+            : countDesc;
         const shortNotes = getShortNotesForPreferred(element.preferred, element.variant);
         const withCustom =
             element.rawComment != null

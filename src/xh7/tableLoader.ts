@@ -20,11 +20,14 @@ interface Xh7TablesJson {
     usage_notes?: Record<string, string[]>;
 }
 
-/** tgscc.json 结构：值为数组，首项为规范字或 null；notes 为 繁体/异体 → 注释字符串 */
+/** tgscc.json 结构：值为数组，首项为规范字或 null；notes 键为繁体/异体；tgscc_list 为通用规范字有序表；simplified_to_* 为规范字→繁体/异体数组 */
 interface TgsccJson {
     traditional_to_simplified?: Record<string, (string | null)[]>;
     variant_to_simplified?: Record<string, (string | null)[]>;
     notes?: Record<string, string>;
+    tgscc_list?: string[];
+    simplified_to_traditional?: Record<string, string[]>;
+    simplified_to_variants?: Record<string, string[]>;
 }
 
 type Xh7DictKey = Extract<
@@ -99,9 +102,101 @@ export function getDict(type: CheckType): Record<string, string> {
         return (data[type as Xh7DictKey] as Record<string, string> | undefined) ?? {};
     }
     const data = ensureTgsccLoaded();
-    if (type === 'tgscc_traditional_to_simplified') return tgsccMapToDict(data.traditional_to_simplified);
+    if (type === 'tgscc_traditional_to_simplified') {
+        const dict = tgsccMapToDict(data.traditional_to_simplified);
+        return filterDictKeyNotEqualValue(dict);
+    }
     if (type === 'tgscc_variant_to_simplified') return tgsccMapToDict(data.variant_to_simplified);
+    if (type === 'tgscc_traditional_equals_standard') {
+        const dict = tgsccMapToDict(data.traditional_to_simplified);
+        return filterDictKeyEqualValue(dict);
+    }
+    const list = data.tgscc_list;
+    if (type === 'tgscc_table1' && list) return sliceToDict(list, 0, 3501, '表一字');
+    if (type === 'tgscc_table2' && list) return sliceToDict(list, 3501, list.length, '表二字');
     return {};
+}
+
+function filterDictKeyNotEqualValue(dict: Record<string, string>): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(dict)) if (k !== v) out[k] = v;
+    return out;
+}
+
+function filterDictKeyEqualValue(dict: Record<string, string>): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(dict)) if (k === v) out[k] = v;
+    return out;
+}
+
+function sliceToDict(arr: string[], start: number, end: number, value: string): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (let i = start; i < end && i < arr.length; i++) out[arr[i]] = value;
+    return out;
+}
+
+/** 自定义替换表检查：预置「表」id（使用 tgscc 数据与逻辑） */
+export type CustomPresetId = 'preset_traditional' | 'preset_variant' | 'preset_simplified_to_tv';
+
+const CUSTOM_PRESET_LABELS: Record<CustomPresetId, string> = {
+    preset_traditional: '通规繁体字->规范字',
+    preset_variant: '通规异体字->规范字',
+    preset_simplified_to_tv: '通规规范字->繁体字异体字',
+};
+
+export function getCustomPresetLabel(id: CustomPresetId): string {
+    return CUSTOM_PRESET_LABELS[id];
+}
+
+export const CUSTOM_PRESET_IDS: CustomPresetId[] = ['preset_traditional', 'preset_variant', 'preset_simplified_to_tv'];
+
+/**
+ * 获取自定义检查预置「表」的字典（用于扫描）；无数据时返回空对象。
+ */
+export function getCustomPresetDict(presetId: CustomPresetId): Record<string, string> {
+    try {
+        const data = ensureTgsccLoaded();
+        if (presetId === 'preset_traditional') {
+            return filterDictKeyNotEqualValue(tgsccMapToDict(data.traditional_to_simplified));
+        }
+        if (presetId === 'preset_variant') {
+            return tgsccMapToDict(data.variant_to_simplified);
+        }
+        if (presetId === 'preset_simplified_to_tv') {
+            const trad = data.simplified_to_traditional ?? {};
+            const vari = data.simplified_to_variants ?? {};
+            const keys = new Set([...Object.keys(trad), ...Object.keys(vari)]);
+            const out: Record<string, string> = {};
+            for (const k of keys) {
+                const t = (trad[k] ?? []).join('');
+                const v = (vari[k] ?? []).join('');
+                const val = t + v;
+                if (val) out[k] = val;
+            }
+            return out;
+        }
+    } catch {
+        // tgscc 未加载时忽略
+    }
+    return {};
+}
+
+/** 供 tgscc 特殊扫描（非通规字、未界定字）使用 */
+export function getTgsccData(): {
+    listSet: Set<string>;
+    traditionalKeys: Set<string>;
+    variantKeys: Set<string>;
+} | null {
+    try {
+        const data = ensureTgsccLoaded();
+        const list = data.tgscc_list ?? [];
+        const listSet = new Set(list);
+        const traditionalKeys = new Set(Object.keys(data.traditional_to_simplified ?? {}));
+        const variantKeys = new Set(Object.keys(data.variant_to_simplified ?? {}));
+        return { listSet, traditionalKeys, variantKeys };
+    } catch {
+        return null;
+    }
 }
 
 /**

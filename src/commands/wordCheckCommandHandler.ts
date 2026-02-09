@@ -14,10 +14,26 @@ import {
     getCurrentOccurrenceIndex,
     setCurrentOccurrenceIndex,
 } from '../xh7/wordCheckView';
-import { initTableLoader, getDict } from '../xh7/tableLoader';
+import { initTableLoader, getDict, getCustomPresetDict, getCustomPresetLabel, CUSTOM_PRESET_IDS, type CustomPresetId } from '../xh7/tableLoader';
+import {
+    registerCustomTablesView,
+    CUSTOM_TABLES_VIEW_ID,
+    KEY_TABLE_ORDER,
+    type CustomTableTreeItem,
+} from '../xh7/customTablesView';
+import {
+    registerDictCheckTypesView,
+    registerTgsccCheckTypesView,
+    DICT_CHECK_TYPES_VIEW_ID,
+    TGSCC_CHECK_TYPES_VIEW_ID,
+    type CheckTypeTreeItem,
+    type DictCheckTypesTreeDataProvider,
+    type TgsccCheckTypesTreeDataProvider,
+} from '../xh7/checkTypesView';
 import { scanDocument } from '../xh7/documentScanner';
+import { scanDocumentTgsccSpecial, isTgsccSpecialType } from '../xh7/documentScannerTgscc';
 import { formatFullNotesAsHtml } from '../xh7/notesResolver';
-import { CHECK_TYPE_LABELS, type CheckType } from '../xh7/types';
+import { CHECK_TYPE_LABELS, DICT_CHECK_TYPES, TGSCC_CHECK_TYPES, type CheckType } from '../xh7/types';
 import {
     initCustomTableCache,
     getCustomTables,
@@ -34,11 +50,14 @@ const VIEW_BASE_TITLE = 'checkWords';
 const KEY_LAST_SELECTED_TABLE_IDS = 'ai-proofread.wordCheck.lastSelectedTableIds';
 const KEY_LAST_ADD_FOLDER = 'ai-proofread.wordCheck.lastAddFolder';
 const KEY_LAST_IS_REGEX = 'ai-proofread.wordCheck.lastIsRegex';
-const KEY_LAST_MANAGED_TABLE_ID = 'ai-proofread.wordCheck.lastManagedTableId';
 
 export class WordCheckCommandHandler {
     private treeView: vscode.TreeView<WordCheckEntry> | null = null;
     private treeProvider: WordCheckTreeDataProvider | null = null;
+    private customTablesProvider: import('../xh7/customTablesView').CustomTablesTreeDataProvider | null = null;
+    private customTablesTreeView: vscode.TreeView<CustomTableTreeItem> | null = null;
+    private dictCheckTypesProvider: DictCheckTypesTreeDataProvider | null = null;
+    private tgsccCheckTypesProvider: TgsccCheckTypesTreeDataProvider | null = null;
 
     constructor(private context: vscode.ExtensionContext) {
         initTableLoader(context);
@@ -51,6 +70,42 @@ export class WordCheckCommandHandler {
         this.treeProvider = reg.provider;
         this.treeView = reg.treeView;
         return reg;
+    }
+
+    /** 注册替换表 TreeView，供「管理自定义替换表」聚焦及删除/上移/下移使用 */
+    registerCustomTablesView(): void {
+        const reg = registerCustomTablesView(this.context);
+        this.customTablesProvider = reg.provider;
+        this.customTablesTreeView = reg.treeView;
+    }
+
+    /** 注册词典/通规检查类型 TreeView，供「管理检查类型」聚焦及上移/下移使用 */
+    registerCheckTypesViews(): void {
+        const dictReg = registerDictCheckTypesView(this.context);
+        this.dictCheckTypesProvider = dictReg.provider as DictCheckTypesTreeDataProvider;
+        const tgsccReg = registerTgsccCheckTypesView(this.context);
+        this.tgsccCheckTypesProvider = tgsccReg.provider as TgsccCheckTypesTreeDataProvider;
+    }
+
+    /** 获取当前参与检查的表 id 列表（按 tableOrder 顺序） */
+    getOrderedSelectedTableIds(): { presetIds: CustomPresetId[]; customIds: string[] } {
+        const lastSelectedIds = this.context.workspaceState.get<string[]>(KEY_LAST_SELECTED_TABLE_IDS) ?? [];
+        const order = this.context.workspaceState.get<string[]>(KEY_TABLE_ORDER) ?? [
+            ...CUSTOM_PRESET_IDS,
+            ...getCustomTables().map((t) => t.id),
+        ];
+        const selectedSet = new Set(lastSelectedIds);
+        const presetIds: CustomPresetId[] = [];
+        const customIds: string[] = [];
+        for (const id of order) {
+            if (!selectedSet.has(id)) continue;
+            if (CUSTOM_PRESET_IDS.includes(id as CustomPresetId)) {
+                presetIds.push(id as CustomPresetId);
+            } else {
+                customIds.push(id);
+            }
+        }
+        return { presetIds, customIds };
     }
 
     private updateViewTitle(entryCount: number, occurrenceCount: number): void {
@@ -85,34 +140,71 @@ export class WordCheckCommandHandler {
 
         const branch = await vscode.window.showQuickPick(
             [
-                { label: '预置检查', value: 'preset' as const },
-                { label: '自定义检查', value: 'custom' as const },
+                { label: '对照词典检查', value: 'dict' as const },
+                { label: '对照通用规范汉字表检查', value: 'tgscc' as const },
+                { label: '自定义替换表检查', value: 'custom' as const },
             ],
-            { placeHolder: '选择检查方式', title: '检查字词' }
+            { placeHolder: '选择检查方式', title: '字词检查' }
         );
         if (!branch) return;
 
-        if (branch.value === 'preset') {
-            await this.runPresetCheck(editor);
+        if (branch.value === 'dict') {
+            await this.runDictCheck(editor);
+            return;
+        }
+        if (branch.value === 'tgscc') {
+            await this.runTgsccCheck(editor);
             return;
         }
         await this.runCustomCheck(editor);
     }
 
-    private async runPresetCheck(editor: vscode.TextEditor): Promise<void> {
-        const typeChoices = await vscode.window.showQuickPick(
-            (Object.entries(CHECK_TYPE_LABELS) as [CheckType, string][]).map(([value, label]) => ({
-                label,
-                value,
-                picked: value === 'variant_to_standard',
-            })),
-            { placeHolder: '勾选要检查的类型（可多选）', title: '预置检查', canPickMany: true }
+    private async runDictCheck(editor: vscode.TextEditor): Promise<void> {
+        const action = await vscode.window.showQuickPick(
+            [
+                { label: '$(play) 开始检查', value: 'run' as const },
+                { label: '$(settings-gear) 管理检查类型', value: 'manage' as const },
+            ],
+            { placeHolder: '选择操作', title: '对照词典检查' }
         );
-        if (!typeChoices?.length) return;
+        if (!action) return;
+        if (action.value === 'manage') {
+            await vscode.commands.executeCommand(`${DICT_CHECK_TYPES_VIEW_ID}.focus`);
+            return;
+        }
+        const types = this.dictCheckTypesProvider?.getOrderedSelectedTypes() ?? [];
+        if (types.length === 0) {
+            vscode.window.showWarningMessage('请在侧栏「词典检查类型」视图中勾选至少一项参与检查。');
+            await vscode.commands.executeCommand(`${DICT_CHECK_TYPES_VIEW_ID}.focus`);
+            return;
+        }
+        await this.runPresetStyleCheck(editor, types);
+    }
 
-        const checkTypes = typeChoices.map((c) => c.value as CheckType);
+    private async runTgsccCheck(editor: vscode.TextEditor): Promise<void> {
+        const action = await vscode.window.showQuickPick(
+            [
+                { label: '$(play) 开始检查', value: 'run' as const },
+                { label: '$(settings-gear) 管理检查类型', value: 'manage' as const },
+            ],
+            { placeHolder: '选择操作', title: '对照通用规范汉字表检查' }
+        );
+        if (!action) return;
+        if (action.value === 'manage') {
+            await vscode.commands.executeCommand(`${TGSCC_CHECK_TYPES_VIEW_ID}.focus`);
+            return;
+        }
+        const types = this.tgsccCheckTypesProvider?.getOrderedSelectedTypes() ?? [];
+        if (types.length === 0) {
+            vscode.window.showWarningMessage('请在侧栏「通规检查类型」视图中勾选至少一项参与检查。');
+            await vscode.commands.executeCommand(`${TGSCC_CHECK_TYPES_VIEW_ID}.focus`);
+            return;
+        }
+        await this.runPresetStyleCheck(editor, types);
+    }
+
+    private async runPresetStyleCheck(editor: vscode.TextEditor, checkTypes: CheckType[]): Promise<void> {
         const scanRange = editor.selection.isEmpty ? undefined : new vscode.Range(editor.selection.start, editor.selection.end);
-
         try {
             const entries = await vscode.window.withProgress(
                 {
@@ -122,21 +214,29 @@ export class WordCheckCommandHandler {
                 },
                 async (progress, cancelToken) => {
                     const merged = new Map<string, WordCheckEntry>();
+                    const typeLabel = (t: CheckType) => CHECK_TYPE_LABELS[t];
                     for (let i = 0; i < checkTypes.length; i++) {
                         if (cancelToken.isCancellationRequested) break;
                         const type = checkTypes[i];
                         progress.report({ message: `加载字词表 (${i + 1}/${checkTypes.length})…` });
-                        const dict = getDict(type);
-                        if (Object.keys(dict).length === 0) continue;
-                        progress.report({ message: scanRange ? '扫描选中文本…' : '扫描文档…' });
-                        const list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                        let list: WordCheckEntry[];
+                        if (isTgsccSpecialType(type)) {
+                            progress.report({ message: scanRange ? '扫描选中文本…' : '扫描文档…' });
+                            list = scanDocumentTgsccSpecial(editor.document, type, cancelToken, scanRange);
+                        } else {
+                            const dict = getDict(type);
+                            if (Object.keys(dict).length === 0) continue;
+                            progress.report({ message: scanRange ? '扫描选中文本…' : '扫描文档…' });
+                            list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                        }
+                        const label = typeLabel(type);
                         for (const e of list) {
                             const key = `${e.variant}|${e.preferred}`;
                             const existing = merged.get(key);
                             if (existing) {
                                 existing.ranges.push(...e.ranges);
                             } else {
-                                merged.set(key, { ...e, ranges: [...e.ranges] });
+                                merged.set(key, { ...e, ranges: [...e.ranges], checkTypeLabel: label });
                             }
                         }
                     }
@@ -164,90 +264,64 @@ export class WordCheckCommandHandler {
 
     private async runCustomCheck(editor: vscode.TextEditor): Promise<void> {
         const scanRange = editor.selection.isEmpty ? undefined : new vscode.Range(editor.selection.start, editor.selection.end);
-        let selectedTables: CustomTable[] = [];
 
-        const lastSelectedIds = this.context.workspaceState.get<string[]>(KEY_LAST_SELECTED_TABLE_IDS) ?? [];
-
-        for (;;) {
-            const tables = getCustomTables();
-            const tableItems = tables.map((t) => ({
-                label: t.name,
-                description: t.isRegex ? `正则 · ${t.rules.length} 条` : `字面 · ${t.rules.length} 条`,
-                table: t,
-                picked: lastSelectedIds.includes(t.id),
-            }));
-            type TablePickItem = { label: string; description?: string; table: CustomTable | null; picked?: boolean };
-            const pick = await vscode.window.showQuickPick<TablePickItem>(
-                [
-                    ...tableItems.map((t) => ({
-                        label: t.label,
-                        description: t.description,
-                        table: t.table,
-                        picked: t.picked,
-                    })),
-                    { label: '$(file-add) 加载新表…', table: null },
-                    { label: '$(settings-gear) 管理自定义表…', table: null },
-                ],
-                {
-                    placeHolder: '勾选要参与检查的表（可多选）',
-                    title: '自定义检查',
-                    canPickMany: true,
-                }
-            );
-            if (!pick?.length) return;
-
-            const loadNew = pick.some((p) => p.label === '$(file-add) 加载新表…');
-            const manage = pick.some((p) => p.label === '$(settings-gear) 管理自定义表…');
-            selectedTables = pick.filter((p): p is TablePickItem & { table: CustomTable } => p.table != null).map((p) => p.table);
-
-            if (loadNew) {
-                const lastFolder = this.context.workspaceState.get<string>(KEY_LAST_ADD_FOLDER);
-                const defaultUri = lastFolder ? vscode.Uri.file(lastFolder) : undefined;
-                const uris = await vscode.window.showOpenDialog({
-                    canSelectMany: false,
-                    filters: { '替换表': ['txt', 'json'] },
-                    defaultUri,
-                });
-                if (uris?.length) {
-                    const parentFolder = path.dirname(uris[0].fsPath);
-                    await this.context.workspaceState.update(KEY_LAST_ADD_FOLDER, parentFolder);
-
-                    const lastIsRegex = this.context.workspaceState.get<boolean>(KEY_LAST_IS_REGEX);
-                    const isRegex = await vscode.window.showQuickPick(
-                        [
-                            { label: '正则替换表', value: true, picked: lastIsRegex === true },
-                            { label: '非正则替换表', value: false, picked: lastIsRegex === false },
-                        ],
-                        { placeHolder: '选择表类型' }
-                    );
-                    if (isRegex != null) {
-                        await this.context.workspaceState.update(KEY_LAST_IS_REGEX, isRegex.value);
-                        const { table, errors } = addCustomTableFromFile(uris[0].fsPath, isRegex.value);
-                        if (table) {
-                            vscode.window.showInformationMessage(`已加载「${table.name}」`);
-                            if (errors.length) {
-                                vscode.window.showWarningMessage(`部分规则编译失败：${errors.join('；')}`);
-                            }
-                        } else {
-                            vscode.window.showErrorMessage(errors[0] ?? '加载失败');
+        const action = await vscode.window.showQuickPick(
+            [
+                { label: '$(play) 开始检查', value: 'run' as const },
+                { label: '$(file-add) 加载新表…', value: 'add' as const },
+                { label: '$(settings-gear) 管理替换表', value: 'manage' as const },
+            ],
+            { placeHolder: '选择操作', title: '自定义替换表检查' }
+        );
+        if (!action) return;
+        if (action.value === 'manage') {
+            await this.handleManageCustomTablesCommand();
+            return;
+        }
+        if (action.value === 'add') {
+            const lastFolder = this.context.workspaceState.get<string>(KEY_LAST_ADD_FOLDER);
+            const defaultUri = lastFolder ? vscode.Uri.file(lastFolder) : undefined;
+            const uris = await vscode.window.showOpenDialog({
+                canSelectMany: false,
+                filters: { '替换表': ['txt', 'json'] },
+                defaultUri,
+            });
+            if (uris?.length) {
+                const parentFolder = path.dirname(uris[0].fsPath);
+                await this.context.workspaceState.update(KEY_LAST_ADD_FOLDER, parentFolder);
+                const lastIsRegex = this.context.workspaceState.get<boolean>(KEY_LAST_IS_REGEX);
+                const isRegex = await vscode.window.showQuickPick(
+                    [
+                        { label: '正则替换表', value: true, picked: lastIsRegex === true },
+                        { label: '非正则替换表', value: false, picked: lastIsRegex === false },
+                    ],
+                    { placeHolder: '选择表类型' }
+                );
+                if (isRegex != null) {
+                    await this.context.workspaceState.update(KEY_LAST_IS_REGEX, isRegex.value);
+                    const { table, errors } = addCustomTableFromFile(uris[0].fsPath, isRegex.value);
+                    if (table) {
+                        vscode.window.showInformationMessage(`已加载「${table.name}」`);
+                        this.customTablesProvider?.refresh();
+                        if (errors.length) {
+                            vscode.window.showWarningMessage(`部分规则编译失败：${errors.join('；')}`);
                         }
+                    } else {
+                        vscode.window.showErrorMessage(errors[0] ?? '加载失败');
                     }
                 }
-                continue;
             }
-            if (manage) {
-                await this.handleManageCustomTablesCommand();
-                continue;
-            }
-            if (selectedTables.length === 0) {
-                vscode.window.showWarningMessage('请至少勾选一张表。');
-                continue;
-            }
-            await this.context.workspaceState.update(
-                KEY_LAST_SELECTED_TABLE_IDS,
-                selectedTables.map((t) => t.id)
-            );
-            break;
+            return;
+        }
+
+        const { presetIds, customIds } = this.getOrderedSelectedTableIds();
+        const tablesById = new Map(getCustomTables().map((t) => [t.id, t]));
+        const selectedPresets = presetIds.map((id) => ({ presetId: id, label: getCustomPresetLabel(id) }));
+        const selectedTables = customIds.map((id) => tablesById.get(id)).filter((t): t is CustomTable => t != null);
+        if (selectedPresets.length === 0 && selectedTables.length === 0) {
+            vscode.window.showWarningMessage('请在侧栏「替换表」视图中勾选至少一项参与检查。');
+            await this.handleManageCustomTablesCommand();
+            return;
         }
 
         const applyMode = await vscode.window.showQuickPick(
@@ -287,18 +361,38 @@ export class WordCheckCommandHandler {
                 },
                 async (progress, cancelToken) => {
                     const merged = new Map<string, WordCheckEntry>();
-                    for (let i = 0; i < selectedTables.length; i++) {
+                    const total = selectedPresets.length + selectedTables.length;
+                    let idx = 0;
+                    for (const { presetId, label } of selectedPresets) {
                         if (cancelToken.isCancellationRequested) break;
-                        const table = selectedTables[i];
-                        progress.report({ message: `扫描表 (${i + 1}/${selectedTables.length}) ${table.name}…` });
-                        const list = scanDocumentWithCustomTable(editor.document, table, cancelToken, scanRange);
+                        idx++;
+                        progress.report({ message: `扫描 (${idx}/${total}) ${label}…` });
+                        const dict = getCustomPresetDict(presetId);
+                        if (Object.keys(dict).length === 0) continue;
+                        const list = scanDocument(editor.document, dict, cancelToken, scanRange);
                         for (const e of list) {
                             const key = `${e.variant}|${e.preferred}`;
                             const existing = merged.get(key);
                             if (existing) {
                                 existing.ranges.push(...e.ranges);
                             } else {
-                                merged.set(key, { ...e, ranges: [...e.ranges] });
+                                merged.set(key, { ...e, ranges: [...e.ranges], checkTypeLabel: label });
+                            }
+                        }
+                    }
+                    for (const table of selectedTables) {
+                        if (cancelToken.isCancellationRequested) break;
+                        idx++;
+                        progress.report({ message: `扫描表 (${idx}/${total}) ${table.name}…` });
+                        const list = scanDocumentWithCustomTable(editor.document, table, cancelToken, scanRange);
+                        const tableLabel = table.name;
+                        for (const e of list) {
+                            const key = `${e.variant}|${e.preferred}`;
+                            const existing = merged.get(key);
+                            if (existing) {
+                                existing.ranges.push(...e.ranges);
+                            } else {
+                                merged.set(key, { ...e, ranges: [...e.ranges], checkTypeLabel: tableLabel });
                             }
                         }
                     }
@@ -335,44 +429,38 @@ export class WordCheckCommandHandler {
     }
 
     async handleManageCustomTablesCommand(): Promise<void> {
-        const tables = getCustomTables();
-        if (tables.length === 0) {
-            vscode.window.showInformationMessage('暂无自定义表，请先在「检查字词 → 自定义检查」中加载新表。');
-            return;
-        }
-        const lastManagedId = this.context.workspaceState.get<string>(KEY_LAST_MANAGED_TABLE_ID);
-        const sorted = [...tables].sort((a, b) => {
-            if (a.id === lastManagedId) return -1;
-            if (b.id === lastManagedId) return 1;
-            return 0;
-        });
-        const choice = await vscode.window.showQuickPick(
-            sorted.map((t) => ({
-                label: t.name,
-                description: `${t.isRegex ? '正则' : '字面'} · ${t.enabled ? '已启用' : '未启用'}`,
-                table: t,
-            })),
-            { placeHolder: '选择要管理的表', title: '管理自定义表' }
-        );
-        if (!choice) return;
-        await this.context.workspaceState.update(KEY_LAST_MANAGED_TABLE_ID, choice.table.id);
-        const action = await vscode.window.showQuickPick(
-            [
-                { label: '删除', value: 'delete' as const },
-                { label: choice.table.enabled ? '禁用' : '启用', value: 'toggle' as const },
-            ],
-            { placeHolder: '选择操作' }
-        );
-        if (!action) return;
-        if (action.value === 'delete') {
-            removeCustomTable(choice.table.id);
-            vscode.window.showInformationMessage(`已删除「${choice.table.name}」。`);
-        } else {
-            setCustomTableEnabled(choice.table.id, !choice.table.enabled);
-            vscode.window.showInformationMessage(
-                choice.table.enabled ? `已禁用「${choice.table.name}」。` : `已启用「${choice.table.name}」。`
-            );
-        }
+        await vscode.commands.executeCommand(`${CUSTOM_TABLES_VIEW_ID}.focus`);
+    }
+
+    async handleCustomTableDelete(element: CustomTableTreeItem): Promise<void> {
+        if (element.isPreset) return;
+        removeCustomTable(element.id);
+        this.customTablesProvider?.removeFromOrder(element.id);
+        vscode.window.showInformationMessage(`已删除「${element.label}」。`);
+    }
+
+    async handleCustomTableMoveUp(element: CustomTableTreeItem): Promise<void> {
+        this.customTablesProvider?.moveInOrder(element.id, -1);
+    }
+
+    async handleCustomTableMoveDown(element: CustomTableTreeItem): Promise<void> {
+        this.customTablesProvider?.moveInOrder(element.id, 1);
+    }
+
+    async handleDictCheckTypeMoveUp(element: CheckTypeTreeItem): Promise<void> {
+        this.dictCheckTypesProvider?.moveInOrder(element.id, -1);
+    }
+
+    async handleDictCheckTypeMoveDown(element: CheckTypeTreeItem): Promise<void> {
+        this.dictCheckTypesProvider?.moveInOrder(element.id, 1);
+    }
+
+    async handleTgsccCheckTypeMoveUp(element: CheckTypeTreeItem): Promise<void> {
+        this.tgsccCheckTypesProvider?.moveInOrder(element.id, -1);
+    }
+
+    async handleTgsccCheckTypeMoveDown(element: CheckTypeTreeItem): Promise<void> {
+        this.tgsccCheckTypesProvider?.moveInOrder(element.id, 1);
     }
 
     /** 上一处：在当前选中条目的多处之间循环（激活编辑器） */

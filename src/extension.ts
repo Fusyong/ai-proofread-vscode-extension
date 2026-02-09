@@ -35,6 +35,8 @@ export function activate(context: vscode.ExtensionContext) {
     const citationHandler = new CitationCommandHandler(context, citationTreeProvider, citationTreeView);
     const wordCheckHandler = new WordCheckCommandHandler(context);
     wordCheckHandler.registerView();
+    wordCheckHandler.registerCustomTablesView();
+    wordCheckHandler.registerCheckTypesViews();
 
     // 设置校对JSON文件的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, context: vscode.ExtensionContext) => {
@@ -250,6 +252,13 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.wordCheck.revealCurrentAndAdvance', () => wordCheckHandler.handleRevealCurrentAndAdvanceCommand()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.applyReplaceForEntry', () => wordCheckHandler.handleApplyReplaceForEntryCommand()),
         vscode.commands.registerCommand('ai-proofread.manageCustomTables', () => wordCheckHandler.handleManageCustomTablesCommand()),
+        vscode.commands.registerCommand('ai-proofread.customTables.delete', (el: import('./xh7/customTablesView').CustomTableTreeItem) => wordCheckHandler.handleCustomTableDelete(el)),
+        vscode.commands.registerCommand('ai-proofread.customTables.moveUp', (el: import('./xh7/customTablesView').CustomTableTreeItem) => wordCheckHandler.handleCustomTableMoveUp(el)),
+        vscode.commands.registerCommand('ai-proofread.customTables.moveDown', (el: import('./xh7/customTablesView').CustomTableTreeItem) => wordCheckHandler.handleCustomTableMoveDown(el)),
+        vscode.commands.registerCommand('ai-proofread.dictCheckTypes.moveUp', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleDictCheckTypeMoveUp(el)),
+        vscode.commands.registerCommand('ai-proofread.dictCheckTypes.moveDown', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleDictCheckTypeMoveDown(el)),
+        vscode.commands.registerCommand('ai-proofread.tgsccCheckTypes.moveUp', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleTgsccCheckTypeMoveUp(el)),
+        vscode.commands.registerCommand('ai-proofread.tgsccCheckTypes.moveDown', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleTgsccCheckTypeMoveDown(el)),
     ];
 
     context.subscriptions.push(...disposables, configManager);

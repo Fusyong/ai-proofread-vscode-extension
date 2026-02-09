@@ -5,7 +5,7 @@
 
 import type { Range } from 'vscode';
 
-/** 检查类型：dict7 五类 + 通用规范汉字表(tgscc) 两类 */
+/** 检查类型：dict7 五类 + 通用规范汉字表(tgscc) 七类 */
 export type CheckType =
     | 'variant_to_standard'
     | 'variant_to_preferred'
@@ -13,7 +13,12 @@ export type CheckType =
     | 'single_char_yitihuabiao_to_standard'
     | 'single_char_yiti_other_to_standard'
     | 'tgscc_traditional_to_simplified'
-    | 'tgscc_variant_to_simplified';
+    | 'tgscc_variant_to_simplified'
+    | 'tgscc_non_standard'
+    | 'tgscc_undefined'
+    | 'tgscc_traditional_equals_standard'
+    | 'tgscc_table1'
+    | 'tgscc_table2';
 
 /** 表名常量，与 JSON 键一致 */
 export const CHECK_TYPE_KEYS: CheckType[] = [
@@ -24,6 +29,31 @@ export const CHECK_TYPE_KEYS: CheckType[] = [
     'single_char_yiti_other_to_standard',
     'tgscc_traditional_to_simplified',
     'tgscc_variant_to_simplified',
+    'tgscc_non_standard',
+    'tgscc_undefined',
+    'tgscc_traditional_equals_standard',
+    'tgscc_table1',
+    'tgscc_table2',
+];
+
+/** 对照词典检查：dict7 五类 */
+export const DICT_CHECK_TYPES: CheckType[] = [
+    'variant_to_standard',
+    'variant_to_preferred',
+    'single_char_traditional_to_standard',
+    'single_char_yitihuabiao_to_standard',
+    'single_char_yiti_other_to_standard',
+];
+
+/** 对照通用规范汉字表检查：tgscc 七类 */
+export const TGSCC_CHECK_TYPES: CheckType[] = [
+    'tgscc_traditional_to_simplified',
+    'tgscc_variant_to_simplified',
+    'tgscc_non_standard',
+    'tgscc_undefined',
+    'tgscc_traditional_equals_standard',
+    'tgscc_table1',
+    'tgscc_table2',
 ];
 
 /** 用于 QuickPick 多选（复选框样式）的显示标签 */
@@ -35,9 +65,14 @@ export const CHECK_TYPE_LABELS: Record<CheckType, string> = {
     single_char_yiti_other_to_standard: '异体字(表外)→标准',
     tgscc_traditional_to_simplified: '繁体字→通用规范字',
     tgscc_variant_to_simplified: '异体字→通用规范字',
+    tgscc_non_standard: '非通用规范字',
+    tgscc_undefined: '未界定字（非通规字且在繁简异表外）',
+    tgscc_traditional_equals_standard: '传承字（繁体字=通用规范字）',
+    tgscc_table1: '表一字',
+    tgscc_table2: '表二字',
 };
 
-/** 单条扫描结果：需要提示的词、更好的词、在文档中的出现位置 */
+/** 单条扫描结果：需要提示的词、更好的词、在文档中的出现位置；每条只对应一种检查类型 */
 export interface WordCheckEntry {
     /** 需要提示的字词（表中 key） */
     variant: string;
@@ -47,6 +82,8 @@ export interface WordCheckEntry {
     ranges: Range[];
     /** 自定义表规则的行内注释，供 tooltip / 查看说明 使用 */
     rawComment?: string;
+    /** 该条对应的检查类型标签（如「繁体字→通用规范字」），用于 TreeView 描述 */
+    checkTypeLabel?: string;
 }
 
 /** 自定义替换表：解析后单条规则（与文件行一一对应） */
