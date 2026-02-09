@@ -432,6 +432,40 @@ export class WordCheckCommandHandler {
         await vscode.commands.executeCommand(`${CUSTOM_TABLES_VIEW_ID}.focus`);
     }
 
+    /** 加载替换表：文件选择 → 正则/字面 → 加入列表并刷新视图 */
+    async handleLoadCustomTableCommand(): Promise<void> {
+        const lastFolder = this.context.workspaceState.get<string>(KEY_LAST_ADD_FOLDER);
+        const defaultUri = lastFolder ? vscode.Uri.file(lastFolder) : undefined;
+        const uris = await vscode.window.showOpenDialog({
+            canSelectMany: false,
+            filters: { '替换表': ['txt', 'json'] },
+            defaultUri,
+        });
+        if (!uris?.length) return;
+        const parentFolder = path.dirname(uris[0].fsPath);
+        await this.context.workspaceState.update(KEY_LAST_ADD_FOLDER, parentFolder);
+        const lastIsRegex = this.context.workspaceState.get<boolean>(KEY_LAST_IS_REGEX);
+        const isRegex = await vscode.window.showQuickPick(
+            [
+                { label: '正则替换表', value: true, picked: lastIsRegex === true },
+                { label: '非正则替换表', value: false, picked: lastIsRegex === false },
+            ],
+            { placeHolder: '选择表类型' }
+        );
+        if (isRegex == null) return;
+        await this.context.workspaceState.update(KEY_LAST_IS_REGEX, isRegex.value);
+        const { table, errors } = addCustomTableFromFile(uris[0].fsPath, isRegex.value);
+        if (table) {
+            vscode.window.showInformationMessage(`已加载「${table.name}」`);
+            this.customTablesProvider?.refresh();
+            if (errors.length) {
+                vscode.window.showWarningMessage(`部分规则编译失败：${errors.join('；')}`);
+            }
+        } else {
+            vscode.window.showErrorMessage(errors[0] ?? '加载失败');
+        }
+    }
+
     async handleCustomTableDelete(element: CustomTableTreeItem): Promise<void> {
         if (element.isPreset) return;
         removeCustomTable(element.id);

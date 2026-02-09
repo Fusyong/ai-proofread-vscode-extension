@@ -163,6 +163,10 @@
           "title": "下移"
         },
         {
+          "command": "ai-proofread.customTables.loadTable",
+          "title": "加载替换表"
+        },
+        {
           "command": "ai-proofread.dictCheckTypes.moveUp",
           "title": "上移"
         },
@@ -559,6 +563,11 @@
         {
           "command": "ai-proofread.prompts.new",
           "when": "view == ai-proofread.prompts",
+          "group": "navigation"
+        },
+        {
+          "command": "ai-proofread.customTables.loadTable",
+          "when": "view == ai-proofread.customTables",
           "group": "navigation"
         }
       ],
