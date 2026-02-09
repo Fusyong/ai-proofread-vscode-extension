@@ -542,7 +542,7 @@
         },
         {
           "id": "ai-proofread.tgsccCheckTypes",
-          "name": "tgscc checks"
+          "name": "TGSCC checks"
         },
         {
           "id": "ai-proofread.customTables",
@@ -550,7 +550,7 @@
         },
         {
           "id": "ai-proofread.wordCheck",
-          "name": "check words"
+          "name": "words checked"
         },
         {
           "id": "ai-proofread.citation",
