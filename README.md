@@ -321,7 +321,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
-### v1.5.2
+### v1.5.3
 
 - 特性：根据词典检查字词，包括异体/繁体字、异形词等
 - 特性：根据《通用规范汉字表》检查字词，包括异体/繁体字、异形词等

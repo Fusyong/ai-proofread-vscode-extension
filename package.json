@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -534,27 +534,33 @@
       "explorer": [
         {
           "id": "ai-proofread.prompts",
-          "name": "prompts"
+          "name": "prompts",
+          "when": "aiProofread.showPromptsView"
         },
         {
           "id": "ai-proofread.dictCheckTypes",
-          "name": "dict checks"
+          "name": "dict checks",
+          "when": "aiProofread.showDictCheckTypesView"
         },
         {
           "id": "ai-proofread.tgsccCheckTypes",
-          "name": "TGSCC checks"
+          "name": "TGSCC checks",
+          "when": "aiProofread.showTgsccCheckTypesView"
         },
         {
           "id": "ai-proofread.customTables",
-          "name": "custom checks"
+          "name": "custom checks",
+          "when": "aiProofread.showCustomTablesView"
         },
         {
           "id": "ai-proofread.wordCheck",
-          "name": "words checked"
+          "name": "words checked",
+          "when": "aiProofread.showWordCheckView"
         },
         {
           "id": "ai-proofread.citation",
-          "name": "citations"
+          "name": "citations",
+          "when": "aiProofread.showCitationView"
         }
       ]
     },
