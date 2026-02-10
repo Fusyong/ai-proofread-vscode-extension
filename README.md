@@ -296,9 +296,12 @@ Additionally, you can also set your own prompts for other text processing scenar
     1. [ ] 读秀，
     2. [ ] 中华经典古籍库，
     3. [ ] 识典故古籍
-3. [ ] 人看的相似度使用编辑距离
-4. [ ] 勘误表改为JSON加web viewer
-5. [ ] 预置更多提示词，包括常用的专项校对
+3. [ ] 扩展webview为可视化入口
+    1. [ ] 选择要校对的原始文件（打开文档；选择文档；自动找到其他配套文件）
+    2. [ ] 其他常用工具的按钮（感知当前打开文档的类型）
+4. [ ] 人看的相似度使用编辑距离
+5. [ ] 勘误表改为JSON加web viewer
+6. [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] 典型错误举例校对
         1. [ ] 标点符号用法错误
         2. [ ] 数字用法错误
@@ -309,13 +312,12 @@ Additionally, you can also set your own prompts for other text processing scenar
     4. [ ] 练习题就地回答
     5. [ ] 翻译
     6. [ ] 按小学语文教材标准加拼音
-6.  [ ] 自主发现、提出、校对知识性问题
+7.  [ ] 自主发现、提出、校对知识性问题
     1. [ ] 检索、核对互联网资料
     2. [ ] 检索、核对本地词典（以Python库mdict查询模块为基础）
-7.  [ ] 内部git版本管理
-8.  [ ] 推理模型无法使用的问题（可能单纯是因为运行时间过长）
-9.  [ ] 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
-
+8.  [ ] 内部git版本管理
+9.  [ ] 推理模型无法使用的问题（可能单纯是因为运行时间过长）
+10. [ ] 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
 
 ## 6. 更新日志
 
@@ -446,7 +448,6 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 - 切分和校对结果改成Webview Panel呈现，在一个切分、校对流程中可以重新打开
 - 切分结果菜单增加一个“校对JSON结果”按钮
-
 
 ### v0.1.5
 
