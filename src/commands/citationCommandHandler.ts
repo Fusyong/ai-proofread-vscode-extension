@@ -110,7 +110,8 @@ export class CitationCommandHandler {
             let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
             if (ngramGranularity === 'word') {
                 try {
-                    jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'));
+                    const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
+                    jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
                 } catch {
                     // 加载失败时回退到字级
                 }
@@ -122,12 +123,14 @@ export class CitationCommandHandler {
                     cancellable: true
                 },
                 async (progress, cancelToken) => {
+                    const cutMode = vscode.workspace.getConfiguration('ai-proofread.jieba').get<'default' | 'search'>('cutMode', 'default');
                     return matchCitationsToReferences(blocks, refStore, {
                         lenDeltaRatio,
                         similarityThreshold,
                         matchesPerCitation,
                         ngramSize,
                         ngramGranularity: jieba ? 'word' : 'char',
+                        cutMode,
                         jieba,
                         cancelToken,
                         progress: (msg, cur, total) => progress.report({ message: msg, increment: total > 0 ? (100 / total) : 0 })
@@ -210,7 +213,8 @@ export class CitationCommandHandler {
             let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
             if (ngramGranularity === 'word') {
                 try {
-                    jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'));
+                    const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
+                    jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
                 } catch {
                     // 加载失败时回退到字级
                 }
@@ -221,17 +225,20 @@ export class CitationCommandHandler {
                     title: '核对选中引文',
                     cancellable: true
                 },
-                async (progress, cancelToken) =>
-                    matchCitationsToReferences(blocks, refStore, {
+                async (progress, cancelToken) => {
+                    const cutMode = vscode.workspace.getConfiguration('ai-proofread.jieba').get<'default' | 'search'>('cutMode', 'default');
+                    return matchCitationsToReferences(blocks, refStore, {
                         lenDeltaRatio,
                         similarityThreshold,
                         matchesPerCitation,
                         ngramSize,
                         ngramGranularity: jieba ? 'word' : 'char',
+                        cutMode,
                         jieba,
                         cancelToken,
                         progress: (msg) => progress.report({ message: msg })
-                    })
+                    });
+                }
             );
             if (this.citationTreeProvider) {
                 this.citationTreeProvider.refresh(blockResults, doc.uri);

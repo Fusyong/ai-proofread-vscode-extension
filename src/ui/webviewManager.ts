@@ -654,7 +654,8 @@ export class WebviewManager {
             let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
             if (ngramGranularity === 'word') {
                 try {
-                    jieba = getJiebaWasm(path.join(context.extensionPath, 'dist'));
+                    const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
+                    jieba = getJiebaWasm(path.join(context.extensionPath, 'dist'), customDictPath || undefined);
                 } catch {
                     // 加载失败时回退到字级
                 }
@@ -664,6 +665,7 @@ export class WebviewManager {
                 similarityThreshold: similarityThreshold,
                 ngramSize: config.get<number>('ngramSize', 1),
                 ngramGranularity: jieba ? 'word' : 'char',
+                cutMode: vscode.workspace.getConfiguration('ai-proofread.jieba').get<'default' | 'search'>('cutMode', 'default'),
                 jieba,
                 offset: config.get<number>('offset', 1),
                 maxWindowExpansion: config.get<number>('maxWindowExpansion', 3),

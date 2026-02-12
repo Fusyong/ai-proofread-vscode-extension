@@ -230,7 +230,8 @@ export class WordCheckCommandHandler {
                             progress.report({ message: scanRange ? '扫描选中文本…' : '扫描文档…' });
                             if (isDictWordTableType(type)) {
                                 try {
-                                    const jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'));
+                                    const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
+                                    const jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
                                     list = scanDocumentWithSegmentation(editor.document, dict, jieba, cancelToken, scanRange);
                                 } catch {
                                     list = scanDocument(editor.document, dict, cancelToken, scanRange);

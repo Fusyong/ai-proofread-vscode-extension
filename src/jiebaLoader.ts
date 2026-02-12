@@ -3,7 +3,9 @@
  * 计划见 docs/jieba-wasm-integration-plan.md
  */
 
+import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 
 /** jieba-wasm 导出的 token（含位置信息） */
 export interface JiebaToken {
@@ -29,16 +31,33 @@ export interface JiebaWasmModule {
     with_dict: (dict: string) => void;
 }
 
-/** 按 distDir 缓存，避免同一 dist 重复加载 */
+/** 按 distDir + customDictPath 缓存 */
 const jiebaCache = new Map<string, JiebaWasmModule>();
 
 /**
- * 从扩展 dist 目录加载 jieba-wasm（构建时由 copy-jieba-dist 复制 jieba_rs_wasm.js + jieba_rs_wasm_bg.wasm）。
- * @param distDir 扩展的 dist 目录绝对路径（建议 context.extensionPath + '/dist'），打包后不含 node_modules 时由此定位 wasm 文件
+ * 解析自定义词典路径（支持 ${workspaceFolder}）
+ */
+function resolveCustomDictPath(configPath: string): string {
+    if (!configPath || !configPath.trim()) return '';
+    let p = configPath.trim();
+    const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (folder && p.includes('${workspaceFolder}')) {
+        p = p.replace(/\$\{workspaceFolder\}/g, folder);
+    }
+    return path.isAbsolute(p) ? p : folder ? path.join(folder, p) : p;
+}
+
+/**
+ * 从扩展 dist 目录加载 jieba-wasm，可选加载用户自定义词典。
+ * @param distDir 扩展的 dist 目录绝对路径（建议 context.extensionPath + '/dist'）
+ * @param customDictPath 自定义词典路径（可选），支持 ${workspaceFolder}；格式：每行「词语 词频 词性」以换行分隔
  * @returns 加载完成的 jieba-wasm 模块
  */
-export function getJiebaWasm(distDir: string): JiebaWasmModule {
-    let cached = jiebaCache.get(distDir);
+export function getJiebaWasm(distDir: string, customDictPath?: string): JiebaWasmModule {
+    const resolvedDictPath = customDictPath ? resolveCustomDictPath(customDictPath) : '';
+    const cacheKey = distDir + '\0' + resolvedDictPath;
+
+    let cached = jiebaCache.get(cacheKey);
     if (cached) return cached;
 
     // jieba-wasm Node.js 版本同步加载，内部通过 __dirname 定位 .wasm 文件
@@ -60,6 +79,21 @@ export function getJiebaWasm(distDir: string): JiebaWasmModule {
         );
     }
 
-    jiebaCache.set(distDir, jieba);
+    if (resolvedDictPath && typeof jieba.with_dict === 'function' && fs.existsSync(resolvedDictPath)) {
+        try {
+            const content = fs.readFileSync(resolvedDictPath, 'utf8');
+            const lines = content
+                .split(/\r?\n/)
+                .map((line) => line.trim())
+                .filter((line) => line && !line.startsWith('#'));
+            if (lines.length > 0) {
+                jieba.with_dict(lines.join('\n'));
+            }
+        } catch (e) {
+            console.warn('[jieba] 加载自定义词典失败:', resolvedDictPath, e);
+        }
+    }
+
+    jiebaCache.set(cacheKey, jieba);
     return jieba;
 }

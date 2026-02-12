@@ -221,9 +221,9 @@ Additionally, you can also set your own prompts for other text processing scenar
 1. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用PDF查看器SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
 2. **字词检查**：命令`check words`。分类两个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义（正则）替换表的提示与替换功能。第三者可用于基于个人积累的专项检查，支持正则表达式，有大较大潜力。其正则替换表与TextPro类似，计划逐步增强兼容能力。
 3. **引文核对**：指定本地文献库根目录（Markdown格式，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。
-4. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
-5. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
-
+4. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
+5. **分词和词频统计**：使用`segment file`和`segment selection`命令。
+6. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
 
 ### 3.8. 注意事项
 
@@ -299,12 +299,13 @@ Additionally, you can also set your own prompts for other text processing scenar
 3. [ ] 扩展webview为可视化入口
     1. [ ] 选择要校对的原始文件（打开文档；选择文档；自动找到其他配套文件）
     2. [ ] 其他常用工具的按钮（感知当前打开文档的类型）
-4. [ ] 尝试新的相似度算法
+4. [ ] 自动从勘误表中收集常用词语错误：在非汉字处切开，再对齐，筛选仅一个汉字改动的对子，再用AI筛选、归纳出查找替换对（含正则）
+5. [ ] 尝试新的相似度算法
     1. [ ] jsdiff（在 NPM 上的包名就叫 diff，Kevin Decker 维护），diffSentences 或 diffWords 可以非常精确地标记出“删减”、“新增”和“未变”的部分。
     2. [ ] fastest-levenshtein，在对齐完成后，快速计算两个相似句子的“修改程度”百分比。它是 JS 环境下编辑距离运算的最快实现
     3. [ ] 人看的相似度使用编辑距离
-5. [ ] 勘误表改为JSON加web viewer
-6. [ ] 预置更多提示词，包括常用的专项校对
+6. [ ] 勘误表改为JSON加web viewer
+7. [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] 典型错误举例校对
         1. [ ] 标点符号用法错误
         2. [ ] 数字用法错误
@@ -315,20 +316,22 @@ Additionally, you can also set your own prompts for other text processing scenar
     4. [ ] 练习题就地回答
     5. [ ] 翻译
     6. [ ] 按小学语文教材标准加拼音
-7.  [ ] 自主发现、提出、校对知识性问题
+8.  [ ] 自主发现、提出、校对知识性问题
     1. [ ] 检索、核对互联网资料
     2. [ ] 检索、核对本地词典（以Python库mdict查询模块为基础）
-8.  [ ] 内部git版本管理
-9.  [ ] 推理模型无法使用的问题（可能单纯是因为运行时间过长）
-10. [ ] 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
+9.  [ ] 内部git版本管理
+10. [ ] 推理模型无法使用的问题（可能单纯是因为运行时间过长）
+11. [ ] 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
 
 ## 6. 更新日志
 
-### v1.6.0
+### v1.6.1
 
-- 特性：集成jieba-wasm分词库，分词后再进行词语检查，提高精确性；在句子对齐和引文核查中，可选分词后再进行相似度计算，但速度较慢。
+- 特性：集成jieba-wasm分词库，支持用户词典路径
+    - 分词后再进行词语检查，提高精确性；
+    - 在句子对齐和引文核查中，可选分词（默认search模式）后再进行相似度计算，更准确，但速度稍慢。
 - 优化：词典表外异形词划分为单字词和多字词两个选项，都在分词后检查。
-- 特性：对文件或选段进行分词。
+- 特性：对文件或选段进行分词，或生成词频词性统计表。
 - !!! caution 安装包体积由726KB增加到3.4MB
 
 ### v1.5.3
