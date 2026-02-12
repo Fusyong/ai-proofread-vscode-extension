@@ -2,10 +2,12 @@
  * 检查字词：对当前文档全文扫描，找出表中词条的出现位置
  * 规划见 docs/xh7-word-check-plan.md
  * 文档无分词，采用纯字面匹配；按「先长后短」排序 key，占用区间不重叠。
+ * 词表（variant_to_standard、variant_to_preferred_single、variant_to_preferred_multi）支持分词后再检查，见 scanDocumentWithSegmentation。
  */
 
 import * as vscode from 'vscode';
 import type { WordCheckEntry } from './types';
+import type { JiebaWasmModule } from '../jiebaLoader';
 
 /** 正则元字符转义，用于字面匹配 */
 function escapeRegex(s: string): string {
@@ -76,4 +78,48 @@ export function scanDocument(
         }
     }
     return entries;
+}
+
+/**
+ * 分词后再检查：仅当 jieba 分词结果为完整词时，才与字典匹配。
+ * 用于 dict7 的异形词表（variant_to_standard、variant_to_preferred_single、variant_to_preferred_multi），减少误报。
+ */
+export function scanDocumentWithSegmentation(
+    document: vscode.TextDocument,
+    dict: Record<string, string>,
+    jieba: JiebaWasmModule,
+    cancelToken?: vscode.CancellationToken,
+    range?: vscode.Range
+): WordCheckEntry[] {
+    const scanRange = range ?? new vscode.Range(0, 0, document.lineCount, 0);
+    const text = document.getText(scanRange);
+    const rangeStartOffset = document.offsetAt(scanRange.start);
+
+    const tokens = jieba.tokenize(text, 'default', true);
+    const dictSet = new Set(Object.keys(dict));
+    const entryMap = new Map<string, WordCheckEntry>();
+
+    for (const tok of tokens) {
+        if (cancelToken?.isCancellationRequested) break;
+        if (!dictSet.has(tok.word)) continue;
+
+        const preferred = dict[tok.word];
+        if (!preferred) continue;
+
+        const startOffset = rangeStartOffset + tok.start;
+        const endOffset = rangeStartOffset + tok.end;
+        const rangeObj = new vscode.Range(
+            document.positionAt(startOffset),
+            document.positionAt(endOffset)
+        );
+
+        const key = `${tok.word}|${preferred}`;
+        const existing = entryMap.get(key);
+        if (existing) {
+            existing.ranges.push(rangeObj);
+        } else {
+            entryMap.set(key, { variant: tok.word, preferred, ranges: [rangeObj] });
+        }
+    }
+    return Array.from(entryMap.values());
 }

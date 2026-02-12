@@ -11,6 +11,7 @@ import { ProgressTracker } from '../progressTracker';
 import { alignSentencesAnchor, getAlignmentStatistics, AlignmentOptions } from '../sentenceAligner';
 import { splitChineseSentencesWithLineNumbers } from '../splitter';
 import { generateHtmlReport } from '../alignmentReportGenerator';
+import { getJiebaWasm } from '../jiebaLoader';
 
 // 接口定义
 export interface SplitResult {
@@ -301,7 +302,7 @@ export class WebviewManager {
                     const alignmentMarkdownPath = this.currentProcessResult?.proofreadResult?.markdownFilePath;
 
                     if (alignmentOriginalPath && alignmentMarkdownPath) {
-                        await this.handleSentenceAlignment(alignmentOriginalPath, alignmentMarkdownPath);
+                        await this.handleSentenceAlignment(alignmentOriginalPath, alignmentMarkdownPath, context);
                     } else {
                         vscode.window.showErrorMessage('无法找到原始文件或校对后的Markdown文件！');
                     }
@@ -606,7 +607,7 @@ export class WebviewManager {
     /**
      * 处理句子对齐（生成勘误表）
      */
-    private async handleSentenceAlignment(fileA: string, fileB: string): Promise<void> {
+    private async handleSentenceAlignment(fileA: string, fileB: string, context: vscode.ExtensionContext): Promise<void> {
         try {
             // 读取对齐参数配置
             const config = vscode.workspace.getConfiguration('ai-proofread.alignment');
@@ -649,10 +650,21 @@ export class WebviewManager {
             const removeInnerWhitespace = removeInnerWhitespaceChoice?.value ?? true;
 
             const citationConfig = vscode.workspace.getConfiguration('ai-proofread.citation');
+            const ngramGranularity = config.get<'word' | 'char'>('ngramGranularity', 'word');
+            let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
+            if (ngramGranularity === 'word') {
+                try {
+                    jieba = getJiebaWasm(path.join(context.extensionPath, 'dist'));
+                } catch {
+                    // 加载失败时回退到字级
+                }
+            }
             const options: AlignmentOptions = {
                 windowSize: config.get<number>('windowSize', 10),
                 similarityThreshold: similarityThreshold,
-                ngramSize: config.get<number>('ngramSize', 2),
+                ngramSize: config.get<number>('ngramSize', 1),
+                ngramGranularity: jieba ? 'word' : 'char',
+                jieba,
                 offset: config.get<number>('offset', 1),
                 maxWindowExpansion: config.get<number>('maxWindowExpansion', 3),
                 consecutiveFailThreshold: config.get<number>('consecutiveFailThreshold', 3),

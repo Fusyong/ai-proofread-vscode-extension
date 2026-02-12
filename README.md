@@ -299,7 +299,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 3. [ ] 扩展webview为可视化入口
     1. [ ] 选择要校对的原始文件（打开文档；选择文档；自动找到其他配套文件）
     2. [ ] 其他常用工具的按钮（感知当前打开文档的类型）
-4. [ ] 人看的相似度使用编辑距离
+4. [ ] 尝试新的相似度算法
+    1. [ ] jsdiff（在 NPM 上的包名就叫 diff，Kevin Decker 维护），diffSentences 或 diffWords 可以非常精确地标记出“删减”、“新增”和“未变”的部分。
+    2. [ ] fastest-levenshtein，在对齐完成后，快速计算两个相似句子的“修改程度”百分比。它是 JS 环境下编辑距离运算的最快实现
+    3. [ ] 人看的相似度使用编辑距离
 5. [ ] 勘误表改为JSON加web viewer
 6. [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] 典型错误举例校对
@@ -324,6 +327,9 @@ Additionally, you can also set your own prompts for other text processing scenar
 ### v1.6.0
 
 - 特性：集成jieba-wasm分词库，支持分词后再进行相似度计算和字词检查，提高精确性。
+- 优化：词典表外异形词划分为单字词和多字词两个选项，都在分词后检查。
+- 特性：对文件或选段进行分词。
+- !!! caution 安装包体积由726KB增加到3.4MB
 
 ### v1.5.3
 

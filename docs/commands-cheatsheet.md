@@ -221,7 +221,8 @@ flowchart LR
 |--------|----------|
 | **alignment.similarityThreshold** | 句子对齐相似度阈值 (0–1)，默认 0.4 |
 | **alignment.windowSize** | 对齐搜索窗口大小（锚点左右各 N 句），默认 10 |
-| **alignment.ngramSize** | 相似度计算 N-gram 大小，默认 2（bigram） |
+| **alignment.ngramSize** | 相似度计算 N-gram 大小，默认 1（unigram） |
+| **alignment.ngramGranularity** | 相似度粒度：词级（默认）或字级 |
 
 ### 4.5 引文核对
 

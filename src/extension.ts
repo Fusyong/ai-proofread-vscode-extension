@@ -31,7 +31,7 @@ export function activate(context: vscode.ExtensionContext) {
     const webviewManager = WebviewManager.getInstance();
     const fileSplitHandler = new FileSplitCommandHandler(webviewManager);
     const proofreadHandler = new ProofreadCommandHandler(webviewManager);
-    const fileCompareHandler = new FileCompareCommandHandler();
+    const fileCompareHandler = new FileCompareCommandHandler(context);
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
@@ -250,6 +250,24 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await utilityHandler.handleMarkTitlesFromTocCommand(editor);
+        }),
+
+        // 注册分词命令
+        vscode.commands.registerCommand('ai-proofread.segmentFile', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleSegmentFileCommand(editor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.segmentSelection', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleSegmentSelectionCommand(editor, context);
         }),
 
         // 注册重新打开结果面板命令

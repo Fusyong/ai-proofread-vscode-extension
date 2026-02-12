@@ -8,6 +8,7 @@ import * as path from 'path';
 import { ReferenceStore, getCitationNormalizeOptions } from '../citation';
 import { collectAllCitations, splitCitationBlocksIntoSentences, type CitationEntry } from '../citation';
 import { matchCitationsToReferences } from '../citation/citationMatcher';
+import { getJiebaWasm } from '../jiebaLoader';
 import { focusCitationView } from '../citation/citationView';
 import type { CitationTreeDataProvider } from '../citation/citationTreeProvider';
 import type { CitationTreeNode } from '../citation/citationTreeProvider';
@@ -104,7 +105,16 @@ export class CitationCommandHandler {
 
             const alignmentConfig = vscode.workspace.getConfiguration('ai-proofread.alignment');
             const similarityThreshold = alignmentConfig.get<number>('similarityThreshold', 0.4);
-            const ngramSize = alignmentConfig.get<number>('ngramSize', 2);
+            const ngramSize = alignmentConfig.get<number>('ngramSize', 1);
+            const ngramGranularity = alignmentConfig.get<'word' | 'char'>('ngramGranularity', 'word');
+            let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
+            if (ngramGranularity === 'word') {
+                try {
+                    jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'));
+                } catch {
+                    // 加载失败时回退到字级
+                }
+            }
             const blockResults = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
@@ -117,6 +127,8 @@ export class CitationCommandHandler {
                         similarityThreshold,
                         matchesPerCitation,
                         ngramSize,
+                        ngramGranularity: jieba ? 'word' : 'char',
+                        jieba,
                         cancelToken,
                         progress: (msg, cur, total) => progress.report({ message: msg, increment: total > 0 ? (100 / total) : 0 })
                     });
@@ -193,7 +205,16 @@ export class CitationCommandHandler {
             const matchesPerCitation = config.get<number>('matchesPerCitation', 2);
             const alignmentConfig = vscode.workspace.getConfiguration('ai-proofread.alignment');
             const similarityThreshold = alignmentConfig.get<number>('similarityThreshold', 0.4);
-            const ngramSize = alignmentConfig.get<number>('ngramSize', 2);
+            const ngramSize = alignmentConfig.get<number>('ngramSize', 1);
+            const ngramGranularity = alignmentConfig.get<'word' | 'char'>('ngramGranularity', 'word');
+            let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
+            if (ngramGranularity === 'word') {
+                try {
+                    jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'));
+                } catch {
+                    // 加载失败时回退到字级
+                }
+            }
             const blockResults = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
@@ -206,6 +227,8 @@ export class CitationCommandHandler {
                         similarityThreshold,
                         matchesPerCitation,
                         ngramSize,
+                        ngramGranularity: jieba ? 'word' : 'char',
+                        jieba,
                         cancelToken,
                         progress: (msg) => progress.report({ message: msg })
                     })

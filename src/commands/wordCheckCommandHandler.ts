@@ -30,10 +30,11 @@ import {
     type DictCheckTypesTreeDataProvider,
     type TgsccCheckTypesTreeDataProvider,
 } from '../xh7/checkTypesView';
-import { scanDocument } from '../xh7/documentScanner';
+import { scanDocument, scanDocumentWithSegmentation } from '../xh7/documentScanner';
 import { scanDocumentTgsccSpecial, isTgsccSpecialType } from '../xh7/documentScannerTgscc';
+import { getJiebaWasm } from '../jiebaLoader';
 import { formatFullNotesAsHtml } from '../xh7/notesResolver';
-import { CHECK_TYPE_LABELS, DICT_CHECK_TYPES, TGSCC_CHECK_TYPES, type CheckType } from '../xh7/types';
+import { CHECK_TYPE_LABELS, DICT_CHECK_TYPES, TGSCC_CHECK_TYPES, isDictWordTableType, type CheckType } from '../xh7/types';
 import {
     initCustomTableCache,
     getCustomTables,
@@ -227,7 +228,16 @@ export class WordCheckCommandHandler {
                             const dict = getDict(type);
                             if (Object.keys(dict).length === 0) continue;
                             progress.report({ message: scanRange ? '扫描选中文本…' : '扫描文档…' });
-                            list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                            if (isDictWordTableType(type)) {
+                                try {
+                                    const jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'));
+                                    list = scanDocumentWithSegmentation(editor.document, dict, jieba, cancelToken, scanRange);
+                                } catch {
+                                    list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                                }
+                            } else {
+                                list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                            }
                         }
                         const label = typeLabel(type);
                         for (const e of list) {

@@ -95,6 +95,14 @@
         "title": "AI Proofreader: mark titles from table of contents"
       },
       {
+        "command": "ai-proofread.segmentFile",
+        "title": "AI Proofreader: segment the file"
+      },
+      {
+        "command": "ai-proofread.segmentSelection",
+        "title": "AI Proofreader: segment the selection"
+      },
+      {
         "command": "ai-proofread.splitFile",
         "title": "AI Proofreader: split file"
       },
@@ -148,7 +156,7 @@
       },
       {
         "command": "ai-proofread.manageCustomTables",
-        "title": "AI Proofreader: 管理自定义替换表"
+        "title": "AI Proofreader: manage custom tables"
       },
       {
         "command": "ai-proofread.customTables.delete",
@@ -181,10 +189,6 @@
       {
         "command": "ai-proofread.tgsccCheckTypes.moveDown",
         "title": "下移"
-      },
-      {
-        "command": "ai-proofread.debug.testJieba",
-        "title": "AI Proofreader: test jieba (debug)"
       }
     ],
     "configuration": {
@@ -405,18 +409,30 @@
           "default": 10,
           "description": "句子对齐（生成勘误表）：搜索窗口大小（锚点左右各N个句子）"
         },
-        "ai-proofread.alignment.similarityThreshold": {
+        "ai-proofread.alignment.ngramGranularity": {
           "order": 49,
-          "type": "number",
-          "default": 0.4,
-          "description": "句子对齐（生成勘误表）：相似度阈值（0-1）"
+          "type": "string",
+          "enum": [
+            "char",
+            "word"
+          ],
+          "default": "char",
+          "description": "相似度计算粒度：字级（默认）或词级（更语义化，需 jieba 分词，速度较慢）。"
         },
-        "ai-proofread.alignment.ngramSize": {
+        "ai-proofread.alignment.similarityThreshold": {
           "order": 50,
           "type": "number",
-          "default": 2,
-          "description": "N-gram 大小，用于相似度计算。影响句子对齐（勘误表）与引文核对。默认 2（bigram）。"
+          "default": 0.4,
+          "description": "相似度阈值（0-1），影响句子对齐（勘误表）与引文核对，默认0.4，粒度选择word时可选0.6"
         },
+        "ai-proofread.alignment.ngramSize": {
+          "order": 50.1,
+          "type": "number",
+          "minimum": 1,
+          "default": 2,
+          "description": "相似度计算时的 N-gram 大小，影响句子对齐（勘误表）与引文核对。默认 2（bigram），粒度选择word时可选1（unigram）。"
+        },
+
         "ai-proofread.alignment.offset": {
           "order": 51,
           "type": "number",
@@ -700,6 +716,16 @@
           "command": "ai-proofread.markTitlesFromToc",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown"
+        },
+        {
+          "command": "ai-proofread.segmentFile",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
+          "command": "ai-proofread.segmentSelection",
+          "group": "ai-proofread@13",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.diffItWithAnotherFile",
