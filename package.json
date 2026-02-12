@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -802,7 +802,8 @@
         "jieba-wasm": false
       },
       "sourceMap": false,
-      "outputFormat": "commonjs"
+      "outputFormat": "commonjs",
+      "optimize": true
     }
   },
   "icon": "icon.png",
