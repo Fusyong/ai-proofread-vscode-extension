@@ -6,7 +6,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { mergeTwoFiles } from '../merger';
-import { getJiebaWasm } from '../jiebaLoader';
+import { getJiebaWasm, type JiebaWasmModule } from '../jiebaLoader';
+import * as OpenCC from 'opencc-js';
 import { searchSelectionInPDF } from '../pdfSearcher';
 import { convertQuotes } from '../quoteConverter';
 import { formatParagraphs } from '../paragraphDetector';
@@ -380,7 +381,7 @@ export class UtilityCommandHandler {
                 const notFoundList = notFound
                     .map(item => `- ${item.name} (级别: ${item.level})`)
                     .join('\n');
-                
+
                 const message = `标记完成！但有 ${notFound.length} 个目录项未找到（起始级别: ${baseLevel}）：\n${notFoundList}`;
                 vscode.window.showWarningMessage(message);
             } else {
@@ -403,35 +404,69 @@ export class UtilityCommandHandler {
     }
 
     /**
-     * 分词：可选繁简、分隔符；对全文或选中文本分词并替换
+     * 分词：可选分词替换或输出词频统计表
      */
     private async runSegment(
         editor: vscode.TextEditor,
         context: vscode.ExtensionContext,
         range: vscode.Range
     ): Promise<void> {
-        const scriptChoice = await vscode.window.showQuickPick(
+        const modeChoice = await vscode.window.showQuickPick(
             [
-                { label: '简体', value: 'simplified', description: '默认' },
-                { label: '繁体', value: 'traditional' },
+                { label: '分词后替换原文', value: 'replace', description: '分词后替换原文，可设分隔符' },
+                { label: '输出词频统计表', value: 'frequency', description: '生成词语、词性、词频表' },
             ],
-            { placeHolder: '选择文本类型（默认简体）', ignoreFocusOut: true }
+            { placeHolder: '选择分词输出方式', ignoreFocusOut: true }
         );
-        if (!scriptChoice) return;
-        // 当前 jieba-wasm 对简繁使用同一词典；scriptChoice 预留后续扩展
-        void scriptChoice;
+        if (!modeChoice) return;
 
-        const sepInput = await vscode.window.showInputBox({
-            prompt: '分隔符（默认空格，留空即空格）',
-            value: ' ',
-            ignoreFocusOut: true,
-        });
-        if (sepInput === undefined) return;
-        const separator = sepInput === '' ? ' ' : sepInput;
+        const text = editor.document.getText(range);
+        if (!text.trim()) {
+            vscode.window.showInformationMessage('文本为空，无法分词');
+            return;
+        }
 
         try {
-            const jieba = getJiebaWasm(path.join(context.extensionPath, 'dist'));
-            const text = editor.document.getText(range);
+            const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
+            const jieba = getJiebaWasm(path.join(context.extensionPath, 'dist'), customDictPath || undefined);
+
+            if (modeChoice.value === 'frequency') {
+                const scriptChoice = await vscode.window.showQuickPick(
+                    [
+                        { label: '简体', value: 'simplified', description: '默认' },
+                        { label: '繁体', value: 'traditional' },
+                    ],
+                    { placeHolder: '选择文本类型（默认简体）', ignoreFocusOut: true }
+                );
+                if (!scriptChoice) return;
+                await this.outputWordFrequencyCsv(
+                    jieba,
+                    text,
+                    editor.document.uri,
+                    scriptChoice.value as 'simplified' | 'traditional'
+                );
+                return;
+            }
+
+            // 分词替换模式
+            const scriptChoice = await vscode.window.showQuickPick(
+                [
+                    { label: '简体', value: 'simplified', description: '默认' },
+                    { label: '繁体', value: 'traditional' },
+                ],
+                { placeHolder: '选择文本类型（默认简体）', ignoreFocusOut: true }
+            );
+            if (!scriptChoice) return;
+            void scriptChoice;
+
+            const sepInput = await vscode.window.showInputBox({
+                prompt: '分隔符（默认空格，留空即空格）',
+                value: ' ',
+                ignoreFocusOut: true,
+            });
+            if (sepInput === undefined) return;
+            const separator = sepInput === '' ? ' ' : sepInput;
+
             const lines = text.split(/\r?\n/);
             const segmentedLines = lines.map((line) => {
                 if (!line.trim()) return line;
@@ -449,6 +484,70 @@ export class UtilityCommandHandler {
             const msg = e instanceof Error ? e.message : String(e);
             vscode.window.showErrorMessage(`分词失败：${msg}`);
         }
+    }
+
+    /** 输出词频统计表为 CSV 文件（词语、词性、词频），可选简体/繁体 */
+    private async outputWordFrequencyCsv(
+        jieba: JiebaWasmModule,
+        text: string,
+        sourceUri: vscode.Uri,
+        script: 'simplified' | 'traditional'
+    ): Promise<void> {
+        const freqMap = new Map<string, number>(); // key: "词语\t词性"
+
+        const lines = text.split(/\r?\n/);
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            const tags = jieba.tag(line, true);
+            for (const t of tags) {
+                if (/^\s*$/.test(t.word)) continue;
+                const key = `${t.word}\t${t.tag || '-'}`;
+                freqMap.set(key, (freqMap.get(key) ?? 0) + 1);
+            }
+        }
+
+        const s2t = script === 'traditional' ? OpenCC.Converter({ from: 'cn', to: 't' }) : null;
+
+        const rows = Array.from(freqMap.entries())
+            .map(([key, count]) => {
+                const [word, tag] = key.split('\t');
+                const wordOut = s2t ? s2t(word) : word;
+                return { word: wordOut, tag, count };
+            })
+            .sort((a, b) => b.count - a.count);
+
+        // CSV：词语,词性,词频；对含逗号/换行/双引号的字段加引号并转义
+        const escapeCsv = (s: string): string => {
+            if (/[,\n"]/.test(s)) {
+                return `"${s.replace(/"/g, '""')}"`;
+            }
+            return s;
+        };
+
+        const csvLines: string[] = ['词语,词性,词频'];
+        for (const r of rows) {
+            csvLines.push(`${escapeCsv(r.word)},${escapeCsv(r.tag || '-')},${r.count}`);
+        }
+
+        const csvContent = '\uFEFF' + csvLines.join('\n'); // BOM for Excel UTF-8
+
+        let outputPath: string;
+        if (sourceUri.scheme === 'file' && sourceUri.fsPath) {
+            outputPath = FilePathUtils.getFilePath(sourceUri.fsPath, '.freq', '.csv');
+        } else {
+            const defaultUri = vscode.workspace.workspaceFolders?.[0]
+                ? vscode.Uri.joinPath(vscode.workspace.workspaceFolders[0].uri, '词频统计.csv')
+                : undefined;
+            const saved = await vscode.window.showSaveDialog({
+                defaultUri,
+                filters: { 'CSV': ['csv'] }
+            });
+            if (!saved) return;
+            outputPath = saved.fsPath;
+        }
+
+        fs.writeFileSync(outputPath, csvContent, 'utf8');
+        vscode.window.showInformationMessage(`词频统计已保存至：${path.basename(outputPath)}`);
     }
 
     /** 对全文分词 */

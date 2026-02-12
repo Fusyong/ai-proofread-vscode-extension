@@ -79,6 +79,7 @@ export async function matchCitationsToReferences(
         matchesPerCitation?: number;
         ngramSize?: number;
         ngramGranularity?: 'word' | 'char';
+        cutMode?: 'default' | 'search';
         jieba?: JiebaWasmModule;
         cancelToken?: vscode.CancellationToken;
         progress?: (message: string, current: number, total: number) => void;
@@ -89,11 +90,13 @@ export async function matchCitationsToReferences(
     const maxMatches = Math.max(1, Math.floor(options.matchesPerCitation ?? 2));
     const ngramSize = Math.max(1, Math.floor(options.ngramSize ?? DEFAULT_NGRAM_SIZE));
     const granularity = options.ngramGranularity ?? 'char';
+    const cutMode = options.cutMode ?? 'default';
     const jieba = options.jieba;
     const simOpts = {
         n: ngramSize,
         granularity: granularity === 'word' && jieba ? 'word' : 'char',
-        jieba: granularity === 'word' && jieba ? jieba : undefined
+        jieba: granularity === 'word' && jieba ? jieba : undefined,
+        cutMode
     };
     const cancelToken = options.cancelToken;
     const progress = options.progress;

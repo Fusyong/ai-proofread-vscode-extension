@@ -94,9 +94,18 @@ export function getNgrams(text: string, n: number): Set<string> {
  * @param text 归一化后的文本
  * @param n n-gram 大小
  * @param jieba jieba-wasm 模块
+ * @param cutMode default（精确）或 search（更细粒度）
  */
-export function getWordNgrams(text: string, n: number, jieba: JiebaWasmModule): Set<string> {
-    const words = jieba.cut(text, true).filter((w) => !/^\s*$/.test(w));
+export function getWordNgrams(
+    text: string,
+    n: number,
+    jieba: JiebaWasmModule,
+    cutMode: 'default' | 'search' = 'default'
+): Set<string> {
+    const words =
+        cutMode === 'search' && typeof jieba.cut_for_search === 'function'
+            ? jieba.cut_for_search(text, true).filter((w) => !/^\s*$/.test(w))
+            : jieba.cut(text, true).filter((w) => !/^\s*$/.test(w));
     if (words.length === 0) {
         return new Set(['']);
     }
@@ -118,6 +127,8 @@ export interface JaccardSimilarityOptions {
     granularity?: 'word' | 'char';
     /** 词级粒度时必填：jieba-wasm 模块 */
     jieba?: JiebaWasmModule;
+    /** 词级粒度时的分词模式：default（精确）或 search（更细粒度） */
+    cutMode?: 'default' | 'search';
 }
 
 /**
@@ -144,11 +155,13 @@ export function jaccardSimilarity(
         return 1.0;
     }
 
+    const cutMode = opts.cutMode ?? 'default';
+
     let ngramsA: Set<string>;
     let ngramsB: Set<string>;
     if (granularity === 'word' && jieba) {
-        ngramsA = getWordNgrams(textA, n, jieba);
-        ngramsB = getWordNgrams(textB, n, jieba);
+        ngramsA = getWordNgrams(textA, n, jieba, cutMode);
+        ngramsB = getWordNgrams(textB, n, jieba, cutMode);
     } else {
         ngramsA = getNgrams(textA, n);
         ngramsB = getNgrams(textB, n);

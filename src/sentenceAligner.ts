@@ -35,6 +35,7 @@ export interface AlignmentOptions {
     similarityThreshold?: number;            // 相似度阈值（0-1），默认0.6
     ngramSize?: number;                     // N-gram大小，默认1
     ngramGranularity?: 'word' | 'char';     // 相似度粒度：词级（默认）或字级
+    cutMode?: 'default' | 'search';        // 词级粒度时的分词模式：default 或 search
     jieba?: JiebaWasmModule;               // 词级粒度时必填：jieba-wasm 模块
     offset?: number;                        // 锚点偏移量，默认1
     maxWindowExpansion?: number;            // 最大窗口扩展倍数，默认3
@@ -75,10 +76,12 @@ function getSimOptions(options: AlignmentOptions): JaccardSimilarityOptions {
     const n = Math.max(1, Math.floor(options.ngramSize ?? 1));
     const granularity = options.ngramGranularity ?? 'char';
     const jieba = options.jieba;
+    const cutMode = options.cutMode ?? 'default';
     return {
         n,
         granularity: granularity === 'word' && jieba ? 'word' : 'char',
-        jieba: granularity === 'word' && jieba ? jieba : undefined
+        jieba: granularity === 'word' && jieba ? jieba : undefined,
+        cutMode
     };
 }
 

@@ -327,7 +327,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.debug.testJieba', async () => {
             try {
                 const distDir = path.join(context.extensionPath, 'dist');
-                const jieba = getJiebaWasm(distDir);
+                const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
+                const jieba = getJiebaWasm(distDir, customDictPath || undefined);
                 const result = jieba.cut('中华人民共和国武汉市长江大桥', true);
                 await vscode.window.showInformationMessage(`jieba-wasm 加载成功，分词结果：${result.join('/')}`);
             } catch (e) {

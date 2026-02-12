@@ -224,6 +224,13 @@ flowchart LR
 | **alignment.ngramSize** | 相似度计算 N-gram 大小，默认 1（unigram） |
 | **alignment.ngramGranularity** | 相似度粒度：词级（默认）或字级 |
 
+### 4.4.1 jieba 分词
+
+| 设置项 | 简短说明 |
+|--------|----------|
+| **jieba.customDictPath** | 自定义词典路径，支持 `${workspaceFolder}` 或绝对路径；格式：每行「词语 词频 词性」 |
+| **jieba.cutMode** | 词级分词模式：default（精确）或 search（更细粒度） |
+
 ### 4.5 引文核对
 
 | 设置项 | 简短说明 |

@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -96,11 +96,11 @@
       },
       {
         "command": "ai-proofread.segmentFile",
-        "title": "AI Proofreader: segment the file"
+        "title": "AI Proofreader: segment file"
       },
       {
         "command": "ai-proofread.segmentSelection",
-        "title": "AI Proofreader: segment the selection"
+        "title": "AI Proofreader: segment selection"
       },
       {
         "command": "ai-proofread.splitFile",
@@ -432,7 +432,6 @@
           "default": 2,
           "description": "相似度计算时的 N-gram 大小，影响句子对齐（勘误表）与引文核对。默认 2（bigram），粒度选择word时可选1（unigram）。"
         },
-
         "ai-proofread.alignment.offset": {
           "order": 51,
           "type": "number",
@@ -468,6 +467,22 @@
           "type": "boolean",
           "default": false,
           "description": "句子对齐（生成勘误表）归一化：是否去掉拉丁字符（默认否，即保留）"
+        },
+        "ai-proofread.jieba.customDictPath": {
+          "order": 54.5,
+          "type": "string",
+          "default": "",
+          "description": "jieba 自定义词典路径。支持 ${workspaceFolder} 或绝对路径。格式：每行「词语 词频 词性（可选）」，如`北京大学 100000 ns`。以换行分隔，空行和 # 开头行忽略。留空则不加载。"
+        },
+        "ai-proofread.jieba.cutMode": {
+          "order": 54.6,
+          "type": "string",
+          "enum": [
+            "search",
+            "default"
+          ],
+          "default": "search",
+          "description": "词级相似度时的分词模式：search（默认，更细粒度，便于匹配不完整引文等）或 default（精确）。用于句子对齐、引文核对等。"
         },
         "ai-proofread.citation.referencesPath": {
           "order": 55,
@@ -718,16 +733,6 @@
           "when": "resourceLangId == markdown"
         },
         {
-          "command": "ai-proofread.segmentFile",
-          "group": "ai-proofread@13",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
-        },
-        {
-          "command": "ai-proofread.segmentSelection",
-          "group": "ai-proofread@13",
-          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
-        },
-        {
           "command": "ai-proofread.diffItWithAnotherFile",
           "group": "ai-proofread@14",
           "when": "resourceLangId == json || resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
@@ -771,6 +776,7 @@
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
     "jieba-wasm": "^2.4.0",
+    "opencc-js": "^1.0.5",
     "sql.js": "^1.10.0"
   },
   "devDependencies": {
