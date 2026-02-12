@@ -326,7 +326,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ### v1.6.0
 
-- 特性：集成jieba-wasm分词库，支持分词后再进行相似度计算和字词检查，提高精确性。
+- 特性：集成jieba-wasm分词库，分词后再进行词语检查，提高精确性；在句子对齐和引文核查中，可选分词后再进行相似度计算，但速度较慢。
 - 优化：词典表外异形词划分为单字词和多字词两个选项，都在分词后检查。
 - 特性：对文件或选段进行分词。
 - !!! caution 安装包体积由726KB增加到3.4MB
