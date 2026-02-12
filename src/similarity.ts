@@ -3,6 +3,8 @@
  * 计划见 docs/citation-verification-plan.md 2.10.5
  */
 
+import type { JiebaWasmModule } from './jiebaLoader';
+
 /**
  * 归一化选项（用于相似度计算）
  */
@@ -74,7 +76,7 @@ export function normalizeForSimilarity(
 }
 
 /**
- * 获取文本的 n-gram 集合（用于 Jaccard 相似度计算）
+ * 获取文本的字级 n-gram 集合（用于 Jaccard 相似度计算）
  */
 export function getNgrams(text: string, n: number): Set<string> {
     if (text.length < n) {
@@ -88,17 +90,70 @@ export function getNgrams(text: string, n: number): Set<string> {
 }
 
 /**
- * 计算两个文本的 Jaccard 相似度（基于 n-gram）
+ * 获取文本的词级 n-gram 集合（先分词，再对词序列做 n-gram）
+ * @param text 归一化后的文本
+ * @param n n-gram 大小
+ * @param jieba jieba-wasm 模块
  */
-export function jaccardSimilarity(textA: string, textB: string, n: number = 2): number {
+export function getWordNgrams(text: string, n: number, jieba: JiebaWasmModule): Set<string> {
+    const words = jieba.cut(text, true).filter((w) => !/^\s*$/.test(w));
+    if (words.length === 0) {
+        return new Set(['']);
+    }
+    if (words.length < n) {
+        return new Set([words.join('|')]);
+    }
+    const ngrams = new Set<string>();
+    for (let i = 0; i <= words.length - n; i++) {
+        ngrams.add(words.slice(i, i + n).join('|'));
+    }
+    return ngrams;
+}
+
+/** Jaccard 相似度计算选项 */
+export interface JaccardSimilarityOptions {
+    /** n-gram 大小，默认 1 */
+    n?: number;
+    /** 粒度：词级（默认）或字级 */
+    granularity?: 'word' | 'char';
+    /** 词级粒度时必填：jieba-wasm 模块 */
+    jieba?: JiebaWasmModule;
+}
+
+/**
+ * 计算两个文本的 Jaccard 相似度（基于 n-gram）
+ * @param textA 文本 A（通常已归一化）
+ * @param textB 文本 B（通常已归一化）
+ * @param optionsOrN 选项对象，或兼容旧 API 的 n 值（字级）
+ */
+export function jaccardSimilarity(
+    textA: string,
+    textB: string,
+    optionsOrN: JaccardSimilarityOptions | number = {}
+): number {
+    const opts: JaccardSimilarityOptions =
+        typeof optionsOrN === 'number' ? { n: optionsOrN, granularity: 'char' } : optionsOrN;
+    const n = Math.max(1, Math.floor(opts.n ?? 1));
+    const granularity = opts.granularity ?? 'char';
+    const jieba = opts.jieba;
+
     if (!textA || !textB) {
         return 0.0;
     }
     if (textA === textB) {
         return 1.0;
     }
-    const ngramsA = getNgrams(textA, n);
-    const ngramsB = getNgrams(textB, n);
+
+    let ngramsA: Set<string>;
+    let ngramsB: Set<string>;
+    if (granularity === 'word' && jieba) {
+        ngramsA = getWordNgrams(textA, n, jieba);
+        ngramsB = getWordNgrams(textB, n, jieba);
+    } else {
+        ngramsA = getNgrams(textA, n);
+        ngramsB = getNgrams(textB, n);
+    }
+
     let intersection = 0;
     for (const ngram of ngramsA) {
         if (ngramsB.has(ngram)) {

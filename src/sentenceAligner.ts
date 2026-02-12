@@ -33,14 +33,16 @@ export interface AlignmentItem {
 export interface AlignmentOptions {
     windowSize?: number;                    // 搜索窗口大小（锚点左右各N个句子），默认10
     similarityThreshold?: number;            // 相似度阈值（0-1），默认0.6
-    ngramSize?: number;                     // N-gram大小，默认2
+    ngramSize?: number;                     // N-gram大小，默认1
+    ngramGranularity?: 'word' | 'char';     // 相似度粒度：词级（默认）或字级
+    jieba?: JiebaWasmModule;               // 词级粒度时必填：jieba-wasm 模块
     offset?: number;                        // 锚点偏移量，默认1
     maxWindowExpansion?: number;            // 最大窗口扩展倍数，默认3
-    consecutiveFailThreshold?: number;      // 连续失败阈值，默认3
+    consecutiveFailThreshold?: number;     // 连续失败阈值，默认3
     removeInnerWhitespace?: boolean;        // 相似度计算时是否忽略句中空白/句内分行，默认 true
-    removePunctuation?: boolean;            // 归一化时是否去掉标点（与引文核对共用），默认 false
-    removeDigits?: boolean;                 // 归一化时是否去掉阿拉伯数字（与引文核对共用），默认 false
-    removeLatin?: boolean;                  // 归一化时是否去掉拉丁字符（与引文核对共用），默认 false
+    removePunctuation?: boolean;           // 归一化时是否去掉标点（与引文核对共用），默认 false
+    removeDigits?: boolean;                // 归一化时是否去掉阿拉伯数字（与引文核对共用），默认 false
+    removeLatin?: boolean;                 // 归一化时是否去掉拉丁字符（与引文核对共用），默认 false
 }
 
 /**
@@ -55,7 +57,8 @@ export interface AlignmentStatistics {
     moveout: number;
 }
 
-import { normalizeForSimilarity, getNgrams, jaccardSimilarity, NormalizeForSimilarityOptions } from './similarity';
+import type { JiebaWasmModule } from './jiebaLoader';
+import { normalizeForSimilarity, jaccardSimilarity, NormalizeForSimilarityOptions, type JaccardSimilarityOptions } from './similarity';
 
 /** 从 AlignmentOptions 构建归一化选项（供 similarity.normalizeForSimilarity） */
 function getNormalizeOptions(options: AlignmentOptions): NormalizeForSimilarityOptions {
@@ -64,6 +67,18 @@ function getNormalizeOptions(options: AlignmentOptions): NormalizeForSimilarityO
         removePunctuation: options.removePunctuation === true,
         removeDigits: options.removeDigits === true,
         removeLatin: options.removeLatin === true
+    };
+}
+
+/** 从 AlignmentOptions 构建相似度计算选项（供 similarity.jaccardSimilarity） */
+function getSimOptions(options: AlignmentOptions): JaccardSimilarityOptions {
+    const n = Math.max(1, Math.floor(options.ngramSize ?? 1));
+    const granularity = options.ngramGranularity ?? 'char';
+    const jieba = options.jieba;
+    return {
+        n,
+        granularity: granularity === 'word' && jieba ? 'word' : 'char',
+        jieba: granularity === 'word' && jieba ? jieba : undefined
     };
 }
 
@@ -82,7 +97,7 @@ export function alignSentencesAnchor(
     const {
         windowSize = 10,
         similarityThreshold = 0.6,
-        ngramSize = 2,
+        ngramSize = 1,
         offset = 1,
         maxWindowExpansion = 3,
         consecutiveFailThreshold = 3,
@@ -92,6 +107,7 @@ export function alignSentencesAnchor(
         removeLatin = false
     } = options;
     const normalizeOpts = getNormalizeOptions(options);
+    const simOpts = getSimOptions(options);
 
     const n = sentencesA.length;
     const m = sentencesB.length;
@@ -143,7 +159,7 @@ export function alignSentencesAnchor(
             }
 
             const sentB = normalizeForSimilarity(sentencesB[bIdx], normalizeOpts);
-            const similarity = jaccardSimilarity(sentA, sentB, ngramSize);
+            const similarity = jaccardSimilarity(sentA, sentB, simOpts);
 
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity;
@@ -173,7 +189,7 @@ export function alignSentencesAnchor(
                 }
 
                 const sentB = normalizeForSimilarity(sentencesB[bIdx], normalizeOpts);
-                const similarity = jaccardSimilarity(sentA, sentB, ngramSize);
+                const similarity = jaccardSimilarity(sentA, sentB, simOpts);
 
                 if (similarity > bestSimilarity) {
                     bestSimilarity = similarity;
@@ -310,7 +326,7 @@ export function alignSentencesAnchor(
     const resultAfterRematch = rematchDeleteInsertSequences(
         result,
         similarityThreshold,
-        ngramSize,
+        simOpts,
         normalizeOpts
     );
 
@@ -318,7 +334,7 @@ export function alignSentencesAnchor(
     const resultAfterNonAdjacentRematch = rematchNonAdjacentDeleteInsert(
         resultAfterRematch,
         similarityThreshold,
-        ngramSize,
+        simOpts,
         windowSize,  // 使用窗口大小作为索引范围
         normalizeOpts
     );
@@ -326,14 +342,14 @@ export function alignSentencesAnchor(
     // 后处理：将单独的DELETE项合并到相邻的MATCH组中
     const resultAfterMergeDelete = mergeDeleteIntoMatch(
         resultAfterNonAdjacentRematch,
-        ngramSize,
+        simOpts,
         normalizeOpts
     );
 
     // 后处理：将单独的INSERT项合并到相邻的MATCH组中（与 delete 合并对称，处理 b 侧）
     const resultAfterMerge = mergeInsertIntoMatch(
         resultAfterMergeDelete,
-        ngramSize,
+        simOpts,
         normalizeOpts
     );
 
@@ -449,13 +465,13 @@ function generateMergedCandidates(
  * 后处理：在相邻的DELETE和INSERT序列之间尝试重新匹配
  * @param alignment 初始对齐结果
  * @param similarityThreshold 相似度阈值
- * @param ngramSize n-gram大小
+ * @param simOpts 相似度计算选项
  * @returns 优化后的对齐结果
  */
 function rematchDeleteInsertSequences(
     alignment: AlignmentItem[],
     similarityThreshold: number = 0.6,
-    ngramSize: number = 2,
+    simOpts: JaccardSimilarityOptions = {},
     normalizeOpts: NormalizeForSimilarityOptions = {}
 ): AlignmentItem[] {
     if (alignment.length === 0) {
@@ -527,7 +543,7 @@ function rematchDeleteInsertSequences(
                         if (dCandidate.text && insCandidate.text) {
                             const sentA = normalizeForSimilarity(dCandidate.text, normalizeOpts);
                             const sentB = normalizeForSimilarity(insCandidate.text, normalizeOpts);
-                            const similarity = jaccardSimilarity(sentA, sentB, ngramSize);
+                            const similarity = jaccardSimilarity(sentA, sentB, simOpts);
 
                             if (similarity > bestSimilarity && similarity >= similarityThreshold) {
                                 bestSimilarity = similarity;
@@ -725,14 +741,14 @@ function rematchDeleteInsertSequences(
  * 后处理：在一定的序号上下范围内处理不相邻的DELETE和INSERT
  * @param alignment 对齐结果（已经过相邻匹配处理）
  * @param similarityThreshold 相似度阈值
- * @param ngramSize n-gram大小
+ * @param simOpts 相似度计算选项
  * @param indexRange 序号范围，用于判断DELETE和INSERT是否在合理范围内（默认10）
  * @returns 优化后的对齐结果
  */
 function rematchNonAdjacentDeleteInsert(
     alignment: AlignmentItem[],
     similarityThreshold: number = 0.6,
-    ngramSize: number = 2,
+    simOpts: JaccardSimilarityOptions = {},
     indexRange: number = 10,
     normalizeOpts: NormalizeForSimilarityOptions = {}
 ): AlignmentItem[] {
@@ -827,7 +843,7 @@ function rematchNonAdjacentDeleteInsert(
                 if (dItem.a && insItem.b) {
                     const sentA = normalizeForSimilarity(dItem.a, normalizeOpts);
                     const sentB = normalizeForSimilarity(insItem.b, normalizeOpts);
-                    const similarity = jaccardSimilarity(sentA, sentB, ngramSize);
+                    const similarity = jaccardSimilarity(sentA, sentB, simOpts);
 
                     if (similarity > bestSimilarity && similarity >= similarityThreshold) {
                         bestSimilarity = similarity;
@@ -928,12 +944,12 @@ function rematchNonAdjacentDeleteInsert(
 /**
  * 后处理：将单独的DELETE项合并到相邻的MATCH组中
  * @param alignment 对齐结果
- * @param ngramSize n-gram大小
+ * @param simOpts 相似度计算选项
  * @returns 优化后的对齐结果
  */
 function mergeDeleteIntoMatch(
     alignment: AlignmentItem[],
-    ngramSize: number = 2,
+    simOpts: JaccardSimilarityOptions = {},
     normalizeOpts: NormalizeForSimilarityOptions = {}
 ): AlignmentItem[] {
     if (alignment.length === 0) {
@@ -966,7 +982,7 @@ function mergeDeleteIntoMatch(
                 const mergedA = prevA + currentItem.a;
                 const sentA = normalizeForSimilarity(mergedA, normalizeOpts);
                 const sentB = normalizeForSimilarity(prevB, normalizeOpts);
-                const newSimilarity = jaccardSimilarity(sentA, sentB, ngramSize);
+                const newSimilarity = jaccardSimilarity(sentA, sentB, simOpts);
 
                 // 如果新相似度高于原相似度，则合并
                 const prevSim = prevItem.similarity ?? 0.0;
@@ -987,7 +1003,7 @@ function mergeDeleteIntoMatch(
                 const mergedA = currentItem.a + nextItem.a;
                 const sentA = normalizeForSimilarity(mergedA, normalizeOpts);
                 const sentB = normalizeForSimilarity(nextItem.b, normalizeOpts);
-                const newSimilarity = jaccardSimilarity(sentA, sentB, ngramSize);
+                const newSimilarity = jaccardSimilarity(sentA, sentB, simOpts);
 
                 // 如果新相似度高于原相似度，则合并
                 const nextSim = nextItem.similarity ?? 0.0;
@@ -1060,12 +1076,12 @@ function mergeDeleteIntoMatch(
 /**
  * 后处理：将单独的INSERT项合并到相邻的MATCH组中（与 mergeDeleteIntoMatch 对称，处理 b 侧）
  * @param alignment 对齐结果
- * @param ngramSize n-gram大小
+ * @param simOpts 相似度计算选项
  * @returns 优化后的对齐结果
  */
 function mergeInsertIntoMatch(
     alignment: AlignmentItem[],
-    ngramSize: number = 2,
+    simOpts: JaccardSimilarityOptions = {},
     normalizeOpts: NormalizeForSimilarityOptions = {}
 ): AlignmentItem[] {
     if (alignment.length === 0) {
@@ -1098,7 +1114,7 @@ function mergeInsertIntoMatch(
                 const mergedB = prevB + currentItem.b;
                 const sentA = normalizeForSimilarity(prevA, normalizeOpts);
                 const sentB = normalizeForSimilarity(mergedB, normalizeOpts);
-                const newSimilarity = jaccardSimilarity(sentA, sentB, ngramSize);
+                const newSimilarity = jaccardSimilarity(sentA, sentB, simOpts);
 
                 const prevSim = prevItem.similarity ?? 0.0;
                 // 结构条件：若归一化后 insert.b 是 prevMatch.a 的后缀，也允许合并（与“合并到下一 MATCH”的前缀条件对称）
@@ -1123,7 +1139,7 @@ function mergeInsertIntoMatch(
                 const mergedB = currentItem.b + nextItem.b;
                 const sentA = normalizeForSimilarity(nextItem.a, normalizeOpts);
                 const sentB = normalizeForSimilarity(mergedB, normalizeOpts);
-                const newSimilarity = jaccardSimilarity(sentA, sentB, ngramSize);
+                const newSimilarity = jaccardSimilarity(sentA, sentB, simOpts);
 
                 const nextSim = nextItem.similarity ?? 0.0;
                 // 与 DELETE 合并对称：DELETE 时下一 MATCH 的 b 已包含 delete 的 a（完整句），相似度必然高；

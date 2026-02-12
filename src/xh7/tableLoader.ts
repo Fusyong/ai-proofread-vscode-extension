@@ -12,7 +12,8 @@ import type { WordCheckNotes } from './types';
 /** dict7 / xh7_tables 结构 */
 interface Xh7TablesJson {
     variant_to_standard?: Record<string, string>;
-    variant_to_preferred?: Record<string, string>;
+    variant_to_preferred_single?: Record<string, string>;
+    variant_to_preferred_multi?: Record<string, string>;
     single_char_traditional_to_standard?: Record<string, string>;
     single_char_yitihuabiao_to_standard?: Record<string, string>;
     single_char_yiti_other_to_standard?: Record<string, string>;
@@ -33,14 +34,16 @@ interface TgsccJson {
 type Xh7DictKey = Extract<
     CheckType,
     | 'variant_to_standard'
-    | 'variant_to_preferred'
+    | 'variant_to_preferred_single'
+    | 'variant_to_preferred_multi'
     | 'single_char_traditional_to_standard'
     | 'single_char_yitihuabiao_to_standard'
     | 'single_char_yiti_other_to_standard'
 >;
 const XH7_KEYS: Xh7DictKey[] = [
     'variant_to_standard',
-    'variant_to_preferred',
+    'variant_to_preferred_single',
+    'variant_to_preferred_multi',
     'single_char_traditional_to_standard',
     'single_char_yitihuabiao_to_standard',
     'single_char_yiti_other_to_standard',

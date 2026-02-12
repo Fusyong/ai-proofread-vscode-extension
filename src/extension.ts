@@ -2,6 +2,7 @@
  * 扩展入口
  */
 
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { PromptManager } from './promptManager';
 import { TempFileManager, ConfigManager, Logger } from './utils';
@@ -15,6 +16,7 @@ import { CitationCommandHandler } from './commands/citationCommandHandler';
 import { registerCitationView } from './citation/citationView';
 import { WordCheckCommandHandler } from './commands/wordCheckCommandHandler';
 import { registerPromptsView, type PromptTreeItem } from './promptsView';
+import { getJiebaWasm } from './jiebaLoader';
 
 
 export function activate(context: vscode.ExtensionContext) {
@@ -29,7 +31,7 @@ export function activate(context: vscode.ExtensionContext) {
     const webviewManager = WebviewManager.getInstance();
     const fileSplitHandler = new FileSplitCommandHandler(webviewManager);
     const proofreadHandler = new ProofreadCommandHandler(webviewManager);
-    const fileCompareHandler = new FileCompareCommandHandler();
+    const fileCompareHandler = new FileCompareCommandHandler(context);
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
@@ -250,6 +252,24 @@ export function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleMarkTitlesFromTocCommand(editor);
         }),
 
+        // 注册分词命令
+        vscode.commands.registerCommand('ai-proofread.segmentFile', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleSegmentFileCommand(editor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.segmentSelection', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleSegmentSelectionCommand(editor, context);
+        }),
+
         // 注册重新打开结果面板命令
         vscode.commands.registerCommand('ai-proofread.reopenResultPanel', () => {
             webviewManager.reopenResultPanel(context);
@@ -304,6 +324,17 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.dictCheckTypes.moveDown', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleDictCheckTypeMoveDown(el)),
         vscode.commands.registerCommand('ai-proofread.tgsccCheckTypes.moveUp', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleTgsccCheckTypeMoveUp(el)),
         vscode.commands.registerCommand('ai-proofread.tgsccCheckTypes.moveDown', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleTgsccCheckTypeMoveDown(el)),
+        vscode.commands.registerCommand('ai-proofread.debug.testJieba', async () => {
+            try {
+                const distDir = path.join(context.extensionPath, 'dist');
+                const jieba = getJiebaWasm(distDir);
+                const result = jieba.cut('中华人民共和国武汉市长江大桥', true);
+                await vscode.window.showInformationMessage(`jieba-wasm 加载成功，分词结果：${result.join('/')}`);
+            } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
+                await vscode.window.showErrorMessage(`jieba-wasm 测试失败：${msg}`);
+            }
+        }),
     ];
 
     context.subscriptions.push(...disposables, configManager);

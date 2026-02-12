@@ -42,7 +42,7 @@ export function generateHtmlReport(
     if (!titleB) titleB = '校对后';
 
     const threshold = options.similarityThreshold || 0.6;
-    const ngramSize = options.ngramSize || 2;
+    const ngramSize = options.ngramSize ?? 1;
     const algorithmName = '锚点算法';
 
     // 获取统计信息

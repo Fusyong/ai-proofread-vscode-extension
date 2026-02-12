@@ -10,8 +10,10 @@ import { FilePathUtils, ErrorUtils } from '../utils';
 import { alignSentencesAnchor, getAlignmentStatistics, AlignmentOptions } from '../sentenceAligner';
 import { splitChineseSentencesWithLineNumbers } from '../splitter';
 import { generateHtmlReport } from '../alignmentReportGenerator';
+import { getJiebaWasm } from '../jiebaLoader';
 
 export class FileCompareCommandHandler {
+    constructor(private context: vscode.ExtensionContext) {}
     /**
      * 处理比较两个文件命令
      */
@@ -198,10 +200,21 @@ export class FileCompareCommandHandler {
             const removeInnerWhitespace = removeInnerWhitespaceChoice?.value ?? true;
 
             const citationConfig = vscode.workspace.getConfiguration('ai-proofread.citation');
+            const ngramGranularity = config.get<'word' | 'char'>('ngramGranularity', 'word');
+            let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
+            if (ngramGranularity === 'word') {
+                try {
+                    jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'));
+                } catch {
+                    // 加载失败时回退到字级
+                }
+            }
             const options: AlignmentOptions = {
                 windowSize: config.get<number>('windowSize', 10),
                 similarityThreshold: similarityThreshold,
-                ngramSize: config.get<number>('ngramSize', 2),
+                ngramSize: config.get<number>('ngramSize', 1),
+                ngramGranularity: jieba ? 'word' : 'char',
+                jieba,
                 offset: config.get<number>('offset', 1),
                 maxWindowExpansion: config.get<number>('maxWindowExpansion', 3),
                 consecutiveFailThreshold: config.get<number>('consecutiveFailThreshold', 3),

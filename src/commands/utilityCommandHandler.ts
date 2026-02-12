@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { mergeTwoFiles } from '../merger';
+import { getJiebaWasm } from '../jiebaLoader';
 import { searchSelectionInPDF } from '../pdfSearcher';
 import { convertQuotes } from '../quoteConverter';
 import { formatParagraphs } from '../paragraphDetector';
@@ -399,5 +400,76 @@ export class UtilityCommandHandler {
         } catch (error) {
             ErrorUtils.showError(error, '标记标题时出错：');
         }
+    }
+
+    /**
+     * 分词：可选繁简、分隔符；对全文或选中文本分词并替换
+     */
+    private async runSegment(
+        editor: vscode.TextEditor,
+        context: vscode.ExtensionContext,
+        range: vscode.Range
+    ): Promise<void> {
+        const scriptChoice = await vscode.window.showQuickPick(
+            [
+                { label: '简体', value: 'simplified', description: '默认' },
+                { label: '繁体', value: 'traditional' },
+            ],
+            { placeHolder: '选择文本类型（默认简体）', ignoreFocusOut: true }
+        );
+        if (!scriptChoice) return;
+        // 当前 jieba-wasm 对简繁使用同一词典；scriptChoice 预留后续扩展
+        void scriptChoice;
+
+        const sepInput = await vscode.window.showInputBox({
+            prompt: '分隔符（默认空格，留空即空格）',
+            value: ' ',
+            ignoreFocusOut: true,
+        });
+        if (sepInput === undefined) return;
+        const separator = sepInput === '' ? ' ' : sepInput;
+
+        try {
+            const jieba = getJiebaWasm(path.join(context.extensionPath, 'dist'));
+            const text = editor.document.getText(range);
+            const lines = text.split(/\r?\n/);
+            const segmentedLines = lines.map((line) => {
+                if (!line.trim()) return line;
+                const words = jieba
+                    .cut(line, true)
+                    .filter((w) => !/^\s*$/.test(w));
+                return words.join(separator);
+            });
+            const result = segmentedLines.join(editor.document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n');
+
+            await editor.edit((editBuilder) => {
+                editBuilder.replace(range, result);
+            });
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            vscode.window.showErrorMessage(`分词失败：${msg}`);
+        }
+    }
+
+    /** 对全文分词 */
+    public async handleSegmentFileCommand(
+        editor: vscode.TextEditor,
+        context: vscode.ExtensionContext
+    ): Promise<void> {
+        const doc = editor.document;
+        const fullRange = new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
+        await this.runSegment(editor, context, fullRange);
+    }
+
+    /** 对选中文本分词 */
+    public async handleSegmentSelectionCommand(
+        editor: vscode.TextEditor,
+        context: vscode.ExtensionContext
+    ): Promise<void> {
+        if (editor.selection.isEmpty) {
+            vscode.window.showInformationMessage('请先选中要分词的文本');
+            return;
+        }
+        await this.runSegment(editor, context, editor.selection);
     }
 }

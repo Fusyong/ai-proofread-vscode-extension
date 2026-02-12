@@ -5,10 +5,11 @@
 
 import type { Range } from 'vscode';
 
-/** 检查类型：dict7 五类 + 通用规范汉字表(tgscc) 七类 */
+/** 检查类型：dict7 六类 + 通用规范汉字表(tgscc) 七类 */
 export type CheckType =
     | 'variant_to_standard'
-    | 'variant_to_preferred'
+    | 'variant_to_preferred_single'
+    | 'variant_to_preferred_multi'
     | 'single_char_traditional_to_standard'
     | 'single_char_yitihuabiao_to_standard'
     | 'single_char_yiti_other_to_standard'
@@ -23,7 +24,8 @@ export type CheckType =
 /** 表名常量，与 JSON 键一致 */
 export const CHECK_TYPE_KEYS: CheckType[] = [
     'variant_to_standard',
-    'variant_to_preferred',
+    'variant_to_preferred_single',
+    'variant_to_preferred_multi',
     'single_char_traditional_to_standard',
     'single_char_yitihuabiao_to_standard',
     'single_char_yiti_other_to_standard',
@@ -36,10 +38,11 @@ export const CHECK_TYPE_KEYS: CheckType[] = [
     'tgscc_table2',
 ];
 
-/** 对照词典检查：dict7 五类 */
+/** 对照词典检查：dict7 六类 */
 export const DICT_CHECK_TYPES: CheckType[] = [
     'variant_to_standard',
-    'variant_to_preferred',
+    'variant_to_preferred_single',
+    'variant_to_preferred_multi',
     'single_char_traditional_to_standard',
     'single_char_yitihuabiao_to_standard',
     'single_char_yiti_other_to_standard',
@@ -56,10 +59,22 @@ export const TGSCC_CHECK_TYPES: CheckType[] = [
     'tgscc_table2',
 ];
 
+/** dict7 中需分词后再检查的词表（异形词表） */
+export function isDictWordTableType(
+    type: CheckType
+): type is 'variant_to_standard' | 'variant_to_preferred_single' | 'variant_to_preferred_multi' {
+    return (
+        type === 'variant_to_standard' ||
+        type === 'variant_to_preferred_single' ||
+        type === 'variant_to_preferred_multi'
+    );
+}
+
 /** 用于 QuickPick 多选（复选框样式）的显示标签 */
 export const CHECK_TYPE_LABELS: Record<CheckType, string> = {
     variant_to_standard: '异形词（表内）→标准',
-    variant_to_preferred: '异形词（表外）→首选',
+    variant_to_preferred_multi: '异形词（表外多字）→首选',
+    variant_to_preferred_single: '异形词（表外单字）→首选',
     single_char_traditional_to_standard: '繁体字→标准',
     single_char_yitihuabiao_to_standard: '异体字(表内)→标准',
     single_char_yiti_other_to_standard: '异体字(表外)→标准',

@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.5.3",
+  "version": "1.6.0",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -95,6 +95,14 @@
         "title": "AI Proofreader: mark titles from table of contents"
       },
       {
+        "command": "ai-proofread.segmentFile",
+        "title": "AI Proofreader: segment the file"
+      },
+      {
+        "command": "ai-proofread.segmentSelection",
+        "title": "AI Proofreader: segment the selection"
+      },
+      {
         "command": "ai-proofread.splitFile",
         "title": "AI Proofreader: split file"
       },
@@ -146,42 +154,42 @@
         "command": "ai-proofread.wordCheck.applyReplaceForEntry",
         "title": "应用替换（当前条目）"
       },
-        {
-          "command": "ai-proofread.manageCustomTables",
-          "title": "AI Proofreader: 管理自定义替换表"
-        },
-        {
-          "command": "ai-proofread.customTables.delete",
-          "title": "删除"
-        },
-        {
-          "command": "ai-proofread.customTables.moveUp",
-          "title": "上移"
-        },
-        {
-          "command": "ai-proofread.customTables.moveDown",
-          "title": "下移"
-        },
-        {
-          "command": "ai-proofread.customTables.loadTable",
-          "title": "加载替换表"
-        },
-        {
-          "command": "ai-proofread.dictCheckTypes.moveUp",
-          "title": "上移"
-        },
-        {
-          "command": "ai-proofread.dictCheckTypes.moveDown",
-          "title": "下移"
-        },
-        {
-          "command": "ai-proofread.tgsccCheckTypes.moveUp",
-          "title": "上移"
-        },
-        {
-          "command": "ai-proofread.tgsccCheckTypes.moveDown",
-          "title": "下移"
-        }
+      {
+        "command": "ai-proofread.manageCustomTables",
+        "title": "AI Proofreader: manage custom tables"
+      },
+      {
+        "command": "ai-proofread.customTables.delete",
+        "title": "删除"
+      },
+      {
+        "command": "ai-proofread.customTables.moveUp",
+        "title": "上移"
+      },
+      {
+        "command": "ai-proofread.customTables.moveDown",
+        "title": "下移"
+      },
+      {
+        "command": "ai-proofread.customTables.loadTable",
+        "title": "加载替换表"
+      },
+      {
+        "command": "ai-proofread.dictCheckTypes.moveUp",
+        "title": "上移"
+      },
+      {
+        "command": "ai-proofread.dictCheckTypes.moveDown",
+        "title": "下移"
+      },
+      {
+        "command": "ai-proofread.tgsccCheckTypes.moveUp",
+        "title": "上移"
+      },
+      {
+        "command": "ai-proofread.tgsccCheckTypes.moveDown",
+        "title": "下移"
+      }
     ],
     "configuration": {
       "title": "AI Proofread",
@@ -297,7 +305,7 @@
         "ai-proofread.proofread.temperature": {
           "order": 26,
           "type": "number",
-          "default": 1.0,
+          "default": 1,
           "description": "模型温度，取值范围是[0:2)，留空则使用模型默认温度，默认1.0"
         },
         "ai-proofread.proofread.promptRepetition": {
@@ -401,18 +409,30 @@
           "default": 10,
           "description": "句子对齐（生成勘误表）：搜索窗口大小（锚点左右各N个句子）"
         },
-        "ai-proofread.alignment.similarityThreshold": {
+        "ai-proofread.alignment.ngramGranularity": {
           "order": 49,
-          "type": "number",
-          "default": 0.4,
-          "description": "句子对齐（生成勘误表）：相似度阈值（0-1）"
+          "type": "string",
+          "enum": [
+            "char",
+            "word"
+          ],
+          "default": "char",
+          "description": "相似度计算粒度：字级（默认）或词级（更语义化，需 jieba 分词，速度较慢）。"
         },
-        "ai-proofread.alignment.ngramSize": {
+        "ai-proofread.alignment.similarityThreshold": {
           "order": 50,
           "type": "number",
-          "default": 2,
-          "description": "N-gram 大小，用于相似度计算。影响句子对齐（勘误表）与引文核对。默认 2（bigram）。"
+          "default": 0.4,
+          "description": "相似度阈值（0-1），影响句子对齐（勘误表）与引文核对，默认0.4，粒度选择word时可选0.6"
         },
+        "ai-proofread.alignment.ngramSize": {
+          "order": 50.1,
+          "type": "number",
+          "minimum": 1,
+          "default": 2,
+          "description": "相似度计算时的 N-gram 大小，影响句子对齐（勘误表）与引文核对。默认 2（bigram），粒度选择word时可选1（unigram）。"
+        },
+
         "ai-proofread.alignment.offset": {
           "order": 51,
           "type": "number",
@@ -503,11 +523,16 @@
         "ai-proofread.citation.ignoredCitationTypes": {
           "order": 63,
           "type": "array",
-          "default": ["short"],
+          "default": [
+            "short"
+          ],
           "description": "忽略的引文类型，不列入树视图。可选：\"short\" 过短的引文（长度小于「有效引文的最小长度」）、\"noFootnote\" 末尾没有注释标记的引文（无 [^1]、^1^、①② 等注码）。默认只忽略过短的引文。",
           "items": {
             "type": "string",
-            "enum": ["short", "noFootnote"]
+            "enum": [
+              "short",
+              "noFootnote"
+            ]
           }
         },
         "ai-proofread.debug.enableConsoleLog": {
@@ -681,7 +706,6 @@
           "command": "ai-proofread.convertQuotes",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
-
         },
         {
           "command": "ai-proofread.formatParagraphs",
@@ -692,6 +716,16 @@
           "command": "ai-proofread.markTitlesFromToc",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown"
+        },
+        {
+          "command": "ai-proofread.segmentFile",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
+          "command": "ai-proofread.segmentSelection",
+          "group": "ai-proofread@13",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.diffItWithAnotherFile",
@@ -723,10 +757,11 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "compile": "parcel build src/extension.ts --no-source-maps && npm run copy-sqljs-dist",
+    "compile": "parcel build src/extension.ts --no-source-maps && npm run copy-sqljs-dist && npm run copy-jieba-dist",
     "watch": "parcel watch src/extension.ts --no-source-maps",
-    "package": "parcel build src/extension.ts --no-source-maps --no-cache && npm run copy-sqljs-dist",
+    "package": "parcel build src/extension.ts --no-source-maps --no-cache && npm run copy-sqljs-dist && npm run copy-jieba-dist",
     "copy-sqljs-dist": "node -e \"const fs=require('fs'),p=require('path'); const src=p.join('node_modules','sql.js','dist'), dst='dist'; fs.copyFileSync(p.join(src,'sql-wasm.js'), p.join(dst,'sql-wasm.js')); fs.copyFileSync(p.join(src,'sql-wasm.wasm'), p.join(dst,'sql-wasm.wasm'));\"",
+    "copy-jieba-dist": "node -e \"const fs=require('fs'),p=require('path'); const src=p.join('node_modules','jieba-wasm','pkg','nodejs'), dst='dist'; fs.copyFileSync(p.join(src,'jieba_rs_wasm.js'), p.join(dst,'jieba_rs_wasm.js')); fs.copyFileSync(p.join(src,'jieba_rs_wasm_bg.wasm'), p.join(dst,'jieba_rs_wasm_bg.wasm'));\"",
     "lint": "eslint src --ext ts",
     "package-vsix": "npx vsce package",
     "publish": "npx vsce publish"
@@ -735,6 +770,7 @@
     "@google/genai": "^0.7.0",
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
+    "jieba-wasm": "^2.4.0",
     "sql.js": "^1.10.0"
   },
   "devDependencies": {
@@ -756,7 +792,8 @@
       "context": "node",
       "includeNodeModules": {
         "vscode": false,
-        "sql.js": false
+        "sql.js": false,
+        "jieba-wasm": false
       },
       "sourceMap": false,
       "outputFormat": "commonjs"
