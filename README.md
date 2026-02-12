@@ -321,6 +321,10 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
+### v1.6.0
+
+- 特性：集成jieba-wasm分词库，支持分词后再进行相似度计算和字词检查，提高精确性。
+
 ### v1.5.3
 
 - 特性：根据词典检查字词，包括异体/繁体字、异形词等
