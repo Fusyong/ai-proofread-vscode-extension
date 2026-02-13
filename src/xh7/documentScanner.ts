@@ -40,6 +40,7 @@ function isOverlapping(consumed: { start: number; end: number }[], start: number
 /**
  * 对文档（或指定范围）扫描，返回该字典中在文本里出现过的条目及其 ranges（文档坐标）。
  * 字典按键长「先长后短」排序；每段文档区间只归属最先匹配到的（最长）key，避免「一呼百应」既匹配整词又被子串「一呼」重复计入。
+ * 当字典全为单字时（如表一字、表二字），使用逐字遍历以 O(n) 完成，避免 3500+ 次全文正则导致的阻塞。
  */
 export function scanDocument(
     document: vscode.TextDocument,
@@ -50,13 +51,20 @@ export function scanDocument(
     const scanRange = range ?? new vscode.Range(0, 0, document.lineCount, 0);
     const text = document.getText(scanRange);
     const rangeStartOffset = document.offsetAt(scanRange.start);
+    const keys = Object.keys(dict);
+
+    const allSingleChar = keys.length > 0 && keys.every((k) => k.length === 1);
+    if (allSingleChar) {
+        return scanDocumentSingleCharDict(document, text, rangeStartOffset, dict, cancelToken);
+    }
+
     const entries: WordCheckEntry[] = [];
-    const keys = Object.keys(dict).sort((a, b) => b.length - a.length);
+    const sortedKeys = keys.sort((a, b) => b.length - a.length);
     const consumed: { start: number; end: number }[] = [];
 
-    for (let i = 0; i < keys.length; i++) {
+    for (let i = 0; i < sortedKeys.length; i++) {
         if (cancelToken?.isCancellationRequested) break;
-        const variant = keys[i];
+        const variant = sortedKeys[i];
         const preferred = dict[variant];
         if (!preferred) continue;
 
@@ -65,6 +73,7 @@ export function scanDocument(
         let m: RegExpExecArray | null;
         re.lastIndex = 0;
         while ((m = re.exec(text)) !== null) {
+            if (cancelToken?.isCancellationRequested) break;
             const startOffset = rangeStartOffset + m.index;
             const endOffset = rangeStartOffset + m.index + m[0].length;
             if (isOverlapping(consumed, startOffset, endOffset)) continue;
@@ -78,6 +87,43 @@ export function scanDocument(
         }
     }
     return entries;
+}
+
+/** 单字字典的 O(n) 扫描：逐字遍历，避免 3500+ 次全文正则 */
+function scanDocumentSingleCharDict(
+    document: vscode.TextDocument,
+    text: string,
+    rangeStartOffset: number,
+    dict: Record<string, string>,
+    cancelToken?: vscode.CancellationToken
+): WordCheckEntry[] {
+    const dictSet = new Set(Object.keys(dict));
+    const entryMap = new Map<string, WordCheckEntry>();
+
+    let offset = 0;
+    for (const ch of text) {
+        if (cancelToken?.isCancellationRequested) break;
+        if (dictSet.has(ch)) {
+            const preferred = dict[ch];
+            if (preferred) {
+                const startOffset = rangeStartOffset + offset;
+                const endOffset = rangeStartOffset + offset + ch.length;
+                const rangeObj = new vscode.Range(
+                    document.positionAt(startOffset),
+                    document.positionAt(endOffset)
+                );
+                const key = `${ch}|${preferred}`;
+                const existing = entryMap.get(key);
+                if (existing) {
+                    existing.ranges.push(rangeObj);
+                } else {
+                    entryMap.set(key, { variant: ch, preferred, ranges: [rangeObj] });
+                }
+            }
+        }
+        offset += ch.length;
+    }
+    return Array.from(entryMap.values());
 }
 
 /**

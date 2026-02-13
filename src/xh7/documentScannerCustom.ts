@@ -51,6 +51,7 @@ export function scanDocumentWithCompiledRules(
         regex.lastIndex = 0;
         let m: RegExpExecArray | null;
         while ((m = regex.exec(text)) !== null) {
+            if (cancelToken?.isCancellationRequested) break;
             const startOffset = rangeStartOffset + m.index;
             const endOffset = rangeStartOffset + m.index + m[0].length;
             if (isOverlapping(consumed, startOffset, endOffset)) continue;
@@ -75,6 +76,7 @@ export function scanDocumentWithCompiledRules(
 
 /**
  * 非正则表：字面匹配（无词界，匹配所有出现），先长后短 + consumed 不重叠；挂上 rawComment。
+ * 当所有规则均为单字时，使用 O(n) 逐字遍历，避免大量全文正则导致的阻塞。
  */
 export function scanDocumentWithLiteralRules(
     document: vscode.TextDocument,
@@ -85,6 +87,12 @@ export function scanDocumentWithLiteralRules(
     const scanRange = range ?? new vscode.Range(0, 0, document.lineCount, 0);
     const text = document.getText(scanRange);
     const rangeStartOffset = document.offsetAt(scanRange.start);
+
+    const allSingleChar = rules.length > 0 && rules.every((r) => r.find.length === 1);
+    if (allSingleChar) {
+        return scanLiteralRulesSingleChar(document, text, rangeStartOffset, rules, cancelToken);
+    }
+
     const consumed: { start: number; end: number }[] = [];
     const entryMap = new Map<string, WordCheckEntry>();
     const commentByFind = new Map<string, string>();
@@ -98,6 +106,7 @@ export function scanDocumentWithLiteralRules(
         regex.lastIndex = 0;
         let m: RegExpExecArray | null;
         while ((m = regex.exec(text)) !== null) {
+            if (cancelToken?.isCancellationRequested) break;
             const startOffset = rangeStartOffset + m.index;
             const endOffset = rangeStartOffset + m.index + m[0].length;
             if (isOverlapping(consumed, startOffset, endOffset)) continue;
@@ -117,6 +126,47 @@ export function scanDocumentWithLiteralRules(
             }
             addConsumed(consumed, startOffset, endOffset);
         }
+    }
+    return Array.from(entryMap.values());
+}
+
+/** 单字规则的字面匹配：O(n) 逐字遍历 */
+function scanLiteralRulesSingleChar(
+    document: vscode.TextDocument,
+    text: string,
+    rangeStartOffset: number,
+    rules: CustomRule[],
+    cancelToken?: vscode.CancellationToken
+): WordCheckEntry[] {
+    const findToReplace = new Map<string, string>();
+    const findToComment = new Map<string, string>();
+    for (const r of rules) {
+        findToReplace.set(r.find, r.replace);
+        if (r.rawComment) findToComment.set(r.find, r.rawComment);
+    }
+    const entryMap = new Map<string, WordCheckEntry>();
+
+    let offset = 0;
+    for (const ch of text) {
+        if (cancelToken?.isCancellationRequested) break;
+        const preferred = findToReplace.get(ch);
+        if (preferred) {
+            const startOffset = rangeStartOffset + offset;
+            const endOffset = rangeStartOffset + offset + ch.length;
+            const rangeObj = new vscode.Range(
+                document.positionAt(startOffset),
+                document.positionAt(endOffset)
+            );
+            const rawComment = findToComment.get(ch);
+            const key = `${ch}|${preferred}`;
+            const existing = entryMap.get(key);
+            if (existing) {
+                existing.ranges.push(rangeObj);
+            } else {
+                entryMap.set(key, { variant: ch, preferred, ranges: [rangeObj], rawComment });
+            }
+        }
+        offset += ch.length;
     }
     return Array.from(entryMap.values());
 }

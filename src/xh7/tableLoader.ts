@@ -21,6 +21,12 @@ interface Xh7TablesJson {
     usage_notes?: Record<string, string[]>;
 }
 
+/** fswv.json 结构：第一批异形词整理表，variant_to_standard 为异形词→推荐；notes 为异形词→说明 */
+interface FswvJson {
+    variant_to_standard?: Record<string, string>;
+    notes?: Record<string, string>;
+}
+
 /** tgscc.json 结构：值为数组，首项为规范字或 null；notes 键为繁体/异体；tgscc_list 为通用规范字有序表；simplified_to_* 为规范字→繁体/异体数组 */
 interface TgsccJson {
     traditional_to_simplified?: Record<string, (string | null)[]>;
@@ -51,6 +57,7 @@ const XH7_KEYS: Xh7DictKey[] = [
 
 let cachedXh7: Xh7TablesJson | null = null;
 let cachedTgscc: TgsccJson | null = null;
+let cachedFswv: FswvJson | null = null;
 let contextForPath: ExtensionContext | null = null;
 
 /**
@@ -60,6 +67,7 @@ export function initTableLoader(context: ExtensionContext): void {
     contextForPath = context;
     cachedXh7 = null;
     cachedTgscc = null;
+    cachedFswv = null;
 }
 
 function getXh7Path(): string {
@@ -84,6 +92,15 @@ function ensureTgsccLoaded(): TgsccJson {
     if (!fs.existsSync(jsonPath)) throw new Error(`字词检查：tgscc 数据文件不存在: ${jsonPath}`);
     cachedTgscc = JSON.parse(fs.readFileSync(jsonPath, 'utf-8')) as TgsccJson;
     return cachedTgscc;
+}
+
+function ensureFswvLoaded(): FswvJson {
+    if (cachedFswv) return cachedFswv;
+    if (!contextForPath) throw new Error('字词检查：未初始化 tableLoader');
+    const jsonPath = contextForPath.asAbsolutePath(path.join('data', 'fswv.json'));
+    if (!fs.existsSync(jsonPath)) throw new Error(`字词检查：fswv 数据文件不存在: ${jsonPath}`);
+    cachedFswv = JSON.parse(fs.readFileSync(jsonPath, 'utf-8')) as FswvJson;
+    return cachedFswv;
 }
 
 /** 将 tgscc 的 键→(string|null)[] 转为 键→string（仅取首项且非 null） */
@@ -138,20 +155,26 @@ function sliceToDict(arr: string[], start: number, end: number, value: string): 
     return out;
 }
 
-/** 自定义替换表检查：预置「表」id（使用 tgscc 数据与逻辑） */
-export type CustomPresetId = 'preset_traditional' | 'preset_variant' | 'preset_simplified_to_tv';
+/** 自定义替换表检查：预置「表」id（使用 tgscc / fswv 数据与逻辑） */
+export type CustomPresetId = 'preset_traditional' | 'preset_variant' | 'preset_simplified_to_tv' | 'preset_fswv';
 
 const CUSTOM_PRESET_LABELS: Record<CustomPresetId, string> = {
-    preset_traditional: '通规繁体字->规范字',
-    preset_variant: '通规异体字->规范字',
-    preset_simplified_to_tv: '通规规范字->繁体字异体字',
+    preset_traditional: '通规繁体字→规范字',
+    preset_variant: '通规异体字→规范字',
+    preset_simplified_to_tv: '通规规范字→繁体字异体字',
+    preset_fswv: '一异表异形词→推荐',
 };
 
 export function getCustomPresetLabel(id: CustomPresetId): string {
     return CUSTOM_PRESET_LABELS[id];
 }
 
-export const CUSTOM_PRESET_IDS: CustomPresetId[] = ['preset_traditional', 'preset_variant', 'preset_simplified_to_tv'];
+export const CUSTOM_PRESET_IDS: CustomPresetId[] = ['preset_traditional', 'preset_variant', 'preset_simplified_to_tv', 'preset_fswv'];
+
+/** 是否需要分词后再匹配（多字词表） */
+export function isPresetRequiringSegmentation(presetId: CustomPresetId): boolean {
+    return presetId === 'preset_fswv';
+}
 
 /**
  * 获取自定义检查预置「表」的字典（用于扫描）；无数据时返回空对象。
@@ -180,6 +203,14 @@ export function getCustomPresetDict(presetId: CustomPresetId): Record<string, st
         }
     } catch {
         // tgscc 未加载时忽略
+    }
+    if (presetId === 'preset_fswv') {
+        try {
+            const fswv = ensureFswvLoaded();
+            return fswv.variant_to_standard ?? {};
+        } catch {
+            // fswv 未加载时忽略
+        }
     }
     return {};
 }
@@ -219,6 +250,13 @@ export function getNotes(preferred: string, variant?: string): WordCheckNotes {
             if (typeof note === 'string') raw.push(note);
         } catch {
             // tgscc 未配置或文件缺失时忽略
+        }
+        try {
+            const fswv = ensureFswvLoaded();
+            const note = fswv.notes?.[variant];
+            if (typeof note === 'string') raw.push(note);
+        } catch {
+            // fswv 未配置或文件缺失时忽略
         }
     }
     return { raw: raw.length ? raw : undefined, usage: usage.length ? usage : undefined };

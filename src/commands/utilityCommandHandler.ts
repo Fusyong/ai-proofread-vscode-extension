@@ -404,7 +404,7 @@ export class UtilityCommandHandler {
     }
 
     /**
-     * 分词：可选分词替换或输出词频统计表
+     * 分词：可选分词替换、输出词频统计表或输出字频统计表
      */
     private async runSegment(
         editor: vscode.TextEditor,
@@ -415,6 +415,7 @@ export class UtilityCommandHandler {
             [
                 { label: '分词后替换原文', value: 'replace', description: '分词后替换原文，可设分隔符' },
                 { label: '输出词频统计表', value: 'frequency', description: '生成词语、词性、词频表' },
+                { label: '输出字频统计表', value: 'charFrequency', description: '生成单字及频度表' },
             ],
             { placeHolder: '选择分词输出方式', ignoreFocusOut: true }
         );
@@ -427,6 +428,11 @@ export class UtilityCommandHandler {
         }
 
         try {
+            if (modeChoice.value === 'charFrequency') {
+                await this.outputCharFrequencyCsv(text, editor.document.uri);
+                return;
+            }
+
             const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
             const jieba = getJiebaWasm(path.join(context.extensionPath, 'dist'), customDictPath || undefined);
 
@@ -533,7 +539,7 @@ export class UtilityCommandHandler {
 
         let outputPath: string;
         if (sourceUri.scheme === 'file' && sourceUri.fsPath) {
-            outputPath = FilePathUtils.getFilePath(sourceUri.fsPath, '.freq', '.csv');
+            outputPath = FilePathUtils.getFilePath(sourceUri.fsPath, '.wordfreq', '.csv');
         } else {
             const defaultUri = vscode.workspace.workspaceFolders?.[0]
                 ? vscode.Uri.joinPath(vscode.workspace.workspaceFolders[0].uri, '词频统计.csv')
@@ -548,6 +554,52 @@ export class UtilityCommandHandler {
 
         fs.writeFileSync(outputPath, csvContent, 'utf8');
         vscode.window.showInformationMessage(`词频统计已保存至：${path.basename(outputPath)}`);
+    }
+
+    /** 输出字频统计表为 CSV 文件（字符、频度） */
+    private async outputCharFrequencyCsv(text: string, sourceUri: vscode.Uri): Promise<void> {
+        const freqMap = new Map<string, number>();
+
+        for (const ch of text) {
+            if (/\s/.test(ch)) continue; // 忽略空白字符
+            freqMap.set(ch, (freqMap.get(ch) ?? 0) + 1);
+        }
+
+        const rows = Array.from(freqMap.entries())
+            .map(([ch, count]) => ({ ch, count }))
+            .sort((a, b) => b.count - a.count);
+
+        const escapeCsv = (s: string): string => {
+            if (/[,\n"]/.test(s)) {
+                return `"${s.replace(/"/g, '""')}"`;
+            }
+            return s;
+        };
+
+        const csvLines: string[] = ['字符,频度'];
+        for (const r of rows) {
+            csvLines.push(`${escapeCsv(r.ch)},${r.count}`);
+        }
+
+        const csvContent = '\uFEFF' + csvLines.join('\n');
+
+        let outputPath: string;
+        if (sourceUri.scheme === 'file' && sourceUri.fsPath) {
+            outputPath = FilePathUtils.getFilePath(sourceUri.fsPath, '.charfreq', '.csv');
+        } else {
+            const defaultUri = vscode.workspace.workspaceFolders?.[0]
+                ? vscode.Uri.joinPath(vscode.workspace.workspaceFolders[0].uri, '字频统计.csv')
+                : undefined;
+            const saved = await vscode.window.showSaveDialog({
+                defaultUri,
+                filters: { 'CSV': ['csv'] }
+            });
+            if (!saved) return;
+            outputPath = saved.fsPath;
+        }
+
+        fs.writeFileSync(outputPath, csvContent, 'utf8');
+        vscode.window.showInformationMessage(`字频统计已保存至：${path.basename(outputPath)}`);
     }
 
     /** 对全文分词 */

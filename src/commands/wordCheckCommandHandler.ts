@@ -14,7 +14,7 @@ import {
     getCurrentOccurrenceIndex,
     setCurrentOccurrenceIndex,
 } from '../xh7/wordCheckView';
-import { initTableLoader, getDict, getCustomPresetDict, getCustomPresetLabel, CUSTOM_PRESET_IDS, type CustomPresetId } from '../xh7/tableLoader';
+import { initTableLoader, getDict, getCustomPresetDict, getCustomPresetLabel, CUSTOM_PRESET_IDS, isPresetRequiringSegmentation, type CustomPresetId } from '../xh7/tableLoader';
 import {
     registerCustomTablesView,
     CUSTOM_TABLES_VIEW_ID,
@@ -44,6 +44,7 @@ import {
 } from '../xh7/customTableCache';
 import { scanDocumentWithCustomTable } from '../xh7/documentScannerCustom';
 import { applyReplaceInDocument } from '../xh7/applyReplace';
+import { FilePathUtils } from '../utils';
 import * as path from 'path';
 
 const VIEW_BASE_TITLE = 'checkWords';
@@ -163,7 +164,8 @@ export class WordCheckCommandHandler {
     private async runDictCheck(editor: vscode.TextEditor): Promise<void> {
         const action = await vscode.window.showQuickPick(
             [
-                { label: '$(play) 开始检查', value: 'run' as const },
+                { label: '$(play) 检查后生成树状视图', value: 'run' as const },
+                { label: '$(file-text) 检查后输出统计表', value: 'csv' as const },
                 { label: '$(settings-gear) 管理检查类型', value: 'manage' as const },
             ],
             { placeHolder: '选择操作', title: '对照词典检查' }
@@ -179,13 +181,14 @@ export class WordCheckCommandHandler {
             await vscode.commands.executeCommand(`${DICT_CHECK_TYPES_VIEW_ID}.focus`);
             return;
         }
-        await this.runPresetStyleCheck(editor, types);
+        await this.runPresetStyleCheck(editor, types, action.value === 'csv' ? 'csv' : 'treeview', action.value === 'csv' ? 'dictchecks' : undefined);
     }
 
     private async runTgsccCheck(editor: vscode.TextEditor): Promise<void> {
         const action = await vscode.window.showQuickPick(
             [
-                { label: '$(play) 开始检查', value: 'run' as const },
+                { label: '$(play) 检查后生成树状视图', value: 'run' as const },
+                { label: '$(file-text) 检查后输出统计表', value: 'csv' as const },
                 { label: '$(settings-gear) 管理检查类型', value: 'manage' as const },
             ],
             { placeHolder: '选择操作', title: '对照通用规范汉字表检查' }
@@ -201,10 +204,10 @@ export class WordCheckCommandHandler {
             await vscode.commands.executeCommand(`${TGSCC_CHECK_TYPES_VIEW_ID}.focus`);
             return;
         }
-        await this.runPresetStyleCheck(editor, types);
+        await this.runPresetStyleCheck(editor, types, action.value === 'csv' ? 'csv' : 'treeview', action.value === 'csv' ? 'TGSCCchecks' : undefined);
     }
 
-    private async runPresetStyleCheck(editor: vscode.TextEditor, checkTypes: CheckType[]): Promise<void> {
+    private async runPresetStyleCheck(editor: vscode.TextEditor, checkTypes: CheckType[], outputMode: 'treeview' | 'csv' = 'treeview', csvSuffix?: 'dictchecks' | 'TGSCCchecks'): Promise<void> {
         const scanRange = editor.selection.isEmpty ? undefined : new vscode.Range(editor.selection.start, editor.selection.end);
         try {
             const entries = await vscode.window.withProgress(
@@ -255,6 +258,11 @@ export class WordCheckCommandHandler {
                 }
             );
 
+            if (outputMode === 'csv' && csvSuffix) {
+                await this.outputDictChecksCsv(entries, editor.document.uri, csvSuffix);
+                return;
+            }
+
             if (!this.treeProvider) return;
             this.treeProvider.refresh(entries, editor.document.uri);
             const totalOccurrences = entries.reduce((s, e) => s + e.ranges.length, 0);
@@ -273,12 +281,45 @@ export class WordCheckCommandHandler {
         }
     }
 
+    /** 将 TreeView 条目输出为 CSV（文档原名.{suffix}.csv） */
+    private async outputDictChecksCsv(entries: WordCheckEntry[], docUri: vscode.Uri, suffix: 'dictchecks' | 'TGSCCchecks' | 'customchecks'): Promise<void> {
+        const escapeCsv = (s: string): string => {
+            if (/[,\n"]/.test(s)) {
+                return `"${s.replace(/"/g, '""')}"`;
+            }
+            return s;
+        };
+
+        const csvLines: string[] = ['字词,提示,出现次数,检查类型'];
+        for (const e of entries) {
+            csvLines.push(
+                `${escapeCsv(e.variant)},${escapeCsv(e.preferred)},${e.ranges.length},${escapeCsv(e.checkTypeLabel ?? '-')}`
+            );
+        }
+
+        const csvContent = '\uFEFF' + csvLines.join('\n');
+
+        if (docUri.scheme !== 'file' || !docUri.fsPath) {
+            vscode.window.showErrorMessage('无法确定文档路径，请使用已保存的文件。');
+            return;
+        }
+
+        const outputPath = FilePathUtils.getFilePath(docUri.fsPath, `.${suffix}`, '.csv');
+        const outputUri = vscode.Uri.file(outputPath);
+        const data = new TextEncoder().encode(csvContent);
+        await vscode.workspace.fs.writeFile(outputUri, data);
+
+        const baseName = outputPath.replace(/^.*[/\\]/, '');
+        vscode.window.showInformationMessage(`字词检查统计表已保存至：${baseName}`);
+    }
+
     private async runCustomCheck(editor: vscode.TextEditor): Promise<void> {
         const scanRange = editor.selection.isEmpty ? undefined : new vscode.Range(editor.selection.start, editor.selection.end);
 
         const action = await vscode.window.showQuickPick(
             [
-                { label: '$(play) 开始检查', value: 'run' as const },
+                { label: '$(play) 检查后生成树状视图', value: 'run' as const },
+                { label: '$(file-text) 检查后输出统计表', value: 'csv' as const },
                 { label: '$(file-add) 加载新表…', value: 'add' as const },
                 { label: '$(settings-gear) 管理替换表', value: 'manage' as const },
             ],
@@ -287,6 +328,84 @@ export class WordCheckCommandHandler {
         if (!action) return;
         if (action.value === 'manage') {
             await this.handleManageCustomTablesCommand();
+            return;
+        }
+        if (action.value === 'csv') {
+            const { presetIds, customIds } = this.getOrderedSelectedTableIds();
+            const tablesById = new Map(getCustomTables().map((t) => [t.id, t]));
+            const selectedPresets = presetIds.map((id) => ({ presetId: id, label: getCustomPresetLabel(id) }));
+            const selectedTables = customIds.map((id) => tablesById.get(id)).filter((t): t is CustomTable => t != null);
+            if (selectedPresets.length === 0 && selectedTables.length === 0) {
+                vscode.window.showWarningMessage('请在侧栏「替换表」视图中勾选至少一项参与检查。');
+                await this.handleManageCustomTablesCommand();
+                return;
+            }
+            try {
+                const entries = await vscode.window.withProgress(
+                    {
+                        location: vscode.ProgressLocation.Notification,
+                        title: scanRange ? '字词检查（选中范围）' : '字词检查',
+                        cancellable: true,
+                    },
+                    async (progress, cancelToken) => {
+                        const merged = new Map<string, WordCheckEntry>();
+                        const total = selectedPresets.length + selectedTables.length;
+                        let idx = 0;
+                        let jiebaForPreset: import('../jiebaLoader').JiebaWasmModule | undefined;
+                        if (selectedPresets.some((p) => isPresetRequiringSegmentation(p.presetId))) {
+                            try {
+                                const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
+                                jiebaForPreset = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
+                            } catch {
+                                // jieba 加载失败时回退到字面匹配
+                            }
+                        }
+                        for (const { presetId, label } of selectedPresets) {
+                            if (cancelToken.isCancellationRequested) break;
+                            idx++;
+                            progress.report({ message: `扫描 (${idx}/${total}) ${label}…` });
+                            const dict = getCustomPresetDict(presetId);
+                            if (Object.keys(dict).length === 0) continue;
+                            let list: WordCheckEntry[];
+                            if (isPresetRequiringSegmentation(presetId) && jiebaForPreset) {
+                                list = scanDocumentWithSegmentation(editor.document, dict, jiebaForPreset, cancelToken, scanRange);
+                            } else {
+                                list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                            }
+                            for (const e of list) {
+                                const key = `${e.variant}|${e.preferred}`;
+                                const existing = merged.get(key);
+                                if (existing) {
+                                    existing.ranges.push(...e.ranges);
+                                } else {
+                                    merged.set(key, { ...e, ranges: [...e.ranges], checkTypeLabel: label });
+                                }
+                            }
+                        }
+                        for (const table of selectedTables) {
+                            if (cancelToken.isCancellationRequested) break;
+                            idx++;
+                            progress.report({ message: `扫描表 (${idx}/${total}) ${table.name}…` });
+                            const list = scanDocumentWithCustomTable(editor.document, table, cancelToken, scanRange);
+                            const tableLabel = table.name;
+                            for (const e of list) {
+                                const key = `${e.variant}|${e.preferred}`;
+                                const existing = merged.get(key);
+                                if (existing) {
+                                    existing.ranges.push(...e.ranges);
+                                } else {
+                                    merged.set(key, { ...e, ranges: [...e.ranges], checkTypeLabel: tableLabel });
+                                }
+                            }
+                        }
+                        return Array.from(merged.values());
+                    }
+                );
+                await this.outputDictChecksCsv(entries, editor.document.uri, 'customchecks');
+            } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
+                vscode.window.showErrorMessage(`字词检查失败：${msg}`);
+            }
             return;
         }
         if (action.value === 'add') {
@@ -374,13 +493,27 @@ export class WordCheckCommandHandler {
                     const merged = new Map<string, WordCheckEntry>();
                     const total = selectedPresets.length + selectedTables.length;
                     let idx = 0;
+                    let jiebaForPreset: import('../jiebaLoader').JiebaWasmModule | undefined;
+                    if (selectedPresets.some((p) => isPresetRequiringSegmentation(p.presetId))) {
+                        try {
+                            const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
+                            jiebaForPreset = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
+                        } catch {
+                            // jieba 加载失败时回退到字面匹配
+                        }
+                    }
                     for (const { presetId, label } of selectedPresets) {
                         if (cancelToken.isCancellationRequested) break;
                         idx++;
                         progress.report({ message: `扫描 (${idx}/${total}) ${label}…` });
                         const dict = getCustomPresetDict(presetId);
                         if (Object.keys(dict).length === 0) continue;
-                        const list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                        let list: WordCheckEntry[];
+                        if (isPresetRequiringSegmentation(presetId) && jiebaForPreset) {
+                            list = scanDocumentWithSegmentation(editor.document, dict, jiebaForPreset, cancelToken, scanRange);
+                        } else {
+                            list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                        }
                         for (const e of list) {
                             const key = `${e.variant}|${e.preferred}`;
                             const existing = merged.get(key);
