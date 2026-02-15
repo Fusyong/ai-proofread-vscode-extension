@@ -27,13 +27,13 @@ Additionally, you can also set your own prompts for other text processing scenar
 4. 最后会自动展示校对前后的差异，效果如下，深红表示原文变动，深绿表示结果变动：
 
 ![前后差异](https://blog.xiiigame.com/img/2025-02-07-比较AI模型校对效果/20252507-160022-52.png)
-    
+
 ### 2.2. 切分文档后批量校对
 
 1. 打开markdown文档，在每一个段落后添加一个空行（一个或多个空行是md的段落标记），打开右键菜单，使用`AI proofreader: split file`选项，选择切分模式（默认按长度），把当前文档切分为JSON文档，结果会呈现在面板中
 2. 通过结果面板中的“校对JSON文件”按钮，批量校对切分好的片段
 3. 通过结果面板中的“比较前后差异”按钮，可以看到和上文相同的校对结果
-![/result_panel](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/result_panel.png) 
+![/result_panel](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/result_panel.png)
 
 ### 2.3. 尝试所有命令
 
@@ -173,11 +173,11 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 > 你是一位专业的儿童文学翻译家……
 > 用户会提供一段需要翻译的目标文本（target），你的任务是把这段文本翻译成适合孩子阅读的汉语作品……
-> 
+>
 > 用户如果供参考文本（reference），翻译时请模仿参考文本的语言风格，遵照参考文本中的人名、地名、术语等实体的指定译法……
-> 
+>
 > 用户如果提供上下文（context），翻译时要根据上下文确定目标文本（target）的具体含义，确保翻译的准确性和连贯性……
-> 
+>
 > 输出要求：
 > 1. 翻译目标文本（target）后输出;
 > 2. 不要给出任何解释、说明；
@@ -214,7 +214,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 7. 测试.proofread.html：通过jsdiff库比较校对前后markdown文件所得的结果，与Word近似的行内标记，可通过浏览器打印成PDF。需要联网调用jsdiff库，并等待运算完成
 8. 测试.proofread.log，校对日志，**校对文本选段的结果也会存在这里**
 
-**请特别注意：除自动累加的日志文件和提示备份的`测试.proofread.json`、自动备份的`测试.proofread.json.md`，其余中间文件，每次操作都将重新生成！如有需要，请自行备份。** 
+**请特别注意：除自动累加的日志文件和提示备份的`测试.proofread.json`、自动备份的`测试.proofread.json.md`，其余中间文件，每次操作都将重新生成！如有需要，请自行备份。**
 
 ### 3.7. 其他功能与工具
 
@@ -304,7 +304,7 @@ Additionally, you can also set your own prompts for other text processing scenar
     1. [ ] jsdiff（在 NPM 上的包名就叫 diff，Kevin Decker 维护），diffSentences 或 diffWords 可以非常精确地标记出“删减”、“新增”和“未变”的部分。
     2. [ ] fastest-levenshtein，在对齐完成后，快速计算两个相似句子的“修改程度”百分比。它是 JS 环境下编辑距离运算的最快实现
     3. [ ] 人看的相似度使用编辑距离
-6. [ ] 调研集成opencc-js
+6. [ ] 调研集成opencc-js，用于繁简转换和用词习惯检查
 7. [ ] 勘误表改为JSON加web viewer
 8. [ ] 预置更多提示词，包括常用的专项校对
     1. [ ] 典型错误举例校对
@@ -457,7 +457,7 @@ Additionally, you can also set your own prompts for other text processing scenar
   - 呈现切分摘要信息，如段落数、超长段落等
   - 查看日志文件时自动滚动到底部
   - debug：重用webwiew报错
-  
+
 ### v0.1.7
 
 - 取消校对时生成jsdiff html，改成提示用户生成

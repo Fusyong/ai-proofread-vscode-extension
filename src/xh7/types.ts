@@ -122,6 +122,8 @@ export interface CustomTable {
     filePath?: string;
     enabled: boolean;
     isRegex: boolean;
+    /** 非正则表时有效：是否匹配词语边界（先分词再检查表中条目是否在分词结果中），默认 false */
+    matchWordBoundary?: boolean;
     rules: CustomRule[];
     compiled?: CompiledCustomRule[];
 }

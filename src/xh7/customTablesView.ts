@@ -93,11 +93,14 @@ export class CustomTablesTreeDataProvider implements vscode.TreeDataProvider<Cus
             item.description = '预置';
         } else {
             const table = getCustomTables().find((t) => t.id === element.id);
-            item.description = table
-                ? table.isRegex
-                    ? `正则 · ${table.rules.length}`
-                    : `字面 · ${table.rules.length}`
-                : undefined;
+            if (table) {
+                if (table.isRegex) {
+                    item.description = `正则 · ${table.rules.length}`;
+                } else {
+                    const wordBound = table.matchWordBoundary ? '词界' : '无词界';
+                    item.description = `字面 · ${table.rules.length} · ${wordBound}`;
+                }
+            }
         }
         return item;
     }

@@ -7,7 +7,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { mergeTwoFiles } from '../merger';
 import { getJiebaWasm, type JiebaWasmModule } from '../jiebaLoader';
-import * as OpenCC from 'opencc-js';
 import { searchSelectionInPDF } from '../pdfSearcher';
 import { convertQuotes } from '../quoteConverter';
 import { formatParagraphs } from '../paragraphDetector';
@@ -437,34 +436,11 @@ export class UtilityCommandHandler {
             const jieba = getJiebaWasm(path.join(context.extensionPath, 'dist'), customDictPath || undefined);
 
             if (modeChoice.value === 'frequency') {
-                const scriptChoice = await vscode.window.showQuickPick(
-                    [
-                        { label: '简体', value: 'simplified', description: '默认' },
-                        { label: '繁体', value: 'traditional' },
-                    ],
-                    { placeHolder: '选择文本类型（默认简体）', ignoreFocusOut: true }
-                );
-                if (!scriptChoice) return;
-                await this.outputWordFrequencyCsv(
-                    jieba,
-                    text,
-                    editor.document.uri,
-                    scriptChoice.value as 'simplified' | 'traditional'
-                );
+                await this.outputWordFrequencyCsv(jieba, text, editor.document.uri);
                 return;
             }
 
             // 分词替换模式
-            const scriptChoice = await vscode.window.showQuickPick(
-                [
-                    { label: '简体', value: 'simplified', description: '默认' },
-                    { label: '繁体', value: 'traditional' },
-                ],
-                { placeHolder: '选择文本类型（默认简体）', ignoreFocusOut: true }
-            );
-            if (!scriptChoice) return;
-            void scriptChoice;
-
             const sepInput = await vscode.window.showInputBox({
                 prompt: '分隔符（默认空格，留空即空格）',
                 value: ' ',
@@ -492,12 +468,11 @@ export class UtilityCommandHandler {
         }
     }
 
-    /** 输出词频统计表为 CSV 文件（词语、词性、词频），可选简体/繁体 */
+    /** 输出词频统计表为 CSV 文件（词语、词性、词频），原样统计不转换 */
     private async outputWordFrequencyCsv(
         jieba: JiebaWasmModule,
         text: string,
-        sourceUri: vscode.Uri,
-        script: 'simplified' | 'traditional'
+        sourceUri: vscode.Uri
     ): Promise<void> {
         const freqMap = new Map<string, number>(); // key: "词语\t词性"
 
@@ -512,13 +487,10 @@ export class UtilityCommandHandler {
             }
         }
 
-        const s2t = script === 'traditional' ? OpenCC.Converter({ from: 'cn', to: 't' }) : null;
-
         const rows = Array.from(freqMap.entries())
             .map(([key, count]) => {
                 const [word, tag] = key.split('\t');
-                const wordOut = s2t ? s2t(word) : word;
-                return { word: wordOut, tag, count };
+                return { word, tag, count };
             })
             .sort((a, b) => b.count - a.count);
 

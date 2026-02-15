@@ -1,11 +1,12 @@
 /**
- * 自定义替换表：正则表每条规则扫描一遍（跨规则 consumed 不重叠）；非正则表为字面匹配（无词界）。
+ * 自定义替换表：正则表每条规则扫描一遍（跨规则 consumed 不重叠）；非正则表为字面匹配（可选词界）。
  * 规划见 docs/custom-word-check-plan.md
  */
 
 import * as vscode from 'vscode';
 import type { WordCheckEntry } from './types';
 import type { CustomRule, CompiledCustomRule, CustomTable } from './types';
+import type { JiebaWasmModule } from '../jiebaLoader';
 
 /** 正则元字符转义，用于字面匹配 */
 function escapeRegex(s: string): string {
@@ -130,6 +131,57 @@ export function scanDocumentWithLiteralRules(
     return Array.from(entryMap.values());
 }
 
+/**
+ * 非正则表 + 匹配词语边界：先分词，仅当分词结果中完整出现表中的 find 时才报告，并挂上 rawComment。
+ */
+export function scanDocumentWithLiteralRulesWithSegmentation(
+    document: vscode.TextDocument,
+    rules: CustomRule[],
+    jieba: JiebaWasmModule,
+    cancelToken?: vscode.CancellationToken,
+    range?: vscode.Range
+): WordCheckEntry[] {
+    const scanRange = range ?? new vscode.Range(0, 0, document.lineCount, 0);
+    const text = document.getText(scanRange);
+    const rangeStartOffset = document.offsetAt(scanRange.start);
+
+    const findToReplace = new Map<string, string>();
+    const findToComment = new Map<string, string>();
+    for (const r of rules) {
+        findToReplace.set(r.find, r.replace);
+        if (r.rawComment) findToComment.set(r.find, r.rawComment);
+    }
+    const findSet = new Set(findToReplace.keys());
+
+    const tokens = jieba.tokenize(text, 'default', true);
+    const entryMap = new Map<string, WordCheckEntry>();
+
+    for (const tok of tokens) {
+        if (cancelToken?.isCancellationRequested) break;
+        if (!findSet.has(tok.word)) continue;
+
+        const preferred = findToReplace.get(tok.word);
+        if (!preferred) continue;
+
+        const startOffset = rangeStartOffset + tok.start;
+        const endOffset = rangeStartOffset + tok.end;
+        const rangeObj = new vscode.Range(
+            document.positionAt(startOffset),
+            document.positionAt(endOffset)
+        );
+        const rawComment = findToComment.get(tok.word);
+
+        const key = `${tok.word}|${preferred}`;
+        const existing = entryMap.get(key);
+        if (existing) {
+            existing.ranges.push(rangeObj);
+        } else {
+            entryMap.set(key, { variant: tok.word, preferred, ranges: [rangeObj], rawComment });
+        }
+    }
+    return Array.from(entryMap.values());
+}
+
 /** 单字规则的字面匹配：O(n) 逐字遍历 */
 function scanLiteralRulesSingleChar(
     document: vscode.TextDocument,
@@ -173,6 +225,7 @@ function scanLiteralRulesSingleChar(
 
 /**
  * 按表类型分发：正则表用 compiled 扫描，非正则表用 rules 字面扫描。
+ * 非正则表且 matchWordBoundary 为 true 时，由调用方使用 scanDocumentWithLiteralRulesWithSegmentation + jieba 进行分词后再匹配。
  */
 export function scanDocumentWithCustomTable(
     document: vscode.TextDocument,

@@ -42,7 +42,7 @@ import {
     removeCustomTable,
     setCustomTableEnabled,
 } from '../xh7/customTableCache';
-import { scanDocumentWithCustomTable } from '../xh7/documentScannerCustom';
+import { scanDocumentWithCustomTable, scanDocumentWithLiteralRulesWithSegmentation } from '../xh7/documentScannerCustom';
 import { applyReplaceInDocument } from '../xh7/applyReplace';
 import { FilePathUtils } from '../utils';
 import * as path from 'path';
@@ -52,6 +52,7 @@ const VIEW_BASE_TITLE = 'checkWords';
 const KEY_LAST_SELECTED_TABLE_IDS = 'ai-proofread.wordCheck.lastSelectedTableIds';
 const KEY_LAST_ADD_FOLDER = 'ai-proofread.wordCheck.lastAddFolder';
 const KEY_LAST_IS_REGEX = 'ai-proofread.wordCheck.lastIsRegex';
+const KEY_LAST_MATCH_WORD_BOUNDARY = 'ai-proofread.wordCheck.lastMatchWordBoundary';
 
 export class WordCheckCommandHandler {
     private treeView: vscode.TreeView<WordCheckEntry> | null = null;
@@ -352,7 +353,9 @@ export class WordCheckCommandHandler {
                         const total = selectedPresets.length + selectedTables.length;
                         let idx = 0;
                         let jiebaForPreset: import('../jiebaLoader').JiebaWasmModule | undefined;
-                        if (selectedPresets.some((p) => isPresetRequiringSegmentation(p.presetId))) {
+                        const needJiebaForPreset = selectedPresets.some((p) => isPresetRequiringSegmentation(p.presetId));
+                        const needJiebaForCustom = selectedTables.some((t) => t.matchWordBoundary && !t.isRegex);
+                        if (needJiebaForPreset || needJiebaForCustom) {
                             try {
                                 const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
                                 jiebaForPreset = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
@@ -386,7 +389,10 @@ export class WordCheckCommandHandler {
                             if (cancelToken.isCancellationRequested) break;
                             idx++;
                             progress.report({ message: `扫描表 (${idx}/${total}) ${table.name}…` });
-                            const list = scanDocumentWithCustomTable(editor.document, table, cancelToken, scanRange);
+                            const list =
+                                table.matchWordBoundary && !table.isRegex && jiebaForPreset
+                                    ? scanDocumentWithLiteralRulesWithSegmentation(editor.document, table.rules, jiebaForPreset, cancelToken, scanRange)
+                                    : scanDocumentWithCustomTable(editor.document, table, cancelToken, scanRange);
                             const tableLabel = table.name;
                             for (const e of list) {
                                 const key = `${e.variant}|${e.preferred}`;
@@ -413,7 +419,7 @@ export class WordCheckCommandHandler {
             const defaultUri = lastFolder ? vscode.Uri.file(lastFolder) : undefined;
             const uris = await vscode.window.showOpenDialog({
                 canSelectMany: false,
-                filters: { '替换表': ['txt', 'json'] },
+                filters: { '替换表 (.txt)': ['txt'] },
                 defaultUri,
             });
             if (uris?.length) {
@@ -429,7 +435,21 @@ export class WordCheckCommandHandler {
                 );
                 if (isRegex != null) {
                     await this.context.workspaceState.update(KEY_LAST_IS_REGEX, isRegex.value);
-                    const { table, errors } = addCustomTableFromFile(uris[0].fsPath, isRegex.value);
+                    let matchWordBoundary = false;
+                    if (!isRegex.value) {
+                        const lastMatch = this.context.workspaceState.get<boolean>(KEY_LAST_MATCH_WORD_BOUNDARY);
+                        const matchPick = await vscode.window.showQuickPick(
+                            [
+                                { label: '否', value: false, picked: lastMatch !== true },
+                                { label: '是', value: true, picked: lastMatch === true },
+                            ],
+                            { placeHolder: '匹配词语边界（先分词再检查表中条目）', title: '非正则替换表' }
+                        );
+                        if (matchPick == null) return;
+                        matchWordBoundary = matchPick.value;
+                        await this.context.workspaceState.update(KEY_LAST_MATCH_WORD_BOUNDARY, matchWordBoundary);
+                    }
+                    const { table, errors } = addCustomTableFromFile(uris[0].fsPath, isRegex.value, undefined, matchWordBoundary);
                     if (table) {
                         vscode.window.showInformationMessage(`已加载「${table.name}」`);
                         this.customTablesProvider?.refresh();
@@ -494,7 +514,9 @@ export class WordCheckCommandHandler {
                     const total = selectedPresets.length + selectedTables.length;
                     let idx = 0;
                     let jiebaForPreset: import('../jiebaLoader').JiebaWasmModule | undefined;
-                    if (selectedPresets.some((p) => isPresetRequiringSegmentation(p.presetId))) {
+                    const needJiebaForPreset = selectedPresets.some((p) => isPresetRequiringSegmentation(p.presetId));
+                    const needJiebaForCustom = selectedTables.some((t) => t.matchWordBoundary && !t.isRegex);
+                    if (needJiebaForPreset || needJiebaForCustom) {
                         try {
                             const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
                             jiebaForPreset = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
@@ -528,7 +550,10 @@ export class WordCheckCommandHandler {
                         if (cancelToken.isCancellationRequested) break;
                         idx++;
                         progress.report({ message: `扫描表 (${idx}/${total}) ${table.name}…` });
-                        const list = scanDocumentWithCustomTable(editor.document, table, cancelToken, scanRange);
+                        const list =
+                            table.matchWordBoundary && !table.isRegex && jiebaForPreset
+                                ? scanDocumentWithLiteralRulesWithSegmentation(editor.document, table.rules, jiebaForPreset, cancelToken, scanRange)
+                                : scanDocumentWithCustomTable(editor.document, table, cancelToken, scanRange);
                         const tableLabel = table.name;
                         for (const e of list) {
                             const key = `${e.variant}|${e.preferred}`;
@@ -582,7 +607,7 @@ export class WordCheckCommandHandler {
         const defaultUri = lastFolder ? vscode.Uri.file(lastFolder) : undefined;
         const uris = await vscode.window.showOpenDialog({
             canSelectMany: false,
-            filters: { '替换表': ['txt', 'json'] },
+            filters: { '替换表 (.txt)': ['txt'] },
             defaultUri,
         });
         if (!uris?.length) return;
@@ -598,7 +623,21 @@ export class WordCheckCommandHandler {
         );
         if (isRegex == null) return;
         await this.context.workspaceState.update(KEY_LAST_IS_REGEX, isRegex.value);
-        const { table, errors } = addCustomTableFromFile(uris[0].fsPath, isRegex.value);
+        let matchWordBoundary = false;
+        if (!isRegex.value) {
+            const lastMatch = this.context.workspaceState.get<boolean>(KEY_LAST_MATCH_WORD_BOUNDARY);
+            const matchPick = await vscode.window.showQuickPick(
+                [
+                    { label: '否', value: false, picked: lastMatch !== true },
+                    { label: '是', value: true, picked: lastMatch === true },
+                ],
+                { placeHolder: '匹配词语边界（先分词再检查表中条目）', title: '非正则替换表' }
+            );
+            if (matchPick == null) return;
+            matchWordBoundary = matchPick.value;
+            await this.context.workspaceState.update(KEY_LAST_MATCH_WORD_BOUNDARY, matchWordBoundary);
+        }
+        const { table, errors } = addCustomTableFromFile(uris[0].fsPath, isRegex.value, undefined, matchWordBoundary);
         if (table) {
             vscode.window.showInformationMessage(`已加载「${table.name}」`);
             this.customTablesProvider?.refresh();

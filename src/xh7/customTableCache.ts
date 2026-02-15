@@ -18,6 +18,7 @@ interface StoredTableMeta {
     filePath?: string;
     enabled: boolean;
     isRegex: boolean;
+    matchWordBoundary?: boolean;
 }
 
 let tables: CustomTable[] = [];
@@ -38,6 +39,7 @@ function saveMetaList(list: StoredTableMeta[]): void {
             filePath: t.filePath,
             enabled: t.enabled,
             isRegex: t.isRegex,
+            matchWordBoundary: t.matchWordBoundary,
         }))
     );
 }
@@ -78,6 +80,7 @@ export function initCustomTableCache(context: ExtensionContext): void {
         filePath: m.filePath,
         enabled: m.enabled,
         isRegex: m.isRegex,
+        matchWordBoundary: m.matchWordBoundary,
         rules: [],
         compiled: undefined,
     }));
@@ -106,20 +109,27 @@ export function addCustomTable(table: CustomTable): void {
             filePath: t.filePath,
             enabled: t.enabled,
             isRegex: t.isRegex,
+            matchWordBoundary: t.matchWordBoundary,
         }))
     );
 }
 
 /**
- * 从文件加载并添加一张表；返回表与错误信息（解析/编译失败或文件不存在时 errors 非空）。
+ * 从文件加载并添加一张表；仅接受 .txt 后缀。返回表与错误信息（解析/编译失败或文件不存在时 errors 非空）。
+ * @param matchWordBoundary 仅非正则表有效：是否匹配词语边界（先分词再检查），默认 false
  */
 export function addCustomTableFromFile(
     filePath: string,
     isRegex: boolean,
-    name?: string
+    name?: string,
+    matchWordBoundary: boolean = false
 ): { table: CustomTable | null; errors: string[] } {
     const errors: string[] = [];
     const absPath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+    const ext = path.extname(absPath).toLowerCase();
+    if (ext !== '.txt') {
+        return { table: null, errors: ['自定义替换表仅接受 .txt 文件'] };
+    }
     if (!fs.existsSync(absPath)) {
         return { table: null, errors: ['文件不存在'] };
     }
@@ -140,6 +150,7 @@ export function addCustomTableFromFile(
         filePath: absPath,
         enabled: true,
         isRegex,
+        matchWordBoundary: !isRegex ? matchWordBoundary : undefined,
         rules,
         compiled,
     };
@@ -159,6 +170,7 @@ export function removeCustomTable(id: string): void {
             filePath: t.filePath,
             enabled: t.enabled,
             isRegex: t.isRegex,
+            matchWordBoundary: t.matchWordBoundary,
         }))
     );
 }
@@ -177,6 +189,7 @@ export function setCustomTableEnabled(id: string, enabled: boolean): void {
                 filePath: x.filePath,
                 enabled: x.enabled,
                 isRegex: x.isRegex,
+                matchWordBoundary: x.matchWordBoundary,
             }))
         );
     }

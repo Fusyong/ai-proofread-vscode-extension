@@ -776,7 +776,6 @@
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
     "jieba-wasm": "^2.4.0",
-    "opencc-js": "^1.0.5",
     "sql.js": "^1.10.0"
   },
   "devDependencies": {
