@@ -18,7 +18,7 @@ import { initTableLoader, getDict, getCustomPresetDict, getCustomPresetLabel, CU
 import {
     registerCustomTablesView,
     CUSTOM_TABLES_VIEW_ID,
-    KEY_TABLE_ORDER,
+    getOrder as getCustomTableOrder,
     type CustomTableTreeItem,
 } from '../xh7/customTablesView';
 import {
@@ -90,13 +90,10 @@ export class WordCheckCommandHandler {
         this.tgsccCheckTypesProvider = tgsccReg.provider as TgsccCheckTypesTreeDataProvider;
     }
 
-    /** 获取当前参与检查的表 id 列表（按 tableOrder 顺序） */
+    /** 获取当前参与检查的表 id 列表（按 tableOrder 顺序；order 与树视图一致，含新载入的表） */
     getOrderedSelectedTableIds(): { presetIds: CustomPresetId[]; customIds: string[] } {
         const lastSelectedIds = this.context.workspaceState.get<string[]>(KEY_LAST_SELECTED_TABLE_IDS) ?? [];
-        const order = this.context.workspaceState.get<string[]>(KEY_TABLE_ORDER) ?? [
-            ...CUSTOM_PRESET_IDS,
-            ...getCustomTables().map((t) => t.id),
-        ];
+        const order = getCustomTableOrder(this.context);
         const selectedSet = new Set(lastSelectedIds);
         const presetIds: CustomPresetId[] = [];
         const customIds: string[] = [];
@@ -233,13 +230,9 @@ export class WordCheckCommandHandler {
                             if (Object.keys(dict).length === 0) continue;
                             progress.report({ message: scanRange ? '扫描选中文本…' : '扫描文档…' });
                             if (isDictWordTableType(type)) {
-                                try {
-                                    const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
-                                    const jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
-                                    list = scanDocumentWithSegmentation(editor.document, dict, jieba, cancelToken, scanRange);
-                                } catch {
-                                    list = scanDocument(editor.document, dict, cancelToken, scanRange);
-                                }
+                                const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
+                                const jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
+                                list = scanDocumentWithSegmentation(editor.document, dict, jieba, cancelToken, scanRange);
                             } else {
                                 list = scanDocument(editor.document, dict, cancelToken, scanRange);
                             }
@@ -359,8 +352,10 @@ export class WordCheckCommandHandler {
                             try {
                                 const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
                                 jiebaForPreset = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
-                            } catch {
-                                // jieba 加载失败时回退到字面匹配
+                            } catch (e) {
+                                const msg = e instanceof Error ? e.message : String(e);
+                                vscode.window.showErrorMessage(`jieba 加载失败，字词检查已中止：${msg}`);
+                                throw e;
                             }
                         }
                         for (const { presetId, label } of selectedPresets) {
@@ -419,7 +414,7 @@ export class WordCheckCommandHandler {
             const defaultUri = lastFolder ? vscode.Uri.file(lastFolder) : undefined;
             const uris = await vscode.window.showOpenDialog({
                 canSelectMany: false,
-                filters: { '替换表 (.txt)': ['txt'] },
+                filters: { '替换表': ['txt'] },
                 defaultUri,
             });
             if (uris?.length) {
@@ -428,8 +423,8 @@ export class WordCheckCommandHandler {
                 const lastIsRegex = this.context.workspaceState.get<boolean>(KEY_LAST_IS_REGEX);
                 const isRegex = await vscode.window.showQuickPick(
                     [
-                        { label: '正则替换表', value: true, picked: lastIsRegex === true },
                         { label: '非正则替换表', value: false, picked: lastIsRegex === false },
+                        { label: '正则替换表', value: true, picked: lastIsRegex === true },
                     ],
                     { placeHolder: '选择表类型' }
                 );
@@ -520,8 +515,10 @@ export class WordCheckCommandHandler {
                         try {
                             const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
                             jiebaForPreset = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
-                        } catch {
-                            // jieba 加载失败时回退到字面匹配
+                        } catch (e) {
+                            const msg = e instanceof Error ? e.message : String(e);
+                            vscode.window.showErrorMessage(`jieba 加载失败，字词检查已中止：${msg}`);
+                            throw e;
                         }
                     }
                     for (const { presetId, label } of selectedPresets) {

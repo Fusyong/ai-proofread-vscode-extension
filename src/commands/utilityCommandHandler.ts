@@ -464,7 +464,7 @@ export class UtilityCommandHandler {
             });
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
-            vscode.window.showErrorMessage(`分词失败：${msg}`);
+            vscode.window.showErrorMessage(`jieba 加载或分词失败，已中止：${msg}`);
         }
     }
 

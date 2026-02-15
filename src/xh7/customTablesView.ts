@@ -18,21 +18,39 @@ export interface CustomTableTreeItem {
     isPreset: boolean;
 }
 
-function getOrder(context: vscode.ExtensionContext): string[] {
+/** 获取表顺序（含合并新载入的表 id 并持久化），供树视图与命令共用 */
+export function getOrder(context: vscode.ExtensionContext): string[] {
     const raw = context.workspaceState.get<string[]>(KEY_TABLE_ORDER);
-    if (Array.isArray(raw) && raw.length > 0) return raw;
+    const order = Array.isArray(raw) && raw.length > 0 ? [...raw] : [...CUSTOM_PRESET_IDS];
     const customIds = getCustomTables().map((t) => t.id);
-    return [...CUSTOM_PRESET_IDS, ...customIds];
+    const seen = new Set(order);
+    let changed = false;
+    for (const id of CUSTOM_PRESET_IDS) {
+        if (!seen.has(id)) {
+            order.push(id);
+            seen.add(id);
+            changed = true;
+        }
+    }
+    for (const id of customIds) {
+        if (!seen.has(id)) {
+            order.push(id);
+            seen.add(id);
+            changed = true;
+        }
+    }
+    if (changed) saveOrder(context, order);
+    return order;
 }
 
 function saveOrder(context: vscode.ExtensionContext, order: string[]): void {
     context.workspaceState.update(KEY_TABLE_ORDER, order);
 }
 
-/** 未保存过时默认只选中第一条（按 order 顺序） */
+/** 未保存过时默认只选中第一条（按 order 顺序）；已保存过则原样返回（允许空数组表示全部不勾选） */
 function getSelectedIds(context: vscode.ExtensionContext): string[] {
     const raw = context.workspaceState.get<string[]>(KEY_LAST_SELECTED_TABLE_IDS);
-    if (Array.isArray(raw) && raw.length > 0) return raw;
+    if (Array.isArray(raw)) return raw;
     const order = getOrder(context);
     return order.length > 0 ? [order[0]] : [];
 }

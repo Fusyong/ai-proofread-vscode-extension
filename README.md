@@ -326,6 +326,12 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ## 6. 更新日志
 
+### v1.6.4
+
+- 特性：用户加载非正则自定义替换表时允许指定是否按词语边界匹配
+- 优化：取消jieba调用失败时保持静默并使用备用方案的行为，改为报告并停止处理。
+- bugfix：删除opencc-js
+
 ### v1.6.3
 
 - 特性：集成jieba-wasm分词库，支持用户词典路径

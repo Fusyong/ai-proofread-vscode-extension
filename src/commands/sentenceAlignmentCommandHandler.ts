@@ -95,8 +95,10 @@ export class SentenceAlignmentCommandHandler {
                 try {
                     const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
                     jieba = getJiebaWasm(path.join(context.extensionPath, 'dist'), customDictPath || undefined);
-                } catch {
-                    // 加载失败时回退到字级
+                } catch (e) {
+                    const msg = e instanceof Error ? e.message : String(e);
+                    vscode.window.showErrorMessage(`jieba 加载失败，句子对齐已中止（当前配置为词级相似度，需要 jieba）：${msg}`);
+                    return;
                 }
             }
             const options: AlignmentOptions = {
