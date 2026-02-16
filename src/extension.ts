@@ -324,18 +324,6 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.dictCheckTypes.moveDown', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleDictCheckTypeMoveDown(el)),
         vscode.commands.registerCommand('ai-proofread.tgsccCheckTypes.moveUp', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleTgsccCheckTypeMoveUp(el)),
         vscode.commands.registerCommand('ai-proofread.tgsccCheckTypes.moveDown', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleTgsccCheckTypeMoveDown(el)),
-        vscode.commands.registerCommand('ai-proofread.debug.testJieba', async () => {
-            try {
-                const distDir = path.join(context.extensionPath, 'dist');
-                const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
-                const jieba = getJiebaWasm(distDir, customDictPath || undefined);
-                const result = jieba.cut('中华人民共和国武汉市长江大桥', true);
-                await vscode.window.showInformationMessage(`jieba-wasm 加载成功，分词结果：${result.join('/')}`);
-            } catch (e) {
-                const msg = e instanceof Error ? e.message : String(e);
-                await vscode.window.showErrorMessage(`jieba-wasm 测试失败：${msg}`);
-            }
-        }),
     ];
 
     context.subscriptions.push(...disposables, configManager);
