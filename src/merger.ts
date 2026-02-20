@@ -63,3 +63,52 @@ export async function mergeTwoFiles(
         total: currentContent.length
     };
 }
+
+/**
+ * 将单个 Markdown 文件的内容合并到 JSON 的每个项中
+ * 即每一个 JSON 项都合并一次同一文本
+ * @param currentFilePath 当前 JSON 文件路径
+ * @param markdownFilePath Markdown 文件路径
+ * @param targetField 要更新的字段（target、reference 或 context）
+ * @param mergeMode 合并模式：update 覆盖，concat 拼接
+ */
+export async function mergeMarkdownIntoJson(
+    currentFilePath: string,
+    markdownFilePath: string,
+    targetField: 'target' | 'reference' | 'context',
+    mergeMode: MergeMode = 'update'
+): Promise<{ updated: number; total: number }> {
+    const currentContent = JSON.parse(fs.readFileSync(currentFilePath, 'utf8'));
+    const markdownContent = fs.readFileSync(markdownFilePath, 'utf8');
+
+    if (!Array.isArray(currentContent)) {
+        throw new Error('JSON 文件必须是数组格式');
+    }
+
+    let updated = 0;
+    for (let i = 0; i < currentContent.length; i++) {
+        const currentItem = currentContent[i];
+
+        if (typeof currentItem !== 'object' || currentItem === null) {
+            continue;
+        }
+
+        if (mergeMode === 'concat') {
+            if (currentItem[targetField] && typeof currentItem[targetField] === 'string') {
+                currentItem[targetField] = currentItem[targetField] + '\n\n' + markdownContent;
+            } else {
+                currentItem[targetField] = markdownContent;
+            }
+        } else {
+            currentItem[targetField] = markdownContent;
+        }
+        updated++;
+    }
+
+    fs.writeFileSync(currentFilePath, JSON.stringify(currentContent, null, 2), 'utf8');
+
+    return {
+        updated,
+        total: currentContent.length
+    };
+}

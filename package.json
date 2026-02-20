@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -61,6 +61,18 @@
       {
         "command": "ai-proofread.proofreadSelection",
         "title": "AI Proofreader: proofread selection"
+      },
+      {
+        "command": "ai-proofread.proofreadSelectionWithExamples",
+        "title": "AI Proofreader: proofread selection with examples"
+      },
+      {
+        "command": "ai-proofread.editProofreadingExamples",
+        "title": "AI Proofreader: edit Proofreading examples"
+      },
+      {
+        "command": "ai-proofread.splitIntoSentences",
+        "title": "AI Proofreader: split into sentences"
       },
       {
         "command": "ai-proofread.diffItWithAnotherFile",
@@ -704,7 +716,12 @@
       "editor/context": [
         {
           "command": "ai-proofread.proofreadSelection",
-          "group": "ai-proofread@11",
+          "group": "ai-proofread@11.0",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.proofreadSelectionWithExamples",
+          "group": "ai-proofread@11.1",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
@@ -716,6 +733,11 @@
           "command": "ai-proofread.citation.verifySelection",
           "group": "ai-proofread@12",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.splitIntoSentences",
+          "group": "ai-proofread@13",
+          "when": "editorTextFocus && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.convertQuotes",

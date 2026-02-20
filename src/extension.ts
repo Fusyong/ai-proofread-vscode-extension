@@ -10,6 +10,7 @@ import { WebviewManager } from './ui/webviewManager';
 import { FileSplitCommandHandler } from './commands/fileSplitCommandHandler';
 import { ProofreadCommandHandler } from './commands/proofreadCommandHandler';
 import { FileCompareCommandHandler } from './commands/fileCompareCommandHandler';
+import { ExamplesCommandHandler } from './commands/examplesCommandHandler';
 import { DocumentConvertCommandHandler } from './commands/documentConvertCommandHandler';
 import { UtilityCommandHandler } from './commands/utilityCommandHandler';
 import { CitationCommandHandler } from './commands/citationCommandHandler';
@@ -32,6 +33,7 @@ export function activate(context: vscode.ExtensionContext) {
     const fileSplitHandler = new FileSplitCommandHandler(webviewManager);
     const proofreadHandler = new ProofreadCommandHandler(webviewManager);
     const fileCompareHandler = new FileCompareCommandHandler(context);
+    const examplesHandler = new ExamplesCommandHandler(context);
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
@@ -151,6 +153,20 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await proofreadHandler.handleProofreadSelectionCommand(editor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.proofreadSelectionWithExamples', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await proofreadHandler.handleProofreadSelectionWithExamplesCommand(editor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.editProofreadingExamples', async () => {
+            await examplesHandler.handleEditProofreadingExamplesCommand();
+        }),
+        vscode.commands.registerCommand('ai-proofread.splitIntoSentences', async () => {
+            await examplesHandler.handleSplitIntoSentencesCommand();
         }),
 
         // 注册提示词管理命令（聚焦 TreeView）

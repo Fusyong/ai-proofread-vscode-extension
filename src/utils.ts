@@ -135,6 +135,19 @@ export class FilePathUtils {
     }
 
     /**
+     * 获取 .proofread/examples.md 路径
+     * @param anchorUri 锚点 URI（如当前文档或 diff 侧文档），用于确定工作区
+     * @returns examples.md 的完整路径。有工作区时用工作区根目录，无工作区时用文档所在目录
+     */
+    public static getExamplesPath(anchorUri: vscode.Uri): string {
+        const folder = vscode.workspace.getWorkspaceFolder(anchorUri);
+        const rootDir = folder
+            ? folder.uri.fsPath
+            : (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? path.dirname(anchorUri.fsPath));
+        return path.join(rootDir, '.proofread', 'examples.md');
+    }
+
+    /**
      * 如果文件已存在，将其备份为带时间戳的.bak文件
      * @param filePath 文件路径
      * @param deleteOriginal 是否在备份后删除原文件（默认 false）

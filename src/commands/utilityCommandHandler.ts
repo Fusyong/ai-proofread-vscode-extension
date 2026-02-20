@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { mergeTwoFiles } from '../merger';
+import { mergeTwoFiles, mergeMarkdownIntoJson } from '../merger';
 import { getJiebaWasm, type JiebaWasmModule } from '../jiebaLoader';
 import { searchSelectionInPDF } from '../pdfSearcher';
 import { convertQuotes } from '../quoteConverter';
@@ -28,18 +28,19 @@ export class UtilityCommandHandler {
         }
 
         try {
-            // 让用户选择来源文件
-            const sourceFile = await vscode.window.showOpenDialog({
-                canSelectFiles: true,
-                canSelectFolders: false,
-                canSelectMany: false,
-                filters: {
-                    'JSON files': ['json']
-                },
-                title: '选择来源JSON文件'
-            });
+            // 让用户选择来源类型
+            const sourceType = await vscode.window.showQuickPick(
+                [
+                    { label: 'JSON 文件', value: 'json', description: '一一对应合并，两个 JSON 数组长度需相同' },
+                    { label: 'Markdown 文件', value: 'markdown', description: '每个 JSON 项都合并同一文本' }
+                ],
+                {
+                    placeHolder: '选择来源类型',
+                    ignoreFocusOut: true
+                }
+            );
 
-            if (!sourceFile || sourceFile.length === 0) {
+            if (!sourceType) {
                 return;
             }
 
@@ -56,24 +57,11 @@ export class UtilityCommandHandler {
                 return;
             }
 
-            // 让用户选择来源文件中的字段
-            const sourceField = await vscode.window.showQuickPick(
-                ['target', 'reference', 'context'],
-                {
-                    placeHolder: '选择来源文件中的字段',
-                    ignoreFocusOut: true
-                }
-            );
-
-            if (!sourceField) {
-                return;
-            }
-
             // 让用户选择合并模式
             const mergeMode = await vscode.window.showQuickPick(
                 [
-                    { label: '拼接', value: 'concat', description: '将来源字段的内容追加到目标字段后面，中间加空行' },
-                    { label: '更新（覆盖）', value: 'update', description: '用来源字段的值覆盖目标字段' }
+                    { label: '拼接', value: 'concat', description: '将来源内容追加到目标字段后面，中间加空行' },
+                    { label: '更新（覆盖）', value: 'update', description: '用来源内容覆盖目标字段' }
                 ],
                 {
                     placeHolder: '选择合并模式',
@@ -101,14 +89,68 @@ export class UtilityCommandHandler {
                 return; // 用户取消
             }
 
-            // 执行合并
-            const result = await mergeTwoFiles(
-                document.uri.fsPath,
-                sourceFile[0].fsPath,
-                targetField as 'target' | 'reference' | 'context',
-                sourceField as 'target' | 'reference' | 'context',
-                mergeMode.value as 'update' | 'concat'
-            );
+            let result: { updated: number; total: number };
+
+            if (sourceType.value === 'json') {
+                // JSON 文件：让用户选择来源文件及来源字段
+                const sourceFile = await vscode.window.showOpenDialog({
+                    canSelectFiles: true,
+                    canSelectFolders: false,
+                    canSelectMany: false,
+                    filters: {
+                        'JSON files': ['json']
+                    },
+                    title: '选择来源 JSON 文件'
+                });
+
+                if (!sourceFile || sourceFile.length === 0) {
+                    return;
+                }
+
+                const sourceField = await vscode.window.showQuickPick(
+                    ['target', 'reference', 'context'],
+                    {
+                        placeHolder: '选择来源文件中的字段',
+                        ignoreFocusOut: true
+                    }
+                );
+
+                if (!sourceField) {
+                    return;
+                }
+
+                result = await mergeTwoFiles(
+                    document.uri.fsPath,
+                    sourceFile[0].fsPath,
+                    targetField as 'target' | 'reference' | 'context',
+                    sourceField as 'target' | 'reference' | 'context',
+                    mergeMode.value as 'update' | 'concat'
+                );
+            } else {
+                // Markdown 文件：每个 JSON 项都合并同一文本
+                const sourceFile = await vscode.window.showOpenDialog({
+                    canSelectFiles: true,
+                    canSelectFolders: false,
+                    canSelectMany: false,
+                    filters: {
+                        'Markdown files': ['md', 'markdown'],
+                        'Text files': ['txt'],
+                        'All files': ['*']
+                    },
+                    title: '选择 Markdown 文件'
+                });
+
+                if (!sourceFile || sourceFile.length === 0) {
+                    return;
+                }
+
+                result = await mergeMarkdownIntoJson(
+                    document.uri.fsPath,
+                    sourceFile[0].fsPath,
+                    targetField as 'target' | 'reference' | 'context',
+                    mergeMode.value as 'update' | 'concat'
+                );
+            }
 
             // 显示结果
             const modeText = mergeMode.value === 'update' ? '更新' : '拼接';
