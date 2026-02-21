@@ -58,7 +58,7 @@ async function openDiffView(
     preview: boolean = true,
     title: string = 'Original ↔ Processed'
 ): Promise<void> {
-    await vscode.commands.executeCommand('vscode.diff', originalUri, proofreadUri, title, { preview });
+    await vscode.commands.executeCommand('vscode.diff', originalUri, proofreadUri, title, { preview, viewColumn: vscode.ViewColumn.Beside });
 }
 
 /**

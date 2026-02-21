@@ -173,6 +173,96 @@ export class UtilityCommandHandler {
     }
 
     /**
+     * 按 JSON 文件路径执行合并（供 Proofreading panel 调用）
+     */
+    public async handleMergeTwoFilesByPath(jsonFilePath: string): Promise<void> {
+        try {
+            const sourceType = await vscode.window.showQuickPick(
+                [
+                    { label: 'JSON 文件', value: 'json', description: '一一对应合并，两个 JSON 数组长度需相同' },
+                    { label: 'Markdown 文件', value: 'markdown', description: '每个 JSON 项都合并同一文本' }
+                ],
+                { placeHolder: '选择来源类型', ignoreFocusOut: true }
+            );
+            if (!sourceType) return;
+
+            const targetField = await vscode.window.showQuickPick(
+                ['target', 'reference', 'context'],
+                { placeHolder: '选择要更新的字段', ignoreFocusOut: true }
+            );
+            if (!targetField) return;
+
+            const mergeMode = await vscode.window.showQuickPick(
+                [
+                    { label: '拼接', value: 'concat', description: '将来源内容追加到目标字段后面，中间加空行' },
+                    { label: '更新（覆盖）', value: 'update', description: '用来源内容覆盖目标字段' }
+                ],
+                { placeHolder: '选择合并模式', ignoreFocusOut: true }
+            );
+            if (!mergeMode) return;
+
+            const updateMarkdown = await vscode.window.showQuickPick(
+                [
+                    { label: '是', value: true, description: '更新对应的Markdown文件' },
+                    { label: '否', value: false, description: '不更新Markdown文件' }
+                ],
+                { placeHolder: '是否更新对应的Markdown文件？', ignoreFocusOut: true }
+            );
+            if (updateMarkdown === undefined) return;
+
+            let result: { updated: number; total: number };
+
+            if (sourceType.value === 'json') {
+                const sourceFile = await vscode.window.showOpenDialog({
+                    canSelectFiles: true, canSelectFolders: false, canSelectMany: false,
+                    filters: { 'JSON files': ['json'] },
+                    title: '选择来源 JSON 文件'
+                });
+                if (!sourceFile?.length) return;
+
+                const sourceField = await vscode.window.showQuickPick(
+                    ['target', 'reference', 'context'],
+                    { placeHolder: '选择来源文件中的字段', ignoreFocusOut: true }
+                );
+                if (!sourceField) return;
+
+                result = await mergeTwoFiles(
+                    jsonFilePath, sourceFile[0].fsPath,
+                    targetField as 'target' | 'reference' | 'context',
+                    sourceField as 'target' | 'reference' | 'context',
+                    mergeMode.value as 'update' | 'concat'
+                );
+            } else {
+                const sourceFile = await vscode.window.showOpenDialog({
+                    canSelectFiles: true, canSelectFolders: false, canSelectMany: false,
+                    filters: { 'Markdown files': ['md', 'markdown'], 'Text files': ['txt'], 'All files': ['*'] },
+                    title: '选择 Markdown 文件'
+                });
+                if (!sourceFile?.length) return;
+
+                result = await mergeMarkdownIntoJson(
+                    jsonFilePath, sourceFile[0].fsPath,
+                    targetField as 'target' | 'reference' | 'context',
+                    mergeMode.value as 'update' | 'concat'
+                );
+            }
+
+            let message = `合并完成！${mergeMode.value === 'update' ? '更新' : '拼接'}了 ${result.updated}/${result.total} 项`;
+            if (updateMarkdown.value) {
+                try {
+                    await this.updateMarkdownFileFromJson(jsonFilePath, targetField as 'target' | 'reference' | 'context');
+                    message += '，已更新对应的Markdown文件';
+                } catch (error) {
+                    ErrorUtils.showError(error, '更新Markdown文件时出错：');
+                }
+            }
+            vscode.window.showInformationMessage(message);
+        } catch (error) {
+            ErrorUtils.showError(error, '合并文件时出错：');
+        }
+    }
+
+    /**
      * 从JSON文件更新对应的Markdown文件
      * @param jsonFilePath JSON文件路径
      * @param fieldName 要使用的字段名（target、reference或context）

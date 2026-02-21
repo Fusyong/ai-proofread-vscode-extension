@@ -31,7 +31,8 @@
 | AI Proofreader: proofread file | 批量校对当前打开的 JSON 文件 |
 | **比较与结果** | |
 | AI Proofreader: diff it with another file | 比较两个文件差异（内置 diff / 生成 HTML 差异 / 生成勘误表） |
-| AI Proofreader: reopen result panel | 重新打开切分/校对结果面板 |
+| AI Proofreader: open proofreading panel | 打开校对面板（支持空面板，可选择主文件） |
+| AI Proofreader: reopen result panel | 同上（兼容旧命令） |
 | **提示词** | |
 | AI Proofreader: set prompts | 管理提示词：增、删、改（无图形界面，粘贴编辑） |
 | AI Proofreader: select prompt | 选择当前使用的提示词 |

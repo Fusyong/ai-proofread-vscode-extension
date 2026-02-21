@@ -119,6 +119,10 @@
         "title": "AI Proofreader: split file"
       },
       {
+        "command": "ai-proofread.openProofreadingPanel",
+        "title": "AI Proofreader: open proofreading panel"
+      },
+      {
         "command": "ai-proofread.reopenResultPanel",
         "title": "AI Proofreader: reopen result panel"
       },

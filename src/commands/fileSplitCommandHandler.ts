@@ -3,8 +3,9 @@
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { handleFileSplit } from '../splitter';
-import { ErrorUtils } from '../utils';
+import { ErrorUtils, FilePathUtils } from '../utils';
 import { WebviewManager, ProcessResult } from '../ui/webviewManager';
 
 export class FileSplitCommandHandler {
@@ -12,6 +13,76 @@ export class FileSplitCommandHandler {
 
     constructor(webviewManager: WebviewManager) {
         this.webviewManager = webviewManager;
+    }
+
+    /**
+     * 按主文件路径切分（供 Proofreading panel 调用）
+     */
+    public async handleFileSplitByPath(
+        mainFilePath: string,
+        context: vscode.ExtensionContext
+    ): Promise<void> {
+        const jsonPath = FilePathUtils.getFilePath(mainFilePath, '', '.json');
+        if (fs.existsSync(jsonPath)) {
+            const confirm = await vscode.window.showWarningMessage(
+                '重新切分将覆盖现有切分结果（.json、.json.md、.log 等），是否继续？',
+                { modal: true },
+                '继续',
+                '取消'
+            );
+            if (confirm !== '继续') return;
+        }
+
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const mode = await vscode.window.showQuickPick([
+            { label: '按长度切分', value: 'length' },
+            { label: '按标题切分', value: 'title' },
+            { label: '按标题和长度切分', value: 'title-length' },
+            { label: '按长度切分，以标题范围为上下文', value: 'titleContext' },
+            { label: '按长度切分，以前后段落为上下文', value: 'paragraphContext' },
+        ], { placeHolder: '请选择切分模式', canPickMany: false });
+        if (!mode) return;
+
+        let options: any = { mode: mode.value };
+        if (mode.value === 'length') {
+            options = await this.handleLengthMode(config, options);
+        } else if (mode.value === 'title' || mode.value === 'title-length' || mode.value === 'titleContext') {
+            options = await this.handleTitleMode(config, mode.value, options);
+        } else if (mode.value === 'paragraphContext') {
+            options = await this.handleParagraphContextMode(config, options);
+        }
+        if (!options) return;
+
+        try {
+            const result = await handleFileSplit(mainFilePath, options);
+            const processResult: ProcessResult = {
+                title: 'Proofreading panel',
+                message: '文件已成功切分！',
+                splitResult: {
+                    jsonFilePath: result.jsonFilePath,
+                    markdownFilePath: result.markdownFilePath,
+                    logFilePath: result.logFilePath,
+                    originalFilePath: mainFilePath,
+                    stats: result.stats
+                },
+                mainFilePath,
+                actions: { showJson: true, showLog: true, showDiff: true }
+            };
+            if (this.webviewManager.isCurrentPanelValid()) {
+                this.webviewManager.updatePanelContent(processResult);
+                this.webviewManager.getCurrentPanel()?.reveal();
+            } else {
+                const panel = this.webviewManager.createWebviewPanel(processResult, context);
+                panel.webview.onDidReceiveMessage(
+                    (message) => this.webviewManager.handleWebviewMessage(message, panel, context),
+                    undefined,
+                    context.subscriptions
+                );
+                panel.reveal();
+            }
+        } catch (error) {
+            ErrorUtils.showError(error, '切分文件时出错：');
+        }
     }
 
     /**
@@ -52,7 +123,7 @@ export class FileSplitCommandHandler {
 
             // 创建或更新智能面板
             const processResult: ProcessResult = {
-                title: 'AI Proofreader Result Panel',
+                title: 'Proofreading panel',
                 message: '文件已成功切分！',
                 splitResult: {
                     jsonFilePath: result.jsonFilePath,
@@ -75,7 +146,7 @@ export class FileSplitCommandHandler {
                 this.webviewManager.getCurrentPanel()?.reveal();
             } else {
                 // 如果没有面板或面板已被dispose，创建新面板
-                const panel = this.webviewManager.createWebviewPanel(processResult);
+                const panel = this.webviewManager.createWebviewPanel(processResult, context);
                 
                 // 监听Webview消息
                 panel.webview.onDidReceiveMessage(

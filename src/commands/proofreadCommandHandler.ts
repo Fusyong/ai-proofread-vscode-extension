@@ -126,11 +126,24 @@ export class ProofreadCommandHandler {
                         progress.report({ message: info });
                     },
                     onProgressUpdate: (progressTracker) => {
-                        // 更新进度条显示
+                        // 更新进度条显示（始终保留切分结果板块）
+                        const existingSplitResult = this.webviewManager.getCurrentProcessResult()?.splitResult;
+                        const splitResult =
+                            existingSplitResult ??
+                            (() => {
+                                const dir = path.dirname(jsonFilePath);
+                                const base = path.basename(jsonFilePath, '.json');
+                                return {
+                                    jsonFilePath,
+                                    markdownFilePath: path.join(dir, `${base}.json.md`),
+                                    logFilePath: path.join(dir, `${base}.log`),
+                                    originalFilePath: originalMarkdownFilePath
+                                };
+                            })();
                         const processResult: ProcessResult = {
-                            title: 'AI Proofreader Result Panel',
+                            title: 'Proofreading panel',
                             message: '正在校对文件...',
-                            splitResult: this.webviewManager.getCurrentProcessResult()?.splitResult,
+                            splitResult,
                             progressTracker: progressTracker,
                             actions: {
                                 showJson: false,
@@ -142,7 +155,7 @@ export class ProofreadCommandHandler {
                         if (this.webviewManager.getCurrentPanel()) {
                             this.webviewManager.updatePanelContent(processResult);
                         } else {
-                            const panel = this.webviewManager.createWebviewPanel(processResult);
+                            const panel = this.webviewManager.createWebviewPanel(processResult, context);
                             panel.webview.onDidReceiveMessage(
                                 (message) => this.webviewManager.handleWebviewMessage(message, panel, context),
                                 undefined,
@@ -184,11 +197,29 @@ export class ProofreadCommandHandler {
                 logMessage += `${'='.repeat(50)}\n\n`;
                 fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
-                // 更新面板显示校对结果
+                // 更新面板显示校对结果（始终保留切分结果板块）
+                const existingSplitResult = this.webviewManager.getCurrentProcessResult()?.splitResult;
+                const splitResult =
+                    existingSplitResult ??
+                    (() => {
+                        // 从 proofread 路径反推切分结果路径，确保切分板块始终可展示
+                        const dir = path.dirname(outputFilePath);
+                        const base = path.basename(outputFilePath, '.proofread.json');
+                        return {
+                            jsonFilePath: path.join(dir, `${base}.json`),
+                            markdownFilePath: path.join(dir, `${base}.json.md`),
+                            logFilePath: path.join(dir, `${base}.log`),
+                            originalFilePath: originalMarkdownFilePath
+                        };
+                    })();
+                const relPath =
+                    vscode.workspace.workspaceFolders?.[0] && originalMarkdownFilePath.startsWith(vscode.workspace.workspaceFolders[0].uri.fsPath)
+                        ? path.relative(vscode.workspace.workspaceFolders[0].uri.fsPath, originalMarkdownFilePath)
+                        : originalMarkdownFilePath;
                 const processResult: ProcessResult = {
-                    title: 'AI Proofreader Result Panel',
-                    message: '文件切分和校对都已完成！',
-                    splitResult: this.webviewManager.getCurrentProcessResult()?.splitResult, // 保留切分结果
+                    title: 'Proofreading panel',
+                    message: `校对项目：${relPath}`,
+                    splitResult,
                     proofreadResult: {
                         outputFilePath: outputFilePath,
                         logFilePath: logFilePath,
@@ -216,7 +247,7 @@ export class ProofreadCommandHandler {
                     this.webviewManager.getCurrentPanel()?.reveal();
                 } else {
                     // 如果没有面板，创建新面板
-                    const panel = this.webviewManager.createWebviewPanel(processResult);
+                    const panel = this.webviewManager.createWebviewPanel(processResult, context);
 
                     // 监听Webview消息
                     panel.webview.onDidReceiveMessage(

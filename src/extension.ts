@@ -54,9 +54,15 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', false);
 
-    // 设置校对JSON文件的回调
-    webviewManager.setProofreadJsonCallback((jsonFilePath: string, context: vscode.ExtensionContext) => {
-        return proofreadHandler.handleProofreadJsonFile(jsonFilePath, context);
+    // 设置校对、切分、合并的回调
+    webviewManager.setProofreadJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
+        return proofreadHandler.handleProofreadJsonFile(jsonFilePath, ctx);
+    });
+    webviewManager.setSplitCallback((mainFilePath: string, ctx: vscode.ExtensionContext) => {
+        return fileSplitHandler.handleFileSplitByPath(mainFilePath, ctx);
+    });
+    webviewManager.setMergeCallback((jsonFilePath: string) => {
+        return utilityHandler.handleMergeTwoFilesByPath(jsonFilePath);
     });
 
     // 注册所有命令
@@ -286,9 +292,13 @@ export function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleSegmentSelectionCommand(editor, context);
         }),
 
-        // 注册重新打开结果面板命令
+        // 打开校对面板（支持空面板）
+        vscode.commands.registerCommand('ai-proofread.openProofreadingPanel', () => {
+            webviewManager.openProofreadingPanel(context);
+        }),
+        // 兼容旧命令
         vscode.commands.registerCommand('ai-proofread.reopenResultPanel', () => {
-            webviewManager.reopenResultPanel(context);
+            webviewManager.openProofreadingPanel(context);
         }),
 
         // 引文核对

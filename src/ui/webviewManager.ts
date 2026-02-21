@@ -14,6 +14,16 @@ import { generateHtmlReport } from '../alignmentReportGenerator';
 import { getJiebaWasm } from '../jiebaLoader';
 
 // 接口定义
+/** 配套文档检测结果 */
+export interface CompanionFiles {
+    json: string;
+    jsonMd: string;
+    log: string;
+    proofreadJson: string;
+    proofreadJsonMd: string;
+    proofreadLog: string;
+}
+
 export interface SplitResult {
     jsonFilePath: string;
     markdownFilePath: string;
@@ -42,6 +52,8 @@ export interface ProofreadResult {
 export interface ProcessResult {
     title: string;
     message: string;
+    mainFilePath?: string;
+    companionFiles?: Partial<CompanionFiles>;
     splitResult?: SplitResult;
     proofreadResult?: ProofreadResult;
     progressTracker?: ProgressTracker;
@@ -52,10 +64,55 @@ export interface ProcessResult {
     };
 }
 
+/** 检测主文件的配套文档 */
+export function detectCompanionFiles(mainFilePath: string): Partial<CompanionFiles> {
+    const dir = path.dirname(mainFilePath);
+    const base = path.basename(mainFilePath, path.extname(mainFilePath));
+    const result: Partial<CompanionFiles> = {};
+    const candidates: (keyof CompanionFiles)[] = ['json', 'jsonMd', 'log', 'proofreadJson', 'proofreadJsonMd', 'proofreadLog'];
+    const paths: Record<keyof CompanionFiles, string> = {
+        json: path.join(dir, `${base}.json`),
+        jsonMd: path.join(dir, `${base}.json.md`),
+        log: path.join(dir, `${base}.log`),
+        proofreadJson: path.join(dir, `${base}.proofread.json`),
+        proofreadJsonMd: path.join(dir, `${base}.proofread.json.md`),
+        proofreadLog: path.join(dir, `${base}.proofread.log`)
+    };
+    for (const key of candidates) {
+        if (fs.existsSync(paths[key])) {
+            (result as any)[key] = paths[key];
+        }
+    }
+    return result;
+}
+
+/** 从 JSON 文件读取条目数 */
+function getJsonArrayLength(filePath: string): number | undefined {
+    try {
+        const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        return Array.isArray(content) ? content.length : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/** 从 proofread.json 读取 null 条目数（未完成校对） */
+function getProofreadNullCount(filePath: string): number | undefined {
+    try {
+        const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        if (!Array.isArray(content)) return undefined;
+        return content.filter((item: unknown) => item === null).length;
+    } catch {
+        return undefined;
+    }
+}
+
 export class WebviewManager {
     private static instance: WebviewManager;
     private currentPanel: vscode.WebviewPanel | undefined;
     private currentProcessResult: ProcessResult | undefined;
+    private mainFilePath: string | undefined;
+    private extensionContext: vscode.ExtensionContext | undefined;
 
     private constructor() {}
 
@@ -86,7 +143,8 @@ export class WebviewManager {
     /**
      * 创建 Webview 面板
      */
-    public createWebviewPanel(result: ProcessResult): vscode.WebviewPanel {
+    public createWebviewPanel(result: ProcessResult, context?: vscode.ExtensionContext): vscode.WebviewPanel {
+        if (context) this.extensionContext = context;
         // 如果已有面板且未被dispose，先关闭它
         if (this.currentPanel) {
             this.currentPanel.dispose();
@@ -94,7 +152,7 @@ export class WebviewManager {
 
         const panel = vscode.window.createWebviewPanel(
             'processResult',
-            result.title,
+            result.title === 'AI Proofreader Result Panel' ? 'Proofreading panel' : result.title,
             vscode.ViewColumn.Beside,
             {
                 enableScripts: true,
@@ -114,16 +172,7 @@ export class WebviewManager {
         this.currentPanel = panel;
         this.currentProcessResult = result;
 
-        // 生成切分结果HTML
-        const splitHtml = result.splitResult ? this.generateSplitResultHtml(result.splitResult) : '';
-
-        // 生成校对结果HTML
-        const proofreadHtml = result.proofreadResult ? this.generateProofreadResultHtml(result.proofreadResult) : '';
-
-        // 生成进度条HTML
-        const progressHtml = result.progressTracker ? result.progressTracker.generateProgressBarHtml() : '';
-
-        panel.webview.html = this.generateWebviewHtml(result, splitHtml, proofreadHtml, progressHtml);
+        panel.webview.html = this.generateFullHtml(result, context);
 
         return panel;
     }
@@ -132,48 +181,111 @@ export class WebviewManager {
      * 更新面板内容
      */
     public updatePanelContent(result: ProcessResult): void {
-        if (this.currentPanel && this.currentProcessResult) {
+        if (this.currentPanel) {
             try {
-                // 检查Webview是否已被dispose
-                if (!this.currentPanel) {
-                    console.warn('Webview已被dispose，无法更新内容');
-                    return;
-                }
-
-                // 更新当前结果
                 this.currentProcessResult = result;
-
-                // 重新生成HTML内容
-                const splitHtml = result.splitResult ? this.generateSplitResultHtml(result.splitResult) : '';
-                const proofreadHtml = result.proofreadResult ? this.generateProofreadResultHtml(result.proofreadResult) : '';
-                const progressHtml = result.progressTracker ? result.progressTracker.generateProgressBarHtml() : '';
-
-                // 更新面板HTML
-                this.currentPanel.webview.html = this.generateWebviewHtml(result, splitHtml, proofreadHtml, progressHtml);
+                this.currentPanel.webview.html = this.generateFullHtml(result, this.extensionContext);
             } catch (error) {
                 console.error('更新Webview内容时出错:', error);
-                // 如果更新失败，尝试重新创建面板
-                this.createWebviewPanel(result);
+                this.createWebviewPanel(result, this.extensionContext);
             }
         }
     }
 
     /**
-     * 重新打开结果面板
+     * 打开校对面板（支持空面板）
      */
-    public reopenResultPanel(context: vscode.ExtensionContext): void {
-        if (this.currentProcessResult) {
-            const panel = this.createWebviewPanel(this.currentProcessResult);
-
-            // 监听Webview消息
-            panel.webview.onDidReceiveMessage(
-                (message) => this.handleWebviewMessage(message, panel, context),
-                undefined,
-                context.subscriptions
-            );
-        } else {
-            vscode.window.showInformationMessage('没有可显示的处理结果');
+    public openProofreadingPanel(context: vscode.ExtensionContext): void {
+        this.extensionContext = context;
+        if (this.currentPanel) {
+            this.currentPanel.reveal();
+            this.refreshPanelContent(context);
+            return;
         }
+        // 无处理结果时，尝试恢复上次选择的主文件
+        if (!this.currentProcessResult && !this.mainFilePath) {
+            const last = context.workspaceState.get<string>('aiProofread.lastMainFile');
+            if (last && fs.existsSync(last)) {
+                this.mainFilePath = last;
+            }
+        }
+        const result = this.currentProcessResult ?? this.buildEmptyOrMainFileResult();
+        const panel = this.createOrRevealPanel(result, context);
+        panel.webview.onDidReceiveMessage(
+            (message) => this.handleWebviewMessage(message, panel, context),
+            undefined,
+            context.subscriptions
+        );
+    }
+
+    /** 兼容旧命令 */
+    public reopenResultPanel(context: vscode.ExtensionContext): void {
+        this.openProofreadingPanel(context);
+    }
+
+    /** 构建空状态或仅主文件状态的结果 */
+    private buildEmptyOrMainFileResult(): ProcessResult {
+        const hasMain = !!this.mainFilePath;
+        const companions = this.mainFilePath ? detectCompanionFiles(this.mainFilePath) : undefined;
+        return {
+            title: 'Proofreading panel',
+            message: hasMain
+                ? `校对项目：${this.getRelativePath(this.mainFilePath!)}`
+                : '选择要校对的主文件，或等待切分/校对完成后查看结果。',
+            mainFilePath: this.mainFilePath,
+            companionFiles: companions,
+            actions: {}
+        };
+    }
+
+    /** 创建或显示面板 */
+    private createOrRevealPanel(result: ProcessResult, context: vscode.ExtensionContext): vscode.WebviewPanel {
+        if (this.currentPanel) {
+            this.currentPanel.reveal();
+            this.currentPanel.webview.html = this.generateFullHtml(result, context);
+            return this.currentPanel;
+        }
+        return this.createWebviewPanel(result, context);
+    }
+
+    /** 刷新面板内容（根据当前状态） */
+    public refreshPanelContent(context: vscode.ExtensionContext): void {
+        if (!this.currentPanel) return;
+        const result = this.currentProcessResult ?? this.buildEmptyOrMainFileResult();
+        // 使用 buildEmptyOrMainFileResult 时需同步到 currentProcessResult，否则按钮无法获取 companionFiles 等路径
+        if (!this.currentProcessResult) {
+            this.currentProcessResult = result;
+        }
+        this.currentPanel.webview.html = this.generateFullHtml(result, context);
+    }
+
+    /** 设置主文件并刷新 */
+    public setMainFile(mainFilePath: string, context: vscode.ExtensionContext): void {
+        this.mainFilePath = mainFilePath;
+        this.refreshPanelContent(context);
+    }
+
+    /** 从当前状态获取路径（支持 splitResult 或 companionFiles） */
+    private getSplitJsonPath(): string | undefined {
+        return this.currentProcessResult?.splitResult?.jsonFilePath ?? (this.currentProcessResult?.companionFiles as any)?.json;
+    }
+    private getSplitLogPath(): string | undefined {
+        return this.currentProcessResult?.splitResult?.logFilePath ?? (this.currentProcessResult?.companionFiles as any)?.log;
+    }
+    private getSplitMarkdownPath(): string | undefined {
+        return this.currentProcessResult?.splitResult?.markdownFilePath ?? (this.currentProcessResult?.companionFiles as any)?.jsonMd;
+    }
+    private getMainFilePath(): string | undefined {
+        return this.currentProcessResult?.splitResult?.originalFilePath ?? this.currentProcessResult?.mainFilePath;
+    }
+    private getProofreadJsonPath(): string | undefined {
+        return this.currentProcessResult?.proofreadResult?.outputFilePath ?? (this.currentProcessResult?.companionFiles as any)?.proofreadJson;
+    }
+    private getProofreadLogPath(): string | undefined {
+        return this.currentProcessResult?.proofreadResult?.logFilePath ?? (this.currentProcessResult?.companionFiles as any)?.proofreadLog;
+    }
+    private getProofreadMarkdownPath(): string | undefined {
+        return this.currentProcessResult?.proofreadResult?.markdownFilePath ?? (this.currentProcessResult?.companionFiles as any)?.proofreadJsonMd;
     }
 
     /**
@@ -184,20 +296,129 @@ export class WebviewManager {
 
         try {
             switch (command) {
-                case 'showSplitJson':
-                    const splitJsonPath = this.currentProcessResult?.splitResult?.jsonFilePath;
-                    if (splitJsonPath) {
-                        const outputUri = vscode.Uri.file(splitJsonPath);
-                        await vscode.workspace.openTextDocument(outputUri);
-                        await vscode.window.showTextDocument(outputUri);
+                case 'selectMainFile': {
+                    const uris = await vscode.window.showOpenDialog({
+                        canSelectFiles: true,
+                        canSelectFolders: false,
+                        canSelectMany: false,
+                        filters: { 'Markdown/Text': ['md', 'markdown', 'txt'], 'TeX': ['tex', 'latex', 'context'], 'All': ['*'] },
+                        title: '选择要校对的主文件'
+                    });
+                    if (uris?.length) {
+                        this.currentProcessResult = undefined; // 切换主文件时清除当前结果
+                        this.setMainFile(uris[0].fsPath, context);
+                        context.workspaceState.update('aiProofread.lastMainFile', uris[0].fsPath);
                     }
                     break;
-                case 'showSplitLog':
-                    const splitLogPath = this.currentProcessResult?.splitResult?.logFilePath;
+                }
+                case 'selectMainFileFromWorkspace': {
+                    const folders = vscode.workspace.workspaceFolders;
+                    if (!folders?.length) {
+                        vscode.window.showWarningMessage('请先打开工作区');
+                        break;
+                    }
+                    const files = await vscode.workspace.findFiles('**/*.{md,markdown,txt}', '**/node_modules/**');
+                    if (files.length === 0) {
+                        vscode.window.showInformationMessage('工作区中未找到 .md / .txt 文件');
+                        break;
+                    }
+                    const items = files.map(uri => ({
+                        label: path.relative(folders[0].uri.fsPath, uri.fsPath),
+                        description: uri.fsPath,
+                        uri
+                    }));
+                    const picked = await vscode.window.showQuickPick(items, {
+                        placeHolder: '选择要校对的主文件',
+                        matchOnDescription: true
+                    });
+                    if (picked) {
+                        this.currentProcessResult = undefined; // 切换主文件时清除当前结果
+                        this.setMainFile(picked.uri.fsPath, context);
+                        context.workspaceState.update('aiProofread.lastMainFile', picked.uri.fsPath);
+                    }
+                    break;
+                }
+                case 'formatParagraphs':
+                case 'markTitlesFromToc': {
+                    // 头部按钮：使用当前编辑窗口文件
+                    await vscode.commands.executeCommand(
+                        command === 'formatParagraphs' ? 'ai-proofread.formatParagraphs' : 'ai-proofread.markTitlesFromToc'
+                    );
+                    break;
+                }
+                case 'formatParagraphsUseMainFile':
+                case 'markTitlesFromTocUseMainFile': {
+                    // 主文件板块：使用主文件
+                    const mainPath = this.mainFilePath ?? this.getMainFilePath();
+                    if (!mainPath) {
+                        vscode.window.showWarningMessage('请先选择主文件');
+                        break;
+                    }
+                    const doc = await vscode.workspace.openTextDocument(mainPath);
+                    await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+                    await vscode.commands.executeCommand(
+                        command === 'formatParagraphsUseMainFile' ? 'ai-proofread.formatParagraphs' : 'ai-proofread.markTitlesFromToc'
+                    );
+                    break;
+                }
+                case 'proofreadSelection':
+                case 'proofreadSelectionWithExamples': {
+                    // 头部按钮：使用当前编辑窗口文件
+                    await vscode.commands.executeCommand(
+                        command === 'proofreadSelection' ? 'ai-proofread.proofreadSelection' : 'ai-proofread.proofreadSelectionWithExamples'
+                    );
+                    break;
+                }
+                case 'convertDocxToMarkdown':
+                    await vscode.commands.executeCommand('ai-proofread.convertDocxToMarkdown');
+                    break;
+                case 'convertPdfToMarkdown':
+                    await vscode.commands.executeCommand('ai-proofread.convertPdfToMarkdown');
+                    break;
+                case 'managePrompts':
+                    await vscode.commands.executeCommand('ai-proofread.managePrompts');
+                    break;
+                case 'openSettings':
+                    await vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread');
+                    break;
+                case 'splitDocument':
+                case 'resplitDocument': {
+                    const mainPath = this.mainFilePath ?? this.getMainFilePath();
+                    if (!mainPath) {
+                        vscode.window.showWarningMessage('请先选择主文件');
+                        break;
+                    }
+                    if ((this as any).splitCallback) {
+                        await (this as any).splitCallback(mainPath, context);
+                    } else {
+                        vscode.window.showWarningMessage('切分功能未就绪');
+                    }
+                    break;
+                }
+                case 'mergeContext': {
+                    const jsonPath = this.getSplitJsonPath();
+                    if (jsonPath && (this as any).mergeCallback) {
+                        await (this as any).mergeCallback(jsonPath, context);
+                    } else {
+                        vscode.window.showWarningMessage('请先完成切分，或合并功能未就绪');
+                    }
+                    break;
+                }
+                case 'showSplitJson': {
+                    const splitJsonPath = this.getSplitJsonPath();
+                    if (splitJsonPath) {
+                        const outputUri = vscode.Uri.file(splitJsonPath);
+                        const splitDoc = await vscode.workspace.openTextDocument(outputUri);
+                        await vscode.window.showTextDocument(splitDoc, { viewColumn: vscode.ViewColumn.Beside });
+                    }
+                    break;
+                }
+                case 'showSplitLog': {
+                    const splitLogPath = this.getSplitLogPath();
                     if (splitLogPath) {
                         const logUri = vscode.Uri.file(splitLogPath);
                         const document = await vscode.workspace.openTextDocument(logUri);
-                        const editor = await vscode.window.showTextDocument(document);
+                        const editor = await vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.Beside });
 
                         // 滚动到文件末端
                         const lastLine = document.lineCount - 1;
@@ -207,15 +428,17 @@ export class WebviewManager {
                         editor.revealRange(new vscode.Range(endPosition, endPosition), vscode.TextEditorRevealType.InCenter);
                     }
                     break;
-                case 'showSplitDiff':
-                    const splitOriginalPath = this.currentProcessResult?.splitResult?.originalFilePath;
-                    const splitMarkdownPath = this.currentProcessResult?.splitResult?.markdownFilePath;
+                }
+                case 'showSplitDiff': {
+                    const splitOriginalPath = this.getMainFilePath();
+                    const splitMarkdownPath = this.getSplitMarkdownPath();
                     if (splitOriginalPath && splitMarkdownPath) {
                         await showFileDiff(splitOriginalPath, splitMarkdownPath);
                     }
                     break;
-                case 'proofreadJson':
-                    const jsonPath = this.currentProcessResult?.splitResult?.jsonFilePath;
+                }
+                case 'proofreadJson': {
+                    const jsonPath = this.getSplitJsonPath();
                     if (jsonPath) {
                         // 直接调用校对JSON文件的回调函数
                         if ((this as any).proofreadJsonCallback) {
@@ -223,20 +446,22 @@ export class WebviewManager {
                         }
                     }
                     break;
-                case 'showProofreadJson':
-                    const proofreadJsonPath = this.currentProcessResult?.proofreadResult?.outputFilePath;
+                }
+                case 'showProofreadJson': {
+                    const proofreadJsonPath = this.getProofreadJsonPath();
                     if (proofreadJsonPath) {
                         const outputUri = vscode.Uri.file(proofreadJsonPath);
-                        await vscode.workspace.openTextDocument(outputUri);
-                        await vscode.window.showTextDocument(outputUri);
+                        const proofreadDoc = await vscode.workspace.openTextDocument(outputUri);
+                        await vscode.window.showTextDocument(proofreadDoc, { viewColumn: vscode.ViewColumn.Beside });
                     }
                     break;
-                case 'showProofreadLog':
-                    const proofreadLogPath = this.currentProcessResult?.proofreadResult?.logFilePath;
+                }
+                case 'showProofreadLog': {
+                    const proofreadLogPath = this.getProofreadLogPath();
                     if (proofreadLogPath) {
                         const logUri = vscode.Uri.file(proofreadLogPath);
                         const document = await vscode.workspace.openTextDocument(logUri);
-                        const editor = await vscode.window.showTextDocument(document);
+                        const editor = await vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.Beside });
 
                         // 滚动到文件末端
                         const lastLine = document.lineCount - 1;
@@ -246,17 +471,18 @@ export class WebviewManager {
                         editor.revealRange(new vscode.Range(endPosition, endPosition), vscode.TextEditorRevealType.InCenter);
                     }
                     break;
-                case 'showProofreadDiff':
-                    const proofreadOriginalPath = this.currentProcessResult?.proofreadResult?.originalFilePath;
-                    const proofreadMarkdownPath = this.currentProcessResult?.proofreadResult?.markdownFilePath;
+                }
+                case 'showProofreadDiff': {
+                    const proofreadOriginalPath = this.getMainFilePath();
+                    const proofreadMarkdownPath = this.getProofreadMarkdownPath();
                     if (proofreadOriginalPath && proofreadMarkdownPath) {
                         await showFileDiff(proofreadOriginalPath, proofreadMarkdownPath);
                     }
                     break;
-                case 'generateDiff':
-                    // 直接生成JSON文件的差异文件
-                    const originalJsonPath = this.currentProcessResult?.splitResult?.jsonFilePath;
-                    const proofreadJsonFilePath = this.currentProcessResult?.proofreadResult?.outputFilePath;
+                }
+                case 'generateDiff': {
+                    const originalJsonPath = this.getSplitJsonPath();
+                    const proofreadJsonFilePath = this.getProofreadJsonPath();
 
                     if (originalJsonPath && proofreadJsonFilePath) {
                         try {
@@ -296,16 +522,58 @@ export class WebviewManager {
                         vscode.window.showErrorMessage('无法找到原始JSON文件或校对后的JSON文件！');
                     }
                     break;
-                case 'generateAlignment':
-                    // 生成句子对齐勘误表
-                    const alignmentOriginalPath = this.currentProcessResult?.proofreadResult?.originalFilePath;
-                    const alignmentMarkdownPath = this.currentProcessResult?.proofreadResult?.markdownFilePath;
+                }
+                case 'generateAlignment': {
+                    const alignmentOriginalPath = this.getMainFilePath();
+                    const alignmentMarkdownPath = this.getProofreadMarkdownPath();
 
                     if (alignmentOriginalPath && alignmentMarkdownPath) {
                         await this.handleSentenceAlignment(alignmentOriginalPath, alignmentMarkdownPath, context);
                     } else {
                         vscode.window.showErrorMessage('无法找到原始文件或校对后的Markdown文件！');
                     }
+                    break;
+                }
+                case 'convertMarkdownToDocx': {
+                    // 头部按钮：使用当前编辑窗口文件
+                    await vscode.commands.executeCommand('ai-proofread.convertMarkdownToDocx');
+                    break;
+                }
+                case 'convertQuotes': {
+                    // 头部按钮：使用当前编辑窗口文件
+                    await vscode.commands.executeCommand('ai-proofread.convertQuotes');
+                    break;
+                }
+                case 'citationOpenView':
+                    await vscode.commands.executeCommand('ai-proofread.citation.openView');
+                    break;
+                case 'checkWords': {
+                    // 头部按钮：使用当前编辑窗口文件
+                    await vscode.commands.executeCommand('ai-proofread.checkWords');
+                    break;
+                }
+                case 'splitIntoSentences':
+                case 'segmentFile':
+                case 'diffItWithAnotherFile':
+                case 'searchSelectionInPDF': {
+                    // 头部按钮：使用当前编辑窗口文件
+                    const cmdMap: Record<string, string> = {
+                        splitIntoSentences: 'ai-proofread.splitIntoSentences',
+                        segmentFile: 'ai-proofread.segmentFile',
+                        diffItWithAnotherFile: 'ai-proofread.diffItWithAnotherFile',
+                        searchSelectionInPDF: 'ai-proofread.searchSelectionInPDF'
+                    };
+                    await vscode.commands.executeCommand(cmdMap[command]);
+                    break;
+                }
+                case 'editProofreadingExamples':
+                    await vscode.commands.executeCommand('ai-proofread.editProofreadingExamples');
+                    break;
+                case 'citationRebuildIndex':
+                    await vscode.commands.executeCommand('ai-proofread.citation.rebuildIndex');
+                    break;
+                case 'manageCustomTables':
+                    await vscode.commands.executeCommand('ai-proofread.manageCustomTables');
                     break;
             }
         } catch (error) {
@@ -317,8 +585,17 @@ export class WebviewManager {
      * 设置校对JSON文件的回调函数
      */
     public setProofreadJsonCallback(callback: (jsonFilePath: string, context: vscode.ExtensionContext) => Promise<void>): void {
-        // 存储回调函数，在 handleWebviewMessage 中使用
         (this as any).proofreadJsonCallback = callback;
+    }
+
+    /** 设置切分文档的回调（按主文件路径切分） */
+    public setSplitCallback(callback: (mainFilePath: string, context: vscode.ExtensionContext) => Promise<void>): void {
+        (this as any).splitCallback = callback;
+    }
+
+    /** 设置合并语境/参考资料的回调（按 JSON 路径） */
+    public setMergeCallback(callback: (jsonFilePath: string, context: vscode.ExtensionContext) => Promise<void>): void {
+        (this as any).mergeCallback = callback;
     }
 
     /**
@@ -343,6 +620,257 @@ export class WebviewManager {
     }
 
     /**
+     * 生成完整 HTML（根据状态：空/主文件/完整结果）
+     * 完整结果时：主文件、切分结果、校对结果 三板块固定顺序展示
+     */
+    private generateFullHtml(result: ProcessResult, context?: vscode.ExtensionContext): string {
+        if (result.splitResult || result.proofreadResult || result.progressTracker) {
+            const mainSectionHtml = this.generateMainSectionForFullResult(result);
+            const splitHtml = result.splitResult ? this.generateSplitResultHtml(result.splitResult) : '';
+            const proofreadSectionHtml = this.generateProofreadSectionHtml(result);
+            return this.generateWebviewHtml(result, mainSectionHtml, splitHtml, proofreadSectionHtml);
+        }
+        if (result.mainFilePath || result.companionFiles) {
+            return this.generateMainFileStateHtml(result);
+        }
+        return this.generateEmptyStateHtml();
+    }
+
+    /** 空状态 HTML */
+    private generateEmptyStateHtml(): string {
+        return this.getBaseHtml(`
+            <div class="header">
+                ${this.getHeaderQuickActionsHtml()}
+                <div class="message">选择要校对的主文件，或等待切分/校对完成后查看结果。</div>
+            </div>
+            <div class="process-section">
+                <h3>📄 选择主文件</h3>
+                <p class="hint">选择要校对的 Markdown 文档，然后进行切分和校对。</p>
+                <div class="section-actions">
+                    <button class="action-button" onclick="handleAction('selectMainFile')">选择主文件</button>
+                    <button class="action-button" onclick="handleAction('selectMainFileFromWorkspace')">从工作区选择</button>
+                </div>
+            </div>
+        `);
+    }
+
+    /** 主文件已选、配套文档检测后的 HTML */
+    private generateMainFileStateHtml(result: ProcessResult): string {
+        const mainPath = result.mainFilePath!;
+        const comp = result.companionFiles || {};
+        const hasJson = !!comp.json;
+        const hasProofread = !!comp.proofreadJson;
+
+        const jsonLen = comp.json ? getJsonArrayLength(comp.json) : undefined;
+        const proofreadLen = comp.proofreadJson ? getJsonArrayLength(comp.proofreadJson) : undefined;
+        const lengthMismatch = (jsonLen !== undefined && proofreadLen !== undefined && jsonLen !== proofreadLen);
+
+        let mainSection = `
+            <div class="process-section">
+                <h3>📄 主文件</h3>
+                <div class="file-paths-compact">
+                    <div class="file-path-row">
+                        <span class="file-label">主文件:</span>
+                        <span class="file-path">${this.getRelativePath(mainPath)}</span>
+                    </div>
+                </div>
+                ${lengthMismatch ? `
+                <div class="warning-box">
+                    ⚠️ JSON 与 proofread.json 条目数不一致（${jsonLen} vs ${proofreadLen}），请检查或删除 proofread.json 后重新校对。
+                </div>
+                ` : ''}
+                <div class="section-actions">
+                    <button class="action-button" onclick="handleAction('selectMainFile')">更换主文件</button>
+                    <button class="action-button" onclick="handleAction('selectMainFileFromWorkspace')">从工作区选择</button>
+                    <button class="action-button" onclick="handleAction('formatParagraphsUseMainFile')" title="AI Proofreader: format paragraphs">整理段落</button>
+                    <button class="action-button" onclick="handleAction('markTitlesFromTocUseMainFile')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
+                    <button class="action-button" onclick="handleAction('splitDocument')" title="AI Proofreader: split file">${hasJson ? '重新切分' : '切分文档'}</button>
+                </div>
+            </div>
+        `;
+
+        let splitSection = '';
+        if (hasJson && comp.json && comp.jsonMd && comp.log) {
+            const stats = this.tryReadSplitStats(comp.log);
+            splitSection = `
+            <div class="process-section">
+                <h3>📄 切分结果</h3>
+                ${stats ? `<div class="stats-section"><div class="stats-inline">
+                    <span class="stat-item">切分片段数: <span class="stat-value">${stats.segmentCount}</span></span>
+                </div></div>` : ''}
+                <div class="file-paths-compact">
+                    <div class="file-path-row"><span class="file-label">JSON:</span><span class="file-path">${this.getRelativePath(comp.json)}</span></div>
+                    <div class="file-path-row"><span class="file-label">JSON.md:</span><span class="file-path">${this.getRelativePath(comp.jsonMd)}</span></div>
+                    <div class="file-path-row"><span class="file-label">日志:</span><span class="file-path">${this.getRelativePath(comp.log)}</span></div>
+                </div>
+                <div class="section-actions">
+                    <button class="action-button" onclick="handleAction('showSplitJson')">查看JSON</button>
+                    <button class="action-button" onclick="handleAction('showSplitLog')">查看日志</button>
+                    <button class="action-button" onclick="handleAction('showSplitDiff')">比较前后差异</button>
+                    <button class="action-button" onclick="handleAction('mergeContext')">合并语境/参考资料</button>
+                    <button class="action-button" onclick="handleAction('proofreadJson')">校对JSON文件</button>
+                </div>
+            </div>
+            `;
+        }
+
+        let proofreadSection = '';
+        if (hasProofread && comp.proofreadJson && comp.proofreadJsonMd && comp.proofreadLog) {
+            const nullCount = getProofreadNullCount(comp.proofreadJson);
+            const hasUnfinished = (nullCount ?? 0) > 0;
+            proofreadSection = `
+            <div class="process-section">
+                <h3>✏️ 校对结果</h3>
+                ${hasUnfinished ? `
+                <div class="warning-box">
+                    ⚠️ 有 <strong>${nullCount}</strong> 条未完成校对（.proofread.json 中为 null）。重新校对时将只处理未完成的条目。
+                </div>
+                ` : ''}
+                <div class="file-paths-compact">
+                    <div class="file-path-row"><span class="file-label">JSON:</span><span class="file-path">${this.getRelativePath(comp.proofreadJson)}</span></div>
+                    <div class="file-path-row"><span class="file-label">JSON.md:</span><span class="file-path">${this.getRelativePath(comp.proofreadJsonMd)}</span></div>
+                    <div class="file-path-row"><span class="file-label">日志:</span><span class="file-path">${this.getRelativePath(comp.proofreadLog)}</span></div>
+                </div>
+                <div class="section-actions">
+                    <button class="action-button" onclick="handleAction('showProofreadJson')">查看JSON</button>
+                    <button class="action-button" onclick="handleAction('showProofreadLog')">查看日志</button>
+                    <button class="action-button" onclick="handleAction('showProofreadDiff')">比较前后差异</button>
+                    <button class="action-button" onclick="handleAction('generateDiff')">生成差异文件</button>
+                    <button class="action-button" onclick="handleAction('generateAlignment')">生成勘误表</button>
+                </div>
+            </div>
+            `;
+        }
+
+        return this.getBaseHtml(`
+            <div class="header">
+                ${this.getHeaderQuickActionsHtml()}
+                <div class="message">${result.message}</div>
+            </div>
+            ${mainSection}
+            ${splitSection}
+            ${proofreadSection}
+        `, true);
+    }
+
+    /** 头部快捷按钮栏（分组、排序，操作对象为当前编辑窗口文件） */
+    private getHeaderQuickActionsHtml(): string {
+        return `
+            <p class="header-commands-hint">常用命令（Ctrl+Shift+P 查找全部命令）</p>
+            <div class="header-actions">
+                <span class="header-group">
+                    <button class="link-button" onclick="handleAction('managePrompts')" title="AI Proofreader: manage prompts">管理提示词</button>
+                    <button class="link-button" onclick="handleAction('openSettings')" title="打开设置">打开设置</button>
+                </span>
+                <span class="config-sep">|</span>
+                <span class="header-group">
+                    <button class="link-button" onclick="handleAction('convertDocxToMarkdown')" title="AI Proofreader: convert docx to markdown">docx → Markdown</button>
+                    <button class="link-button" onclick="handleAction('convertPdfToMarkdown')" title="AI Proofreader: convert PDF to markdown">PDF → Markdown</button>
+                    <button class="link-button" onclick="handleAction('convertMarkdownToDocx')" title="AI Proofreader: convert markdown to docx">Markdown → docx</button>
+                </span>
+                <span class="config-sep">|</span>
+                <span class="header-group">
+                    <button class="link-button" onclick="handleAction('proofreadSelection')" title="AI Proofreader: proofread selection">校对选中文本</button>
+                    <button class="link-button" onclick="handleAction('proofreadSelectionWithExamples')" title="AI Proofreader: proofread selection with examples">使用样例校对选中</button>
+                    <button class="link-button" onclick="handleAction('editProofreadingExamples')" title="AI Proofreader: edit Proofreading examples">编辑校对样例</button>
+                </span>
+                <span class="config-sep">|</span>
+                <span class="header-group">
+                    <button class="link-button" onclick="handleAction('citationOpenView')" title="AI Proofreader: verify citations">核对全文引文</button>
+                    <button class="link-button" onclick="handleAction('citationRebuildIndex')" title="AI Proofreader: build citation reference index">建立引文索引</button>
+                </span>
+                <span class="config-sep">|</span>
+                <span class="header-group">
+                    <button class="link-button" onclick="handleAction('checkWords')" title="AI Proofreader: check words">字词检查</button>
+                    <button class="link-button" onclick="handleAction('manageCustomTables')" title="AI Proofreader: manage custom tables">管理自定义替换表</button>
+                </span>
+                <span class="config-sep">|</span>
+                <span class="header-group">
+                    <button class="link-button" onclick="handleAction('formatParagraphs')" title="AI Proofreader: format paragraphs">整理段落</button>
+                    <button class="link-button" onclick="handleAction('markTitlesFromToc')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
+                    <button class="link-button" onclick="handleAction('convertQuotes')" title="AI Proofreader: convert quotes to Chinese">半角引号转全角</button>
+                    <button class="link-button" onclick="handleAction('splitIntoSentences')" title="AI Proofreader: split into sentences">切分为句子</button>
+                </span>
+                <span class="config-sep">|</span>
+                <span class="header-group">
+                    <button class="link-button" onclick="handleAction('segmentFile')" title="AI Proofreader: segment file">分词</button>
+                    <button class="link-button" onclick="handleAction('segmentFile')" title="AI Proofreader: segment file">词频统计</button>
+                    <button class="link-button" onclick="handleAction('segmentFile')" title="AI Proofreader: segment file">字频统计</button>
+                </span>
+                <span class="config-sep">|</span>
+                <span class="header-group">
+                    <button class="link-button" onclick="handleAction('diffItWithAnotherFile')" title="AI Proofreader: diff it with another file">diff 与另一文件</button>
+                    <button class="link-button" onclick="handleAction('searchSelectionInPDF')" title="AI Proofreader: search selection in PDF">在 PDF 中搜索选中文本</button>
+                </span>
+            </div>
+        `;
+    }
+
+    private tryReadSplitStats(logPath: string): { segmentCount: number } | null {
+        try {
+            const text = fs.readFileSync(logPath, 'utf8');
+            const m = text.match(/切分片段数[：:]\s*(\d+)/);
+            if (m) return { segmentCount: parseInt(m[1], 10) };
+        } catch { /* ignore */ }
+        return null;
+    }
+
+    private getBaseHtml(bodyContent: string, includeExtraStyles = false): string {
+        const extraStyles = includeExtraStyles ? `
+            .hint { font-size: 12px; color: #6B8E9A; margin: 8px 0; }
+            .header-commands-hint { font-size: 12px; color: #6B8E9A; margin: 0 0 6px 0; }
+            .consistency-hint { font-style: italic; }
+            .warning-box { padding: 10px; margin: 10px 0; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; font-size: 13px; color: #856404; }
+            .header-actions { margin-bottom: 8px; padding-bottom: 8px; font-size: 12px; color: #6B8E9A; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+            .header-group { display: inline-flex; align-items: center; gap: 4px; }
+            .config-sep { margin: 0 6px; color: var(--vscode-panel-border); }
+            .link-button { background: none; border: none; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; padding: 0 4px; text-decoration: underline; }
+        ` : '';
+        return `
+            <!DOCTYPE html>
+            <html lang="zh-CN">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Proofreading panel</title>
+                <style>
+                    body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground);
+                        background-color: var(--vscode-editor-background); padding: 16px; line-height: 1.4; }
+                    .header { margin-bottom: 16px; padding-bottom: 12px; }
+                    .message { font-size: 15px; margin-bottom: 16px; color: #6B8E9A; font-weight: 500; }
+                    .process-section { margin-bottom: 20px; padding: 16px; background-color: var(--vscode-editor-background);
+                        border: 1px solid var(--vscode-panel-border); border-radius: 6px; }
+                    .process-section h3 { margin-top: 0; margin-bottom: 12px; color: #5A7A85; font-size: 16px;
+                        padding-bottom: 6px; }
+                    .stats-section { margin-bottom: 12px; padding: 12px; background-color: #F8FAFB; border: 1px solid #E8F0F2; border-radius: 4px; }
+                    .stats-inline { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+                    .stat-item { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+                    .stat-value { color: #4A6B7A; font-weight: 600; }
+                    .file-paths-compact { margin-bottom: 16px; padding: 12px; background-color: #F8FAFB; border: 1px solid #E8F0F2; border-radius: 4px; }
+                    .file-path-row { margin-bottom: 6px; display: flex; align-items: center; font-size: 12px; }
+                    .file-label { font-weight: 500; min-width: 100px; color: #6B8E9A; }
+                    .file-path { color: #4A6B7A; font-family: var(--vscode-editor-font-family); font-size: 11px; word-break: break-all; margin-left: 8px; }
+                    .section-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px;  }
+                    .action-button { padding: 6px 12px; background-color: #8BACB8; color: white; border: none; border-radius: 4px;
+                        cursor: pointer; font-size: 12px; transition: background-color 0.2s; font-weight: 500; }
+                    .action-button:hover { background-color: #7A9BA8; }
+                    .action-button:disabled { background-color: #B8C5CA; color: #8A9BA0; cursor: not-allowed; }
+                    ${extraStyles}
+                    ${ProgressTracker.generateProgressBarCss()}
+                </style>
+            </head>
+            <body>
+                ${bodyContent}
+                <script>
+                    const vscode = acquireVsCodeApi();
+                    function handleAction(action) { vscode.postMessage({ command: action }); }
+                </script>
+            </body>
+            </html>
+        `;
+    }
+
+    /**
      * 生成切分结果HTML
      */
     private generateSplitResultHtml(splitResult: SplitResult): string {
@@ -363,10 +891,6 @@ export class WebviewManager {
                 ${statsHtml}
                 <div class="file-paths-compact">
                     <div class="file-path-row">
-                        <span class="file-label">原始文件:</span>
-                        <span class="file-path">${this.getRelativePath(splitResult.originalFilePath)}</span>
-                    </div>
-                    <div class="file-path-row">
                         <span class="file-label">JSON结果:</span>
                         <span class="file-path">${this.getRelativePath(splitResult.jsonFilePath)}</span>
                     </div>
@@ -381,21 +905,45 @@ export class WebviewManager {
                 </div>
                 <div class="section-actions">
                     ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitJson\')">查看JSON文件</button>' : ''}
-                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'proofreadJson\')">校对JSON文件</button>' : ''}
                     ${splitResult.logFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitLog\')">查看切分日志</button>' : ''}
                     ${splitResult.originalFilePath && splitResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitDiff\')">比较前后差异</button>' : ''}
+                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'mergeContext\')">合并语境/参考资料</button>' : ''}
+                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'proofreadJson\')">校对JSON文件</button>' : ''}
                 </div>
             </div>
         `;
     }
 
     /**
-     * 生成校对结果HTML
+     * 生成校对结果板块 HTML（进度条嵌入其中，校对进行中即显示）
      */
-    private generateProofreadResultHtml(proofreadResult: ProofreadResult): string {
+    private generateProofreadSectionHtml(result: ProcessResult): string {
+        if (!result.progressTracker && !result.proofreadResult) {
+            return '';
+        }
+        const progressHtml = result.progressTracker ? result.progressTracker.generateProgressBarHtml() : '';
+        const proofreadContent = result.proofreadResult ? this.generateProofreadResultContent(result.proofreadResult) : '';
         return `
             <div class="process-section">
                 <h3>✏️ 校对结果</h3>
+                ${progressHtml}
+                ${proofreadContent}
+            </div>
+        `;
+    }
+
+    /**
+     * 生成校对结果内容（文件列表与按钮，不含外框）
+     */
+    private generateProofreadResultContent(proofreadResult: ProofreadResult): string {
+        const nullCount = getProofreadNullCount(proofreadResult.outputFilePath);
+        const hasUnfinished = (nullCount ?? 0) > 0;
+        return `
+                ${hasUnfinished ? `
+                <div class="warning-box">
+                    ⚠️ 有 <strong>${nullCount}</strong> 条未完成校对（.proofread.json 中为 null）。重新校对时将只处理未完成的条目。
+                </div>
+                ` : ''}
                 <div class="file-paths-compact">
                     <div class="file-path-row">
                         <span class="file-label">JSON结果:</span>
@@ -417,14 +965,52 @@ export class WebviewManager {
                     ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'generateDiff\')">生成差异文件</button>' : ''}
                     ${proofreadResult.originalFilePath && proofreadResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'generateAlignment\')">生成勘误表</button>' : ''}
                 </div>
+        `;
+    }
+
+    /**
+     * 生成主文件板块（用于完整结果时的固定布局）
+     */
+    private generateMainSectionForFullResult(result: ProcessResult): string {
+        const mainPath =
+            result.mainFilePath ??
+            result.splitResult?.originalFilePath ??
+            result.proofreadResult?.originalFilePath;
+        if (!mainPath) return '';
+        const comp = result.companionFiles || {};
+        const hasJson = !!result.splitResult || !!comp.json;
+        const jsonLen = comp.json ? getJsonArrayLength(comp.json) : undefined;
+        const proofreadLen = comp.proofreadJson ? getJsonArrayLength(comp.proofreadJson) : undefined;
+        const lengthMismatch = (jsonLen !== undefined && proofreadLen !== undefined && jsonLen !== proofreadLen);
+        return `
+            <div class="process-section">
+                <h3>📄 主文件</h3>
+                <div class="file-paths-compact">
+                    <div class="file-path-row">
+                        <span class="file-label">主文件:</span>
+                        <span class="file-path">${this.getRelativePath(mainPath)}</span>
+                    </div>
+                </div>
+                ${lengthMismatch ? `
+                <div class="warning-box">
+                    ⚠️ JSON 与 proofread.json 条目数不一致（${jsonLen} vs ${proofreadLen}），请检查或删除 proofread.json 后重新校对。
+                </div>
+                ` : ''}
+                <div class="section-actions">
+                    <button class="action-button" onclick="handleAction('selectMainFile')">更换主文件</button>
+                    <button class="action-button" onclick="handleAction('selectMainFileFromWorkspace')">从工作区选择</button>
+                    <button class="action-button" onclick="handleAction('formatParagraphsUseMainFile')" title="AI Proofreader: format paragraphs">整理段落</button>
+                    <button class="action-button" onclick="handleAction('markTitlesFromTocUseMainFile')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
+                    <button class="action-button" onclick="handleAction('splitDocument')" title="AI Proofreader: split file">${hasJson ? '重新切分' : '切分文档'}</button>
+                </div>
             </div>
         `;
     }
 
     /**
-     * 生成完整的 Webview HTML
+     * 生成完整的 Webview HTML（主文件、切分结果、校对结果 固定顺序）
      */
-    private generateWebviewHtml(result: ProcessResult, splitHtml: string, proofreadHtml: string, progressHtml: string): string {
+    private generateWebviewHtml(result: ProcessResult, mainSectionHtml: string, splitHtml: string, proofreadSectionHtml: string): string {
         return `
             <!DOCTYPE html>
             <html lang="zh-CN">
@@ -444,7 +1030,6 @@ export class WebviewManager {
                     .header {
                         margin-bottom: 16px;
                         padding-bottom: 12px;
-                        border-bottom: 1px solid var(--vscode-panel-border);
                     }
                     .message {
                         font-size: 15px;
@@ -464,7 +1049,6 @@ export class WebviewManager {
                         margin-bottom: 12px;
                         color: #5A7A85;
                         font-size: 16px;
-                        border-bottom: 1px solid #E8F0F2;
                         padding-bottom: 6px;
                     }
                     .process-section h4 {
@@ -550,7 +1134,6 @@ export class WebviewManager {
                         gap: 8px;
                         margin-top: 12px;
                         padding-top: 12px;
-                        border-top: 1px solid #E8F0F2;
                     }
                     .actions {
                         display: flex;
@@ -559,7 +1142,7 @@ export class WebviewManager {
                     }
                     .action-button {
                         padding: 6px 12px;
-                        background-color: #7A9BA8;
+                        background-color: #8BACB8;
                         color: white;
                         border: none;
                         border-radius: 4px;
@@ -569,26 +1152,40 @@ export class WebviewManager {
                         font-weight: 500;
                     }
                     .action-button:hover {
-                        background-color: #6B8E9A;
+                        background-color: #7A9BA8;
                     }
                     .action-button:disabled {
                         background-color: #B8C5CA;
                         color: #8A9BA0;
                         cursor: not-allowed;
                     }
+                    .warning-box {
+                        padding: 10px;
+                        margin: 10px 0;
+                        background: #fff3cd;
+                        border: 1px solid #ffc107;
+                        border-radius: 4px;
+                        font-size: 13px;
+                        color: #856404;
+                    }
+                    .header-commands-hint { font-size: 12px; color: #6B8E9A; margin: 0 0 6px 0; }
+                    .header-actions { margin-bottom: 8px; padding-bottom: 8px; font-size: 12px; color: #6B8E9A; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+                    .header-group { display: inline-flex; align-items: center; gap: 4px; }
+                    .config-sep { margin: 0 6px; color: var(--vscode-panel-border); }
+                    .link-button { background: none; border: none; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; padding: 0 4px; text-decoration: underline; }
 
                     ${ProgressTracker.generateProgressBarCss()}
                 </style>
             </head>
             <body>
                 <div class="header">
+                    ${this.getHeaderQuickActionsHtml()}
                     <div class="message">${result.message}</div>
                 </div>
 
+                ${mainSectionHtml}
                 ${splitHtml}
-                ${progressHtml}
-                ${proofreadHtml}
-
+                ${proofreadSectionHtml}
 
                 <script>
                     const vscode = acquireVsCodeApi();
