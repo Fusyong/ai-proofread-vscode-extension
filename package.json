@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.6.4",
+  "version": "1.7.0",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -500,6 +500,20 @@
           "default": "search",
           "description": "词级相似度时的分词模式：search（默认，更细粒度，便于匹配不完整引文等）或 default（精确）。用于句子对齐、引文核对等。"
         },
+        "ai-proofread.wordErrorCollector.clauseSimilarityThreshold": {
+          "order": 54.7,
+          "type": "number",
+          "default": 0.4,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "常用词语错误收集：小句对齐相似度阈值（0-1）"
+        },
+        "ai-proofread.wordErrorCollector.delimiters": {
+          "order": 54.8,
+          "type": "string",
+          "default": "，；。？！",
+          "description": "常用词语错误收集：小句分隔符，如「，；。？！」表示在中文逗号、分号、句号、问号、叹号处切分"
+        },
         "ai-proofread.citation.referencesPath": {
           "order": 55,
           "type": "string",
@@ -805,6 +819,7 @@
     "sql.js": "^1.10.0"
   },
   "devDependencies": {
+    "diff": "^7.0.0",
     "@eslint/config-array": "^0.19.2",
     "@eslint/object-schema": "^2.1.6",
     "@types/node": "^18.x",

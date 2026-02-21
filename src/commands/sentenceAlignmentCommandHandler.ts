@@ -10,6 +10,7 @@ import { splitChineseSentencesWithLineNumbers } from '../splitter';
 import { FilePathUtils, ErrorUtils } from '../utils';
 import { generateHtmlReport } from '../alignmentReportGenerator';
 import { getJiebaWasm } from '../jiebaLoader';
+import { collectWordErrors, formatWordErrors, parseDelimitersFromConfig } from '../wordErrorCollector';
 
 export class SentenceAlignmentCommandHandler {
     /**
@@ -86,18 +87,31 @@ export class SentenceAlignmentCommandHandler {
 
             const fileB = fileUrisB[0].fsPath;
 
+            const collectWordErrorsChoice = await vscode.window.showQuickPick(
+                [
+                    { label: '否', description: '仅生成勘误表（默认）', value: false },
+                    { label: '是', description: '同时收集常用词语错误', value: true }
+                ],
+                {
+                    placeHolder: '是否同时收集常用词语错误？',
+                    title: '常用词语错误',
+                    ignoreFocusOut: true
+                }
+            );
+            const shouldCollectWordErrors = collectWordErrorsChoice?.value ?? false;
+
             // 读取对齐参数配置（归一化与引文核对共用 citation 配置）
             const config = vscode.workspace.getConfiguration('ai-proofread.alignment');
             const citationConfig = vscode.workspace.getConfiguration('ai-proofread.citation');
             const ngramGranularity = config.get<'word' | 'char'>('ngramGranularity', 'word');
             let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
-            if (ngramGranularity === 'word') {
+            if (ngramGranularity === 'word' || shouldCollectWordErrors) {
                 try {
                     const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
                     jieba = getJiebaWasm(path.join(context.extensionPath, 'dist'), customDictPath || undefined);
                 } catch (e) {
                     const msg = e instanceof Error ? e.message : String(e);
-                    vscode.window.showErrorMessage(`jieba 加载失败，句子对齐已中止（当前配置为词级相似度，需要 jieba）：${msg}`);
+                    vscode.window.showErrorMessage(`jieba 加载失败，${shouldCollectWordErrors ? '词语错误收集需要 jieba；' : ''}${ngramGranularity === 'word' ? '当前配置为词级相似度，需要 jieba；' : ''}已中止：${msg}`);
                     return;
                 }
             }
@@ -189,6 +203,25 @@ export class SentenceAlignmentCommandHandler {
                 // 生成HTML报告
                 generateHtmlReport(alignment, outputFile, titleA, titleB, options, runtime);
 
+                let wordErrorsMessage = '';
+                if (shouldCollectWordErrors && jieba) {
+                    progress.report({ increment: 95, message: '收集词语错误...' });
+                    const weConfig = vscode.workspace.getConfiguration('ai-proofread.wordErrorCollector');
+                    const delimitersStr = weConfig.get<string>('delimiters', '，；。？！');
+                    const delimiters = parseDelimitersFromConfig(delimitersStr);
+                    const clauseThreshold = weConfig.get<number>('clauseSimilarityThreshold', 0.4);
+                    const cutMode = vscode.workspace.getConfiguration('ai-proofread.jieba').get<'default' | 'search'>('cutMode', 'default');
+                    const entries = collectWordErrors(alignment, {
+                        jieba,
+                        cutMode,
+                        delimiters,
+                        clauseSimilarityThreshold: clauseThreshold
+                    });
+                    const wordErrorsPath = FilePathUtils.getFilePath(fileA, '.word-errors', '.csv');
+                    fs.writeFileSync(wordErrorsPath, formatWordErrors(entries), 'utf8');
+                    wordErrorsMessage = `\n词语错误已保存至: ${path.basename(wordErrorsPath)}（${entries.length} 条）`;
+                }
+
                 progress.report({ increment: 100, message: '完成' });
 
                 // 显示统计信息
@@ -200,7 +233,7 @@ export class SentenceAlignmentCommandHandler {
                     `移出: ${stats.moveout}\n` +
                     `移入: ${stats.movein}`;
 
-                vscode.window.showInformationMessage(statsMessage + `\n报告已保存至: ${path.basename(outputFile)}`);
+                vscode.window.showInformationMessage(statsMessage + `\n报告已保存至: ${path.basename(outputFile)}` + wordErrorsMessage);
             });
 
         } catch (error) {

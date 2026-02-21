@@ -1,10 +1,10 @@
 *QQ群“ai-proofreader 校对插件”：1055031650*
 
-一个用于文档和图书校对、基于大语言模型服务的VS Code扩展，支持选中文本直接校对和长文档切分后批量校对两种工作流，并集成了一些跟校对相关的辅助功能。[这里是代码库](https://github.com/Fusyong/ai-proofread-vscode-extension)。本扩展与[相应的Python校对工具库](https://github.com/Fusyong/ai-proofread)的功能大致相同。
+一个用于文档和图书校对、基于大语言模型服务的VS Code扩展，支持选中文本直接校对和长文档切分后批量校对两种工作流，并集成了一些跟校对相关的辅助功能。[这里是代码库](https://github.com/Fusyong/ai-proofread-vscode-extension)。本扩展的原型基于一个Python校对工具库[Fusyong/ai-proofread](https://github.com/Fusyong/ai-proofread)。
 
 另外，你也可以设置自己的提示词，用于其他文本处理场景，比如翻译、注释、编写练习题等。
 
-A VS Code extension for document and book proofreading based on LLM services, supporting two workflows: proofreading selected text directly and proofreading long documents after segmentation. [Here is the code repository](https://github.com/Fusyong/ai-proofread-vscode-extension). This extension has roughly the same functions as [the corresponding Python proofreading tool library](https://github.com/Fusyong/ai-proofread).
+A VS Code extension for document and book proofreading based on LLM services, supporting two workflows: proofreading selected text directly and proofreading long documents after segmentation. [Here is the code repository](https://github.com/Fusyong/ai-proofread-vscode-extension). The prototype of this extension is based on a Python proofreading tool library [Fusyong/ai-proofread](https://github.com/Fusyong/ai-proofread).
 
 Additionally, you can also set your own prompts for other text processing scenarios, such as translation, annotation, creating exercises, and more.
 
@@ -156,7 +156,7 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 1. 调用vscode内置的diff editor比较校对前后md文件。校对面板“前后差异”按钮的功能与此相同。对于长文本，diff editor有段落无法对齐的问题。此时，可以通过加空行或删除空行来帮助对齐。
 2. 用jsdiff比较两个文件，生成HTML形式的结果，类似带修改标记的Word文档。本模式还支持JSON文件，自动拼接JSON一级元素或`target`字段内容进行比较，支持每次比较的片段数量（默认0表示所有片段），生成多个有序的差异文件，避免过长文本无法渲染的问题；校对面板“生成差异文件”按钮的功能与此相同（**注意：这个按钮使用的也是JSON中的文本，而不是md中的文本**）。
-3. 逐句对齐两个md文件，生成一个有筛选和比较功能的HTML文件，从而可用于制作审校记录、勘误表。校对面板“生成勘误表”按钮的功能与此相同。
+3. 逐句对齐两个md文件，生成一个有筛选和比较功能的HTML文件，从而可用于制作审校记录、勘误表。校对面板“生成勘误表”按钮的功能与此相同。生成勘误表时可选择**同时收集常用词语错误**，输出为 CSV 格式（错误词语,正确词语,错误词语所在小句,错词长度,正词长度），保存为 `{主文件名}.word-errors.csv`，便于筛选和积累个人常用错词表、自定义替换表。
 
 ### 3.4. 管理提示词
 
@@ -224,6 +224,8 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 6. 测试.proofread.json.md，拼合上项JSON文件中的结果，比较最初的markdown文件即可看出改动处；如果这个文件已经存在，则自动备份，并加时间戳
 7. 测试.proofread.html：通过jsdiff库比较校对前后markdown文件所得的结果，与Word近似的行内标记，可通过浏览器打印成PDF。需要联网调用jsdiff库，并等待运算完成
 8. 测试.proofread.log，校对日志，**校对文本选段的结果也会存在这里**
+9. 测试.alignment.html，逐句对齐勘误表（通过 diff 命令选择「对齐句子生成勘误表」或校对面板「生成勘误表」生成）
+10. 测试.word-errors.csv，常用词语错误收集结果（生成勘误表时选择「同时收集」可得），CSV 格式（错误词语,正确词语,错误词语所在小句,错词长度,正词长度），便于筛选
 
 **请特别注意：除自动累加的日志文件和提示备份的`测试.proofread.json`、自动备份的`测试.proofread.json.md`，其余中间文件，每次操作都将重新生成！如有需要，请自行备份。**
 
@@ -302,18 +304,14 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 ## 5. TODO
 
-1. 自动从勘误表中收集常用词语错误：在非汉字处切开，再对齐，筛选仅一个汉字改动的对子，再用AI筛选、归纳出查找替换对（含正则）
-2. 数字连续性检查（以Python库相应模块为基础）
-3. 在线引文核对
+1. 数字连续性检查（以Python库相应模块为基础）
+2. 在线引文核对
     1. 读秀，
     2. 中华经典古籍库，
     3. 识典故古籍
-4. 尝试新的相似度算法
-    1. jsdiff（在 NPM 上的包名就叫 diff，Kevin Decker 维护），diffSentences 或 diffWords 可以非常精确地标记出“删减”、“新增”和“未变”的部分。
-    2. fastest-levenshtein，在对齐完成后，快速计算两个相似句子的“修改程度”百分比。它是 JS 环境下编辑距离运算的最快实现
-    3. 人看的相似度使用编辑距离
+4. 人看的相似度使用编辑距离：fastest-levenshtein，在对齐完成后，快速计算两个相似句子的“修改程度”百分比。它是 JS 环境下编辑距离运算的最快实现
 5. 调研集成opencc-js，用于繁简转换和用词习惯检查
-6. 勘误表改为JSON加web viewer
+6.  勘误表改为JSON加web viewer
 7.  预置更多提示词，包括常用的专项校对
     1. 典型错误举例校对
         1. 标点符号用法错误
@@ -334,8 +332,9 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 ## 6. 更新日志
 
-### v1.6.4
+### v1.7.0
 
+- 特性：比较文件时自动收集错误词语与正确词语对，以便整理后用作自定义替换表
 - 优化：扩展结果面板为校对面板，即全流程控制面板
 - 特性：编辑校对样例；使用样例校对选中文本；合并JSON功能时可以合并一个Markdown文件，比如校对样例文件；切分为句子的命令。
 - 特性：用户加载非正则自定义替换表时允许指定是否按词语边界匹配

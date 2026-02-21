@@ -1060,3 +1060,53 @@ export function splitChineseSentencesWithLineNumbers(
     // 在原文中查找每个句子的位置并计算行号
     return _findSentencePositions(text, sentences);
 }
+
+/** 默认小句分隔符：中文逗号、分号、句号、问号、叹号 */
+const DEFAULT_CLAUSE_DELIMITERS = ['，', '；', '。', '？', '！'];
+
+/**
+ * 在逗号、分号等处将句子切分为小句
+ * 用于常用词语错误收集功能，在勘误表句子对齐基础上进一步细分。
+ *
+ * @param sentence 要切分的句子
+ * @param delimiters 分隔符列表，默认 ['，', '；', '。', '？', '！']
+ * @returns 切分后的小句列表（分隔符归入前一小句）
+ */
+export function splitClauses(
+    sentence: string,
+    delimiters: string[] = DEFAULT_CLAUSE_DELIMITERS
+): string[] {
+    if (!sentence || !sentence.trim()) {
+        return [];
+    }
+
+    if (delimiters.length === 0) {
+        return [sentence.trim()];
+    }
+
+    // 构建正则：匹配任意一个分隔符
+    const escaped = delimiters.map(d => d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const pattern = new RegExp(`(${escaped.join('|')})`, 'g');
+
+    const clauses: string[] = [];
+    let lastEnd = 0;
+    let match: RegExpExecArray | null;
+
+    pattern.lastIndex = 0;
+
+    while ((match = pattern.exec(sentence)) !== null) {
+        const endPos = match.index + match[0].length;
+        const clause = sentence.substring(lastEnd, endPos).trim();
+        if (clause) {
+            clauses.push(clause);
+        }
+        lastEnd = endPos;
+    }
+
+    const remainder = sentence.substring(lastEnd).trim();
+    if (remainder) {
+        clauses.push(remainder);
+    }
+
+    return clauses;
+}
