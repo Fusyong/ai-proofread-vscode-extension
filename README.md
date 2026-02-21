@@ -297,9 +297,7 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 ## 5. TODO
 
-1. 扩展webview为可视化入口
-    1. 选择要校对的原始文件（打开文档；选择文档；自动找到其他配套文件）
-    2. 其他常用工具的按钮（感知当前打开文档的类型）
+1. 扩展 webview 为校对流程控制台（Proofreading panel）：详见 [docs/proofreading-panel-plan.md](docs/proofreading-panel-plan.md)
 2. 自动从勘误表中收集常用词语错误：在非汉字处切开，再对齐，筛选仅一个汉字改动的对子，再用AI筛选、归纳出查找替换对（含正则）
 3. 数字连续性检查（以Python库相应模块为基础）
 4. 在线引文核对
