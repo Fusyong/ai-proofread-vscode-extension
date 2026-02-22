@@ -54,7 +54,7 @@ export function activate(context: vscode.ExtensionContext) {
     const segmentProvider = new SegmentTreeDataProvider();
     const { treeView: segmentTreeView } = registerSegmentView(context, segmentProvider);
     const numberingHandler = new NumberingCheckCommandHandler(context, numberingProvider, numberingTreeView, segmentProvider, segmentTreeView);
-    const continuousProofreadHandler = new ContinuousProofreadCommandHandler();
+    const continuousProofreadHandler = new ContinuousProofreadCommandHandler(examplesHandler);
 
     const promptManager = PromptManager.getInstance(context);
     const { provider: promptsTreeProvider } = registerPromptsView(context, promptManager);

@@ -10,12 +10,7 @@ import { proofreadSelection } from '../proofreader';
 import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
 import { getSegmentFromPositionWithMode, splitChineseSentencesSimple } from '../splitter';
 import { normalizeLineEndings } from '../utils';
-
-const EXAMPLES_HEADER = `## 校对示例
-
-与项目相关的校对示例，供参考。每个 example 块的格式为：<example><input>原文</input><output>校对后</output></example>
-
-`;
+import type { ExamplesCommandHandler } from './examplesCommandHandler';
 
 interface ContinuousProofreadConfig {
     platform: string;
@@ -39,6 +34,9 @@ export class ContinuousProofreadCommandHandler {
     private configManager = ConfigManager.getInstance();
     private statusBarItem: vscode.StatusBarItem;
     private extensionContext: vscode.ExtensionContext | undefined; // 用于终止时清除配置
+    constructor(private examplesHandler: ExamplesCommandHandler) {
+        this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
+    }
     private session: {
         config: ContinuousProofreadConfig;
         documentUri: vscode.Uri;
@@ -49,10 +47,6 @@ export class ContinuousProofreadCommandHandler {
         awaitingExamplesConfirmation: boolean; // 样例确认中时，skip 不生效
         diffCloseListener: vscode.Disposable | undefined; // 关闭 diff 时提示
     } | null = null;
-
-    constructor() {
-        this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
-    }
 
     dispose(): void {
         this.statusBarItem.dispose();
@@ -310,6 +304,14 @@ export class ContinuousProofreadCommandHandler {
         examplesPath: string
     ): Promise<number[] | 'cancel'> {
         return new Promise((resolve) => {
+            let resolved = false;
+            const doResolve = (value: number[] | 'cancel') => {
+                if (!resolved) {
+                    resolved = true;
+                    resolve(value);
+                }
+            };
+
             const panel = vscode.window.createWebviewPanel(
                 'continuousProofreadExamples',
                 '选择要保留的校对样例',
@@ -404,48 +406,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             panel.webview.onDidReceiveMessage((msg: { type: string; selectedIndices?: number[] }) => {
                 if (msg.type === 'confirm') {
+                    doResolve(msg.selectedIndices ?? []);
                     panel.dispose();
-                    resolve(msg.selectedIndices ?? []);
                 } else if (msg.type === 'cancel') {
+                    doResolve('cancel');
                     panel.dispose();
-                    resolve('cancel');
                 } else if (msg.type === 'stop') {
-                    panel.dispose();
                     this.handleStopCommand();
-                    resolve('cancel');
+                    doResolve('cancel');
+                    panel.dispose();
                 }
             });
 
-            panel.onDidDispose(() => resolve('cancel'));
+            panel.onDidDispose(() => doResolve('cancel'));
         });
-    }
-
-    /**
-     * 将选中的样例追加到 examples.md（保存前确保 .proofread 目录和 examples.md 均存在）
-     * @returns 是否保存成功
-     */
-    private appendExamplesToFile(examplesPath: string, examples: CandidateExample[], indices: number[]): boolean {
-        try {
-            const dir = path.dirname(examplesPath);
-            FilePathUtils.ensureDirExists(dir);
-            if (!fs.existsSync(examplesPath)) {
-                fs.writeFileSync(examplesPath, EXAMPLES_HEADER + '\n\n', 'utf8');
-            }
-
-            const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const toAdd = indices
-                .filter(i => i >= 0 && i < examples.length)
-                .map(i => examples[i])
-                .map(({ input, output }) => `<example><input>${escape(input)}</input><output>${escape(output)}</output></example>`);
-
-            if (toAdd.length === 0) return true;
-
-            fs.appendFileSync(examplesPath, toAdd.join('\n\n') + '\n\n', 'utf8');
-            return true;
-        } catch (err) {
-            ErrorUtils.showError(err, '保存样例到 examples.md 时出错：');
-            return false;
-        }
     }
 
     /**
@@ -586,8 +560,18 @@ document.addEventListener('DOMContentLoaded', function() {
             this.session.proofreadUri = undefined;
 
             if (result !== 'cancel' && result.length > 0) {
-                if (this.appendExamplesToFile(examplesPath, examples, result)) {
-                    vscode.window.showInformationMessage(`已添加 ${result.length} 条样例到 examples.md`);
+                const examplesToAdd = result
+                    .filter(i => i >= 0 && i < examples.length)
+                    .map(i => examples[i]);
+                if (examplesToAdd.length > 0) {
+                    const added = await this.examplesHandler.appendExamplesAndShow(examplesPath, examplesToAdd);
+                    if (added > 0) {
+                        const skipped = examplesToAdd.length - added;
+                        const msg = skipped > 0
+                            ? `已添加 ${added} 条样例到 examples.md（${skipped} 条已存在已跳过）`
+                            : `已添加 ${added} 条样例到 examples.md`;
+                        vscode.window.showInformationMessage(msg);
+                    }
                 }
             }
         } else {
@@ -639,6 +623,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const selection = new vscode.Selection(segmentRange.start, segmentRange.end);
 
         const editor = await vscode.window.showTextDocument(document);
+        // 滚动视口：上部约 2 行前文，下部为即将校对的段落
+        const revealStartLine = Math.max(0, segResult.range.start.line - 2);
+        const revealRange = new vscode.Range(
+            new vscode.Position(revealStartLine, 0),
+            new vscode.Position(segResult.range.end.line, segResult.range.end.character)
+        );
+        editor.revealRange(revealRange, vscode.TextEditorRevealType.AtTop);
         this.updateStatusBar(`持续校对 (第 ${this.session.segmentIndex + 1} 段) | Alt+Enter 接受 Ctrl+Alt+S 跳过 Ctrl+Alt+Q 停止 或关闭 diff 选择`, true);
 
         let result: string | null;

@@ -329,4 +329,42 @@ export class ExamplesCommandHandler {
     public getExamplesPathForProofread(): string | undefined {
         return this.getExamplesPath();
     }
+
+    /**
+     * 追加样例到 examples.md 并打开文件（供持续校对等调用，与 handleExampleEditSave 逻辑一致）
+     * @param examplesPath examples.md 完整路径
+     * @param examplesToAdd 待添加的 { input, output } 数组
+     * @returns 实际添加条数（0 表示全部已存在或失败）
+     */
+    public async appendExamplesAndShow(examplesPath: string, examplesToAdd: Array<{ input: string; output: string }>): Promise<number> {
+        if (examplesToAdd.length === 0) return 0;
+        try {
+            const examplesDir = path.dirname(examplesPath);
+            FilePathUtils.ensureDirExists(examplesDir);
+            const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const allFormatted = examplesToAdd
+                .map(({ input, output }) => `<example><input>${escape(input)}</input><output>${escape(output)}</output></example>`);
+
+            const isNewFile = !fs.existsSync(examplesPath);
+            const existingContent = isNewFile ? '' : fs.readFileSync(examplesPath, 'utf8');
+            const toAppend = allFormatted.filter(ex => !existingContent.includes(ex));
+
+            if (toAppend.length === 0) {
+                vscode.window.showInformationMessage('所有待添加的示例已存在于 examples.md 中。');
+                return 0;
+            }
+
+            const contentToAppend = isNewFile
+                ? EXAMPLES_HEADER + toAppend.join('\n\n') + '\n\n'
+                : toAppend.join('\n\n') + '\n\n';
+            fs.appendFileSync(examplesPath, contentToAppend, 'utf8');
+
+            const docToOpen = await vscode.workspace.openTextDocument(examplesPath);
+            await vscode.window.showTextDocument(docToOpen);
+            return toAppend.length;
+        } catch (err) {
+            ErrorUtils.showError(err, '保存样例到 examples.md 时出错：');
+            return 0;
+        }
+    }
 }
