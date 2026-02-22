@@ -21,6 +21,7 @@ import { registerNumberingView } from './numbering/numberingView';
 import { SegmentTreeDataProvider } from './numbering/segmentTreeProvider';
 import { registerSegmentView } from './numbering/segmentView';
 import { NumberingCheckCommandHandler } from './commands/numberingCheckCommandHandler';
+import { ContinuousProofreadCommandHandler } from './commands/continuousProofreadCommandHandler';
 import { registerPromptsView, type PromptTreeItem } from './promptsView';
 import { getJiebaWasm } from './jiebaLoader';
 
@@ -53,6 +54,7 @@ export function activate(context: vscode.ExtensionContext) {
     const segmentProvider = new SegmentTreeDataProvider();
     const { treeView: segmentTreeView } = registerSegmentView(context, segmentProvider);
     const numberingHandler = new NumberingCheckCommandHandler(context, numberingProvider, numberingTreeView, segmentProvider, segmentTreeView);
+    const continuousProofreadHandler = new ContinuousProofreadCommandHandler();
 
     const promptManager = PromptManager.getInstance(context);
     const { provider: promptsTreeProvider } = registerPromptsView(context, promptManager);
@@ -397,9 +399,23 @@ export function activate(context: vscode.ExtensionContext) {
             await new Promise((r) => setTimeout(r, 50));
             await numberingHandler.handleSegmentCheckCommand();
         }),
+
+        // 持续发现与监督校对
+        vscode.commands.registerCommand('ai-proofread.continuousProofread', () =>
+            continuousProofreadHandler.handleContinuousProofreadCommand(context)
+        ),
+        vscode.commands.registerCommand('ai-proofread.continuousProofread.accept', () =>
+            continuousProofreadHandler.handleAcceptAndContinueCommand(context)
+        ),
+        vscode.commands.registerCommand('ai-proofread.continuousProofread.skip', () =>
+            continuousProofreadHandler.handleSkipCommand(context)
+        ),
+        vscode.commands.registerCommand('ai-proofread.continuousProofread.stop', () =>
+            continuousProofreadHandler.handleStopCommand()
+        ),
     ];
 
-    context.subscriptions.push(...disposables, configManager);
+    context.subscriptions.push(...disposables, configManager, new vscode.Disposable(() => continuousProofreadHandler.dispose()));
 }
 
 export function deactivate() {

@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -245,6 +245,22 @@
       {
         "command": "ai-proofread.numbering.defineSegmentPattern",
         "title": "定义段内序号"
+      },
+      {
+        "command": "ai-proofread.continuousProofread",
+        "title": "AI Proofreader: continuous proofread"
+      },
+      {
+        "command": "ai-proofread.continuousProofread.accept",
+        "title": "接受并继续"
+      },
+      {
+        "command": "ai-proofread.continuousProofread.skip",
+        "title": "跳过当前段"
+      },
+      {
+        "command": "ai-proofread.continuousProofread.stop",
+        "title": "AI Proofreader: stop continuous proofread"
       }
     ],
     "configuration": {
@@ -849,6 +865,31 @@
           "command": "ai-proofread.wordCheck.applyReplaceForEntry",
           "key": "ctrl+enter",
           "when": "view == ai-proofread.wordCheck && viewItem == wordCheckEntry"
+        },
+        {
+          "command": "ai-proofread.continuousProofread",
+          "key": "ctrl+alt+p",
+          "when": "editorTextFocus && (resourceLangId == markdown || resourceLangId == text || resourceLangId == plaintext || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.continuousProofread.accept",
+          "key": "ctrl+enter",
+          "when": "aiProofreadContinuousProofreadActive == true"
+        },
+        {
+          "command": "ai-proofread.continuousProofread.accept",
+          "key": "alt+enter",
+          "when": "aiProofreadContinuousProofreadActive == true"
+        },
+        {
+          "command": "ai-proofread.continuousProofread.skip",
+          "key": "ctrl+alt+s",
+          "when": "aiProofreadContinuousProofreadActive == true"
+        },
+        {
+          "command": "ai-proofread.continuousProofread.stop",
+          "key": "ctrl+alt+q",
+          "when": "aiProofreadContinuousProofreadActive == true"
         }
       ],
       "editor/context": [
@@ -861,6 +902,16 @@
           "command": "ai-proofread.proofreadSelectionWithExamples",
           "group": "ai-proofread@11.1",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.continuousProofread",
+          "group": "ai-proofread@11.2",
+          "when": "editorTextFocus && (resourceLangId == markdown || resourceLangId == text || resourceLangId == plaintext || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.continuousProofread.stop",
+          "group": "ai-proofread@11.3",
+          "when": "aiProofreadContinuousProofreadActive == true"
         },
         {
           "command": "ai-proofread.searchSelectionInPDF",

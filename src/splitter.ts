@@ -47,6 +47,83 @@ export function splitTextByLength(text: string, cutBy: number = 600): string[] {
 }
 
 /**
+ * 从指定位置起取一段（按长度在空行处切分）
+ * @param document 文档
+ * @param position 起始位置
+ * @param cutBy 切分长度（字符数）
+ * @returns 段文本和范围，若无则返回 null
+ */
+export function getSegmentFromPosition(
+    document: { getText: () => string; offsetAt: (p: { line: number; character: number }) => number; positionAt: (offset: number) => { line: number; character: number } },
+    position: { line: number; character: number },
+    cutBy: number = 600
+): { segment: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } } | null {
+    const text = document.getText();
+    const offset = document.offsetAt(position);
+    const remaining = text.slice(offset);
+    if (!remaining.trim()) return null;
+
+    const chunks = splitTextByLength(remaining, cutBy);
+    const firstChunk = chunks[0];
+    if (!firstChunk) return null;
+
+    const startOffset = offset;
+    const endOffset = offset + firstChunk.length;
+    const startPos = document.positionAt(startOffset);
+    const endPos = document.positionAt(endOffset);
+    return {
+        segment: firstChunk,
+        range: { start: startPos, end: endPos }
+    };
+}
+
+/**
+ * 从指定位置起取一段（按标题切分，取下一个标题区块）
+ * @param document 文档
+ * @param position 起始位置
+ * @param levels 标题级别列表，如 [1,2] 表示 # 和 ##
+ * @returns 段文本和范围，若无则返回 null
+ */
+export function getSegmentFromPositionByTitle(
+    document: { getText: () => string; offsetAt: (p: { line: number; character: number }) => number; positionAt: (offset: number) => { line: number; character: number } },
+    position: { line: number; character: number },
+    levels: number[] = [2]
+): { segment: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } } | null {
+    const text = document.getText();
+    const offset = document.offsetAt(position);
+    const remaining = text.slice(offset);
+    if (!remaining.trim()) return null;
+
+    const sections = splitMarkdownByTitle(remaining, levels);
+    const firstSection = sections[0];
+    if (!firstSection) return null;
+
+    const startOffset = offset;
+    const endOffset = offset + firstSection.length;
+    const startPos = document.positionAt(startOffset);
+    const endPos = document.positionAt(endOffset);
+    return {
+        segment: firstSection,
+        range: { start: startPos, end: endPos }
+    };
+}
+
+/**
+ * 从指定位置起取一段（根据切分模式）
+ */
+export function getSegmentFromPositionWithMode(
+    document: { getText: () => string; offsetAt: (p: { line: number; character: number }) => number; positionAt: (offset: number) => { line: number; character: number } },
+    position: { line: number; character: number },
+    mode: 'length' | 'title',
+    options: { cutBy?: number; levels?: number[] }
+): { segment: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } } | null {
+    if (mode === 'title') {
+        return getSegmentFromPositionByTitle(document, position, options.levels ?? [2]);
+    }
+    return getSegmentFromPosition(document, position, options.cutBy ?? 600);
+}
+
+/**
  * 将markdown文本按标题级别切分
  * @param text markdown文本
  * @param levels 要切分的标题级别列表
