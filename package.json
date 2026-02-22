@@ -205,6 +205,30 @@
       {
         "command": "ai-proofread.tgsccCheckTypes.moveDown",
         "title": "下移"
+      },
+      {
+        "command": "ai-proofread.numbering.check",
+        "title": "AI Proofreader: check numbering hierarchy"
+      },
+      {
+        "command": "ai-proofread.numbering.reveal",
+        "title": "定位到文档"
+      },
+      {
+        "command": "ai-proofread.numbering.markAsTitle",
+        "title": "标记为 Markdown 标题"
+      },
+      {
+        "command": "ai-proofread.numbering.promote",
+        "title": "升级"
+      },
+      {
+        "command": "ai-proofread.numbering.demote",
+        "title": "降级"
+      },
+      {
+        "command": "ai-proofread.numbering.toggleSimplifiedLevel",
+        "title": "伸缩层级"
       }
     ],
     "configuration": {
@@ -597,6 +621,35 @@
           "type": "string",
           "default": "",
           "description": "字词检查：应用替换时，替换结果后附加的标记（如】）。Ctrl+Enter 应用替换时使用此配置。"
+        },
+        "ai-proofread.numbering.ignoreMarkdownPrefix": {
+          "order": 93,
+          "type": "boolean",
+          "default": true,
+          "description": "序号检查：解析时是否忽略行首 # 以识别序号"
+        },
+        "ai-proofread.numbering.checkScope": {
+          "order": 94,
+          "type": "string",
+          "enum": ["heading", "intext", "both"],
+          "enumDescriptions": ["仅标题序号", "仅文中序号", "两者都检查"],
+          "default": "both",
+          "description": "序号检查：检查范围"
+        },
+        "ai-proofread.numbering.customLevels": {
+          "order": 95,
+          "type": "array",
+          "default": [],
+          "description": "序号检查：用户自定义层级，每项含 level、pattern、name",
+          "items": {
+            "type": "object",
+            "properties": {
+              "level": { "type": "number" },
+              "name": { "type": "string" },
+              "pattern": { "type": "string" },
+              "sequenceType": { "type": "string" }
+            }
+          }
         }
       }
     },
@@ -631,11 +684,21 @@
           "id": "ai-proofread.citation",
           "name": "citations",
           "when": "aiProofread.showCitationView"
+        },
+        {
+          "id": "ai-proofread.numbering",
+          "name": "标题层级树",
+          "when": "aiProofread.showNumberingView"
         }
       ]
     },
     "menus": {
       "view/title": [
+        {
+          "command": "ai-proofread.numbering.toggleSimplifiedLevel",
+          "when": "view == ai-proofread.numbering",
+          "group": "navigation"
+        },
         {
           "command": "ai-proofread.prompts.new",
           "when": "view == ai-proofread.prompts",
@@ -722,6 +785,21 @@
           "command": "ai-proofread.wordCheck.applyReplaceForEntry",
           "group": "wordCheck@2",
           "when": "view == ai-proofread.wordCheck && viewItem == wordCheckEntry"
+        },
+        {
+          "command": "ai-proofread.numbering.markAsTitle",
+          "group": "numbering@2",
+          "when": "view == ai-proofread.numbering && viewItem == numberingHeading"
+        },
+        {
+          "command": "ai-proofread.numbering.promote",
+          "group": "numbering@2",
+          "when": "view == ai-proofread.numbering && viewItem == numberingHeading"
+        },
+        {
+          "command": "ai-proofread.numbering.demote",
+          "group": "numbering@2",
+          "when": "view == ai-proofread.numbering && viewItem == numberingHeading"
         }
       ],
       "keybindings": [
@@ -771,6 +849,11 @@
           "command": "ai-proofread.markTitlesFromToc",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown"
+        },
+        {
+          "command": "ai-proofread.numbering.check",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == plaintext"
         },
         {
           "command": "ai-proofread.diffItWithAnotherFile",

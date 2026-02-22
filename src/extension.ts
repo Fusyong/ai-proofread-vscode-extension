@@ -16,6 +16,9 @@ import { UtilityCommandHandler } from './commands/utilityCommandHandler';
 import { CitationCommandHandler } from './commands/citationCommandHandler';
 import { registerCitationView } from './citation/citationView';
 import { WordCheckCommandHandler } from './commands/wordCheckCommandHandler';
+import { NumberingTreeDataProvider } from './numbering/numberingTreeProvider';
+import { registerNumberingView } from './numbering/numberingView';
+import { NumberingCheckCommandHandler } from './commands/numberingCheckCommandHandler';
 import { registerPromptsView, type PromptTreeItem } from './promptsView';
 import { getJiebaWasm } from './jiebaLoader';
 
@@ -43,6 +46,10 @@ export function activate(context: vscode.ExtensionContext) {
     wordCheckHandler.registerCustomTablesView();
     wordCheckHandler.registerCheckTypesViews();
 
+    const numberingProvider = new NumberingTreeDataProvider();
+    const { treeView: numberingTreeView } = registerNumberingView(context, numberingProvider);
+    const numberingHandler = new NumberingCheckCommandHandler(context, numberingProvider, numberingTreeView);
+
     const promptManager = PromptManager.getInstance(context);
     const { provider: promptsTreeProvider } = registerPromptsView(context, promptManager);
 
@@ -53,6 +60,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', false);
+    vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', false);
 
     // 设置校对、切分、合并的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
@@ -350,6 +358,18 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.dictCheckTypes.moveDown', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleDictCheckTypeMoveDown(el)),
         vscode.commands.registerCommand('ai-proofread.tgsccCheckTypes.moveUp', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleTgsccCheckTypeMoveUp(el)),
         vscode.commands.registerCommand('ai-proofread.tgsccCheckTypes.moveDown', (el: import('./xh7/checkTypesView').CheckTypeTreeItem) => wordCheckHandler.handleTgsccCheckTypeMoveDown(el)),
+
+        // 标题层级与连续性检查
+        vscode.commands.registerCommand('ai-proofread.numbering.check', async () => {
+            await vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', true);
+            await new Promise((r) => setTimeout(r, 50));
+            await numberingHandler.handleCheckCommand();
+        }),
+        vscode.commands.registerCommand('ai-proofread.numbering.reveal', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleRevealCommand(node)),
+        vscode.commands.registerCommand('ai-proofread.numbering.markAsTitle', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleMarkAsTitleCommand(node)),
+        vscode.commands.registerCommand('ai-proofread.numbering.promote', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handlePromoteCommand(node)),
+        vscode.commands.registerCommand('ai-proofread.numbering.demote', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleDemoteCommand(node)),
+        vscode.commands.registerCommand('ai-proofread.numbering.toggleSimplifiedLevel', () => numberingHandler.handleToggleSimplifiedLevelCommand()),
     ];
 
     context.subscriptions.push(...disposables, configManager);
