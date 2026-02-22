@@ -229,6 +229,22 @@
       {
         "command": "ai-proofread.numbering.toggleSimplifiedLevel",
         "title": "伸缩层级"
+      },
+      {
+        "command": "ai-proofread.numbering.defineTitle",
+        "title": "定义标题"
+      },
+      {
+        "command": "ai-proofread.numbering.checkSegments",
+        "title": "检查段内序号"
+      },
+      {
+        "command": "ai-proofread.numberingSegments.toggleSimplifiedLevel",
+        "title": "伸缩层级"
+      },
+      {
+        "command": "ai-proofread.numbering.defineSegmentPattern",
+        "title": "定义段内序号"
       }
     ],
     "configuration": {
@@ -626,27 +642,33 @@
           "order": 93,
           "type": "boolean",
           "default": true,
-          "description": "序号检查：解析时是否忽略行首 # 以识别序号"
-        },
-        "ai-proofread.numbering.checkScope": {
-          "order": 94,
-          "type": "string",
-          "enum": ["heading", "intext", "both"],
-          "enumDescriptions": ["仅标题序号", "仅文中序号", "两者都检查"],
-          "default": "both",
-          "description": "序号检查：检查范围"
+          "description": "标题树检查：解析时是否忽略行首 # 以识别序号"
         },
         "ai-proofread.numbering.customLevels": {
-          "order": 95,
+          "order": 94,
           "type": "array",
           "default": [],
-          "description": "序号检查：用户自定义层级，每项含 level、pattern、name",
+          "description": "标题树检查：用户自定义层级。每项含 level(1-8)、pattern(正则，需用捕获组包住序号)、name、sequenceType(序号类型可选 arabic | chinese-lower | chinese-upper | roman-upper | roman-lower | latin-upper | latin-lower | circled)。匹配时忽略原文空白。",
           "items": {
             "type": "object",
             "properties": {
               "level": { "type": "number" },
               "name": { "type": "string" },
               "pattern": { "type": "string" },
+              "sequenceType": { "type": "string" }
+            }
+          }
+        },
+        "ai-proofread.numbering.customInlinePatterns": {
+          "order": 95,
+          "type": "array",
+          "default": [],
+          "description": "段内序号检查：用户自定义 pattern(正则，需用捕获组包住序号)、name(可选)、sequenceType(序号类型同前)。支持一行多匹配。",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pattern": { "type": "string" },
+              "name": { "type": "string" },
               "sequenceType": { "type": "string" }
             }
           }
@@ -687,8 +709,13 @@
         },
         {
           "id": "ai-proofread.numbering",
-          "name": "标题层级树",
+          "name": "标题树",
           "when": "aiProofread.showNumberingView"
+        },
+        {
+          "id": "ai-proofread.numberingSegments",
+          "name": "段内序号",
+          "when": "aiProofread.showNumberingSegmentsView"
         }
       ]
     },
@@ -697,6 +724,21 @@
         {
           "command": "ai-proofread.numbering.toggleSimplifiedLevel",
           "when": "view == ai-proofread.numbering",
+          "group": "navigation"
+        },
+        {
+          "command": "ai-proofread.numbering.defineTitle",
+          "when": "view == ai-proofread.numbering",
+          "group": "navigation"
+        },
+        {
+          "command": "ai-proofread.numberingSegments.toggleSimplifiedLevel",
+          "when": "view == ai-proofread.numberingSegments",
+          "group": "navigation"
+        },
+        {
+          "command": "ai-proofread.numbering.defineSegmentPattern",
+          "when": "view == ai-proofread.numberingSegments",
           "group": "navigation"
         },
         {

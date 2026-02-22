@@ -75,4 +75,26 @@ export interface ParseOptions {
     checkScope?: 'heading' | 'intext' | 'both';
     /** 标题序号：行首最大缩进（空格数），超过则视为文中序号 */
     headingMaxIndent?: number;
+    /** 行号偏移（用于按段解析时映射回原文） */
+    lineOffset?: number;
+    /** 段内检测时忽略 # 开头的标题行 */
+    skipMarkdownHeadingLines?: boolean;
+    /** 段内检测时支持一行内多个序号（如 (一)。。。（二）。。。（三）） */
+    multiMatchPerLine?: boolean;
+}
+
+/** 段内序号：一段（连续多行）的根节点 */
+export interface SegmentNode {
+    /** 段序号（1-based） */
+    segmentIndex: number;
+    /** 起始行号（1-based） */
+    startLine: number;
+    /** 结束行号（1-based） */
+    endLine: number;
+    /** 段首行预览 */
+    preview: string;
+    /** 段内序号子节点 */
+    children: NumberingNode[];
+    /** 行范围（用于定位） */
+    range?: Range;
 }

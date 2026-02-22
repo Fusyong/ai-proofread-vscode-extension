@@ -4,7 +4,7 @@
  */
 
 import type { NumberingNode, CheckIssue } from './types';
-import { getSlotById } from './slotTable';
+import { getEffectiveSlotById } from './slotResolver';
 
 /**
  * 收集树中所有节点（深度优先）
@@ -106,7 +106,7 @@ function checkMixedStyleAtLevel(
         const slotIds = new Set(list.map((n) => n.slotId));
         if (slotIds.size <= 1) continue;
         const slotNames = [...slotIds]
-            .map((id) => getSlotById(id)?.marker ?? `slot${id}`)
+            .map((id) => getEffectiveSlotById(id)?.marker ?? `slot${id}`)
             .join('、');
         const firstSlot = list[0].slotId;
         const firstDiff = list.find((n) => n.slotId !== firstSlot);

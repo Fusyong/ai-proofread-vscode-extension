@@ -2,7 +2,7 @@
 
 本文档为 AI Proofreader 扩展的「标题层级与连续性检查」功能提供需求分析、技术方案和分阶段开发计划。
 
-**功能目标**：对文档中的标题层级树进行解析、校验和可视化，支持多种序号体系，检测层级错乱、同级不连续等问题，并通过 TreeView 展示结果、支持批量操作（标记为 Markdown 标题、升级/降级）。
+**功能目标**：对文档中的标题树进行解析、校验和可视化，支持多种序号体系，检测层级错乱、同级不连续等问题，并通过 TreeView 展示结果、支持批量操作（标记为 Markdown 标题、升级/降级）。
 
 ---
 
@@ -12,7 +12,7 @@
 
 1. **标题层级体系**：建立用户可扩展的标题层级体系，支持字符串和正则表达式配置。
 2. **检查机制**：检测层级缺失、层级错乱、同级不连续等问题。
-3. **TreeView 展示**：以树形结构展示文档标题层级树，标注潜在错误，支持同级别批量操作。
+3. **TreeView 展示**：以树形结构展示文档标题树，标注潜在错误，支持同级别批量操作。
 
 ### 1.2 序号分类
 
@@ -82,7 +82,7 @@
 
 ### 1.5 TreeView 与操作
 
-- **展示**：树形展示文档标题层级树，每个节点对应一个序号行；可区分标题序号/文中序号；错误节点用图标/颜色标注。
+- **展示**：树形展示文档标题树，每个节点对应一个序号行；可区分标题序号/文中序号；错误节点用图标/颜色标注。
 - **操作**（同级别批量，主要针对标题序号）：
   - **标记为 Markdown 标题**：将选中节点对应的行改为 `## 标题` 等形式。
   - **整体升级**：减少 `#` 数量或提升标题层级。
@@ -250,8 +250,36 @@ interface CheckIssue {
 
 ### 5.2 用户扩展
 
-- 配置项 `ai-proofread.numbering.customLevels`：数组，每项含 `level`、`pattern`（字符串转正则）、`name`。
+- 配置项 `ai-proofread.numbering.customLevels`：数组，每项含 `level`、`pattern`（字符串转正则）、`name`、`sequenceType`（可选）。
 - 与预置合并时，用户定义优先覆盖同 level 的预置。
+
+#### 自定义 pattern 写法
+
+**匹配规则**：自定义层级匹配时，会先去掉原文中所有空白字符（`\s+` → 空），再与 pattern 匹配。因此 `第 1 章`、`第1章` 在 pattern 中可统一按 `第1章` 处理。
+
+**格式**：
+- 普通字符串：`第(\\d+)章`（JSON 中需双反斜杠）或 `第(\d+)章`
+- 正则字面量：`/第(\d+)章/` 或 `/第(\d+)章/i`（支持 i、g、m 等标志）
+
+**捕获数字**：必须用**捕获组** `(...)` 包住序号部分，系统会取 `match[1]` 或 `match[2]` 作为 `numberingValue`：
+- 若 pattern 只有一个捕获组，用 `(数字部分)` 即可，如 `第(\d+)章`
+- 若有可选前缀（如 `#{1,6}`），第一个捕获组可能是前缀，第二个才是数字，如 `(#{1,6})?第(\d+)章` 中的 `(\d+)`
+
+**sequenceType**（可选）：决定如何把捕获到的字符串转为数值，默认 `arabic`。可选值：
+- `arabic`：阿拉伯数字
+- `chinese-lower` / `chinese-upper`：中文小写/大写
+- `roman-upper` / `roman-lower`：罗马数字
+- `latin-upper` / `latin-lower`：拉丁字母（A=1, B=2…）
+- `circled`：带圈数字 ①②③
+
+**示例**：
+
+| 用途       | pattern           | sequenceType   | 匹配示例              |
+|------------|-------------------|----------------|-----------------------|
+| 第 N 章    | `第(\d+)章`       | arabic         | 第1章、第 2 章        |
+| 第 N 节    | `第([一二三四五六七八九十百千]+)节` | chinese-lower | 第一节、第 二 节       |
+| Part N     | `[Pp]art(\d+)`    | arabic         | Part 1、part2（匹配时已去空白） |
+| 附录 A     | `附录([A-Z])`     | latin-upper    | 附录A、附录 B         |
 
 ---
 
@@ -298,7 +326,7 @@ interface CheckIssue {
 ### 7.3 package.json 贡献点
 
 - **commands**：上述命令。
-- **views.explorer**：`ai-proofread.numbering`，名称「标题层级树」。
+- **views.explorer**：`ai-proofread.numbering`，名称「标题树」。
 - **menus.view/item/context**：当 `view == ai-proofread.numbering` 时显示「标记为标题」「升级」「降级」「定位」。
 - **configuration**：`ai-proofread.numbering.ignoreMarkdownPrefix`、`ai-proofread.numbering.customLevels`、`ai-proofread.numbering.allowGaps` 等。
 
@@ -377,7 +405,7 @@ interface CheckIssue {
 ### 10.4 与 mark titles from table of contents 的关系
 
 - **mark titles from table of contents**：根据目录表在正文中查找并标记标题，是「目录 → 正文」的匹配。
-- **序号检查**：解析正文中的标题层级树，检查其合理性，并可「序号行 → 添加 #」。
+- **序号检查**：解析正文中的标题树，检查其合理性，并可「序号行 → 添加 #」。
 - 两者互补，不冲突；可考虑在序号检查的「标记为标题」时，与目录表逻辑做可选联动（如根据目录表确定 `#` 数量），作为后续增强。
 
 ---

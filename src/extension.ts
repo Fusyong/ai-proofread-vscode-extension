@@ -18,6 +18,8 @@ import { registerCitationView } from './citation/citationView';
 import { WordCheckCommandHandler } from './commands/wordCheckCommandHandler';
 import { NumberingTreeDataProvider } from './numbering/numberingTreeProvider';
 import { registerNumberingView } from './numbering/numberingView';
+import { SegmentTreeDataProvider } from './numbering/segmentTreeProvider';
+import { registerSegmentView } from './numbering/segmentView';
 import { NumberingCheckCommandHandler } from './commands/numberingCheckCommandHandler';
 import { registerPromptsView, type PromptTreeItem } from './promptsView';
 import { getJiebaWasm } from './jiebaLoader';
@@ -48,7 +50,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     const numberingProvider = new NumberingTreeDataProvider();
     const { treeView: numberingTreeView } = registerNumberingView(context, numberingProvider);
-    const numberingHandler = new NumberingCheckCommandHandler(context, numberingProvider, numberingTreeView);
+    const segmentProvider = new SegmentTreeDataProvider();
+    const { treeView: segmentTreeView } = registerSegmentView(context, segmentProvider);
+    const numberingHandler = new NumberingCheckCommandHandler(context, numberingProvider, numberingTreeView, segmentProvider, segmentTreeView);
 
     const promptManager = PromptManager.getInstance(context);
     const { provider: promptsTreeProvider } = registerPromptsView(context, promptManager);
@@ -61,6 +65,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', false);
+    vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', false);
 
     // 设置校对、切分、合并的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
@@ -361,15 +366,37 @@ export function activate(context: vscode.ExtensionContext) {
 
         // 标题层级与连续性检查
         vscode.commands.registerCommand('ai-proofread.numbering.check', async () => {
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', true);
-            await new Promise((r) => setTimeout(r, 50));
-            await numberingHandler.handleCheckCommand();
+            const choice = await vscode.window.showQuickPick(
+                [
+                    { label: '标题树', value: 'title' },
+                    { label: '段内序号', value: 'segment' },
+                ],
+                { title: '选择检查模式', placeHolder: '标题树：全文序号结构；段内序号：按段检测文中序号' }
+            );
+            if (!choice) return;
+            if (choice.value === 'title') {
+                await vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', true);
+                await new Promise((r) => setTimeout(r, 50));
+                await numberingHandler.handleCheckCommand();
+            } else {
+                await vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', true);
+                await new Promise((r) => setTimeout(r, 50));
+                await numberingHandler.handleSegmentCheckCommand();
+            }
         }),
         vscode.commands.registerCommand('ai-proofread.numbering.reveal', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleRevealCommand(node)),
         vscode.commands.registerCommand('ai-proofread.numbering.markAsTitle', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleMarkAsTitleCommand(node)),
         vscode.commands.registerCommand('ai-proofread.numbering.promote', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handlePromoteCommand(node)),
         vscode.commands.registerCommand('ai-proofread.numbering.demote', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleDemoteCommand(node)),
         vscode.commands.registerCommand('ai-proofread.numbering.toggleSimplifiedLevel', () => numberingHandler.handleToggleSimplifiedLevelCommand()),
+        vscode.commands.registerCommand('ai-proofread.numberingSegments.toggleSimplifiedLevel', () => numberingHandler.handleSegmentToggleSimplifiedLevelCommand()),
+        vscode.commands.registerCommand('ai-proofread.numbering.defineTitle', () => numberingHandler.handleDefineTitleCommand()),
+        vscode.commands.registerCommand('ai-proofread.numbering.defineSegmentPattern', () => numberingHandler.handleDefineSegmentPatternCommand()),
+        vscode.commands.registerCommand('ai-proofread.numbering.checkSegments', async () => {
+            await vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', true);
+            await new Promise((r) => setTimeout(r, 50));
+            await numberingHandler.handleSegmentCheckCommand();
+        }),
     ];
 
     context.subscriptions.push(...disposables, configManager);

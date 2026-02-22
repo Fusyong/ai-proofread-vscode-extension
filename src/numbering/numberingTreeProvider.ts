@@ -48,9 +48,9 @@ export class NumberingTreeDataProvider implements vscode.TreeDataProvider<Number
     getTreeItem(element: NumberingNode): vscode.TreeItem {
         const issue = this.issues.find((i) => i.node === element);
         const idx = element.lineText.indexOf(element.numberingText);
-        const suffix = idx >= 0
-            ? element.lineText.substring(idx).trimStart()
-            : element.lineText;
+        const suffix = (idx >= 0
+            ? element.lineText.substring(idx)
+            : element.lineText).trimStart();
         const preview = suffix.length > PREVIEW_LEN ? suffix.slice(0, PREVIEW_LEN) + '…' : suffix;
         const displayLevel = this.getDisplayLevel(element);
         const levelPrefix = element.category === 'heading'
@@ -66,13 +66,6 @@ export class NumberingTreeDataProvider implements vscode.TreeDataProvider<Number
         item.description = issue ? issue.type : '';
         item.tooltip = issue ? `${element.lineText}\n\n${issue.message}` : element.lineText;
         item.contextValue = element.category === 'heading' ? 'numberingHeading' : 'numberingIntext';
-        if (issue) {
-            item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('editorWarning.foreground'));
-        } else if (element.category === 'heading') {
-            item.iconPath = new vscode.ThemeIcon('symbol-namespace');
-        } else {
-            item.iconPath = new vscode.ThemeIcon('list-flat');
-        }
         return item;
     }
 
