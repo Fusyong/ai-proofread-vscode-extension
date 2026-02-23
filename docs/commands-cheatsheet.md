@@ -2,7 +2,7 @@
 
 *v1.7.0*
 
-> **文档定位**：本文档是**快速入口**——帮你从业务场景找到对应流程和命令。详细说明、依赖安装、最佳实践见扩展主页面或 [README](../README.md)。
+> **文档定位**：本文档是**快速入口**——帮你从业务场景找到对应流程和命令。详细说明、依赖安装、最佳实践见扩展主页面或 [README](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/README.md)。
 
 ---
 
@@ -320,7 +320,7 @@ flowchart LR
 | **字词检查** | wordCheck.replacePrefix/Suffix、wordErrorCollector.* |
 | **标题与序号** | numbering.ignoreMarkdownPrefix、customLevels、customInlinePatterns |
 
-完整配置说明见 [README - 配置](../README.md)。
+完整配置说明见 [README - 配置](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/README.md)。
 
 ---
 
@@ -337,7 +337,7 @@ flowchart LR
 | **标题层级规则** | 设置 `numbering.customLevels` | 标题树检查用；自定义序号格式（如「前言」「单一单元」） |
 | **段内序号规则** | 设置 `numbering.customInlinePatterns` | 段内序号检查用；自定义 pattern |
 
-详细说明见扩展主页面或 [README](../README.md)。
+详细说明见扩展主页面或 [README](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/README.md)。
 
 ---
 
@@ -345,4 +345,4 @@ flowchart LR
 
 - **Mermaid 图**：可在支持 Mermaid 的 Markdown 预览（如 VS Code 插件）、GitHub/GitLab、Notion 等中直接渲染为流程图。
 - **命令查找**：命令面板（Ctrl+Shift+P）输入「AI Proofreader」或「proofread」「split」「convert」「check」等关键词即可缩小范围。
-- **详细说明**：每个命令的详细用法、依赖（Pandoc、pdftotext、SumatraPDF 等）和注意事项见扩展主页面或 [README](../README.md)；设置说明则可以在设置界面看到。
+- **详细说明**：每个命令的详细用法、依赖（Pandoc、pdftotext、SumatraPDF 等）和注意事项见扩展主页面或 [README](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/README.md)；设置说明则可以在设置界面看到。

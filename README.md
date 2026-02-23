@@ -15,7 +15,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 1. [安装VS Code](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#_1)，用VSCode打开一个空文件夹，通过VS Code界面左侧的扩展按钮打开扩展管理窗口（Ctrl+Shift+X）
 2. 搜索AI Proofreader，点击安装按钮`install`安装
 3. 到大语言模型服务平台（默认为[Deepseek开放平台](https://platform.deepseek.com/)），通过注册、实名认证、充值、生成API秘钥等操作，获得有效的秘钥，复制秘钥
-5. 回到AI Proofreader扩展界面，后点击设置按钮⚙️，选中弹出菜单中的设置项Settings，把秘钥粘贴到对应平台的API秘钥框中
+4. 回到AI Proofreader扩展界面，后点击设置按钮⚙️，选中弹出菜单中的设置项Settings，把秘钥粘贴到对应平台的API秘钥框中
 
 ## 2. 快速上手
 
@@ -48,6 +48,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 打开markdown文件（或选中其中一段文字），或上述切分得到JSON文件，这时可以使用右键菜单访问与文本类型相关的命令，如切分或校对。
 
+更详细的命令速查与业务流程图见[docs/commands-cheatsheet.md](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/docs/commands-cheatsheet.md)。
+
 ## 3. 使用说明
 
 ### 3.1. 文档准备
@@ -69,7 +71,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 文档转换后还有[一些整理技巧](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode)，不过对于使用本扩展进行校对而言，进一步的整理工作通常不是必须的。常见的例外情形是，你希望按篇、章、节、标题等结构来切分、校对，以便保持语境连贯，那么你需要学习更多整理技巧，或者使用其他工具，以便得到有标题的Markdown文档。
 
 1. 本扩展命令`mark titles from table of contents`，可以根据一个目录表文件（Markdown分级列表的形式），逐行比较当前文档，把标题行标记出来，会自动忽略数字（如页码）、英文句点和省略号（页码前导符号）、空格、带圈数字①-㉟、Markdown形式的注码如 `[^1] [^abc]`、上标注码如 `^1^ ^abc^`。
-2. PDF到处的文本，如果没有使用空行分段，无法切分，可以使用整理段落命令`format paragraphs`中的“段末加空行”选项加以处理。
+2. PDF导出的文本，如果没有使用空行分段，无法切分，可以使用整理段落命令`format paragraphs`中的“段末加空行”选项加以处理。
 3. Markdown中的段内断行是合法的，即使句子被断开，对大模型的影响也不大。当然，也可以用上述命令`format paragraphs`中的“删除段内分行”选项处理后再校对。
 4. 过多的无效字符影响输出速度，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。方正系排版软件可能使用半角标点，校对后通常会被改成全角，你也可以使用相同的方法加以替换，避免干扰。请参考上述讲整理技巧的文章。
 5. 更强大、通用的文本整理技术是正则表达式查找替换，这需要专门学习，可参考[给编辑朋友的正则表达式课程](https://blog.xiiigame.com/2020-05-31-给编辑朋友的正则表达式课程/)。
@@ -150,12 +152,12 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 5. 最后会提示你查看结果：JSON结果、前后差异、日志文件，以及生成差异文件（类似带修改标记的Word文档）。
 6. 如有未完成的条目，可重新校对，重新校对时只处理未完成的条目
 
-#### 3.3.3 持续发现与监督校对（实验功能）
+#### 3.2.3 持续发现与监督校对（实验功能）
 
-从当前位置自动带样例校对一段，人工复核保存并收集样例，然后继续下一轮。
+一个半自动的持续工作流。从当前位置开始，自动切分一段并带样例提交LLM校对，**人工复核校对结果**，保存后自动整理校对样例，**人工挑选校对样例**，确认后自动继续下一轮。
 
 1. 打开要校对的文档，将光标置于起始位置
-2. 使用命令 `AI Proofreader: continuous proofread` 或快捷键 `Ctrl+Alt+P` 启动
+2. 使用命令 `continuous proofread` 或快捷键 `Ctrl+Alt+P` 启动
 3. 首次使用需选择切分方式（按长度 / 按标题）、上下文构建方式、温度、提示词重复模式；本流程内自动沿用，终止后配置清除
 4. 每段校对完成后会打开 diff 视图，可编辑右侧结果
 5.关闭 diff 窗口时会提示「接受并继续」「放弃」和「终止校对」
@@ -172,14 +174,15 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 ### 3.4. 管理提示词
 
-**本扩展目前默认提示词的功能是校对一般的语言文字错误和知识性错误**，具体内容见代码库种的proofreader.ts文件。你可以设置自己的提示词，不限于校对工作。
+#### 3.4.1 提示词管理
 
-通过命令面板（Ctrl+Shift+P）可以
+**本扩展目前默认提示词的功能是校对一般的语言文字错误和知识性错误**，具体内容见代码库中的proofreader.ts文件。你可以设置自己的提示词，不限于校对工作。
 
-1. 管理提示词 (AI Proofreader: set prompts)，可增、删、改。没有编辑界面，请写好后粘贴进入。
-2. 选择当前使用的提示词 (AI Proofreader: select prompt)
+通过命令面板（Ctrl+Shift+P）使用manage prompts命令可以打开提示列表视图，管理提示词。可增、删、改，选择当前使用的提示词。没有编辑界面，请写好后贴入。
 
 也可以在配置文件中处理提示词，但不适合没有编程知识的用户使用。
+
+#### 3.4.2 提示词原理与撰写示范
 
 为了写好提示词，你需要了解本扩展的工作原理：
 
@@ -210,9 +213,9 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 本人有一个[开源提示词库](https://github.com/Fusyong/LLM-prompts-from-a-book-editor)，但不是针对本扩展的，改造（对三种标签进行说明）后才能用于本扩展。
 
-### 3.5. 提示词重复功能
+#### 3.4.3 提示词重复功能
 
-支持基于谷歌研究的提示词重复功能，以提高准确度。其原理是：重复用户输入（reference、context、target），让模型在真正处理时已经获得全局信息，从而获得更好的上下文理解。
+本扩展支持基于谷歌研究的提示词重复功能，以提高准确度。其原理是：重复用户输入（reference、context、target），让模型在真正处理时已经获得全局信息，从而获得更好的上下文理解。
 
 **重复模式**：在设置中配置 `ai-proofread.proofread.promptRepetition` 选项：
 - **不重复**（none，默认）：不启用重复功能
@@ -224,7 +227,7 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 - 重复发生在可并行化的prefill阶段，不增加延迟
 - 建议先在少量文本上测试效果，再决定是否启用。经初步测试，对于较长的文本效果更好
 
-### 3.6. 日志等过程文件
+### 3.5. 日志等过程文件
 
 为了让用户能够核验、控制每一个步骤，扩展会以要校对的文档的文件名（以“测试.md”为例）为基础，生成一些中间文件，各自的作用如下：
 
@@ -234,24 +237,31 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 4. 测试.log，切分日志，用来检查切分是否合理
 5. 测试.proofread.json，校对上述JSON文件的直接结果，其中的`null`项表示还没有校对结果，重新校对时只处理`null`对应的条目，而不会重复处理已经完成的条目；校对前后的JSON长度不一致时（比如切分标准不一导致）会提示备份
 6. 测试.proofread.json.md，拼合上项JSON文件中的结果，比较最初的markdown文件即可看出改动处；如果这个文件已经存在，则自动备份，并加时间戳
-7. 测试.proofread.html：通过jsdiff库比较校对前后markdown文件所得的结果，与Word近似的行内标记，可通过浏览器打印成PDF。需要联网调用jsdiff库，并等待运算完成
+7. 测试.diff.html：通过jsdiff库比较校对前后markdown文件所得的结果，与Word近似的行内标记，可通过浏览器打印成PDF。需要联网调用jsdiff库，并等待运算完成
 8. 测试.proofread.log，校对日志，**校对文本选段的结果也会存在这里**
 9. 测试.alignment.html，逐句对齐勘误表（通过 diff 命令选择「对齐句子生成勘误表」或校对面板「生成勘误表」生成）
 10. 测试.word-errors.csv，常用词语错误收集结果（生成勘误表时选择「同时收集」可得），CSV 格式（错误词语,正确词语,错误词语所在小句,错词长度,正词长度），便于筛选
 
 **请特别注意：除自动累加的日志文件和提示备份的`测试.proofread.json`、自动备份的`测试.proofread.json.md`，其余中间文件，每次操作都将重新生成！如有需要，请自行备份。**
 
-### 3.7. 其他功能与工具
+### 3.6. 其他功能与工具
 
-1. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用PDF查看器SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
-2. **字词检查**：命令`check words`。分类两个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的提示与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》的数据，用户可加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有大较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。
-3. **标题树与段内序号检查**：命令`check numbering hierarchy`。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
-4. **引文核对**：指定本地文献库根目录（Markdown格式，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。
-5. **转换半角引号为全角**：使用`AI Proofreader: convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。
-6. **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。
-7. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
+已经作为辅助工具在前文提到的功能，这里也列入题目，以便速查。
 
-### 3.8. 注意事项
+1. **转换文档格式**：前面说到`convert docx to markdown`和`convert PDF to markdown`两个命令。还有`convert markdown to docx`，可转换Markdown为docx（Word、WPS的常用格式）。
+2. **标记标题**：前面说到`mark titles from table of contents`命令可基于目录列表标记标题。如果文档标题以序号引导，还可以使用后面提到的`check numbering hierarchy`命令来标记。
+3. **段落整理**：前面说到`format paragraphs`命令，可以在段末加空行，即整理成符合Markdown格式的段落；还可以删除符合Markdown格式但不符合一般习惯的段内分行。基于文档行长众数来计算，因而适合整体较长，并且以长段落为主的文档；短小、段落零碎时准确率会比较低。
+4. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用PDF查看器SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
+5. **字词检查**：命令`check words`。分类两个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的提示与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》的数据。用户还可以通过`manage custom tables`命令，加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。这是一个非常强大且灵活的功能，值得深入探索。
+6. **标题树与段内序号检查**：命令`check numbering hierarchy`。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
+7. **引文核对**：指定本地文献库根目录（Markdown格式，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。
+8. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
+9. **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
+10. **按句子切分**：使用`split into sentences`命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子，适合用于编辑校对样例，与其保存时的默认分隔符一致。
+11. **编辑校对样例**：使用`edit proofreading examples`命令，千文已经有介绍。
+12. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
+
+### 3.7. 注意事项
 
 1. 确保在使用前已正确配置必要的 API 密钥。**请妥善保存你的秘钥！**
 2. **一般的语言文字校对依赖丰富的知识、语料，建议使用大规模、非推理模型。某些推理模型、混合模型可能因为运行时间过长而导致错误，而服务器端可能已经实际运行并计费！**
@@ -273,7 +283,7 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 > ⚠️ `proofread.retryDelay` 与 `proofread.timeout` 的单位均为 **秒**。扩展会在内部自动转换为毫秒进行 API 调用，升级旧版本后请确认你的设置值。
 
-### 4.2. 大语言模型
+### 4.1. 大语言模型
 
 目前支持这些大语言模型服务：
 
@@ -282,7 +292,7 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 1. [Google Gemini](https://aistudio.google.com/)，[模型列表](https://ai.google.dev/gemini-api/docs/models)
 1. [Ollama本地模型](https://ollama.ai/)，对计算机性能、专业知识要求较高
 
-### 3.2. 模型温度
+### 4.2. 模型温度
 
 每个模型用于校对的最佳温度需要耐心测试才能得到。
 
@@ -344,6 +354,10 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 ## 6. 更新日志
 
+### v1.7.1
+
+- 优化：文档和速查手册
+
 ### v1.7.0
 
 - 特性：持续发现与监督校对流程（实验功能），即带样例校对，审改校对结果并收集样例，再次带样例校对，如此循环。是对现有几个功能的集成
@@ -362,7 +376,7 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
     - 在句子对齐和引文核查中，可选分词（默认search模式）后再进行相似度计算，更准确，但速度稍慢。
 - 优化：字词检查
     - 词典表外异形词划分为单字词和多字词两个选项，都在分词后检查
-    - 增加《第一异形词整理表》数据，作为预置的自定义替换表
+    - 增加《第一批异形词整理表》数据，作为预置的自定义替换表
     - 字词检查可选输出统计表
     - 简化单字检查逻辑，大大提高速度
 - 特性：对文件或选段进行分词，或生成词频词性统计表；生成字频统计表
@@ -530,6 +544,9 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 ```bash
 # 安装依赖
 npm install
+
+# 首次开发需先执行一次打包，确保 sql.js 和 jieba-wasm 已复制到 dist
+npm run package
 
 # 开发时实时编译
 npm run watch
