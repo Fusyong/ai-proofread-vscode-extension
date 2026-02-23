@@ -233,46 +233,45 @@ flowchart LR
 
 | 命令 | 简短说明 |
 |------|----------|
-| **文档（可选）** | |
+| **文档转换** | |
 | AI Proofreader: convert docx to markdown | 将 Word(docx) 转为 Markdown，需安装 Pandoc |
 | AI Proofreader: convert PDF to markdown | 将活文字 PDF 转为 Markdown，需安装 pdftotext |
 | AI Proofreader: convert markdown to docx | 将 Markdown 转为 Word(docx) |
 | **文档整理** | |
 | AI Proofreader: format paragraphs | 整理段落：段末加空行 / 删除段内分行 |
 | AI Proofreader: mark titles from table of contents | 根据目录表（Markdown 列表）在文档中标记标题 |
+| AI Proofreader: check numbering hierarchy | 检查带序号的标题，也可用于标记这些标题 |
 | AI Proofreader: convert quotes to Chinese | 半角引号转全角（可设为校对后自动执行） |
-| **文档切分** | |
+| **文档切分与语境合并** | |
 | AI Proofreader: split file ⭐ | 切分文件（统一入口，会提示选择切分模式） |
 | AI Proofreader: split by length | 按长度切分，输入目标字符数 |
 | AI Proofreader: split by title | 按标题切分，输入标题级别（如 1,2） |
 | AI Proofreader: split by title and length | 按标题+长度：题下过长则再切、过短则合并 |
 | AI Proofreader: split by length with title context | 按长度切分，并为每段配上所在标题范围的上下文（注意 token 费用） |
 | AI Proofreader: split by length with paragraph context | 按长度切分，并为每段配上前后段落作为上下文（注意 token 费用） |
-| AI Proofreader: split into sentences | 将文本切分为句子（用于整理校对样例等） |
-| **合并与校对** | |
 | AI Proofreader: merge two files | 合并两个 JSON：把语境/参考资料并入校对用 JSON |
+| **合并与校对** | |
+| AI Proofreader: open proofreading panel ⭐ | 打开 **校对面板**（集中了切分、校对、比较等**按钮**，是主要 UI 入口） |
+| AI Proofreader: proofread file ⭐ | 批量校对当前打开的 JSON 文件 |
 | AI Proofreader: proofread selection ⭐ | 校对当前选中的文本（选段校对） |
 | AI Proofreader: proofread selection with examples | 带样例校对选中文本（参考 .proofread/examples.md） |
-| AI Proofreader: edit Proofreading examples | 编辑校对样例（基于选中文本或 diff 窗口） |
-| AI Proofreader: proofread file ⭐ | 批量校对当前打开的 JSON 文件 |
 | AI Proofreader: continuous proofread ⭐ | 持续发现与监督校对（实验功能，命令面板或右键菜单） |
 | AI Proofreader: stop continuous proofread | 终止持续校对 |
-| **比较与结果** | |
+| AI Proofreader: edit Proofreading examples | 编辑校对样例（基于选中文本或 diff 窗口） |
+| AI Proofreader: split into sentences | 将文本切分为句子（用于整理校对样例等） |
+| **比较与结果呈现** | |
 | AI Proofreader: diff it with another file ⭐ | 比较两个文件差异（内置 diff / 生成 HTML 差异 / 生成勘误表） |
-| AI Proofreader: open proofreading panel ⭐ | 打开 **校对面板**（集中了切分、校对、比较等**按钮**，是主要 UI 入口） |
-| AI Proofreader: reopen result panel | 同上（兼容旧命令） |
+| AI Proofreader: search selection in PDF | 在同名 PDF 中搜索当前选中文本（需 SumatraPDF） |
 | **提示词** | |
 | AI Proofreader: manage prompts | 管理提示词：增、删、改；在侧栏 prompts 视图中选择当前提示词 |
 | **分词与统计** | |
 | AI Proofreader: segment file | 分词 / 词频统计 / 字频统计（整文件） |
 | AI Proofreader: segment selection | 分词 / 词频统计 / 字频统计（选中部分） |
-| **字词检查** | |
+| **专项检查** | |
 | AI Proofreader: check words | 字词检查：词典检查、通用规范汉字表、自定义替换表 |
 | AI Proofreader: manage custom tables | 管理自定义替换表 |
-| **标题与序号** | |
 | AI Proofreader: check numbering hierarchy | 检查标题序号层级与段内序号 |
 | **PDF 与引文** | |
-| AI Proofreader: search selection in PDF | 在同名 PDF 中搜索当前选中文本（需 SumatraPDF） |
 | AI Proofreader: build citation reference index | 建立本地文献库索引（引文核对前需先执行） |
 | AI Proofreader: verify citations | 打开引文核对视图，批量核对全文引文 |
 | AI Proofreader: verify selected citation | 核对当前选中的引文 |
