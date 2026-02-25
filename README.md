@@ -355,6 +355,10 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 ## 6. 更新日志
 
+### v1.7.2
+
+- bugfix：Cannot read properties of undefined (reading 'CrLf')
+
 ### v1.7.1
 
 - 优化：文档和速查手册

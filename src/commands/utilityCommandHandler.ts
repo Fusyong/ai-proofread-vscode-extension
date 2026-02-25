@@ -524,7 +524,7 @@ export class UtilityCommandHandler {
                 document.positionAt(0),
                 document.positionAt(fullText.length)
             );
-            const eol = document.eol === vscode.EndOfLineSequence.CrLf ? '\r\n' : '\n';
+            const eol = document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
 
             await editor.edit(editBuilder => {
                 editBuilder.replace(fullRange, markedLines.join(eol));

@@ -613,8 +613,8 @@ export class WordCheckCommandHandler {
         const lastIsRegex = this.context.workspaceState.get<boolean>(KEY_LAST_IS_REGEX);
         const isRegex = await vscode.window.showQuickPick(
             [
-                { label: '正则替换表', value: true, picked: lastIsRegex === true },
                 { label: '非正则替换表', value: false, picked: lastIsRegex === false },
+                { label: '正则替换表', value: true, picked: lastIsRegex === true },
             ],
             { placeHolder: '选择表类型' }
         );
