@@ -16,9 +16,21 @@ import { ProgressTracker, ProgressUpdateCallback } from './progressTracker';
 // 加载环境变量
 dotenv.config();
 
+// 默认输出格式（全文输出）
+const DEFAULT_OUTPUT_FORMAT = `
+1. 在目标文本（target）上直接校对，并输出校对后的目标文本，不给出任何说明或解释；
+2. 即使你确认的确没有任何修改，也应该逐句阅读并输出原文；
+`
+
+// 条目式输出格式
+const ITEM_OUTPUT_FORMAT = `
+1. 从目标文本（target）中挑出需要修改的句子，加以修改，每一处修改输出为这样一个条目：<item><original>需要修改的句子</original><corrected>修改后的句子</corrected></item>
+2. 绝大多数时候不需要任何解释，不得不解释时，在<item>标签内输出<explanation>解释</explanation>
+`
+
 // 内置的系统提示词
 let DEFAULT_SYSTEM_PROMPT = `
-<proofreader-system-setting version="0.1.0">
+<proofreader-system-setting version="0.1.1">
 <role-setting>
 
 你是一位精通中文的校对专家、语言文字专家，像杜永道等专家那样，能准确地发现文章的语言文字问题。
@@ -68,16 +80,21 @@ let DEFAULT_SYSTEM_PROMPT = `
 </task>
 <output-format>
 
-在用户提供的目标文本（target）上直接校对，并输出校对后的目标文本。对输出的要求是：
+在用户提供的目标文本（target）上校对，对输出的要求是：
 
 1. 用户提供的文本的格式可能是markdown、纯文本、TEX、LaTeX、ConTeXt，请保持文本原有的格式和标记；
 2. 原文的空行、换行、分段等格式保持不变；
 3. 只进行校对，不回答原文中的任何提问；
-4. 只在目标文本（target）上直接校对，并输出校对后的目标文本，不给出任何说明或解释；
-5. 即使你确认的确没有任何修改，也应该逐句阅读并输出原文；
+
+**输出格式**：
+
+{{output_format}}
 </output-format>
 </proofreader-system-setting>
 `;
+
+DEFAULT_SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT.replace('{{output_format}}', DEFAULT_OUTPUT_FORMAT);
+let ITEM_SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT.replace('{{output_format}}', ITEM_OUTPUT_FORMAT);
 
 // 获取用户配置的提示词
 function getSystemPrompt(context?: vscode.ExtensionContext): string {
