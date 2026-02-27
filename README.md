@@ -327,7 +327,19 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 ## 5. TODO
 
-1. 支持按条目输出（.proofread-item.json）的系统默认提示词，以及相应生成treeview和.proofread.json的功能（二者基本一致），在校对面板上增加按钮。
+请做一个计划，以支持按条目输出。初步设想是：
+1. 提示词管理中增加提示词的输出类型：全文；条目（原文+改后+说明；其他。条目式提示词见ITEM_SYSTEM_PROMPT，目前要求LLM输出<item><original>需要修改的句子</original><corrected>修改后的句子</corrected><explanation>解释</explanation></item>，输出JSON是不是更佳？
+2. 条目式提示词的结果，替换为修改后的句子；对于JSON批量校对流程，结果先存到.proofread-item.json，再输出.proofread.json，并有命令、按钮生成treeview
+3. 替换原文句子为改后句子的逻辑：先片段内全文查找，然后尝试忽略空格、标点查找；最后尝试相似度最高匹配；
+
+请提出优化建议，生成计划。
+
+我已经做了一些工作，请检查是否合理。
+
+
+
+
+1. 古籍印刷通用字規範字形表
 2. 在线引文核对
     1. 读秀，
     2. 中华经典古籍库，
