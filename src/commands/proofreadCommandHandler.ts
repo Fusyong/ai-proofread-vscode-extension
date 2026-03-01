@@ -8,6 +8,7 @@ import * as path from 'path';
 import { processJsonFileAsync, proofreadSelection } from '../proofreader';
 import { showDiff } from '../differ';
 import { FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
+import { getPromptDisplayName } from '../promptManager';
 import { WebviewManager, ProcessResult } from '../ui/webviewManager';
 import { ProgressTracker } from '../progressTracker';
 
@@ -85,13 +86,9 @@ export class ProofreadCommandHandler {
 
         // 写入开始日志
         // 获取当前使用的提示词名称
-        let currentPromptName = '系统默认提示词';
-        if (context) {
-            const promptName = context.globalState.get<string>('currentPrompt', '');
-            if (promptName !== '') {
-                currentPromptName = promptName;
-            }
-        }
+        const currentPromptName = context
+            ? getPromptDisplayName(context.globalState.get<string>('currentPrompt', ''))
+            : '系统默认提示词（full）';
 
         const startTime = new Date().toLocaleString();
         let logMessage = `\n${'='.repeat(50)}\n`;
@@ -524,6 +521,7 @@ export class ProofreadCommandHandler {
                     // 固定原始文本以免用户操作
                     const originalText = editor.document.getText(editor.selection);
                     const fileExt = path.extname(editor.document.fileName);
+                    let rawItemOutput: string | undefined;
                     const result = await proofreadSelection(
                         editor,
                         editor.selection,
@@ -535,18 +533,16 @@ export class ProofreadCommandHandler {
                         context,
                         beforeParagraphs,
                         afterParagraphs,
-                        actualRepetitionMode
+                        actualRepetitionMode,
+                        undefined,
+                        (raw) => { rawItemOutput = raw; }
                     );
 
                     if (result) {
-                        // 获取当前使用的提示词名称
-                        let currentPromptName = '系统默认提示词';
-                        if (context) {
-                            const promptName = context.globalState.get<string>('currentPrompt', '');
-                            if (promptName !== '') {
-                                currentPromptName = promptName;
-                            }
-                        }
+                        // 获取当前使用的提示词显示名称
+                        const currentPromptName = context
+                            ? getPromptDisplayName(context.globalState.get<string>('currentPrompt', ''))
+                            : '系统默认提示词（full）';
 
                         // 获取提示词重复模式显示名称（用于日志）
                         const repetitionModeNames: { [key: string]: string } = {
@@ -556,9 +552,10 @@ export class ProofreadCommandHandler {
                         };
                         const repetitionModeName = actualRepetitionMode ? repetitionModeNames[actualRepetitionMode] || '不重复' : '不重复';
 
-                        // 把参数和校对结果写入日志文件
+                        // 把参数和校对结果写入日志：条目式输出时写 LLM 原始返回，否则写替换后结果
                         const logFilePath = FilePathUtils.getFilePath(editor.document.uri.fsPath, '.proofread', '.log');
-                        const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nRepetitionMode: ${repetitionModeName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${result}\n${'='.repeat(50)}\n\n`;
+                        const resultForLog = rawItemOutput !== undefined ? rawItemOutput : result;
+                        const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nRepetitionMode: ${repetitionModeName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${resultForLog}\n${'='.repeat(50)}\n\n`;
                         fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
                         // 显示信息消息，包含提示词重复模式（使用键名）
@@ -566,7 +563,7 @@ export class ProofreadCommandHandler {
                         const contextLength = contextLevel ? '已设置' : 'none';
                         const referenceLength = referenceFile ? '已设置' : 'none';
                         vscode.window.showInformationMessage(
-                            `校对完成 | Prompt: ${currentPromptName.slice(0, 4)}… Rep. ${actualRepetitionMode} | ` +
+                            `校对完成 | Prompt: ${currentPromptName} Rep. ${actualRepetitionMode} | ` +
                             `Context: R. ${referenceLength}, C. ${contextLength}, T. ${targetLength} | ` +
                             `Model: ${platform}, ${model}, T. ${userTemperature}`
                         );
@@ -600,14 +597,10 @@ export class ProofreadCommandHandler {
     }): Promise<boolean> {
         const { jsonFilePath, totalCount, platform, model, rpm, maxConcurrent, temperature, context } = params;
 
-        // 获取当前提示词名称
-        let currentPromptName = '系统默认提示词';
-        if (context) {
-            const promptName = context.globalState.get<string>('currentPrompt', '');
-            if (promptName !== '') {
-                currentPromptName = promptName;
-            }
-        }
+        // 获取当前提示词显示名称
+        const currentPromptName = context
+            ? getPromptDisplayName(context.globalState.get<string>('currentPrompt', ''))
+            : '系统默认提示词（full）';
 
         // 获取超时和重试配置
         const config = vscode.workspace.getConfiguration('ai-proofread');

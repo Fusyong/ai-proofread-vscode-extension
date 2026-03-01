@@ -12,6 +12,10 @@ import { ConfigManager, Logger } from './utils';
 import { convertQuotes } from './quoteConverter';
 import { buildTitleBasedContext, buildParagraphBasedContext } from './splitter';
 import { ProgressTracker, ProgressUpdateCallback } from './progressTracker';
+import { parseItemOutput, type ProofreadItem } from './itemOutputParser';
+import { applyItemReplacements } from './itemReplacer';
+import { SYSTEM_PROMPT_NAME_FULL, SYSTEM_PROMPT_NAME_ITEM, getPromptDisplayName } from './promptManager';
+import { getExtensionContext } from './extensionContextHolder';
 
 // 加载环境变量
 dotenv.config();
@@ -22,14 +26,15 @@ const DEFAULT_OUTPUT_FORMAT = `
 2. 即使你确认的确没有任何修改，也应该逐句阅读并输出原文；
 `
 
-// 条目式输出格式
+// 条目式输出格式（JSON）
 const ITEM_OUTPUT_FORMAT = `
-1. 从目标文本（target）中挑出需要修改的句子，加以修改，每一处修改输出为这样一个条目：<item><original>需要修改的句子</original><corrected>修改后的句子</corrected></item>
-2. 绝大多数时候不需要任何解释，不得不解释时，在<item>标签内输出<explanation>解释</explanation>
+1. 从目标文本（target）中挑出有问题、需要修改的句子，加以修改，以 JSON 格式输出，且只输出该 JSON，不要其他说明。
+2. JSON 格式为：{"items":[{"original":"有问题、需要修改的句子","corrected":"修改后的句子","explanation":"解释，绝大多数情形下可省略，仅在不解释难以理解时填写"}]}
+3. 若无任何修改，输出：{"items":[]}
 `
 
 // 内置的系统提示词
-let DEFAULT_SYSTEM_PROMPT = `
+const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `
 <proofreader-system-setting version="0.1.1">
 <role-setting>
 
@@ -93,26 +98,54 @@ let DEFAULT_SYSTEM_PROMPT = `
 </proofreader-system-setting>
 `;
 
-DEFAULT_SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT.replace('{{output_format}}', DEFAULT_OUTPUT_FORMAT);
-let ITEM_SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT.replace('{{output_format}}', ITEM_OUTPUT_FORMAT);
+const DEFAULT_SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT_TEMPLATE.replace('{{output_format}}', DEFAULT_OUTPUT_FORMAT);
+const ITEM_SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT_TEMPLATE.replace('{{output_format}}', ITEM_OUTPUT_FORMAT);
 
-// 获取用户配置的提示词
+/** 输出类型：全文 | 条目 */
+export type OutputType = 'full' | 'item';
+
+/**
+ * 获取当前输出类型：从当前选中的提示词（系统全文/系统条目/自定义）或全局配置读取
+ */
+export function getOutputType(context?: vscode.ExtensionContext): OutputType {
+    const ctx = context ?? getExtensionContext();
+    if (ctx) {
+        const currentPromptName = ctx.globalState.get<string>('currentPrompt', SYSTEM_PROMPT_NAME_FULL) ?? SYSTEM_PROMPT_NAME_FULL;
+        if (currentPromptName === SYSTEM_PROMPT_NAME_ITEM) return 'item';
+        if (currentPromptName === SYSTEM_PROMPT_NAME_FULL) return 'full';
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const prompts = config.get<Array<{ name: string; content: string; outputType?: 'full' | 'item' | 'other' }>>('prompts', []);
+        if (currentPromptName && prompts.length > 0) {
+            const selected = prompts.find(p => p.name === currentPromptName);
+            if (selected?.outputType === 'item' || selected?.outputType === 'full') return selected.outputType;
+            if (selected?.outputType === 'other') return 'full';
+        }
+    }
+    const config = vscode.workspace.getConfiguration('ai-proofread');
+    const defaultOutputType = config.get<'full' | 'item'>('proofread.defaultOutputType', 'full');
+    return defaultOutputType === 'item' ? 'item' : 'full';
+}
+
+// 获取用户配置的提示词；优先使用调用方传入的 context，否则使用激活时持有的 context
 function getSystemPrompt(context?: vscode.ExtensionContext): string {
     const config = vscode.workspace.getConfiguration('ai-proofread');
-    const prompts = config.get<Array<{name: string, content: string}>>('prompts', []);
+    const prompts = config.get<Array<{ name: string; content: string; outputType?: string }>>('prompts', []);
     const logger = Logger.getInstance();
+    const ctx = context ?? getExtensionContext();
 
-    // 如果有context，从全局状态获取当前选择的提示词名称
-    if (context) {
-        const currentPromptName = context.globalState.get<string>('currentPrompt', '');
+    if (ctx) {
+        const currentPromptName = ctx.globalState.get<string>('currentPrompt', SYSTEM_PROMPT_NAME_FULL) ?? SYSTEM_PROMPT_NAME_FULL;
 
-        // 如果当前选择的是系统默认提示词（空字符串）
-        if (currentPromptName === '') {
-            logger.info('使用系统默认提示词');
+        if (currentPromptName === SYSTEM_PROMPT_NAME_ITEM) {
+            logger.info('使用系统默认提示词（item）');
+            return ITEM_SYSTEM_PROMPT;
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_FULL) {
+            logger.info('使用系统默认提示词（full）');
             return DEFAULT_SYSTEM_PROMPT;
         }
 
-        // 如果当前选择的是自定义提示词，查找对应的提示词
+        // 当前选择的是自定义提示词
         if (currentPromptName && prompts.length > 0) {
             const selectedPrompt = prompts.find(p => p.name === currentPromptName);
             if (selectedPrompt) {
@@ -122,15 +155,13 @@ function getSystemPrompt(context?: vscode.ExtensionContext): string {
         }
     }
 
-    // 如果没有context或没有找到对应的提示词，使用默认逻辑
+    // 无 context 或未找到对应提示词时的回退
     if (prompts.length > 0) {
-        // 如果有自定义提示词，使用第一个作为默认
         logger.info(`使用自定义提示词: ${prompts[0].name}`);
         return prompts[0].content;
     }
 
-    // 如果没有自定义提示词，使用系统默认提示词
-    logger.info('使用系统默认提示词');
+    logger.info('使用系统默认提示词（full）');
     return DEFAULT_SYSTEM_PROMPT;
 }
 
@@ -748,25 +779,40 @@ export async function processJsonFileAsync(
     // 读取输入JSON文件
     const inputParagraphs = JSON.parse(fs.readFileSync(jsonInPath, 'utf8'));
     const totalCount = inputParagraphs.length;
+    const isItemMode = getOutputType(context) === 'item';
+    const itemPath = jsonOutPath.replace(/\.proofread\.json$/i, '.proofread-item.json');
 
-    // 初始化或读取输出JSON文件
+    // 全文模式：使用 .proofread.json；条目模式：阶段一写 .proofread-item.json，阶段二再写 .proofread.json
     let outputParagraphs: (string | null)[] = [];
-    if (fs.existsSync(jsonOutPath)) {
-        outputParagraphs = JSON.parse(fs.readFileSync(jsonOutPath, 'utf8'));
-        if (outputParagraphs.length !== totalCount) {
-            throw new Error(`输出JSON的长度与输入JSON的长度不同: ${outputParagraphs.length} != ${totalCount}。请解决冲突，或删除原有的输出JSON文件。`);
+    let outputItemParagraphs: (string | null)[] = [];
+
+    if (isItemMode) {
+        outputItemParagraphs = fs.existsSync(itemPath)
+            ? JSON.parse(fs.readFileSync(itemPath, 'utf8'))
+            : new Array(totalCount).fill(null);
+        if (outputItemParagraphs.length !== totalCount) {
+            throw new Error(`proofread-item.json 长度与输入不一致: ${outputItemParagraphs.length} != ${totalCount}。请删除或修正后重试。`);
         }
-    } else {
         outputParagraphs = new Array(totalCount).fill(null);
-        fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
+    } else {
+        if (fs.existsSync(jsonOutPath)) {
+            outputParagraphs = JSON.parse(fs.readFileSync(jsonOutPath, 'utf8'));
+            if (outputParagraphs.length !== totalCount) {
+                throw new Error(`输出JSON的长度与输入JSON的长度不同: ${outputParagraphs.length} != ${totalCount}。请解决冲突，或删除原有的输出JSON文件。`);
+            }
+        } else {
+            outputParagraphs = new Array(totalCount).fill(null);
+            fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
+        }
     }
 
     // 创建进度跟踪器
     const progressTracker = new ProgressTracker(inputParagraphs, onProgressUpdate);
 
     // 根据现有输出文件初始化已完成的状态
-    for (let i = 0; i < outputParagraphs.length; i++) {
-        if (outputParagraphs[i] !== null) {
+    const completedMask = isItemMode ? outputItemParagraphs : outputParagraphs;
+    for (let i = 0; i < completedMask.length; i++) {
+        if (completedMask[i] !== null) {
             progressTracker.updateProgress(i, 'completed');
         }
     }
@@ -776,20 +822,20 @@ export async function processJsonFileAsync(
         onProgressUpdate(progressTracker);
     }
 
-    // 确定要处理的段落索引
+    // 确定要处理的段落索引（条目模式看 item 文件，全文模式看 proofread 文件）
     const indicesToProcess: number[] = [];
     if (typeof startCount === 'number') {
         const startIndex = startCount - 1;
         const stopIndex = stopCount ? stopCount - 1 : totalCount - 1;
         for (let i = startIndex; i <= stopIndex; i++) {
-            if (i < totalCount && outputParagraphs[i] === null) {
+            if (i < totalCount && completedMask[i] === null) {
                 indicesToProcess.push(i);
             }
         }
     } else {
         for (const idx of startCount) {
             const i = idx - 1;
-            if (0 <= i && i < totalCount && outputParagraphs[i] === null) {
+            if (0 <= i && i < totalCount && completedMask[i] === null) {
                 indicesToProcess.push(i);
             }
         }
@@ -830,18 +876,17 @@ export async function processJsonFileAsync(
 
         // 检查target是否为空字符串（包括空白行、空格等）
         if (!targetText || targetText.trim() === '') {
-            // 如果target为空，直接原样返回内容作为结果
-            outputParagraphs[index] = targetText;
-            fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
-
-            // 更新状态为已完成
+            if (isItemMode) {
+                outputItemParagraphs[index] = '{"items":[]}';
+                fs.writeFileSync(itemPath, JSON.stringify(outputItemParagraphs, null, 2), 'utf8');
+            } else {
+                outputParagraphs[index] = targetText;
+                fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
+            }
             progressTracker.updateProgress(index, 'completed');
-
             const skipInfo = `跳过 No. ${index + 1}/${totalCount} (target为空，直接返回原内容)\n${'-'.repeat(40)}\n`;
             logger.info(skipInfo);
-            if (onProgress) {
-                onProgress(skipInfo);
-            }
+            if (onProgress) onProgress(skipInfo);
             return;
         }
 
@@ -887,26 +932,22 @@ export async function processJsonFileAsync(
             const elapsed = (Date.now() - startTime) / 1000;
 
             if (processedText) {
-                outputParagraphs[index] = processedText;
-                fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
-
-                // 更新状态为已完成
+                if (isItemMode) {
+                    outputItemParagraphs[index] = processedText;
+                    fs.writeFileSync(itemPath, JSON.stringify(outputItemParagraphs, null, 2), 'utf8');
+                } else {
+                    outputParagraphs[index] = processedText;
+                    fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
+                }
                 progressTracker.updateProgress(index, 'completed');
-
                 const completeInfo = `完成 ${index + 1}/${totalCount} 长度 ${targetText.length} 用时 ${elapsed.toFixed(2)}s\n${'-'.repeat(40)}\n`;
                 logger.info(completeInfo);
-                if (onProgress) {
-                    onProgress(completeInfo);
-                }
+                if (onProgress) onProgress(completeInfo);
             } else {
-                // 更新状态为失败
                 progressTracker.updateProgress(index, 'failed', 'API返回空结果');
-
                 const errorInfo = `段落 ${index + 1}/${totalCount}: 处理失败，跳过\n${'-'.repeat(40)}\n`;
                 logger.error(errorInfo);
-                if (onProgress) {
-                    onProgress(errorInfo);
-                }
+                if (onProgress) onProgress(errorInfo);
             }
         } catch (error) {
             // 更新状态为失败
@@ -963,8 +1004,27 @@ export async function processJsonFileAsync(
         logger.info('已提交的任务已完成');
     }
 
+    // 条目模式：阶段二，按段应用替换后写入 .proofread.json
+    if (isItemMode) {
+        for (let i = 0; i < totalCount; i++) {
+            const raw = outputItemParagraphs[i];
+            const target = inputParagraphs[i]?.target ?? '';
+            if (raw !== null && raw !== undefined) {
+                const items = parseItemOutput(raw);
+                outputParagraphs[i] = items.length > 0
+                    ? applyItemReplacements(target, items)
+                    : target;
+            } else {
+                outputParagraphs[i] = target;
+            }
+        }
+        fs.writeFileSync(jsonOutPath, JSON.stringify(outputParagraphs, null, 2), 'utf8');
+    }
+
     // 生成处理统计
-    const processedCount = outputParagraphs.filter(p => p !== null).length;
+    const processedCount = isItemMode
+        ? outputItemParagraphs.filter(p => p !== null).length
+        : outputParagraphs.filter(p => p !== null).length;
     const totalLength = inputParagraphs.reduce((sum: number, p: any) => sum + p.target.length, 0);
     const processedLength = outputParagraphs.reduce((sum: number, p: string | null) => sum + (p ? p.length : 0), 0);
     const unprocessedParagraphs = inputParagraphs
@@ -1002,6 +1062,8 @@ export async function processJsonFileAsync(
  * @param beforeParagraphs 前文段落数
  * @param afterParagraphs 后文段落数
  * @param repetitionMode 提示词重复模式（可选，覆盖配置）
+ * @param onItemItems 条目式输出时回调解析出的条目（供持续校对等直接用作待选样例）
+ * @param onRawItemOutput 条目式输出时回调 LLM 原始返回（供日志等写入原始结果，不写替换后文本）
  * @returns 校对后的文本
  */
 export async function proofreadSelection(
@@ -1015,7 +1077,9 @@ export async function proofreadSelection(
     context?: vscode.ExtensionContext,
     beforeParagraphs?: number,
     afterParagraphs?: number,
-    repetitionMode?: PromptRepetitionMode
+    repetitionMode?: PromptRepetitionMode,
+    onItemItems?: (items: ProofreadItem[]) => void,
+    onRawItemOutput?: (raw: string) => void
 ): Promise<string | null> {
     // 获取选中的文本
     const selectedText = editor.document.getText(selection);
@@ -1075,14 +1139,10 @@ export async function proofreadSelection(
     }
     const postText = `<target>\n${targetText}\n</target>`;
 
-    // 获取当前使用的提示词名称
-    let currentPromptName = '系统默认提示词';
-    if (context) {
-        const promptName = context.globalState.get<string>('currentPrompt', '');
-        if (promptName !== '') {
-            currentPromptName = promptName;
-        }
-    }
+    const promptCtx = context ?? getExtensionContext();
+    const currentPromptName = promptCtx
+        ? getPromptDisplayName(promptCtx.globalState.get<string>('currentPrompt', SYSTEM_PROMPT_NAME_FULL) ?? SYSTEM_PROMPT_NAME_FULL)
+        : '系统默认提示词（full）';
 
     // 获取提示词重复模式（使用传入的参数，如果没有则从配置读取）
     const actualRepetitionMode = repetitionMode || getPromptRepetitionMode();
@@ -1092,7 +1152,7 @@ export async function proofreadSelection(
     const contextLength = contextText.length;
     const referenceLength = referenceText.length;
     vscode.window.showInformationMessage(
-        `Prompt: ${currentPromptName.slice(0, 4)}… Rep. ${actualRepetitionMode} | ` +
+        `Prompt: ${currentPromptName} Rep. ${actualRepetitionMode} | ` +
         `Context: R. ${referenceLength}, C. ${contextLength}, T. ${targetLength} | ` +
         `Model: ${platform}, ${model}, T. ${userTemperature}`
     );
@@ -1114,5 +1174,14 @@ export async function proofreadSelection(
 
     let result = await client.proofread(postText, preText, userTemperature, context, actualRepetitionMode);
 
+    if (result && getOutputType(context) === 'item') {
+        onRawItemOutput?.(result);
+        const items = parseItemOutput(result);
+        if (items.length > 0) {
+            onItemItems?.(items);
+            return applyItemReplacements(selectedText, items);
+        }
+        return selectedText;
+    }
     return result;
 }

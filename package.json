@@ -261,6 +261,10 @@
       {
         "command": "ai-proofread.continuousProofread.stop",
         "title": "AI Proofreader: stop continuous proofread"
+      },
+      {
+        "command": "ai-proofread.showProofreadItemsTree",
+        "title": "AI Proofreader: show proofread items tree"
       }
     ],
     "configuration": {
@@ -396,6 +400,22 @@
           "default": "none",
           "description": "提示词重复模式（基于谷歌研究：重复提示词可提高准确度。注意：会增加输入token，但可能提高校对准确度）"
         },
+        "ai-proofread.proofread.defaultOutputType": {
+          "order": 27.5,
+          "type": "string",
+          "enum": ["full", "item"],
+          "enumDescriptions": ["全文输出", "条目式输出（original/corrected/explanation）"],
+          "default": "full",
+          "description": "系统默认提示词时的输出类型"
+        },
+        "ai-proofread.proofread.itemReplaceSimilarityThreshold": {
+          "order": 27.6,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.85,
+          "description": "条目式替换时相似度匹配阈值（0–1）"
+        },
         "ai-proofread.prompts": {
           "order": 28,
           "type": "array",
@@ -410,6 +430,12 @@
               "content": {
                 "type": "string",
                 "description": "提示词内容"
+              },
+              "outputType": {
+                "type": "string",
+                "enum": ["full", "item", "other"],
+                "enumDescriptions": ["全文", "条目（original+corrected+explanation）", "其他"],
+                "description": "输出类型，默认 full"
               }
             },
             "required": [
@@ -732,6 +758,11 @@
           "id": "ai-proofread.numberingSegments",
           "name": "段内序号",
           "when": "aiProofread.showNumberingSegmentsView"
+        },
+        {
+          "id": "ai-proofread.proofreadItems",
+          "name": "校对条目",
+          "when": "aiProofread.showProofreadItemsView"
         }
       ]
     },

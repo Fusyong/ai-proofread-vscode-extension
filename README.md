@@ -213,7 +213,22 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 本人有一个[开源提示词库](https://github.com/Fusyong/LLM-prompts-from-a-book-editor)，但不是针对本扩展的，改造（对三种标签进行说明）后才能用于本扩展。
 
-#### 3.4.3 提示词重复功能
+#### 3.4.3 提示词输出类型
+
+本扩展支持三种提示词输出类型：full（全文输出）；item（条目式输出）；other（其他）。**全文输出可以强制大模型内省，防止偷懒和不过脑子[`系统默认提示词（full）`生成的改动要明显比`系统默认提示词（item）`多]**；而条目式输出可以节省输出token，适用于预期修改比较少的情形，比如专项审校；other类型暂时按全文处理，可用于收集自定义的结构化数据。
+
+上文所说提示词的输出类型都是full。下面是系统默认提示词（item）中对输出结构的要求：
+
+```markdown
+**输出格式**：
+1. 从目标文本（target）中挑出需要修改的句子，加以修改，以 JSON 格式输出，且只输出该 JSON，不要其他说明。
+2. JSON 格式为：{"items":[{"original":"需要修改的句子","corrected":"修改后的句子","explanation":"解释，绝大多数情形下可省略，仅在不解释难以理解时填写"}]}
+3. 若无任何修改，输出：{"items":[]}
+```
+
+请注意，JSON、items、original、corrected、explanation这些词语，对于大模型的理解和输出后的处理都有用，因此不要改变它们的形式。如果你对JSON格式了解不多，我建议直接在这个模版上改写。corrected和explanation两项可以省略。
+
+#### 3.4.4 提示词重复功能
 
 本扩展支持基于谷歌研究的提示词重复功能，以提高准确度。其原理是：重复用户输入（reference、context、target），让模型在真正处理时已经获得全局信息，从而获得更好的上下文理解。
 
@@ -327,19 +342,7 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 ## 5. TODO
 
-请做一个计划，以支持按条目输出。初步设想是：
-1. 提示词管理中增加提示词的输出类型：全文；条目（原文+改后+说明；其他。条目式提示词见ITEM_SYSTEM_PROMPT，目前要求LLM输出<item><original>需要修改的句子</original><corrected>修改后的句子</corrected><explanation>解释</explanation></item>，输出JSON是不是更佳？
-2. 条目式提示词的结果，替换为修改后的句子；对于JSON批量校对流程，结果先存到.proofread-item.json，再输出.proofread.json，并有命令、按钮生成treeview
-3. 替换原文句子为改后句子的逻辑：先片段内全文查找，然后尝试忽略空格、标点查找；最后尝试相似度最高匹配；
-
-请提出优化建议，生成计划。
-
-我已经做了一些工作，请检查是否合理。
-
-
-
-
-1. 古籍印刷通用字規範字形表
+1. 词典儿化词检查
 2. 在线引文核对
     1. 读秀，
     2. 中华经典古籍库，
@@ -366,6 +369,12 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 10. 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
 
 ## 6. 更新日志
+
+### v1.8.0
+
+- 特性：提示词增加输出类型标记：full（全文输出）；item（条目式输出）；other（其他，暂时按全文处理，可用于收集自定义的结构化数据）
+- 特性：支持条目式输出（提示词输出类型item），即输出原文（original，必选）、修改后（corrected）、解释（explanation）三项内容，这样可以节省输出token，适用于预期修改比较少的情形，比如专项审校
+- 特性：自定义替换表中预置《古籍印刷通用字規範字形表》
 
 ### v1.7.2
 

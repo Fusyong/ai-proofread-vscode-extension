@@ -14,7 +14,7 @@ import {
     getCurrentOccurrenceIndex,
     setCurrentOccurrenceIndex,
 } from '../xh7/wordCheckView';
-import { initTableLoader, getDict, getCustomPresetDict, getCustomPresetLabel, CUSTOM_PRESET_IDS, isPresetRequiringSegmentation, type CustomPresetId } from '../xh7/tableLoader';
+import { initTableLoader, getDict, getCustomPresetDict, getCustomPresetLabel, CUSTOM_PRESET_IDS, isPresetRequiringSegmentation, isPresetGjtg, type CustomPresetId } from '../xh7/tableLoader';
 import {
     registerCustomTablesView,
     CUSTOM_TABLES_VIEW_ID,
@@ -32,6 +32,7 @@ import {
 } from '../xh7/checkTypesView';
 import { scanDocument, scanDocumentWithSegmentation } from '../xh7/documentScanner';
 import { scanDocumentTgsccSpecial, isTgsccSpecialType } from '../xh7/documentScannerTgscc';
+import { scanDocumentGjtg } from '../xh7/documentScannerGjtg';
 import { getJiebaWasm } from '../jiebaLoader';
 import { formatFullNotesAsHtml } from '../xh7/notesResolver';
 import { CHECK_TYPE_LABELS, DICT_CHECK_TYPES, TGSCC_CHECK_TYPES, isDictWordTableType, type CheckType } from '../xh7/types';
@@ -362,13 +363,17 @@ export class WordCheckCommandHandler {
                             if (cancelToken.isCancellationRequested) break;
                             idx++;
                             progress.report({ message: `扫描 (${idx}/${total}) ${label}…` });
-                            const dict = getCustomPresetDict(presetId);
-                            if (Object.keys(dict).length === 0) continue;
                             let list: WordCheckEntry[];
-                            if (isPresetRequiringSegmentation(presetId) && jiebaForPreset) {
-                                list = scanDocumentWithSegmentation(editor.document, dict, jiebaForPreset, cancelToken, scanRange);
+                            if (isPresetGjtg(presetId)) {
+                                list = scanDocumentGjtg(editor.document, cancelToken, scanRange);
                             } else {
-                                list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                                const dict = getCustomPresetDict(presetId);
+                                if (Object.keys(dict).length === 0) continue;
+                                if (isPresetRequiringSegmentation(presetId) && jiebaForPreset) {
+                                    list = scanDocumentWithSegmentation(editor.document, dict, jiebaForPreset, cancelToken, scanRange);
+                                } else {
+                                    list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                                }
                             }
                             for (const e of list) {
                                 const key = `${e.variant}|${e.preferred}`;
@@ -525,13 +530,17 @@ export class WordCheckCommandHandler {
                         if (cancelToken.isCancellationRequested) break;
                         idx++;
                         progress.report({ message: `扫描 (${idx}/${total}) ${label}…` });
-                        const dict = getCustomPresetDict(presetId);
-                        if (Object.keys(dict).length === 0) continue;
                         let list: WordCheckEntry[];
-                        if (isPresetRequiringSegmentation(presetId) && jiebaForPreset) {
-                            list = scanDocumentWithSegmentation(editor.document, dict, jiebaForPreset, cancelToken, scanRange);
+                        if (isPresetGjtg(presetId)) {
+                            list = scanDocumentGjtg(editor.document, cancelToken, scanRange);
                         } else {
-                            list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                            const dict = getCustomPresetDict(presetId);
+                            if (Object.keys(dict).length === 0) continue;
+                            if (isPresetRequiringSegmentation(presetId) && jiebaForPreset) {
+                                list = scanDocumentWithSegmentation(editor.document, dict, jiebaForPreset, cancelToken, scanRange);
+                            } else {
+                                list = scanDocument(editor.document, dict, cancelToken, scanRange);
+                            }
                         }
                         for (const e of list) {
                             const key = `${e.variant}|${e.preferred}`;

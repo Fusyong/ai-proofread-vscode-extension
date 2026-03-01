@@ -23,10 +23,12 @@ import { registerSegmentView } from './numbering/segmentView';
 import { NumberingCheckCommandHandler } from './commands/numberingCheckCommandHandler';
 import { ContinuousProofreadCommandHandler } from './commands/continuousProofreadCommandHandler';
 import { registerPromptsView, type PromptTreeItem } from './promptsView';
+import { registerProofreadItemsView } from './proofreadItemsView';
 import { getJiebaWasm } from './jiebaLoader';
-
+import { setExtensionContext } from './extensionContextHolder';
 
 export function activate(context: vscode.ExtensionContext) {
+    setExtensionContext(context);
     const logger = Logger.getInstance();
     const configManager = ConfigManager.getInstance();
     logger.info('AI Proofread extension is now active!');
@@ -58,6 +60,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const promptManager = PromptManager.getInstance(context);
     const { provider: promptsTreeProvider } = registerPromptsView(context, promptManager);
+    registerProofreadItemsView(context);
 
     // 按需显示 TreeView：默认全部隐藏，由命令显式打开
     vscode.commands.executeCommand('setContext', 'aiProofread.showPromptsView', false);
@@ -68,6 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', false);
+    vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', false);
 
     // 设置校对、切分、合并的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
@@ -413,6 +417,11 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.continuousProofread.stop', () =>
             continuousProofreadHandler.handleStopCommand()
         ),
+        vscode.commands.registerCommand('ai-proofread.showProofreadItemsTree', async () => {
+            await vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', true);
+            await new Promise((r) => setTimeout(r, 50));
+            await vscode.commands.executeCommand('ai-proofread.proofreadItems.focus');
+        }),
     ];
 
     context.subscriptions.push(...disposables, configManager, new vscode.Disposable(() => continuousProofreadHandler.dispose()));

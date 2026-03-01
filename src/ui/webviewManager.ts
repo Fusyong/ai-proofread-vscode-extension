@@ -579,6 +579,19 @@ export class WebviewManager {
                 case 'manageCustomTables':
                     await vscode.commands.executeCommand('ai-proofread.manageCustomTables');
                     break;
+                case 'showProofreadItemsTree': {
+                    const proofreadJsonPath = this.getProofreadJsonPath();
+                    const itemPath = proofreadJsonPath?.replace(/\.proofread\.json$/i, '.proofread-item.json');
+                    if (itemPath && fs.existsSync(itemPath)) {
+                        const itemUri = vscode.Uri.file(itemPath);
+                        const doc = await vscode.workspace.openTextDocument(itemUri);
+                        await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+                    }
+                    await vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', true);
+                    await new Promise((r) => setTimeout(r, 50));
+                    await vscode.commands.executeCommand('ai-proofread.proofreadItems.focus');
+                    break;
+                }
             }
         } catch (error) {
             ErrorUtils.showError(error, `执行操作时出错：`);
@@ -965,6 +978,7 @@ export class WebviewManager {
                 </div>
                 <div class="section-actions">
                     ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadJson\')">查看JSON文件</button>' : ''}
+                    ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadItemsTree\')">查看校对条目</button>' : ''}
                     ${proofreadResult.logFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadLog\')">查看校对日志</button>' : ''}
                     ${proofreadResult.originalFilePath && proofreadResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadDiff\')">比较前后差异</button>' : ''}
                     ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'generateDiff\')">生成差异文件</button>' : ''}
