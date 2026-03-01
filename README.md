@@ -215,9 +215,15 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 
 #### 3.4.3 提示词输出类型
 
-本扩展支持三种提示词输出类型：full（全文输出）；item（条目式输出）；other（其他）。**全文输出可以强制大模型内省，防止偷懒和不过脑子，`系统默认提示词（full）`生成的改动要明显比`系统默认提示词（item）`多**；而条目式输出可以节省输出token，适用于预期修改比较少的情形，进行专项审校；other类型暂时按全文处理，可用于收集自定义的结构化数据。
+本扩展支持三种提示词输出类型：full（全文输出）；item（条目式输出）；other（其他）。
 
-上文所说提示词的输出类型都是full。下面是系统默认提示词（item）中对输出结构的要求：
+**要求全文输出等于强制大模型显式内省，从而防止偷懒与不过脑子，`系统默认提示词（full）`生成的改动要明显比`系统默认提示词（item）`多**。
+
+而条目式输出，每个问题输出original（原文）、corrected（修改后）、explanation（解释）三项内容，其中只有original是必需的，输出后要用于定位和（如果有corrected）替换，可以节省输出token，适用于预期修改比较少的情形，形成进行专项审校。
+
+other类型输出的后续处理暂时跟全文输出相同，可用于收集自定义的结构化数据。
+
+前面所说的提示词例子的输出类型是full（全文输出）。下面是`系统默认提示词（item）`中对输出格式的指令，供参考：
 
 ```markdown
 **输出格式**：
@@ -226,7 +232,7 @@ Proofread Selection命令还有姊妹命令proofread selection with examples，�
 3. 若无任何修改，输出：{"items":[]}
 ```
 
-请注意，JSON、items、original、corrected、explanation这些词语，对于大模型的理解和输出后的处理都有用，因此不要改变它们的形式。如果你对JSON格式了解不多，我建议直接在这个模版上改写。corrected和explanation两项可以省略。
+请注意，输出形式选item（条目式输出）时，JSON、items、original、corrected、explanation这些词语，对于大模型的理解和输出后的处理都有用，因此不要改变它们的形式。如果你对JSON格式了解不多，我建议直接在这个模版上改写。corrected和explanation两项可以省略。
 
 #### 3.4.4 提示词重复功能
 
