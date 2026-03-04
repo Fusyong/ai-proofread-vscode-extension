@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { proofreadSelection } from '../proofreader';
 import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
+import type { ProofreadItem } from '../itemOutputParser';
 import { getSegmentFromPositionWithMode, splitChineseSentencesSimple } from '../splitter';
 import { normalizeLineEndings } from '../utils';
 import type { ExamplesCommandHandler } from './examplesCommandHandler';
@@ -43,9 +44,10 @@ export class ContinuousProofreadCommandHandler {
         startOffset: number;
         segmentIndex: number;
         proofreadUri: vscode.Uri | undefined;
-        currentSegmentEndOffset: number | undefined; // 当前段结束偏移，用于 skip
-        awaitingExamplesConfirmation: boolean; // 样例确认中时，skip 不生效
-        diffCloseListener: vscode.Disposable | undefined; // 关闭 diff 时提示
+        currentSegmentEndOffset: number | undefined;
+        awaitingExamplesConfirmation: boolean;
+        diffCloseListener: vscode.Disposable | undefined;
+        currentSegmentItems: ProofreadItem[] | undefined; // 条目式输出时本段解析出的条目，直接用作待选样例
     } | null = null;
 
     dispose(): void {
@@ -450,7 +452,8 @@ document.addEventListener('DOMContentLoaded', function() {
             proofreadUri: undefined,
             currentSegmentEndOffset: undefined,
             awaitingExamplesConfirmation: false,
-            diffCloseListener: undefined
+            diffCloseListener: undefined,
+            currentSegmentItems: undefined,
         };
         this.setContextActive(true);
         await this.runLoop(context, referenceFile);
@@ -549,7 +552,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const originalText = segResult.segment;
-        const examples = this.extractCandidateExamples(originalText, finalText);
+        const examples: CandidateExample[] =
+            this.session.currentSegmentItems && this.session.currentSegmentItems.length > 0
+                ? this.session.currentSegmentItems.filter((i) => i.corrected != null).map((i) => ({ input: i.original, output: i.corrected! }))
+                : this.extractCandidateExamples(originalText, finalText);
+        this.session.currentSegmentItems = undefined;
         const examplesPath = FilePathUtils.getExamplesPath(doc.uri);
 
         if (examples.length > 0 && examplesPath) {
@@ -636,19 +643,23 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             result = await vscode.window.withProgress(
                 { location: vscode.ProgressLocation.Notification, title: '正在校对...', cancellable: false },
-                async () => proofreadSelection(
-                    editor,
-                    selection,
-                    this.session!.config.platform,
-                    this.session!.config.model,
-                    this.session!.config.contextLevel,
-                    referenceFile,
-                    this.session!.config.temperature,
-                    context,
-                    this.session!.config.beforeParagraphs,
-                    this.session!.config.afterParagraphs,
-                    this.session!.config.repetitionMode
-                )
+                async () =>
+                    proofreadSelection(
+                        editor,
+                        selection,
+                        this.session!.config.platform,
+                        this.session!.config.model,
+                        this.session!.config.contextLevel,
+                        referenceFile,
+                        this.session!.config.temperature,
+                        context,
+                        this.session!.config.beforeParagraphs,
+                        this.session!.config.afterParagraphs,
+                        this.session!.config.repetitionMode,
+                        (items) => {
+                            if (this.session) this.session.currentSegmentItems = items;
+                        }
+                    )
             );
         } catch (err) {
             ErrorUtils.showError(err, '校对失败：');
