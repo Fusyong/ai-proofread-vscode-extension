@@ -5,7 +5,7 @@
 
 import type { Range } from 'vscode';
 
-/** 检查类型：dict7 六类 + 通用规范汉字表(tgscc) 七类 */
+/** 检查类型：dict7 七类 + 通用规范汉字表(tgscc) 七类 */
 export type CheckType =
     | 'variant_to_standard'
     | 'variant_to_preferred_single'
@@ -13,6 +13,7 @@ export type CheckType =
     | 'single_char_traditional_to_standard'
     | 'single_char_yitihuabiao_to_standard'
     | 'single_char_yiti_other_to_standard'
+    | 'non_erhua_to_erhua'
     | 'tgscc_traditional_to_simplified'
     | 'tgscc_variant_to_simplified'
     | 'tgscc_non_standard'
@@ -29,6 +30,7 @@ export const CHECK_TYPE_KEYS: CheckType[] = [
     'single_char_traditional_to_standard',
     'single_char_yitihuabiao_to_standard',
     'single_char_yiti_other_to_standard',
+    'non_erhua_to_erhua',
     'tgscc_traditional_to_simplified',
     'tgscc_variant_to_simplified',
     'tgscc_non_standard',
@@ -38,7 +40,7 @@ export const CHECK_TYPE_KEYS: CheckType[] = [
     'tgscc_table2',
 ];
 
-/** 对照词典检查：dict7 六类 */
+/** 对照词典检查：dict7 七类 */
 export const DICT_CHECK_TYPES: CheckType[] = [
     'variant_to_standard',
     'variant_to_preferred_single',
@@ -46,6 +48,7 @@ export const DICT_CHECK_TYPES: CheckType[] = [
     'single_char_traditional_to_standard',
     'single_char_yitihuabiao_to_standard',
     'single_char_yiti_other_to_standard',
+    'non_erhua_to_erhua',
 ];
 
 /** 对照通用规范汉字表检查：tgscc 七类 */
@@ -59,14 +62,15 @@ export const TGSCC_CHECK_TYPES: CheckType[] = [
     'tgscc_table2',
 ];
 
-/** dict7 中需分词后再检查的词表（异形词表） */
+/** dict7 中需分词后再检查的词表（异形词表、未儿化→儿化） */
 export function isDictWordTableType(
     type: CheckType
-): type is 'variant_to_standard' | 'variant_to_preferred_single' | 'variant_to_preferred_multi' {
+): type is 'variant_to_standard' | 'variant_to_preferred_single' | 'variant_to_preferred_multi' | 'non_erhua_to_erhua' {
     return (
         type === 'variant_to_standard' ||
         type === 'variant_to_preferred_single' ||
-        type === 'variant_to_preferred_multi'
+        type === 'variant_to_preferred_multi' ||
+        type === 'non_erhua_to_erhua'
     );
 }
 
@@ -78,6 +82,7 @@ export const CHECK_TYPE_LABELS: Record<CheckType, string> = {
     single_char_traditional_to_standard: '繁体字→标准',
     single_char_yitihuabiao_to_standard: '异体字(表内)→标准',
     single_char_yiti_other_to_standard: '异体字(表外)→标准',
+    non_erhua_to_erhua: '未儿化词→儿化词',
     tgscc_traditional_to_simplified: '繁体字→通用规范字',
     tgscc_variant_to_simplified: '异体字→通用规范字',
     tgscc_non_standard: '非通用规范字',

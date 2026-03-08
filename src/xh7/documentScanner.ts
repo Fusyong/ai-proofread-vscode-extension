@@ -2,7 +2,7 @@
  * 检查字词：对当前文档全文扫描，找出表中词条的出现位置
  * 规划见 docs/xh7-word-check-plan.md
  * 文档无分词，采用纯字面匹配；按「先长后短」排序 key，占用区间不重叠。
- * 词表（variant_to_standard、variant_to_preferred_single、variant_to_preferred_multi）支持分词后再检查，见 scanDocumentWithSegmentation。
+ * 词表（variant_to_standard、variant_to_preferred_single、variant_to_preferred_multi、non_erhua_to_erhua）支持分词后再检查，见 scanDocumentWithSegmentation。
  */
 
 import * as vscode from 'vscode';
@@ -128,7 +128,7 @@ function scanDocumentSingleCharDict(
 
 /**
  * 分词后再检查：仅当 jieba 分词结果为完整词时，才与字典匹配。
- * 用于 dict7 的异形词表（variant_to_standard、variant_to_preferred_single、variant_to_preferred_multi），减少误报。
+ * 用于 dict7 的异形词表及未儿化→儿化词表（variant_to_standard、variant_to_preferred_single、variant_to_preferred_multi、non_erhua_to_erhua），整词匹配，减少误报。
  */
 export function scanDocumentWithSegmentation(
     document: vscode.TextDocument,

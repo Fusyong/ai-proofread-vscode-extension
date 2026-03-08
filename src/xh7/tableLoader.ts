@@ -17,6 +17,7 @@ interface Xh7TablesJson {
     single_char_traditional_to_standard?: Record<string, string>;
     single_char_yitihuabiao_to_standard?: Record<string, string>;
     single_char_yiti_other_to_standard?: Record<string, string>;
+    non_erhua_to_erhua?: Record<string, string>;
     raw_notes?: Record<string, string[]>;
     usage_notes?: Record<string, string[]>;
 }
@@ -45,6 +46,7 @@ type Xh7DictKey = Extract<
     | 'single_char_traditional_to_standard'
     | 'single_char_yitihuabiao_to_standard'
     | 'single_char_yiti_other_to_standard'
+    | 'non_erhua_to_erhua'
 >;
 const XH7_KEYS: Xh7DictKey[] = [
     'variant_to_standard',
@@ -53,6 +55,7 @@ const XH7_KEYS: Xh7DictKey[] = [
     'single_char_traditional_to_standard',
     'single_char_yitihuabiao_to_standard',
     'single_char_yiti_other_to_standard',
+    'non_erhua_to_erhua',
 ];
 
 let cachedXh7: Xh7TablesJson | null = null;
