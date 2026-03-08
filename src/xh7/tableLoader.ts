@@ -46,7 +46,6 @@ type Xh7DictKey = Extract<
     | 'single_char_traditional_to_standard'
     | 'single_char_yitihuabiao_to_standard'
     | 'single_char_yiti_other_to_standard'
-    | 'non_erhua_to_erhua'
 >;
 const XH7_KEYS: Xh7DictKey[] = [
     'variant_to_standard',
@@ -55,7 +54,6 @@ const XH7_KEYS: Xh7DictKey[] = [
     'single_char_traditional_to_standard',
     'single_char_yitihuabiao_to_standard',
     'single_char_yiti_other_to_standard',
-    'non_erhua_to_erhua',
 ];
 
 let cachedXh7: Xh7TablesJson | null = null;
@@ -137,10 +135,28 @@ function tgsccMapToDict(map: Record<string, (string | null)[]> | undefined): Rec
     return out;
 }
 
+/** 从 non_erhua_to_erhua 按键长过滤：单字或多字 */
+function filterNonErhuaToErhua(
+    dict: Record<string, string> | undefined,
+    single: boolean
+): Record<string, string> {
+    if (!dict) return {};
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(dict)) {
+        if (single ? k.length === 1 : k.length > 1) out[k] = v;
+    }
+    return out;
+}
+
 /**
  * 获取指定检查类型的字典（需要提示的词 → 更好的词）
  */
 export function getDict(type: CheckType): Record<string, string> {
+    if (type === 'non_erhua_to_erhua_single' || type === 'non_erhua_to_erhua_multi') {
+        const data = ensureXh7Loaded();
+        const base = data.non_erhua_to_erhua ?? {};
+        return filterNonErhuaToErhua(base, type === 'non_erhua_to_erhua_single');
+    }
     if (XH7_KEYS.includes(type as Xh7DictKey)) {
         const data = ensureXh7Loaded();
         return (data[type as Xh7DictKey] as Record<string, string> | undefined) ?? {};
