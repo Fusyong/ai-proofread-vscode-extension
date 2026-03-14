@@ -24,11 +24,15 @@ import { NumberingCheckCommandHandler } from './commands/numberingCheckCommandHa
 import { ContinuousProofreadCommandHandler } from './commands/continuousProofreadCommandHandler';
 import { registerPromptsView, type PromptTreeItem } from './promptsView';
 import { registerProofreadItemsView } from './proofreadItemsView';
+import { registerWelcomeView } from './ui/welcomeView';
 import { getJiebaWasm } from './jiebaLoader';
 import { setExtensionContext } from './extensionContextHolder';
 
 export function activate(context: vscode.ExtensionContext) {
     setExtensionContext(context);
+    // 最先注册欢迎视图，避免点击 Activity Bar 图标时出现 "no data provider registered"
+    registerWelcomeView(context);
+
     const logger = Logger.getInstance();
     const configManager = ConfigManager.getInstance();
     logger.info('AI Proofread extension is now active!');

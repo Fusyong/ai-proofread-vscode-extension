@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.8.1",
+  "version": "1.8.3",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -10,7 +10,9 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:ai-proofread.welcome"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -717,8 +719,22 @@
         }
       }
     },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ai-proofread",
+          "title": "AI Proofreader",
+          "icon": "icon28.png"
+        }
+      ]
+    },
     "views": {
-      "explorer": [
+      "ai-proofread": [
+        {
+          "id": "ai-proofread.welcome",
+          "name": "overview",
+          "type": "webview"
+        },
         {
           "id": "ai-proofread.prompts",
           "name": "prompts",
@@ -1053,7 +1069,7 @@
       "optimize": true
     }
   },
-  "icon": "icon.png",
+  "icon": "icon128.png",
   "publisher": "HuangFusyong",
   "repository": {
     "type": "git",
