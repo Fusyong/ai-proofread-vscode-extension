@@ -192,10 +192,10 @@ flowchart TD
     Start["我要切分 Markdown"] --> Q1{"有标题结构?"}
     Q1 -->|无| ByLen["按长度切分 <br> split by length"]
     Q1 -->|有| Q2{"题下段落长度合适?"}
-    Q2 -->|是，且不太长| ByTitle["按标题切分 <br> split by title"]
+    Q2 -->|是且不太长| ByTitle["按标题切分 <br> split by title"]
     Q2 -->|长短不一| ByTitleLen["按标题+长度 <br> split by title and length"]
     Q2 -->|需要整章作语境| WithTitleCtx["带标题范围上下文 <br> split by length with title context"]
-    Q1 -->|有，只需前后段语境| WithParaCtx["带前后段落上下文 <br> split by length with paragraph context"]
+    Q1 -->|有只需前后段语境| WithParaCtx["带前后段落上下文 <br> split by length with paragraph context"]
 
     ByLen --> Out["得到 .json + .json.md"]
     ByTitle --> Out

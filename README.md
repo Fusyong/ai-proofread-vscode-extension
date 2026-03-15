@@ -304,8 +304,6 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 * 阿里云百炼平台[限流规则](https://help.aliyun.com/zh/model-studio/rate-limit)：qwen-max系列稳定版的rpm通常为600甚至更高，带日期的快照版通常为60，没有并发限制（建议为10）
 * 谷歌[rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits)
 
-> ⚠️ `proofread.retryDelay` 与 `proofread.timeout` 的单位均为 **秒**。扩展会在内部自动转换为毫秒进行 API 调用，升级旧版本后请确认你的设置值。
-
 ### 4.1. 大语言模型
 
 目前支持这些大语言模型服务：
