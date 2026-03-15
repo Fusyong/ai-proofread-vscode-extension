@@ -15,6 +15,7 @@ interface Xh7TablesJson {
     variant_to_preferred_single?: Record<string, string>;
     variant_to_preferred_multi?: Record<string, string>;
     single_char_traditional_to_standard?: Record<string, string>;
+    single_char_traditional_to_standard_traditional?: Record<string, string>;
     single_char_yitihuabiao_to_standard?: Record<string, string>;
     single_char_yiti_other_to_standard?: Record<string, string>;
     non_erhua_to_erhua?: Record<string, string>;
@@ -44,6 +45,7 @@ type Xh7DictKey = Extract<
     | 'variant_to_preferred_single'
     | 'variant_to_preferred_multi'
     | 'single_char_traditional_to_standard'
+    | 'single_char_traditional_to_standard_traditional'
     | 'single_char_yitihuabiao_to_standard'
     | 'single_char_yiti_other_to_standard'
 >;
@@ -52,6 +54,7 @@ const XH7_KEYS: Xh7DictKey[] = [
     'variant_to_preferred_single',
     'variant_to_preferred_multi',
     'single_char_traditional_to_standard',
+    'single_char_traditional_to_standard_traditional',
     'single_char_yitihuabiao_to_standard',
     'single_char_yiti_other_to_standard',
 ];
