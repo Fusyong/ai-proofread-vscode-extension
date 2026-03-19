@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -265,6 +265,14 @@
       {
         "command": "ai-proofread.showProofreadItemsTree",
         "title": "AI Proofreader: show proofread items tree"
+      },
+      {
+        "command": "ai-proofread.opencc",
+        "title": "OpenCC"
+      },
+      {
+        "command": "ai-proofread.openccSelection",
+        "title": "OpenCC selection"
       }
     ],
     "configuration": {
@@ -403,8 +411,14 @@
         "ai-proofread.proofread.defaultOutputType": {
           "order": 27.5,
           "type": "string",
-          "enum": ["full", "item"],
-          "enumDescriptions": ["全文输出", "条目式输出（original/corrected/explanation）"],
+          "enum": [
+            "full",
+            "item"
+          ],
+          "enumDescriptions": [
+            "全文输出",
+            "条目式输出（original/corrected/explanation）"
+          ],
           "default": "full",
           "description": "系统默认提示词时的输出类型"
         },
@@ -433,8 +447,16 @@
               },
               "outputType": {
                 "type": "string",
-                "enum": ["full", "item", "other"],
-                "enumDescriptions": ["全文", "条目（original+corrected+explanation）", "其他"],
+                "enum": [
+                  "full",
+                  "item",
+                  "other"
+                ],
+                "enumDescriptions": [
+                  "全文",
+                  "条目（original+corrected+explanation）",
+                  "其他"
+                ],
                 "description": "输出类型，默认 full"
               }
             },
@@ -626,6 +648,12 @@
           "default": true,
           "description": "引文核对归一化：是否去掉 Markdown 注码 [^1] 和上标注码 ^1^（默认是，即去掉）"
         },
+        "ai-proofread.citation.openccT2cnBeforeSimilarity": {
+          "order": 59.5,
+          "type": "boolean",
+          "default": false,
+          "description": "引文核对预处理：是否先用 OpenCC 将繁体（t）转换为简体（cn），以便匹配两侧简繁不同的文本。"
+        },
         "ai-proofread.citation.lenDeltaRatio": {
           "order": 60,
           "type": "number",
@@ -694,10 +722,18 @@
           "items": {
             "type": "object",
             "properties": {
-              "level": { "type": "number" },
-              "name": { "type": "string" },
-              "pattern": { "type": "string" },
-              "sequenceType": { "type": "string" }
+              "level": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "pattern": {
+                "type": "string"
+              },
+              "sequenceType": {
+                "type": "string"
+              }
             }
           }
         },
@@ -709,9 +745,15 @@
           "items": {
             "type": "object",
             "properties": {
-              "pattern": { "type": "string" },
-              "name": { "type": "string" },
-              "sequenceType": { "type": "string" }
+              "pattern": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "sequenceType": {
+                "type": "string"
+              }
             }
           }
         }
@@ -1003,6 +1045,16 @@
           "command": "ai-proofread.mergeTwoFiles",
           "group": "ai-proofread@32",
           "when": "resourceLangId == json"
+        },
+        {
+          "command": "ai-proofread.opencc",
+          "group": "ai-proofread@40",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == plaintext || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
+          "command": "ai-proofread.openccSelection",
+          "group": "ai-proofread@40.1",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == plaintext || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         }
       ]
     }
@@ -1023,10 +1075,10 @@
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
     "jieba-wasm": "^2.4.0",
+    "opencc-js": "^1.0.5",
     "sql.js": "^1.10.0"
   },
   "devDependencies": {
-    "diff": "^7.0.0",
     "@eslint/config-array": "^0.19.2",
     "@eslint/object-schema": "^2.1.6",
     "@types/node": "^18.x",
@@ -1034,6 +1086,7 @@
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
     "@vscode/vsce": "^3.3.2",
+    "diff": "^8.0.3",
     "eslint": "^8.57.0",
     "glob": "^10.3.10",
     "parcel": "^2.11.0",

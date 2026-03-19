@@ -26,6 +26,32 @@ import { registerPromptsView, type PromptTreeItem } from './promptsView';
 import { registerProofreadItemsView } from './proofreadItemsView';
 import { getJiebaWasm } from './jiebaLoader';
 import { setExtensionContext } from './extensionContextHolder';
+import { convertOpencc, type OpenccLocale } from './opencc';
+
+const OPENCC_LOCALES: Array<{ id: OpenccLocale; label: string; description: string }> = [
+    { id: 'cn', label: 'cn', description: 'Simplified Chinese (Mainland China)' },
+    { id: 'tw', label: 'tw', description: 'Traditional Chinese (Taiwan)' },
+    { id: 'twp', label: 'twp', description: 'Traditional Chinese (Taiwan) with phrase conversion' },
+    { id: 'hk', label: 'hk', description: 'Traditional Chinese (Hong Kong)' },
+    { id: 'jp', label: 'jp', description: 'Japanese Shinjitai' },
+    { id: 't', label: 't', description: 'Traditional Chinese (OpenCC standard)' },
+];
+
+async function askOpenccLocale(
+    title: string,
+    placeHolder: string,
+    defaultValue: OpenccLocale
+): Promise<OpenccLocale | undefined> {
+    const picked = await vscode.window.showQuickPick(
+        OPENCC_LOCALES.map((x) => ({ label: x.label, description: x.description, id: x.id })),
+        {
+            title,
+            placeHolder,
+            ignoreFocusOut: true,
+        }
+    );
+    return (picked?.id ?? defaultValue) as OpenccLocale;
+}
 
 export function activate(context: vscode.ExtensionContext) {
     setExtensionContext(context);
@@ -309,6 +335,60 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await utilityHandler.handleSegmentSelectionCommand(editor, context);
+        }),
+
+        // OpenCC：繁简/地区字词转换（opencc-js）
+        vscode.commands.registerCommand('ai-proofread.opencc', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            const doc = editor.document;
+            const from = await askOpenccLocale('OpenCC', '选择原文文种（from）', 't');
+            if (!from) return;
+            const to = await askOpenccLocale('OpenCC', '选择目标文种（to）', 'cn');
+            if (!to) return;
+
+            const fullText = doc.getText();
+            if (!fullText) return;
+            const converted = convertOpencc(fullText, from, to);
+            if (converted === fullText) {
+                vscode.window.showInformationMessage(`OpenCC：无变化（${from} → ${to}）`);
+                return;
+            }
+            const fullRange = new vscode.Range(doc.positionAt(0), doc.positionAt(fullText.length));
+            await editor.edit((editBuilder) => editBuilder.replace(fullRange, converted));
+            vscode.window.showInformationMessage(`OpenCC：已转换（${from} → ${to}）`);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.openccSelection', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            const selection = editor.selection;
+            if (!selection || selection.isEmpty) {
+                vscode.window.showInformationMessage('请先选中文本再执行 OpenCC selection。');
+                return;
+            }
+            const doc = editor.document;
+            const selectedText = doc.getText(selection);
+            if (!selectedText) return;
+
+            const from = await askOpenccLocale('OpenCC selection', '选择原文文种（from）', 't');
+            if (!from) return;
+            const to = await askOpenccLocale('OpenCC selection', '选择目标文种（to）', 'cn');
+            if (!to) return;
+
+            const converted = convertOpencc(selectedText, from, to);
+            if (converted === selectedText) {
+                vscode.window.showInformationMessage(`OpenCC selection：无变化（${from} → ${to}）`);
+                return;
+            }
+            await editor.edit((editBuilder) => editBuilder.replace(selection, converted));
+            vscode.window.showInformationMessage(`OpenCC selection：已转换（${from} → ${to}）`);
         }),
 
         // 打开校对面板（支持空面板）

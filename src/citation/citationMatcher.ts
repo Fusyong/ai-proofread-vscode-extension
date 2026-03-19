@@ -5,10 +5,12 @@
 
 import * as vscode from 'vscode';
 import type { JiebaWasmModule } from '../jiebaLoader';
-import { jaccardSimilarity } from '../similarity';
+import { jaccardSimilarity, normalizeForSimilarity } from '../similarity';
+import { convertOpencc } from '../opencc';
 import { ReferenceStore } from './referenceStore';
 import type { RefSentenceRow } from './referenceStore';
 import type { CitationBlockWithSentences, CitationSentence } from './citationCollector';
+import { getCitationNormalizeOptions } from './referenceStore';
 
 /** 整块引文的一条匹配结果（文献片段） */
 export interface BlockMatchCandidate {
@@ -39,6 +41,11 @@ function normalizedWithoutEllipsis(normalized: string): string {
 /** 句是否含省略号 */
 function hasEllipsis(text: string): boolean {
     return /\u2026+|\.{2,}/.test(text);
+}
+
+function normalizeForCitationMatch(text: string, enableOpenccT2cn: boolean): string {
+    const pre = enableOpenccT2cn ? convertOpencc(text, 't', 'cn') : text;
+    return normalizeForSimilarity(pre, getCitationNormalizeOptions());
 }
 
 /**
@@ -85,6 +92,8 @@ export async function matchCitationsToReferences(
         progress?: (message: string, current: number, total: number) => void;
     } = {}
 ): Promise<BlockMatchResult[]> {
+    const openccConfig = vscode.workspace.getConfiguration('ai-proofread.citation');
+    const enableOpenccT2cn = openccConfig.get<boolean>('openccT2cnBeforeSimilarity', false);
     const lenDeltaRatio = options.lenDeltaRatio ?? DEFAULT_LEN_DELTA_RATIO;
     const threshold = options.similarityThreshold ?? 0.4;
     const maxMatches = Math.max(1, Math.floor(options.matchesPerCitation ?? 2));
@@ -119,12 +128,14 @@ export async function matchCitationsToReferences(
 
         for (const anchorIdx of anchorIndices) {
             const anchor = sents[anchorIdx];
+            // 注意：lenNorm 依然使用索引/分句时的 normalized.length（不受 OpenCC 影响），只用于候选长度过滤
             const candidates = await refStore.getCandidatesByLength(anchor.lenNorm, lenDeltaRatio);
-            const anchorNorm = normalizedWithoutEllipsis(anchor.normalized);
+            const anchorNorm = normalizedWithoutEllipsis(normalizeForCitationMatch(anchor.text, enableOpenccT2cn));
             let bestRef: RefSentenceRow | undefined;
             let bestScore = 0;
             for (const ref of candidates) {
-                const score = jaccardSimilarity(anchorNorm, normalizedWithoutEllipsis(ref.normalized), simOpts);
+                const refNorm = normalizedWithoutEllipsis(normalizeForCitationMatch(ref.content, enableOpenccT2cn));
+                const score = jaccardSimilarity(anchorNorm, refNorm, simOpts);
                 if (score > bestScore) {
                     bestScore = score;
                     bestRef = ref;
@@ -145,8 +156,9 @@ export async function matchCitationsToReferences(
             for (let i = 0; i < n; i++) {
                 const rIdx = refIdx - anchorIdx + i;
                 const refSent = refOrdered[rIdx];
-                const citNorm = normalizedWithoutEllipsis(sents[i].normalized);
-                const sim = jaccardSimilarity(citNorm, normalizedWithoutEllipsis(refSent.normalized), simOpts);
+                const citNorm = normalizedWithoutEllipsis(normalizeForCitationMatch(sents[i].text, enableOpenccT2cn));
+                const refNorm = normalizedWithoutEllipsis(normalizeForCitationMatch(refSent.content, enableOpenccT2cn));
+                const sim = jaccardSimilarity(citNorm, refNorm, simOpts);
                 scores.push(sim);
             }
             const avg = scores.reduce((a, x) => a + x, 0) / scores.length;
