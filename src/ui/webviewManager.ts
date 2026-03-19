@@ -665,7 +665,6 @@ export class WebviewManager {
                 <p class="hint">选择要校对的 Markdown 文档，然后进行切分和校对。</p>
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('selectMainFile')">选择主文件</button>
-                    <button class="action-button" onclick="handleAction('selectMainFileFromWorkspace')">从工作区选择</button>
                 </div>
             </div>
         `);
@@ -698,7 +697,6 @@ export class WebviewManager {
                 ` : ''}
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('selectMainFile')">更换主文件</button>
-                    <button class="action-button" onclick="handleAction('selectMainFileFromWorkspace')">从工作区选择</button>
                     <button class="action-button" onclick="handleAction('formatParagraphsUseMainFile')" title="AI Proofreader: format paragraphs">整理段落</button>
                     <button class="action-button" onclick="handleAction('markTitlesFromTocUseMainFile')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
                     <button class="action-button" onclick="handleAction('splitDocument')" title="AI Proofreader: split file">${hasJson ? '重新切分' : '切分文档'}</button>
@@ -711,7 +709,7 @@ export class WebviewManager {
             const stats = this.tryReadSplitStats(comp.log);
             splitSection = `
             <div class="process-section">
-                <h3>📄 切分结果</h3>
+                <h3>✂️ 切分结果</h3>
                 ${stats ? `<div class="stats-section"><div class="stats-inline">
                     <span class="stat-item">切分片段数: <span class="stat-value">${stats.segmentCount}</span></span>
                 </div></div>` : ''}
@@ -776,14 +774,16 @@ export class WebviewManager {
             <p class="header-commands-hint">常用命令（Ctrl+Shift+P 查找全部命令）</p>
             <div class="header-actions">
                 <span class="header-group">
-                    <button class="link-button" onclick="handleAction('managePrompts')" title="AI Proofreader: manage prompts">管理提示词</button>
-                    <button class="link-button" onclick="handleAction('openSettings')" title="打开设置">打开设置</button>
-                </span>
-                <span class="config-sep">|</span>
-                <span class="header-group">
                     <button class="link-button" onclick="handleAction('convertDocxToMarkdown')" title="AI Proofreader: convert docx to markdown">docx → Markdown</button>
                     <button class="link-button" onclick="handleAction('convertPdfToMarkdown')" title="AI Proofreader: convert PDF to markdown">PDF → Markdown</button>
                     <button class="link-button" onclick="handleAction('convertMarkdownToDocx')" title="AI Proofreader: convert markdown to docx">Markdown → docx</button>
+                </span>
+                <span class="config-sep">|</span>
+                <span class="header-group">
+                    <button class="link-button" onclick="handleAction('formatParagraphs')" title="AI Proofreader: format paragraphs">整理段落</button>
+                    <button class="link-button" onclick="handleAction('markTitlesFromToc')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
+                    <button class="link-button" onclick="handleAction('convertQuotes')" title="AI Proofreader: convert quotes to Chinese">半角引号转全角</button>
+                    <button class="link-button" onclick="handleAction('splitIntoSentences')" title="AI Proofreader: split into sentences">切分为句子</button>
                 </span>
                 <span class="config-sep">|</span>
                 <span class="header-group">
@@ -804,13 +804,6 @@ export class WebviewManager {
                 </span>
                 <span class="config-sep">|</span>
                 <span class="header-group">
-                    <button class="link-button" onclick="handleAction('formatParagraphs')" title="AI Proofreader: format paragraphs">整理段落</button>
-                    <button class="link-button" onclick="handleAction('markTitlesFromToc')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
-                    <button class="link-button" onclick="handleAction('convertQuotes')" title="AI Proofreader: convert quotes to Chinese">半角引号转全角</button>
-                    <button class="link-button" onclick="handleAction('splitIntoSentences')" title="AI Proofreader: split into sentences">切分为句子</button>
-                </span>
-                <span class="config-sep">|</span>
-                <span class="header-group">
                     <button class="link-button" onclick="handleAction('segmentFile')" title="AI Proofreader: segment file">分词</button>
                     <button class="link-button" onclick="handleAction('segmentFile')" title="AI Proofreader: segment file">词频统计</button>
                     <button class="link-button" onclick="handleAction('segmentFile')" title="AI Proofreader: segment file">字频统计</button>
@@ -819,6 +812,11 @@ export class WebviewManager {
                 <span class="header-group">
                     <button class="link-button" onclick="handleAction('diffItWithAnotherFile')" title="AI Proofreader: diff it with another file">diff 与另一文件</button>
                     <button class="link-button" onclick="handleAction('searchSelectionInPDF')" title="AI Proofreader: search selection in PDF">在 PDF 中搜索选中文本</button>
+                </span>
+                <span class="config-sep">|</span>
+                <span class="header-group">
+                    <button class="link-button" onclick="handleAction('managePrompts')" title="AI Proofreader: manage prompts">管理提示词</button>
+                    <button class="link-button" onclick="handleAction('openSettings')" title="打开设置">打开设置</button>
                 </span>
             </div>
         `;
@@ -905,7 +903,7 @@ export class WebviewManager {
 
         return `
             <div class="process-section">
-                <h3>📄 切分结果</h3>
+                <h3>✂️ 切分结果</h3>
                 ${statsHtml}
                 <div class="file-paths-compact">
                     <div class="file-path-row">
@@ -1017,7 +1015,6 @@ export class WebviewManager {
                 ` : ''}
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('selectMainFile')">更换主文件</button>
-                    <button class="action-button" onclick="handleAction('selectMainFileFromWorkspace')">从工作区选择</button>
                     <button class="action-button" onclick="handleAction('formatParagraphsUseMainFile')" title="AI Proofreader: format paragraphs">整理段落</button>
                     <button class="action-button" onclick="handleAction('markTitlesFromTocUseMainFile')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
                     <button class="action-button" onclick="handleAction('splitDocument')" title="AI Proofreader: split file">${hasJson ? '重新切分' : '切分文档'}</button>

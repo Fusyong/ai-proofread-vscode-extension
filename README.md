@@ -30,15 +30,16 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 ### 2.2. 切分文档后批量校对
 
-1. 用`open proofreading panel`打开校对面板，选择你要校对的主文件——通常是纯文本或markdown格式，并在每一个段落后添加一个空行（一个或多个空行是md的段落标记）作为允许切分的标记
+![/result_panel](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/ui_overview.png)
+
+1. 通过左侧活动栏图标的指引，或命令面板中的`open proofreading panel`命令打开校对面板，选择你要校对的主文件——通常是纯文本或markdown格式，并在每一个段落后添加一个空行（一个或多个空行是md的段落标记）作为允许切分的标记
 2. 使用切分文件按钮切分文档，选择切分模式（默认按长度），把当前文档切分为JSON文档，结果会呈现在校对面板中
 3. 通过校对面板中的“校对JSON文件”按钮，批量校对切分好的片段
 4. 通过校对面板中的“比较前后差异”按钮，可以看到和上文相同的校对结果
-![/result_panel](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/result_panel.png)
 
 ### 2.3. 尝试所有命令
 
-本扩展可以通过命令、校对面板按钮和文件窗口右键菜单三种形式进行操作。
+本扩展可以通过命令面板中的命令、校对面板按钮和文件窗口右键菜单三种形式进行操作。
 
 其中，命令的功能最全。本扩展的所有功能都可以通过命令面板（Ctrl+Shift+P）查找、访问：
 
@@ -274,10 +275,11 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 3. **段落整理**：前面说到`format paragraphs`命令，可以在段末加空行，即整理成符合Markdown格式的段落；还可以删除符合Markdown格式但不符合一般习惯的段内分行。基于文档行长众数来计算，因而适合整体较长，并且以长段落为主的文档；短小、段落零碎时准确率会比较低。
 4. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用PDF查看器SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
 5. **字词检查**：命令`check words`。分类两个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的提示与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》的数据。用户还可以通过`manage custom tables`命令，加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。这是一个非常强大且灵活的功能，值得深入探索。
+![树视图（提示词管理、字词检查、引文检查）](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/special_checks.png)
 6. **标题树与段内序号检查**：命令`check numbering hierarchy`。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
 7. **引文核对**：指定本地文献库根目录（Markdown格式，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。
 8. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
-9. **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
+9.  **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
 10. **按句子切分**：使用`split into sentences`命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子，适合用于编辑校对样例，与其保存时的默认分隔符一致。
 11. **编辑校对样例**：使用`edit proofreading examples`命令，千文已经有介绍。
 12. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
@@ -301,8 +303,6 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 * Deepseek[限速](https://api-docs.deepseek.com/zh-cn/quick_start/rate_limit)：没有并发限制，但服务器在高流量时会延迟（需要注意观察）
 * 阿里云百炼平台[限流规则](https://help.aliyun.com/zh/model-studio/rate-limit)：qwen-max系列稳定版的rpm通常为600甚至更高，带日期的快照版通常为60，没有并发限制（建议为10）
 * 谷歌[rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits)
-
-> ⚠️ `proofread.retryDelay` 与 `proofread.timeout` 的单位均为 **秒**。扩展会在内部自动转换为毫秒进行 API 调用，升级旧版本后请确认你的设置值。
 
 ### 4.1. 大语言模型
 
@@ -377,10 +377,15 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 6. 更新日志
 
-### v1.8.2
+### v1.8.4
 
 - 特性：引文核对时通过opencc-js繁转简后再计算相似度，以便匹配两侧简繁不同的文本
 - 特性：增加了opencc-js提供的转换文种功能
+
+### v1.8.3
+
+- 特性：在activity bar上增加扩展图标，展示概览页，引导用户使用
+- 优化：文档，速查手册
 
 ### v1.8.1
 
