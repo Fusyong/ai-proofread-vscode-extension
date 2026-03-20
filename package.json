@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -270,11 +270,11 @@
       },
       {
         "command": "ai-proofread.opencc",
-        "title": "OpenCC"
+        "title": "AI Proofreader: OpenCC"
       },
       {
         "command": "ai-proofread.openccSelection",
-        "title": "OpenCC selection"
+        "title": "AI Proofreader: OpenCC selection"
       }
     ],
     "configuration": {
