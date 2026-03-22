@@ -556,13 +556,17 @@ export class WebviewManager {
                 case 'splitIntoSentences':
                 case 'segmentFile':
                 case 'diffItWithAnotherFile':
-                case 'searchSelectionInPDF': {
+                case 'searchSelectionInPDF':
+                case 'searchSelectionInShidianguji':
+                case 'searchSelectionInAncientbooks': {
                     // 头部按钮：使用当前编辑窗口文件
                     const cmdMap: Record<string, string> = {
                         splitIntoSentences: 'ai-proofread.splitIntoSentences',
                         segmentFile: 'ai-proofread.segmentFile',
                         diffItWithAnotherFile: 'ai-proofread.diffItWithAnotherFile',
-                        searchSelectionInPDF: 'ai-proofread.searchSelectionInPDF'
+                        searchSelectionInPDF: 'ai-proofread.searchSelectionInPDF',
+                        searchSelectionInShidianguji: 'ai-proofread.searchSelectionInShidianguji',
+                        searchSelectionInAncientbooks: 'ai-proofread.searchSelectionInAncientbooks'
                     };
                     await vscode.commands.executeCommand(cmdMap[command]);
                     break;
@@ -812,6 +816,8 @@ export class WebviewManager {
                 <span class="header-group">
                     <button class="link-button" onclick="handleAction('diffItWithAnotherFile')" title="AI Proofreader: diff it with another file">diff 与另一文件</button>
                     <button class="link-button" onclick="handleAction('searchSelectionInPDF')" title="AI Proofreader: search selection in PDF">在 PDF 中搜索选中文本</button>
+                    <button class="link-button" onclick="handleAction('searchSelectionInShidianguji')" title="AI Proofreader: search selection in Shidianguji">在识典古籍中搜索选中文本</button>
+                    <button class="link-button" onclick="handleAction('searchSelectionInAncientbooks')" title="AI Proofreader: search selection in Ancientbooks (jingdian)">在中华经典古籍库中搜索选中文本</button>
                 </span>
                 <span class="config-sep">|</span>
                 <span class="header-group">

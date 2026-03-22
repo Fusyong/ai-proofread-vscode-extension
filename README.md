@@ -273,16 +273,20 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 1. **转换文档格式**：前面说到`convert docx to markdown`和`convert PDF to markdown`两个命令。还有`convert markdown to docx`，可转换Markdown为docx（Word、WPS的常用格式）。
 2. **标记标题**：前面说到`mark titles from table of contents`命令可基于目录列表标记标题。如果文档标题以序号引导，还可以使用后面提到的`check numbering hierarchy`命令来标记。
 3. **段落整理**：前面说到`format paragraphs`命令，可以在段末加空行，即整理成符合Markdown格式的段落；还可以删除符合Markdown格式但不符合一般习惯的段内分行。基于文档行长众数来计算，因而适合整体较长，并且以长段落为主的文档；短小、段落零碎时准确率会比较低。
-4. **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用PDF查看器SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
-5. **字词检查**：命令`check words`。分类两个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的提示与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》的数据。用户还可以通过`manage custom tables`命令，加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。这是一个非常强大且灵活的功能，值得深入探索。
+4. **搜索选中文本**
+    * **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用PDF查看器SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
+    * **在参考文献库中搜索**：`search selection in References`。如果参考文献目录在工作区外，可能受版本限制会没有结果，可将该目录加入工作区后再搜。
+    * **连线搜索[中华经典古籍库](https://jingdian.ancientbooks.cn)**：`search selection in Ancientbooks (jingdian)`。
+    * **连线搜索[识典古籍](https://www.shidianguji.com/)**：`search selection in Shidianguji`。
+1. **字词检查**：命令`check words`。分类两个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的提示与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》的数据。用户还可以通过`manage custom tables`命令，加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。这是一个非常强大且灵活的功能，值得深入探索。
 ![树视图（提示词管理、字词检查、引文检查）](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/special_checks.png)
-6. **标题树与段内序号检查**：命令`check numbering hierarchy`。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
-7. **引文核对**：指定本地文献库根目录（Markdown格式，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。需要注意的是，**文献库索引和引文核对的处理单元都是句子**，因此本功能不适用于不成句和没有句末标点的文本，如词语级别的引用、无标点古籍；这样的情况，可以用VSCode自带的多文件全文搜索（Ctrl+Shift+H）功能处理。
-8. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
-9.  **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
-10. **按句子切分**：使用`split into sentences`命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子，适合用于编辑校对样例，与其保存时的默认分隔符一致。
-11. **编辑校对样例**：使用`edit proofreading examples`命令，千文已经有介绍。
-12. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
+1. **标题树与段内序号检查**：命令`check numbering hierarchy`。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
+2. **引文核对**：指定本地文献库根目录（默认为根目录下的`references`，文件格式为Markdown，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。需要注意的是，**文献库索引和引文核对的处理单元都是句子**，因此本功能不适用于不成句和没有句末标点的文本，如词语级别的引用、无标点古籍；这样的情况，可以用VSCode自带的多文件全文搜索（Ctrl+Shift+H）功能处理。
+3. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
+4.  **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
+5.  **按句子切分**：使用`split into sentences`命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子，适合用于编辑校对样例，与其保存时的默认分隔符一致。
+6.  **编辑校对样例**：使用`edit proofreading examples`命令，千文已经有介绍。
+7.  **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
 
 ### 3.7. 注意事项
 
@@ -376,6 +380,10 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 12. 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
 
 ## 6. 更新日志
+
+### v1.8.5
+
+- 特性：在识典古籍、中华经典古籍库、文献目录中搜索选中文本
 
 ### v1.8.4
 

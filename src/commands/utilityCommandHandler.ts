@@ -8,6 +8,8 @@ import * as path from 'path';
 import { mergeTwoFiles, mergeMarkdownIntoJson } from '../merger';
 import { getJiebaWasm, type JiebaWasmModule } from '../jiebaLoader';
 import { searchSelectionInPDF } from '../pdfSearcher';
+import { searchSelectionInShidianguji } from '../shidiangujiSearch';
+import { searchSelectionInAncientbooks } from '../ancientbooksSearch';
 import { convertQuotes } from '../quoteConverter';
 import { formatParagraphs } from '../paragraphDetector';
 import { showDiff } from '../differ';
@@ -315,6 +317,30 @@ export class UtilityCommandHandler {
             await searchSelectionInPDF(editor);
         } catch (error) {
             ErrorUtils.showError(error, '搜索PDF时出错：');
+        }
+    }
+
+    public async handleSearchSelectionInShidiangujiCommand(editor: vscode.TextEditor): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('请先打开文件并选择要搜索的文本');
+            return;
+        }
+        try {
+            await searchSelectionInShidianguji(editor);
+        } catch (error) {
+            ErrorUtils.showError(error, '打开识典古籍搜索时出错：');
+        }
+    }
+
+    public async handleSearchSelectionInAncientbooksCommand(editor: vscode.TextEditor): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('请先打开文件并选择要搜索的文本');
+            return;
+        }
+        try {
+            await searchSelectionInAncientbooks(editor);
+        } catch (error) {
+            ErrorUtils.showError(error, '打开中华经典古籍库搜索时出错：');
         }
     }
 

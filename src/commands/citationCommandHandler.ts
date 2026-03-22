@@ -18,6 +18,33 @@ import { normalizeLineEndings } from '../utils';
 
 const CITATION_VIEW_BASE_TITLE = 'Citation';
 
+const MAX_FIND_IN_FILES_QUERY_CHARS = 2000;
+
+/**
+ * 生成「在文件中查找」的 filesToInclude：优先使用相对当前工作区根的 glob；若目录在所有工作区根之外（或当前无工作区），则使用绝对路径 glob（正斜杠）。
+ */
+function getReferenceFilesToIncludePattern(refRoot: string): { pattern: string; usedAbsoluteOutsideWorkspace: boolean } {
+    const normRef = path.normalize(refRoot).replace(/[/\\]+$/, '');
+    const posixDir = normRef.split(path.sep).join('/');
+
+    const folders = vscode.workspace.workspaceFolders;
+    if (folders?.length) {
+        for (const wf of folders) {
+            const root = path.normalize(wf.uri.fsPath);
+            const rel = path.relative(root, normRef);
+            if (!rel || rel === '.') {
+                return { pattern: '**', usedAbsoluteOutsideWorkspace: false };
+            }
+            if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
+                return { pattern: rel.split(path.sep).join('/') + '/**', usedAbsoluteOutsideWorkspace: false };
+            }
+        }
+    }
+
+    const pattern = `${posixDir}/**`;
+    return { pattern, usedAbsoluteOutsideWorkspace: true };
+}
+
 export class CitationCommandHandler {
     constructor(
         private context: vscode.ExtensionContext,
@@ -29,6 +56,73 @@ export class CitationCommandHandler {
     private updateCitationViewTitle(entryCount: number): void {
         if (this.citationTreeView) {
             this.citationTreeView.title = `${CITATION_VIEW_BASE_TITLE} (${entryCount})`;
+        }
+    }
+
+    /**
+     * 在当前窗口打开「在文件中查找」，搜索选中文本，并尽量将范围限定在参考文献根目录（ai-proofread.citation.referencesPath）。
+     */
+    async handleSearchSelectionInReferencesCommand(editor: vscode.TextEditor): Promise<void> {
+        const raw = editor.document.getText(editor.selection);
+        if (!raw) {
+            vscode.window.showInformationMessage('请先选择要搜索的文本');
+            return;
+        }
+        let query = raw.replace(/\s+/g, ' ').trim();
+        if (!query) {
+            vscode.window.showInformationMessage('请先选择要搜索的文本');
+            return;
+        }
+        let truncated = false;
+        if (query.length > MAX_FIND_IN_FILES_QUERY_CHARS) {
+            query = query.slice(0, MAX_FIND_IN_FILES_QUERY_CHARS);
+            truncated = true;
+        }
+
+        const refStore = ReferenceStore.getInstance(this.context);
+        const root = refStore.getReferencesRoot();
+        if (!root) {
+            vscode.window.showWarningMessage(
+                '请先在设置中配置「引文核对：参考文献根路径」（ai-proofread.citation.referencesPath），如 test/references'
+            );
+            return;
+        }
+        if (!fs.existsSync(root)) {
+            vscode.window.showErrorMessage(`参考文献路径不存在: ${root}`);
+            return;
+        }
+
+        const { pattern: filesToInclude, usedAbsoluteOutsideWorkspace } = getReferenceFilesToIncludePattern(root);
+
+        const args: {
+            query: string;
+            triggerSearch: boolean;
+            isRegex: boolean;
+            matchWholeWord: boolean;
+            isCaseSensitive: boolean;
+            filesToInclude: string;
+        } = {
+            query,
+            triggerSearch: true,
+            isRegex: false,
+            matchWholeWord: false,
+            isCaseSensitive: false,
+            filesToInclude
+        };
+
+        try {
+            await vscode.commands.executeCommand('workbench.action.findInFiles', args);
+            if (usedAbsoluteOutsideWorkspace) {
+                vscode.window.showInformationMessage(
+                    '参考文献目录在工作区外，已把绝对路径填入「要包含的文件」。若无结果，可将该目录加入工作区后再搜。'
+                );
+            }
+            if (truncated) {
+                vscode.window.showWarningMessage(`搜索文本过长，已截断为前 ${MAX_FIND_IN_FILES_QUERY_CHARS} 个字符`);
+            }
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            vscode.window.showErrorMessage(`打开「在文件中查找」失败: ${msg}`);
         }
     }
 

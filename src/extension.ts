@@ -268,6 +268,24 @@ export function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleSearchSelectionInPDFCommand(editor);
         }),
 
+        vscode.commands.registerCommand('ai-proofread.searchSelectionInShidianguji', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('请先打开文件并选择要搜索的文本');
+                return;
+            }
+            await utilityHandler.handleSearchSelectionInShidiangujiCommand(editor);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.searchSelectionInAncientbooks', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('请先打开文件并选择要搜索的文本');
+                return;
+            }
+            await utilityHandler.handleSearchSelectionInAncientbooksCommand(editor);
+        }),
+
         // 注册比较两个文件命令
         vscode.commands.registerCommand('ai-proofread.diffItWithAnotherFile', async () => {
             const editor = vscode.window.activeTextEditor;
@@ -423,6 +441,14 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('ai-proofread.citation.searchInPdf', (nodeOrItem?: unknown) => {
             citationHandler.handleSearchInPdfCommand(nodeOrItem as import('./citation/citationTreeProvider').CitationTreeNode | { id?: string } | undefined);
+        }),
+        vscode.commands.registerCommand('ai-proofread.searchSelectionInReferences', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('请先打开文件并选择要搜索的文本');
+                return;
+            }
+            await citationHandler.handleSearchSelectionInReferencesCommand(editor);
         }),
         vscode.commands.registerCommand('ai-proofread.checkWords', async () => {
             // 按需显示与字词检查相关的视图
