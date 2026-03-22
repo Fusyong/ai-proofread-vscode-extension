@@ -31,7 +31,8 @@ export class WordCheckTreeDataProvider implements vscode.TreeDataProvider<WordCh
                 ? `${countDesc} · ${element.checkTypeLabel}`
                 : element.checkTypeLabel
             : countDesc;
-        const shortNotes = getShortNotesForPreferred(element.preferred, element.variant);
+        const isHai7Preset = element.checkTypeLabel?.startsWith('hai7') ?? false;
+        const shortNotes = isHai7Preset ? '' : getShortNotesForPreferred(element.preferred, element.variant);
         const withCustom =
             element.rawComment != null
                 ? element.rawComment + (shortNotes ? '\n\n' + shortNotes : '')

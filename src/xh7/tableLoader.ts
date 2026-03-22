@@ -61,7 +61,21 @@ let cachedTgscc: TgsccJson | null = null;
 let cachedFswv: FswvJson | null = null;
 /** 古籍印刷通用字规范字形表：允许的字符集合（从 data/gjtg.txt 解析） */
 let cachedGjtgSet: Set<string> | null = null;
+/** hai7.json：人名生卒、年号 raw */
+let cachedHai7: Hai7Json | null = null;
+let hai7LoadFailed = false;
 let contextForPath: ExtensionContext | null = null;
+
+/** data/hai7.json 行结构 */
+export interface Hai7Row {
+    raw: string;
+    label?: string;
+}
+
+interface Hai7Json {
+    person_birth_death: Record<string, Hai7Row[]>;
+    era_years: Record<string, Hai7Row[]>;
+}
 
 /**
  * 初始化加载器（在扩展 activate 时传入 context）
@@ -72,6 +86,29 @@ export function initTableLoader(context: ExtensionContext): void {
     cachedTgscc = null;
     cachedFswv = null;
     cachedGjtgSet = null;
+    cachedHai7 = null;
+    hai7LoadFailed = false;
+}
+
+/**
+ * 加载 hai7.json（人名/年号表）；缺失或解析失败时返回 null。
+ */
+export function getHai7Data(): Hai7Json | null {
+    if (hai7LoadFailed) return null;
+    if (cachedHai7) return cachedHai7;
+    if (!contextForPath) return null;
+    const jsonPath = contextForPath.asAbsolutePath(path.join('data', 'hai7.json'));
+    if (!fs.existsSync(jsonPath)) {
+        hai7LoadFailed = true;
+        return null;
+    }
+    try {
+        cachedHai7 = JSON.parse(fs.readFileSync(jsonPath, 'utf-8')) as Hai7Json;
+        return cachedHai7;
+    } catch {
+        hai7LoadFailed = true;
+        return null;
+    }
 }
 
 function getXh7Path(): string {
@@ -195,8 +232,15 @@ function sliceToDict(arr: string[], start: number, end: number, value: string): 
     return out;
 }
 
-/** 自定义替换表检查：预置「表」id（使用 tgscc / fswv / gjtg 数据与逻辑） */
-export type CustomPresetId = 'preset_traditional' | 'preset_variant' | 'preset_simplified_to_tv' | 'preset_fswv' | 'preset_gjtg';
+/** 自定义替换表检查：预置「表」id（使用 tgscc / fswv / gjtg / hai7 数据与逻辑） */
+export type CustomPresetId =
+    | 'preset_traditional'
+    | 'preset_variant'
+    | 'preset_simplified_to_tv'
+    | 'preset_fswv'
+    | 'preset_gjtg'
+    | 'preset_hai7_person'
+    | 'preset_hai7_era';
 
 const CUSTOM_PRESET_LABELS: Record<CustomPresetId, string> = {
     preset_traditional: '通规繁体字→规范字',
@@ -204,13 +248,31 @@ const CUSTOM_PRESET_LABELS: Record<CustomPresetId, string> = {
     preset_simplified_to_tv: '通规规范字→繁体字异体字',
     preset_fswv: '一异表异形词→推荐',
     preset_gjtg: '非古籍通规字形',
+    preset_hai7_person: '人名信息',
+    preset_hai7_era: '年号信息',
 };
+
+export function isPresetHai7Person(presetId: CustomPresetId): boolean {
+    return presetId === 'preset_hai7_person';
+}
+
+export function isPresetHai7Era(presetId: CustomPresetId): boolean {
+    return presetId === 'preset_hai7_era';
+}
 
 export function getCustomPresetLabel(id: CustomPresetId): string {
     return CUSTOM_PRESET_LABELS[id];
 }
 
-export const CUSTOM_PRESET_IDS: CustomPresetId[] = ['preset_traditional', 'preset_variant', 'preset_simplified_to_tv', 'preset_fswv', 'preset_gjtg'];
+export const CUSTOM_PRESET_IDS: CustomPresetId[] = [
+    'preset_traditional',
+    'preset_variant',
+    'preset_simplified_to_tv',
+    'preset_fswv',
+    'preset_gjtg',
+    'preset_hai7_person',
+    'preset_hai7_era',
+];
 
 /** 是否需要分词后再匹配（多字词表） */
 export function isPresetRequiringSegmentation(presetId: CustomPresetId): boolean {
@@ -260,6 +322,8 @@ export function getCustomPresetDict(presetId: CustomPresetId): Record<string, st
     }
     // preset_gjtg 不使用字典，由扫描器 scanDocumentGjtg 逐字检查
     if (presetId === 'preset_gjtg') return {};
+    // hai7 由 documentScannerHai7 按正则与表核对
+    if (presetId === 'preset_hai7_person' || presetId === 'preset_hai7_era') return {};
     return {};
 }
 

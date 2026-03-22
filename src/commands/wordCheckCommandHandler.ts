@@ -14,7 +14,19 @@ import {
     getCurrentOccurrenceIndex,
     setCurrentOccurrenceIndex,
 } from '../xh7/wordCheckView';
-import { initTableLoader, getDict, getCustomPresetDict, getCustomPresetLabel, CUSTOM_PRESET_IDS, isPresetRequiringSegmentation, isPresetGjtg, type CustomPresetId } from '../xh7/tableLoader';
+import {
+    initTableLoader,
+    getDict,
+    getCustomPresetDict,
+    getCustomPresetLabel,
+    CUSTOM_PRESET_IDS,
+    isPresetRequiringSegmentation,
+    isPresetGjtg,
+    isPresetHai7Person,
+    isPresetHai7Era,
+    type CustomPresetId,
+} from '../xh7/tableLoader';
+import { scanDocumentHai7Person, scanDocumentHai7Era } from '../xh7/documentScannerHai7';
 import {
     registerCustomTablesView,
     CUSTOM_TABLES_VIEW_ID,
@@ -366,6 +378,10 @@ export class WordCheckCommandHandler {
                             let list: WordCheckEntry[];
                             if (isPresetGjtg(presetId)) {
                                 list = scanDocumentGjtg(editor.document, cancelToken, scanRange);
+                            } else if (isPresetHai7Person(presetId)) {
+                                list = scanDocumentHai7Person(editor.document, cancelToken, scanRange);
+                            } else if (isPresetHai7Era(presetId)) {
+                                list = scanDocumentHai7Era(editor.document, cancelToken, scanRange);
                             } else {
                                 const dict = getCustomPresetDict(presetId);
                                 if (Object.keys(dict).length === 0) continue;
@@ -533,6 +549,10 @@ export class WordCheckCommandHandler {
                         let list: WordCheckEntry[];
                         if (isPresetGjtg(presetId)) {
                             list = scanDocumentGjtg(editor.document, cancelToken, scanRange);
+                        } else if (isPresetHai7Person(presetId)) {
+                            list = scanDocumentHai7Person(editor.document, cancelToken, scanRange);
+                        } else if (isPresetHai7Era(presetId)) {
+                            list = scanDocumentHai7Era(editor.document, cancelToken, scanRange);
                         } else {
                             const dict = getCustomPresetDict(presetId);
                             if (Object.keys(dict).length === 0) continue;
