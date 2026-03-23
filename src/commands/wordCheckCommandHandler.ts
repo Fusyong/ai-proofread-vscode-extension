@@ -57,6 +57,11 @@ import {
 } from '../xh7/customTableCache';
 import { scanDocumentWithCustomTable, scanDocumentWithLiteralRulesWithSegmentation } from '../xh7/documentScannerCustom';
 import { applyReplaceInDocument } from '../xh7/applyReplace';
+import {
+    DEFAULT_WORD_CHECK_SORT_FILTER,
+    type WordCheckSortMode,
+    type WordCheckSortFilterState,
+} from '../xh7/wordCheckSortFilter';
 import { FilePathUtils } from '../utils';
 import * as path from 'path';
 
@@ -121,10 +126,17 @@ export class WordCheckCommandHandler {
         return { presetIds, customIds };
     }
 
-    private updateViewTitle(entryCount: number, occurrenceCount: number): void {
-        if (this.treeView) {
-            this.treeView.title = `${VIEW_BASE_TITLE} (${entryCount} 条 / ${occurrenceCount} 处)`;
+    private updateViewTitle(): void {
+        if (!this.treeView || !this.treeProvider) return;
+        const st = this.treeProvider.getViewTitleStats();
+        let suffix = '';
+        if (st.isFiltered) {
+            suffix =
+                st.rawEntryCount !== st.displayEntryCount
+                    ? ` · 已筛选（全 ${st.rawEntryCount} 条）`
+                    : ' · 已筛选';
         }
+        this.treeView.title = `${VIEW_BASE_TITLE} (${st.displayEntryCount} 条 / ${st.displayOccurrenceCount} 处)${suffix}`;
     }
 
     /**
@@ -272,8 +284,7 @@ export class WordCheckCommandHandler {
 
             if (!this.treeProvider) return;
             this.treeProvider.refresh(entries, editor.document.uri);
-            const totalOccurrences = entries.reduce((s, e) => s + e.ranges.length, 0);
-            this.updateViewTitle(entries.length, totalOccurrences);
+            this.updateViewTitle();
             await focusWordCheckView();
             if (entries.length === 0) {
                 vscode.window.showInformationMessage('当前文档中未发现需要提示的字词。');
@@ -283,7 +294,7 @@ export class WordCheckCommandHandler {
             vscode.window.showErrorMessage(`字词检查失败：${msg}`);
             if (this.treeProvider) {
                 this.treeProvider.refresh([], null);
-                this.updateViewTitle(0, 0);
+                this.updateViewTitle();
             }
         }
     }
@@ -596,9 +607,9 @@ export class WordCheckCommandHandler {
             );
 
             if (!this.treeProvider) return;
-            this.treeProvider.refresh(entries, editor.document.uri);
             const totalOccurrences = entries.reduce((s, e) => s + e.ranges.length, 0);
-            this.updateViewTitle(entries.length, totalOccurrences);
+            this.treeProvider.refresh(entries, editor.document.uri);
+            this.updateViewTitle();
             await focusWordCheckView();
 
             if (applyMode.value === 'replace' && entries.length > 0) {
@@ -606,7 +617,7 @@ export class WordCheckCommandHandler {
                 if (ok) {
                     vscode.window.showInformationMessage(`已替换 ${totalOccurrences} 处。`);
                     this.treeProvider.refresh([], null);
-                    this.updateViewTitle(0, 0);
+                    this.updateViewTitle();
                 } else {
                     vscode.window.showErrorMessage('替换失败');
                 }
@@ -618,7 +629,7 @@ export class WordCheckCommandHandler {
             vscode.window.showErrorMessage(`字词检查失败：${msg}`);
             if (this.treeProvider) {
                 this.treeProvider.refresh([], null);
-                this.updateViewTitle(0, 0);
+                this.updateViewTitle();
             }
         }
     }
@@ -706,6 +717,166 @@ export class WordCheckCommandHandler {
         this.tgsccCheckTypesProvider?.moveInOrder(element.id, 1);
     }
 
+    /** 字词检查视图：排序与筛选（标题栏 … 菜单） */
+    async handleWordCheckSortAndFilterCommand(): Promise<void> {
+        if (!this.treeProvider) return;
+
+        type PickDef =
+            | { t: 'sort'; mode: WordCheckSortMode }
+            | { t: 'filterText' }
+            | { t: 'filterTypes' }
+            | { t: 'minCount' }
+            | { t: 'clearFilter' }
+            | { t: 'resetAll' };
+
+        interface SortFilterPickItem extends vscode.QuickPickItem {
+            def?: PickDef;
+        }
+
+        const SORT_LABELS: Record<WordCheckSortMode, string> = {
+            document: '文档顺序（首次出现位置）',
+            countDesc: '出现次数（多 → 少）',
+            countAsc: '出现次数（少 → 多）',
+            variantZh: '需提示词（中文拼音序）',
+            preferredZh: '建议替换词（中文拼音序）',
+            typeThenDocument: '检查类型 → 文档顺序',
+        };
+
+        const state = this.treeProvider.getSortFilterState();
+
+        const items: SortFilterPickItem[] = [
+            { label: '排序', kind: vscode.QuickPickItemKind.Separator },
+            ...(
+                [
+                    'document',
+                    'countDesc',
+                    'countAsc',
+                    'variantZh',
+                    'preferredZh',
+                    'typeThenDocument',
+                ] as WordCheckSortMode[]
+            ).map((mode) => ({
+                label: SORT_LABELS[mode],
+                description: state.sort === mode ? '当前' : undefined,
+                def: { t: 'sort' as const, mode },
+            })),
+            { label: '筛选', kind: vscode.QuickPickItemKind.Separator },
+            {
+                label: '$(search) 关键词…',
+                description: state.filter.text ? `当前：${state.filter.text}` : '在需提示词或建议词中匹配',
+                def: { t: 'filterText' },
+            },
+            {
+                label: '$(list-selection) 检查类型…',
+                description:
+                    state.filter.checkTypes.length > 0 ? `已选 ${state.filter.checkTypes.length} 类` : '不限制',
+                def: { t: 'filterTypes' },
+            },
+            {
+                label: '$(symbol-numeric) 最少出现次数…',
+                description: state.filter.minCount > 0 ? `当前：≥${state.filter.minCount}` : '不限制',
+                def: { t: 'minCount' },
+            },
+            {
+                label: '$(clear-all) 清除筛选条件',
+                description: '保留当前排序',
+                def: { t: 'clearFilter' },
+            },
+            {
+                label: '$(discard) 重置排序与筛选',
+                description: '恢复默认',
+                def: { t: 'resetAll' },
+            },
+        ];
+
+        const picked = await vscode.window.showQuickPick<SortFilterPickItem>(items, {
+            title: '字词检查：排序与筛选',
+            placeHolder: '选择一项',
+        });
+        if (!picked?.def) return;
+
+        const applyState = async (next: WordCheckSortFilterState): Promise<void> => {
+            await this.treeProvider!.persistSortFilterState(next);
+            this.treeProvider!.refreshViewOnly();
+            this.updateViewTitle();
+        };
+
+        const d = picked.def;
+        if (d.t === 'sort') {
+            await applyState({ ...state, sort: d.mode });
+            return;
+        }
+        if (d.t === 'clearFilter') {
+            await applyState({
+                ...state,
+                filter: { text: '', checkTypes: [], minCount: 0 },
+            });
+            return;
+        }
+        if (d.t === 'resetAll') {
+            await applyState({
+                sort: DEFAULT_WORD_CHECK_SORT_FILTER.sort,
+                filter: {
+                    text: DEFAULT_WORD_CHECK_SORT_FILTER.filter.text,
+                    checkTypes: [...DEFAULT_WORD_CHECK_SORT_FILTER.filter.checkTypes],
+                    minCount: DEFAULT_WORD_CHECK_SORT_FILTER.filter.minCount,
+                },
+            });
+            return;
+        }
+        if (d.t === 'filterText') {
+            const input = await vscode.window.showInputBox({
+                title: '筛选关键词',
+                placeHolder: '在需提示词或建议词中匹配；留空清除',
+                value: state.filter.text,
+            });
+            if (input === undefined) return;
+            await applyState({ ...state, filter: { ...state.filter, text: input.trim() } });
+            return;
+        }
+        if (d.t === 'minCount') {
+            const input = await vscode.window.showInputBox({
+                title: '最少出现次数',
+                placeHolder: '≥1 的整数；留空或 0 表示不限制',
+                value: state.filter.minCount > 0 ? String(state.filter.minCount) : '',
+                validateInput: (v) => {
+                    const s = v.trim();
+                    if (s === '') return null;
+                    const n = parseInt(s, 10);
+                    if (!Number.isFinite(n) || n < 0) return '请输入非负整数';
+                    return null;
+                },
+            });
+            if (input === undefined) return;
+            const min = input.trim() === '' ? 0 : parseInt(input.trim(), 10);
+            await applyState({ ...state, filter: { ...state.filter, minCount: min } });
+            return;
+        }
+        if (d.t === 'filterTypes') {
+            const labels = this.treeProvider.collectCheckTypeLabels();
+            if (labels.length === 0) {
+                vscode.window.showInformationMessage('当前结果中没有检查类型标签。');
+                return;
+            }
+            const typeItems = labels.map((lab) => ({
+                label: lab || '(无类型)',
+                value: lab,
+                picked:
+                    state.filter.checkTypes.length === 0 ? true : state.filter.checkTypes.includes(lab),
+            }));
+            const chosen = await vscode.window.showQuickPick(typeItems, {
+                canPickMany: true,
+                title: '包含的检查类型',
+                placeHolder: '勾选要显示的类型；全选等同于不限制',
+            });
+            if (chosen === undefined) return;
+            const values = chosen.map((c) => c.value);
+            const allSelected = values.length === labels.length;
+            const newTypes = allSelected ? [] : values;
+            await applyState({ ...state, filter: { ...state.filter, checkTypes: newTypes } });
+        }
+    }
+
     /** 上一处：在当前选中条目的多处之间循环（激活编辑器） */
     async handlePrevOccurrenceCommand(): Promise<void> {
         const entry = this.getSelectedEntry();
@@ -777,11 +948,10 @@ export class WordCheckCommandHandler {
         const ok = await applyReplaceInDocument(editor, [entry], prefix, suffix);
         if (ok) {
             vscode.window.showInformationMessage(`已替换 ${entry.ranges.length} 处。`);
-            const entries = this.treeProvider?.getEntries() ?? [];
+            const entries = this.treeProvider?.getRawEntries() ?? [];
             const remaining = entries.filter((e) => e !== entry);
             this.treeProvider?.refresh(remaining, docUri);
-            const totalOccurrences = remaining.reduce((s, e) => s + e.ranges.length, 0);
-            this.updateViewTitle(remaining.length, totalOccurrences);
+            this.updateViewTitle();
         } else {
             vscode.window.showErrorMessage('替换失败');
         }

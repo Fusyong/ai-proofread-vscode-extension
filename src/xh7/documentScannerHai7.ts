@@ -31,9 +31,14 @@ function normalizeRawDash(s: string): string {
     return s;
 }
 
+/** 「前」与阿拉伯数字之间排版空格不影响核验（前 99 → 前99） */
+function normalizeQianBeforeArabicDigits(s: string): string {
+    return s.replace(/前\s+(\d+)/g, '前$1');
+}
+
 /** 括注内 raw 与表中 raw 比对 */
 function normalizeRawForCompare(s: string): string {
-    return normalizeSpaces(normalizeRawDash(s));
+    return normalizeQianBeforeArabicDigits(normalizeSpaces(normalizeRawDash(s)));
 }
 
 function normalizeLabelForCompare(s: string): string {
@@ -50,7 +55,7 @@ function parseBracketInner(inner: string): { label?: string; raw: string } {
     return { raw: t };
 }
 
-/** 解析年份 token：前134 → -134；134 → 134；？ → null */
+/** 解析年份 token：前134 / 前 134 → -134；134 → 134；？ → null */
 function parseYearToken(tok: string): number | null {
     const t = tok.trim();
     if (t === '？' || t === '?') return null;

@@ -463,6 +463,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.wordCheck.showNotes', () => wordCheckHandler.handleShowNotesCommand()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.revealCurrentAndAdvance', () => wordCheckHandler.handleRevealCurrentAndAdvanceCommand()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.applyReplaceForEntry', () => wordCheckHandler.handleApplyReplaceForEntryCommand()),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.sortAndFilter', () => wordCheckHandler.handleWordCheckSortAndFilterCommand()),
         vscode.commands.registerCommand('ai-proofread.manageCustomTables', async () => {
             // 按需显示自定义替换表及相关视图
             await vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', true);

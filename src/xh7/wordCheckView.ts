@@ -38,7 +38,7 @@ export function registerWordCheckView(
     context: vscode.ExtensionContext,
     onReveal: (entry: WordCheckEntry, index: number) => void
 ): WordCheckViewRegistration {
-    const treeDataProvider = new WordCheckTreeDataProvider();
+    const treeDataProvider = new WordCheckTreeDataProvider(context);
     const treeView = vscode.window.createTreeView(VIEW_ID, {
         treeDataProvider,
         showCollapseAll: true,

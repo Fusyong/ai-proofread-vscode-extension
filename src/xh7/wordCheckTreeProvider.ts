@@ -6,18 +6,113 @@
 import * as vscode from 'vscode';
 import type { WordCheckEntry } from './types';
 import { getShortNotesForPreferred } from './notesResolver';
+import {
+    type WordCheckSortFilterState,
+    DEFAULT_WORD_CHECK_SORT_FILTER,
+    applySortAndFilter,
+    isFilterActive,
+    sumOccurrences,
+    type WordCheckSortMode,
+} from './wordCheckSortFilter';
+
+const KEY_SORT = 'ai-proofread.wordCheck.sortMode';
+const KEY_FILTER_TEXT = 'ai-proofread.wordCheck.filterText';
+const KEY_FILTER_TYPES = 'ai-proofread.wordCheck.filterCheckTypes';
+const KEY_FILTER_MIN = 'ai-proofread.wordCheck.filterMinCount';
 
 export class WordCheckTreeDataProvider implements vscode.TreeDataProvider<WordCheckEntry> {
     private _onDidChangeTreeData = new vscode.EventEmitter<WordCheckEntry | undefined | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-    private entries: WordCheckEntry[] = [];
+    private rawEntries: WordCheckEntry[] = [];
     private documentUri: vscode.Uri | null = null;
+    private sortFilter: WordCheckSortFilterState = {
+        sort: DEFAULT_WORD_CHECK_SORT_FILTER.sort,
+        filter: {
+            text: DEFAULT_WORD_CHECK_SORT_FILTER.filter.text,
+            checkTypes: [...DEFAULT_WORD_CHECK_SORT_FILTER.filter.checkTypes],
+            minCount: DEFAULT_WORD_CHECK_SORT_FILTER.filter.minCount,
+        },
+    };
 
+    constructor(private readonly context: vscode.ExtensionContext) {
+        this.loadSortFilterFromStorage();
+    }
+
+    private loadSortFilterFromStorage(): void {
+        const ws = this.context.workspaceState;
+        const sort = ws.get<WordCheckSortMode>(KEY_SORT);
+        const text = ws.get<string>(KEY_FILTER_TEXT);
+        const types = ws.get<string[]>(KEY_FILTER_TYPES);
+        const min = ws.get<number>(KEY_FILTER_MIN);
+        if (sort) {
+            this.sortFilter.sort = sort;
+        }
+        if (typeof text === 'string') {
+            this.sortFilter.filter.text = text;
+        }
+        if (Array.isArray(types)) {
+            this.sortFilter.filter.checkTypes = [...types];
+        }
+        if (typeof min === 'number' && min >= 0) {
+            this.sortFilter.filter.minCount = min;
+        }
+    }
+
+    getSortFilterState(): WordCheckSortFilterState {
+        return {
+            sort: this.sortFilter.sort,
+            filter: { ...this.sortFilter.filter, checkTypes: [...this.sortFilter.filter.checkTypes] },
+        };
+    }
+
+    async persistSortFilterState(state: WordCheckSortFilterState): Promise<void> {
+        this.sortFilter = {
+            sort: state.sort,
+            filter: { ...state.filter, checkTypes: [...state.filter.checkTypes] },
+        };
+        const ws = this.context.workspaceState;
+        await ws.update(KEY_SORT, this.sortFilter.sort);
+        await ws.update(KEY_FILTER_TEXT, this.sortFilter.filter.text);
+        await ws.update(KEY_FILTER_TYPES, this.sortFilter.filter.checkTypes);
+        await ws.update(KEY_FILTER_MIN, this.sortFilter.filter.minCount);
+    }
+
+    /** 扫描完成或替换后更新原始列表并重绘 */
     refresh(entries: WordCheckEntry[], documentUri: vscode.Uri | null, _runLabel?: string): void {
-        this.entries = entries;
+        this.rawEntries = entries;
         this.documentUri = documentUri;
         this._onDidChangeTreeData.fire();
+    }
+
+    private getDisplayEntries(): WordCheckEntry[] {
+        return applySortAndFilter(this.rawEntries, this.sortFilter);
+    }
+
+    /** 更新排序筛选后仅刷新视图 */
+    refreshViewOnly(): void {
+        this._onDidChangeTreeData.fire();
+    }
+
+    getViewTitleStats(): {
+        rawEntryCount: number;
+        rawOccurrenceCount: number;
+        displayEntryCount: number;
+        displayOccurrenceCount: number;
+        isFiltered: boolean;
+    } {
+        const raw = this.rawEntries;
+        const display = this.getDisplayEntries();
+        const rawOcc = sumOccurrences(raw);
+        const displayOcc = sumOccurrences(display);
+        const filtered = isFilterActive(this.sortFilter.filter) || display.length !== raw.length;
+        return {
+            rawEntryCount: raw.length,
+            rawOccurrenceCount: rawOcc,
+            displayEntryCount: display.length,
+            displayOccurrenceCount: displayOcc,
+            isFiltered: filtered,
+        };
     }
 
     getTreeItem(element: WordCheckEntry): vscode.TreeItem {
@@ -46,19 +141,34 @@ export class WordCheckTreeDataProvider implements vscode.TreeDataProvider<WordCh
 
     getChildren(_element?: WordCheckEntry): WordCheckEntry[] {
         if (_element) return [];
-        return this.entries;
+        return this.getDisplayEntries();
     }
 
     getDocumentUri(): vscode.Uri | null {
         return this.documentUri;
     }
 
+    /** 当前树中可见条目（已排序筛选） */
     getEntries(): WordCheckEntry[] {
-        return this.entries;
+        return this.getDisplayEntries();
+    }
+
+    /** 完整扫描结果（替换删除等应基于此项） */
+    getRawEntries(): WordCheckEntry[] {
+        return this.rawEntries;
     }
 
     getEntryById(itemId: string | undefined): WordCheckEntry | undefined {
         if (!itemId || !itemId.includes('|')) return undefined;
-        return this.entries.find((e) => `${e.variant}|${e.preferred}` === itemId);
+        return this.rawEntries.find((e) => `${e.variant}|${e.preferred}` === itemId);
+    }
+
+    /** 从当前结果集中收集去重后的检查类型标签（含空串占位） */
+    collectCheckTypeLabels(): string[] {
+        const set = new Set<string>();
+        for (const e of this.rawEntries) {
+            set.add(e.checkTypeLabel ?? '');
+        }
+        return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-CN'));
     }
 }
