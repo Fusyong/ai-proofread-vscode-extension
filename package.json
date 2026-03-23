@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.8.6",
+  "version": "1.8.7",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -183,6 +183,11 @@
       {
         "command": "ai-proofread.wordCheck.applyReplaceForEntry",
         "title": "应用替换（当前条目）"
+      },
+      {
+        "command": "ai-proofread.wordCheck.sortAndFilter",
+        "title": "排序与筛选…",
+        "icon": "$(filter)"
       },
       {
         "command": "ai-proofread.manageCustomTables",
@@ -838,6 +843,11 @@
     },
     "menus": {
       "view/title": [
+        {
+          "command": "ai-proofread.wordCheck.sortAndFilter",
+          "when": "view == ai-proofread.wordCheck",
+          "group": "1_sort"
+        },
         {
           "command": "ai-proofread.numbering.toggleSimplifiedLevel",
           "when": "view == ai-proofread.numbering",
