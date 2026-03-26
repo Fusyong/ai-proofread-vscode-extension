@@ -301,43 +301,43 @@
           "order": 10,
           "type": "string",
           "enum": [
-            "deepseek",
             "aliyun",
+            "deepseek",
             "google",
             "ollama"
           ],
           "enumDescriptions": [
-            "Deepseek开放平台",
             "阿里云百炼平台",
+            "Deepseek开放平台",
             "Google Gemini平台",
             "Ollama本地模型"
           ],
-          "default": "deepseek",
-          "description": "大模型服务平台选择"
-        },
-        "ai-proofread.apiKeys.deepseek": {
-          "order": 11,
-          "type": "string",
-          "default": "",
-          "description": "Deepseek开放平台 API 密钥"
-        },
-        "ai-proofread.proofread.models.deepseek": {
-          "order": 12,
-          "type": "string",
-          "default": "deepseek-chat",
-          "description": "Deepseek开放平台模型,如: deepseek-chat（推理模型deepseek-reasoner容易失败且费用高）"
+          "default": "aliyun",
+          "description": "大模型服务平台选择（默认阿里云百炼平台）"
         },
         "ai-proofread.apiKeys.aliyun": {
-          "order": 13,
+          "order": 11,
           "type": "string",
           "default": "",
           "description": "阿里云百炼平台 API 密钥"
         },
         "ai-proofread.proofread.models.aliyun": {
-          "order": 14,
+          "order": 12,
           "type": "string",
           "default": "qwen3-max",
-          "description": "阿里云百炼平台模型,如: qwen3-max, qwen-max-latest,qwen-max,  qwen-plus-latest, qwen-plus, deepseek-v3, (推理模型deepseek-r1容易失败且费用高)"
+          "description": "阿里云百炼平台模型,如: qwen3-max, qwen-max-latest, qwen-max,  qwen-plus-latest, qwen-plus, deepseek-v3, (推理模型deepseek-r1容易失败且费用高)"
+        },
+        "ai-proofread.apiKeys.deepseek": {
+          "order": 13,
+          "type": "string",
+          "default": "",
+          "description": "Deepseek开放平台 API 密钥"
+        },
+        "ai-proofread.proofread.models.deepseek": {
+          "order": 14,
+          "type": "string",
+          "default": "deepseek-chat",
+          "description": "Deepseek开放平台模型,如: deepseek-chat（推理模型deepseek-reasoner容易失败且费用高）"
         },
         "ai-proofread.apiKeys.google": {
           "order": 15,

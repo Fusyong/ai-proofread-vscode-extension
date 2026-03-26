@@ -14,7 +14,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 1. [安装VS Code](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#_1)，用VSCode打开一个空文件夹，通过VS Code界面左侧的扩展按钮打开扩展管理窗口（Ctrl+Shift+X）
 2. 搜索AI Proofreader，点击安装按钮`install`安装
-3. 到大语言模型服务平台（默认为[Deepseek开放平台](https://platform.deepseek.com/)），通过注册、实名认证、充值、生成API秘钥等操作，获得有效的秘钥，复制秘钥
+3. 到大语言模型服务平台（默认为[阿里云百炼](https://bailian.console.aliyun.com/)），通过注册、实名认证、充值、生成API秘钥等操作，获得有效的秘钥，复制秘钥
 4. 回到AI Proofreader扩展界面，后点击设置按钮⚙️，选中弹出菜单中的设置项Settings，把秘钥粘贴到对应平台的API秘钥框中
 
 ## 2. 快速上手
@@ -304,18 +304,18 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 参考：
 
-* Deepseek[限速](https://api-docs.deepseek.com/zh-cn/quick_start/rate_limit)：没有并发限制，但服务器在高流量时会延迟（需要注意观察）
 * 阿里云百炼平台[限流规则](https://help.aliyun.com/zh/model-studio/rate-limit)：qwen-max系列稳定版的rpm通常为600甚至更高，带日期的快照版通常为60，没有并发限制（建议为10）
+* Deepseek[限速](https://api-docs.deepseek.com/zh-cn/quick_start/rate_limit)：没有并发限制，但服务器在高流量时会延迟（需要注意观察）
 * 谷歌[rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits)
 
 ### 4.1. 大语言模型
 
 目前支持这些大语言模型服务：
 
-1. [Deepseek开放平台](https://platform.deepseek.com/)（默认）
 1. [阿里云百炼](https://bailian.console.aliyun.com/)，[模型列表](https://bailian.console.aliyun.com/?tab=model#/model-market)
-1. [Google Gemini](https://aistudio.google.com/)，[模型列表](https://ai.google.dev/gemini-api/docs/models)
-1. [Ollama本地模型](https://ollama.ai/)，对计算机性能、专业知识要求较高
+2. [Deepseek开放平台](https://platform.deepseek.com/)（默认）
+3. [Google Gemini](https://aistudio.google.com/)，[模型列表](https://ai.google.dev/gemini-api/docs/models)
+4. [Ollama本地模型](https://ollama.ai/)，对计算机性能、专业知识要求较高
 
 ### 4.2. 模型温度
 
@@ -327,7 +327,11 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 以下是官方资料：
 
-1. deepseek
+1. 阿里云百炼平台
+
+    * qwen系列: 取值范围是`[0:2)`
+
+2. deepseek
 
     `temperature` 参数默认为 1.0。
 
@@ -341,10 +345,6 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
     | 翻译                | 1.3  |
     | 创意类写作/诗歌创作 | 1.5  |
 
-2. 阿里云百炼平台
-
-    * deepseek v3/r1: temperature：0.7（取值范围是`[0:2)`）
-    * qwen系列: 取值范围是`[0:2)`
 
 3. Google Gemini
 
@@ -352,16 +352,15 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 5. TODO
 
-1. 生卒年检查
-2. 校对样例文件改为JSON，配编辑、勾选应用界面（webview）
-3. 在线引文核对
+1. 校对样例文件改为JSON，配编辑、勾选应用界面（webview）
+2. 在线引文核对
     1. 读秀，
     2. 中华经典古籍库，
     3. 识典故古籍
-5. 人看的相似度使用编辑距离：fastest-levenshtein，在对齐完成后，快速计算两个相似句子的“修改程度”百分比。它是 JS 环境下编辑距离运算的最快实现
-6. 调研集成opencc-js，用于繁简转换和用词习惯检查
-7.  勘误表改为JSON加web viewer
-8.  预置更多提示词，包括常用的专项校对
+3. 人看的相似度使用编辑距离：fastest-levenshtein，在对齐完成后，快速计算两个相似句子的“修改程度”百分比。它是 JS 环境下编辑距离运算的最快实现
+4. 调研集成opencc-js，用于繁简转换和用词习惯检查
+5.  勘误表改为JSON加web viewer
+6.  预置更多提示词，包括常用的专项校对
     1. 典型错误举例校对
         1. 标点符号用法错误
         2. 数字用法错误
@@ -372,12 +371,12 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
     4. 练习题就地回答
     5. 翻译
     6. 按小学语文教材标准加拼音
-9.  自主发现、提出、校对知识性问题
+7.  自主发现、提出、校对知识性问题
     1. 检索、核对互联网资料
     2. 检索、核对本地词典（以Python库mdict查询模块为基础）
-10. 内部git版本管理
-11. 推理模型无法使用的问题（可能单纯是因为运行时间过长）
-12. 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
+8.  内部git版本管理
+9.  推理模型无法使用的问题（可能单纯是因为运行时间过长）
+10. 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
 
 ## 6. 更新日志
 
