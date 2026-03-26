@@ -1,3 +1,6 @@
+!!! caution 
+    默认平台已经由DeepSeek改成阿里云百炼。只有DeepSeek账号的用户需要手动改回DeepSeek。
+
 *QQ群“ai-proofreader 校对插件”：1055031650*
 
 一个用于文档和图书校对、基于大语言模型服务的VS Code扩展，支持选中文本直接校对和长文档切分后批量校对两种工作流，并集成了一些跟校对相关的辅助功能。[这里是代码库](https://github.com/Fusyong/ai-proofread-vscode-extension)。本扩展的原型基于一个Python校对工具库[Fusyong/ai-proofread](https://github.com/Fusyong/ai-proofread)。
