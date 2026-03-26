@@ -26,7 +26,9 @@ function normalizeSpaces(s: string): string {
 }
 
 function normalizeRawDash(s: string): string {
-    return s.replace(/[−–—\-]/g, '—');
+    // 严格要求年份区间使用的连接号仅为全角破折号「—」。
+    // 因此不再把「- / – / −」等替换为「—」；避免把非目标写法误判为相符。
+    return s;
 }
 
 /** 「前」与阿拉伯数字之间排版空格不影响核验（前 99 → 前99） */
@@ -57,7 +59,9 @@ function parseBracketInner(inner: string): { label?: string; raw: string } {
 function parseYearToken(tok: string): number | null {
     const t = tok.trim();
     if (t === '？' || t === '?') return null;
-    const pre = t.match(/^前\s*(\d+)$/);
+    // 允许「130？/前130？」：视为未知端点，返回 null
+    if (/^前(\d+)[？\?]$/.test(t) || /^(\d+)[？\?]$/.test(t)) return null;
+    const pre = t.match(/^前(\d+)$/);
     if (pre) return -parseInt(pre[1], 10);
     const m = t.match(/^(\d+)$/);
     if (m) return parseInt(m[1], 10);
@@ -67,7 +71,7 @@ function parseYearToken(tok: string): number | null {
 /** 从 raw 字符串解析起止年（支持 1573—1620、前134—前129、910—？ 等） */
 function parseRawSpan(raw: string): { start: number | null; end: number | null } {
     const n = normalizeRawDash(raw.trim());
-    const parts = n.split(/[—\-–]/);
+    const parts = n.split(/—/);
     if (parts.length < 2) return { start: null, end: null };
     return {
         start: parseYearToken(parts[0]),
@@ -310,20 +314,28 @@ export function scanDocumentHai7Person(
     return Array.from(map.values());
 }
 
-/** 从括注中提取首个整数年份（含 前134 / 前 134 → -134） */
+/**
+ * 括注中的“单年”年份：
+ * - 允许：`130`、`前130`
+ * - 允许尾缀问好：`130？/前130？`（视为未知端点，返回 null）
+ * - 禁止：`130年`、`前130年`、`前130年后头` 等带「年」或多余文字的写法
+ */
 function extractYearTokenFromInner(inner: string): number | null {
-    const t = inner.trim();
-    const pre = t.match(/^前\s*(\d+)/);
+    const t = normalizeSpaces(inner);
+    if (t === '？' || t === '?') return null;
+    // 允许「130？/前130？」：未知端点
+    if (/^前(\d+)[？\?]$/.test(t) || /^(\d+)[？\?]$/.test(t)) return null;
+    const pre = t.match(/^前(\d+)$/);
     if (pre) return -parseInt(pre[1], 10);
-    const mm = t.match(/(-?\d+)/);
-    if (!mm) return null;
-    return parseInt(mm[1], 10);
+    const m = t.match(/^(\d+)$/);
+    if (!m) return null;
+    return parseInt(m[1], 10);
 }
 
 /** 「年号+汉字第几年+年+括注」：汉字年指具体一年，括注阿拉伯只能是单年，不得为区间 */
 function arabicInnerIsYearRange(inner: string): boolean {
     const t = normalizeSpaces(inner);
-    const spanM = t.match(/^([^—\-–]+)[—\-–](.+)$/);
+    const spanM = t.match(/^([^—]+?)\s*—\s*(.+)$/);
     if (!spanM) return false;
     const a = parseYearToken(spanM[1].trim());
     const b = parseYearToken(spanM[2].trim());
@@ -332,8 +344,7 @@ function arabicInnerIsYearRange(inner: string): boolean {
 
 /** 括注阿拉伯数字与推算的绝对年份一致（仅单年；区间由调用方先拒绝） */
 function arabicMatchesInnerSingleYear(inner: string, absYear: number): boolean {
-    const t = normalizeSpaces(inner);
-    const single = extractYearTokenFromInner(t);
+    const single = extractYearTokenFromInner(inner);
     return single !== null && single === absYear;
 }
 
