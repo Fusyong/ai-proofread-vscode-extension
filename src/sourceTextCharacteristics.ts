@@ -44,7 +44,7 @@ export function formatSourceCharacteristicsBlock(raw: string): string {
 export function getSourceCharacteristicContentInputPrompt(): string {
     return (
         `${SOURCE_TEXT_CHARACTERISTICS_INTRO}\n\n` +
-        '请在下方填写接续的整体说明正文；上一句在校对注入时会自动置于文首，此处不必重复输入。'
+        '请填写后续的整体说明正文。前一句会自动置于你的输入之前，此处不必输入'
     );
 }
 
