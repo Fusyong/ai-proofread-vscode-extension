@@ -9,6 +9,8 @@ import { processJsonFileAsync, proofreadSelection } from '../proofreader';
 import { showDiff } from '../differ';
 import { FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
 import { getPromptDisplayName } from '../promptManager';
+import { isUsingSystemDefaultPrompt, pickSourceTextCharacteristicsInjection } from '../sourceTextCharacteristicsPicker';
+import { summarizeSourceCharacteristicsForLog } from '../sourceTextCharacteristics';
 import { WebviewManager, ProcessResult } from '../ui/webviewManager';
 import { ProgressTracker } from '../progressTracker';
 
@@ -72,6 +74,17 @@ export class ProofreadCommandHandler {
             return; // 用户取消操作，不进行备份
         }
 
+        let sourceTextCharacteristics = '';
+        let sourceCharacteristicsDisplayTitle: string | undefined;
+        if (context && isUsingSystemDefaultPrompt(context)) {
+            const picked = await pickSourceTextCharacteristicsInjection(context);
+            if (picked === undefined) {
+                return;
+            }
+            sourceTextCharacteristics = picked.injectText;
+            sourceCharacteristicsDisplayTitle = picked.displayTitle;
+        }
+
         // 用户已确认参数，现在检查并备份输出文件（统一逻辑）
         const shouldContinue = await this.checkAndBackupOutputFile(
             jsonFilePath,
@@ -94,6 +107,7 @@ export class ProofreadCommandHandler {
         let logMessage = `\n${'='.repeat(50)}\n`;
         logMessage += `Start: ${startTime}\n`;
         logMessage += `Prompt: ${currentPromptName}\n`;
+        logMessage += `SrcHint: ${sourceCharacteristicsDisplayTitle ?? summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)}\n`;
         logMessage += `Model: ${platform}, ${model}, T. ${temperature}\n`;
         logMessage += `RPM: ${rpm}\n`;
         logMessage += `MaxConcurrent: ${maxConcurrent}\n`;
@@ -117,6 +131,7 @@ export class ProofreadCommandHandler {
                     rpm,
                     maxConcurrent,
                     temperature,
+                    sourceTextCharacteristics,
                     onProgress: (info: string) => {
                         // 将进度信息写入日志
                         fs.appendFileSync(logFilePath, info + '\n', 'utf8');
@@ -511,6 +526,17 @@ export class ProofreadCommandHandler {
                 actualRepetitionMode = repetitionMode.value as 'none' | 'target' | 'all';
             }
 
+            let sourceTextCharacteristics = '';
+            let sourceCharacteristicsDisplayTitle: string | undefined;
+            if (context && isUsingSystemDefaultPrompt(context)) {
+                const picked = await pickSourceTextCharacteristicsInjection(context);
+                if (picked === undefined) {
+                    return;
+                }
+                sourceTextCharacteristics = picked.injectText;
+                sourceCharacteristicsDisplayTitle = picked.displayTitle;
+            }
+
             // 显示进度
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
@@ -534,6 +560,8 @@ export class ProofreadCommandHandler {
                         beforeParagraphs,
                         afterParagraphs,
                         actualRepetitionMode,
+                        sourceTextCharacteristics,
+                        sourceCharacteristicsDisplayTitle,
                         undefined,
                         (raw) => { rawItemOutput = raw; }
                     );
@@ -555,7 +583,7 @@ export class ProofreadCommandHandler {
                         // 把参数和校对结果写入日志：条目式输出时写 LLM 原始返回，否则写替换后结果
                         const logFilePath = FilePathUtils.getFilePath(editor.document.uri.fsPath, '.proofread', '.log');
                         const resultForLog = rawItemOutput !== undefined ? rawItemOutput : result;
-                        const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nRepetitionMode: ${repetitionModeName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${resultForLog}\n${'='.repeat(50)}\n\n`;
+                        const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nSrcHint: ${sourceCharacteristicsDisplayTitle ?? summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)}\nRepetitionMode: ${repetitionModeName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${resultForLog}\n${'='.repeat(50)}\n\n`;
                         fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
                         // 显示信息消息，包含提示词重复模式（使用键名）
@@ -563,7 +591,7 @@ export class ProofreadCommandHandler {
                         const contextLength = contextLevel ? '已设置' : 'none';
                         const referenceLength = referenceFile ? '已设置' : 'none';
                         vscode.window.showInformationMessage(
-                            `校对完成 | Prompt: ${currentPromptName} Rep. ${actualRepetitionMode} | ` +
+                            `校对完成 | Prompt: ${currentPromptName} Src. ${sourceCharacteristicsDisplayTitle ?? summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)} Rep. ${actualRepetitionMode} | ` +
                             `Context: R. ${referenceLength}, C. ${contextLength}, T. ${targetLength} | ` +
                             `Model: ${platform}, ${model}, T. ${userTemperature}`
                         );

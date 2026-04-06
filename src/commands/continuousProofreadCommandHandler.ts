@@ -7,6 +7,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { proofreadSelection } from '../proofreader';
+import { isUsingSystemDefaultPrompt, pickSourceTextCharacteristicsInjection } from '../sourceTextCharacteristicsPicker';
 import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
 import type { ProofreadItem } from '../itemOutputParser';
 import { getSegmentFromPositionWithMode, splitChineseSentencesSimple } from '../splitter';
@@ -21,6 +22,10 @@ interface ContinuousProofreadConfig {
     beforeParagraphs: number;
     afterParagraphs: number;
     repetitionMode: 'none' | 'target' | 'all';
+    /** 系统默认提示词时注入的源文本特性提示词正文；空字符串表示不注入 */
+    sourceTextCharacteristics?: string;
+    /** 注入项在通知/日志中的标题（预设名或「本次临时输入」等） */
+    sourceTextCharacteristicsTitle?: string;
     splitMode: 'length' | 'title';
     splitCutBy: number;
     splitLevels: number[];
@@ -206,6 +211,17 @@ export class ContinuousProofreadCommandHandler {
         ], { placeHolder: '提示词重复模式', ignoreFocusOut: true });
         if (repMode === undefined) return null;
 
+        let sourceTextCharacteristics = '';
+        let sourceTextCharacteristicsTitle: string | undefined;
+        if (isUsingSystemDefaultPrompt(context)) {
+            const picked = await pickSourceTextCharacteristicsInjection(context);
+            if (picked === undefined) {
+                return null;
+            }
+            sourceTextCharacteristics = picked.injectText;
+            sourceTextCharacteristicsTitle = picked.displayTitle;
+        }
+
         const fullConfig: ContinuousProofreadConfig = {
             platform,
             model,
@@ -214,6 +230,8 @@ export class ContinuousProofreadCommandHandler {
             beforeParagraphs,
             afterParagraphs,
             repetitionMode: repMode.value,
+            sourceTextCharacteristics,
+            sourceTextCharacteristicsTitle,
             splitMode,
             splitCutBy,
             splitLevels
@@ -656,6 +674,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         this.session!.config.beforeParagraphs,
                         this.session!.config.afterParagraphs,
                         this.session!.config.repetitionMode,
+                        this.session!.config.sourceTextCharacteristics ?? '',
+                        this.session!.config.sourceTextCharacteristicsTitle,
                         (items) => {
                             if (this.session) this.session.currentSegmentItems = items;
                         }

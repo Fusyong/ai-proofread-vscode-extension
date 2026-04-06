@@ -279,24 +279,24 @@ export class ConfigManager {
  */
 export class Logger {
     private static instance: Logger;
-    private debugEnabled: boolean = false;
 
-    private constructor() {
-        // 检查是否启用调试模式（通过环境变量或配置）
-        const config = vscode.workspace.getConfiguration('ai-proofread');
-        this.debugEnabled = config.get<boolean>('debug.enableConsoleLog', false);
-
-        // 也检查环境变量（开发时使用）
-        if (process.env.AI_PROOFREAD_DEBUG === 'true') {
-            this.debugEnabled = true;
-        }
-    }
+    private constructor() {}
 
     public static getInstance(): Logger {
         if (!Logger.instance) {
             Logger.instance = new Logger();
         }
         return Logger.instance;
+    }
+
+    /**
+     * 是否在开发者工具控制台原样输出提交给 LLM 的完整负载（每次读取配置，改开关后立即生效）
+     */
+    private isLlmPayloadConsoleLogEnabled(): boolean {
+        if (process.env.AI_PROOFREAD_DEBUG === 'true') {
+            return true;
+        }
+        return vscode.workspace.getConfiguration('ai-proofread').get<boolean>('debug.enableConsoleLog', false) === true;
     }
 
     public info(message: string): void {
@@ -312,27 +312,24 @@ export class Logger {
     }
 
     /**
-     * 调试日志（仅在启用调试模式时输出）
-     * 使用此方法可以避免在生产环境中的性能损失
-     * @param message 调试消息
-     * @param data 可选的数据对象（会被JSON.stringify序列化）
+     * 调试日志：在启用「控制台输出 LLM 提交内容」时输出（完整对象经 JSON 格式化，与请求体字段一致）
      */
     public debug(message: string, data?: any): void {
-        if (this.debugEnabled) {
-            if (data !== undefined) {
-                console.log(`[DEBUG] ${message}`, JSON.stringify(data, null, 2));
-            } else {
-                console.log(`[DEBUG] ${message}`);
-            }
+        if (!this.isLlmPayloadConsoleLogEnabled()) {
+            return;
+        }
+        if (data !== undefined) {
+            console.log(`[DEBUG] ${message}`, JSON.stringify(data, null, 2));
+        } else {
+            console.log(`[DEBUG] ${message}`);
         }
     }
 
     /**
-     * 调试日志（直接输出，不进行JSON序列化）
-     * 用于输出简单字符串，避免序列化开销
+     * 调试日志（纯文本行，不进行 JSON 序列化）
      */
     public debugSimple(message: string): void {
-        if (this.debugEnabled) {
+        if (this.isLlmPayloadConsoleLogEnabled()) {
             console.log(`[DEBUG] ${message}`);
         }
     }

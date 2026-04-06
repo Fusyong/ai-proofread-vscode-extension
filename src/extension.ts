@@ -23,6 +23,8 @@ import { registerSegmentView } from './numbering/segmentView';
 import { NumberingCheckCommandHandler } from './commands/numberingCheckCommandHandler';
 import { ContinuousProofreadCommandHandler } from './commands/continuousProofreadCommandHandler';
 import { registerPromptsView, type PromptTreeItem } from './promptsView';
+import { SourceTextCharacteristicManager } from './sourceTextCharacteristicManager';
+import { registerSourceTextCharacteristicsView, type SourceCharacteristicTreeItem } from './sourceTextCharacteristicsView';
 import { registerProofreadItemsView } from './proofreadItemsView';
 import { registerWelcomeView } from './ui/welcomeView';
 import { getJiebaWasm } from './jiebaLoader';
@@ -90,6 +92,11 @@ export function activate(context: vscode.ExtensionContext) {
 
     const promptManager = PromptManager.getInstance(context);
     const { provider: promptsTreeProvider } = registerPromptsView(context, promptManager);
+    const sourceTextCharacteristicManager = SourceTextCharacteristicManager.getInstance(context);
+    const { provider: sourceTextCharacteristicsTreeProvider } = registerSourceTextCharacteristicsView(
+        context,
+        sourceTextCharacteristicManager
+    );
     registerProofreadItemsView(context);
 
     // 按需显示 TreeView：默认全部隐藏，由命令显式打开
@@ -102,6 +109,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', false);
+    vscode.commands.executeCommand('setContext', 'aiProofread.showSourceTextCharacteristicsView', false);
 
     // 设置校对、切分、合并的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
@@ -224,10 +232,10 @@ export function activate(context: vscode.ExtensionContext) {
             await examplesHandler.handleSplitIntoSentencesCommand();
         }),
 
-        // 注册提示词管理命令（聚焦 TreeView）
+        // 注册提示词管理命令（同时显示 prompts 与源文本特性两个 TreeView，并聚焦 prompts）
         vscode.commands.registerCommand('ai-proofread.managePrompts', async () => {
-            // 按需显示 prompts 视图
             await vscode.commands.executeCommand('setContext', 'aiProofread.showPromptsView', true);
+            await vscode.commands.executeCommand('setContext', 'aiProofread.showSourceTextCharacteristicsView', true);
             PromptManager.getInstance(context).managePrompts();
         }),
 
@@ -245,6 +253,23 @@ export function activate(context: vscode.ExtensionContext) {
             if (el?.id && el.prompt) {
                 await promptManager.deletePrompt(el.id);
                 promptsTreeProvider.refresh();
+            }
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.sourceTextCharacteristics.new', async () => {
+            await sourceTextCharacteristicManager.addPrompt();
+            sourceTextCharacteristicsTreeProvider.refresh();
+        }),
+        vscode.commands.registerCommand('ai-proofread.sourceTextCharacteristics.edit', async (el: SourceCharacteristicTreeItem) => {
+            if (el?.userPrompt) {
+                await sourceTextCharacteristicManager.editPrompt(el.userPrompt);
+                sourceTextCharacteristicsTreeProvider.refresh();
+            }
+        }),
+        vscode.commands.registerCommand('ai-proofread.sourceTextCharacteristics.delete', async (el: SourceCharacteristicTreeItem) => {
+            if (el?.userPrompt && el.id) {
+                await sourceTextCharacteristicManager.deletePrompt(el.id);
+                sourceTextCharacteristicsTreeProvider.refresh();
             }
         }),
 

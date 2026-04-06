@@ -42,6 +42,17 @@ function getHtml(): string {
         .btn:hover {
             background: var(--vscode-button-hoverBackground);
         }
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .btn-grid .btn {
+            margin-bottom: 0;
+            min-width: 0;
+            text-align: left;
+        }
         .hint {
             margin-top: 16px;
             padding-top: 12px;
@@ -60,9 +71,12 @@ function getHtml(): string {
 </head>
 <body>
     <button class="btn" data-action="openPanel">打开校对面板</button>
-    <button class="btn" data-action="showExtension">查看说明文档</button>
-    <button class="btn" data-action="openCheatsheet">命令速查与业务流程图</button>
-    <button class="btn" data-action="managePrompts">管理提示词</button>
+    <div class="btn-grid">
+        <button class="btn" data-action="showExtension">查看说明文档</button>
+        <button class="btn" data-action="openCheatsheet">命令速查与业务流程图</button>
+        <button class="btn" data-action="managePrompts">管理提示词</button>
+        <button class="btn" data-action="openSettings">打开设置</button>
+    </div>
     <div class="hint">
         可通过三种方式使用本扩展：
         <ol>
@@ -121,6 +135,9 @@ export function registerWelcomeView(context: vscode.ExtensionContext): void {
                         break;
                     case 'managePrompts':
                         vscode.commands.executeCommand('ai-proofread.managePrompts');
+                        break;
+                    case 'openSettings':
+                        vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread');
                         break;
                 }
             });

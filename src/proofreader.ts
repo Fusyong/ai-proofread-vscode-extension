@@ -16,6 +16,7 @@ import { parseItemOutput, type ProofreadItem } from './itemOutputParser';
 import { applyItemReplacements } from './itemReplacer';
 import { SYSTEM_PROMPT_NAME_FULL, SYSTEM_PROMPT_NAME_ITEM, getPromptDisplayName } from './promptManager';
 import { getExtensionContext } from './extensionContextHolder';
+import { formatSourceCharacteristicsBlock, summarizeSourceCharacteristicsForLog } from './sourceTextCharacteristics';
 
 // 加载环境变量
 dotenv.config();
@@ -83,6 +84,7 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `
 6. 对于外文文本，同样参照上面的要求，并结合该文种的校对惯例进行校对。
 
 </task>
+{{source_text_characteristics}}
 <output-format>
 
 在用户提供的目标文本（target）上校对，对输出的要求是：
@@ -98,8 +100,13 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `
 </proofreader-system-setting>
 `;
 
-const DEFAULT_SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT_TEMPLATE.replace('{{output_format}}', DEFAULT_OUTPUT_FORMAT);
-const ITEM_SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT_TEMPLATE.replace('{{output_format}}', ITEM_OUTPUT_FORMAT);
+function buildSystemPromptFromTemplate(outputFormat: string, sourceTextCharacteristics: string): string {
+    const block = formatSourceCharacteristicsBlock(sourceTextCharacteristics);
+    return DEFAULT_SYSTEM_PROMPT_TEMPLATE.replace('{{output_format}}', outputFormat).replace(
+        '{{source_text_characteristics}}',
+        block
+    );
+}
 
 /** 输出类型：全文 | 条目 */
 export type OutputType = 'full' | 'item';
@@ -127,7 +134,8 @@ export function getOutputType(context?: vscode.ExtensionContext): OutputType {
 }
 
 // 获取用户配置的提示词；优先使用调用方传入的 context，否则使用激活时持有的 context
-function getSystemPrompt(context?: vscode.ExtensionContext): string {
+// sourceTextCharacteristics 仅在当前为系统默认 full/item 时生效，自定义提示词忽略
+function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCharacteristics: string = ''): string {
     const config = vscode.workspace.getConfiguration('ai-proofread');
     const prompts = config.get<Array<{ name: string; content: string; outputType?: string }>>('prompts', []);
     const logger = Logger.getInstance();
@@ -138,11 +146,11 @@ function getSystemPrompt(context?: vscode.ExtensionContext): string {
 
         if (currentPromptName === SYSTEM_PROMPT_NAME_ITEM) {
             logger.info('使用系统默认提示词（item）');
-            return ITEM_SYSTEM_PROMPT;
+            return buildSystemPromptFromTemplate(ITEM_OUTPUT_FORMAT, sourceTextCharacteristics);
         }
         if (currentPromptName === SYSTEM_PROMPT_NAME_FULL) {
             logger.info('使用系统默认提示词（full）');
-            return DEFAULT_SYSTEM_PROMPT;
+            return buildSystemPromptFromTemplate(DEFAULT_OUTPUT_FORMAT, sourceTextCharacteristics);
         }
 
         // 当前选择的是自定义提示词
@@ -162,7 +170,7 @@ function getSystemPrompt(context?: vscode.ExtensionContext): string {
     }
 
     logger.info('使用系统默认提示词（full）');
-    return DEFAULT_SYSTEM_PROMPT;
+    return buildSystemPromptFromTemplate(DEFAULT_OUTPUT_FORMAT, sourceTextCharacteristics);
 }
 
 /**
@@ -198,7 +206,14 @@ function getPromptRepetitionMode(): PromptRepetitionMode {
  * API调用接口
  */
 export interface ApiClient {
-    proofread(targetText: string, preText?: string, temperature?: number | null, context?: vscode.ExtensionContext, repetitionMode?: PromptRepetitionMode): Promise<string | null>;
+    proofread(
+        targetText: string,
+        preText?: string,
+        temperature?: number | null,
+        context?: vscode.ExtensionContext,
+        repetitionMode?: PromptRepetitionMode,
+        sourceTextCharacteristics?: string
+    ): Promise<string | null>;
 }
 
 /**
@@ -236,7 +251,14 @@ export class DeepseekApiClient implements ApiClient {
     }
 
     // 使用 Deepseek API 进行校对
-    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext, repetitionMode?: PromptRepetitionMode): Promise<string | null> {
+    async proofread(
+        targetText: string,
+        preText: string = '',
+        temperature: number|null = null,
+        context?: vscode.ExtensionContext,
+        repetitionMode?: PromptRepetitionMode,
+        sourceTextCharacteristics: string = ''
+    ): Promise<string | null> {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
@@ -244,7 +266,7 @@ export class DeepseekApiClient implements ApiClient {
         const timeout = convertSecondsToMilliseconds(config.get<number>('proofread.timeout', 50), 50);
 
         const messages = [
-            { role: 'system', content: getSystemPrompt(context) }
+            { role: 'system', content: getSystemPrompt(context, sourceTextCharacteristics) }
         ];
 
         // 使用传入的重复模式，如果没有则从配置读取
@@ -371,7 +393,14 @@ export class AliyunApiClient implements ApiClient {
     }
 
     // 使用阿里云百炼 API 进行校对
-    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext, repetitionMode?: PromptRepetitionMode): Promise<string | null> {
+    async proofread(
+        targetText: string,
+        preText: string = '',
+        temperature: number|null = null,
+        context?: vscode.ExtensionContext,
+        repetitionMode?: PromptRepetitionMode,
+        sourceTextCharacteristics: string = ''
+    ): Promise<string | null> {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
@@ -379,7 +408,7 @@ export class AliyunApiClient implements ApiClient {
         const timeout = convertSecondsToMilliseconds(config.get<number>('proofread.timeout', 50), 50);
 
         const messages = [
-            { role: 'system', content: getSystemPrompt(context) }
+            { role: 'system', content: getSystemPrompt(context, sourceTextCharacteristics) }
         ];
 
         // 使用传入的重复模式，如果没有则从配置读取
@@ -506,7 +535,14 @@ export class GoogleApiClient implements ApiClient {
     }
 
     // 使用 Google API 进行校对
-    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext, repetitionMode?: PromptRepetitionMode): Promise<string | null> {
+    async proofread(
+        targetText: string,
+        preText: string = '',
+        temperature: number|null = null,
+        context?: vscode.ExtensionContext,
+        repetitionMode?: PromptRepetitionMode,
+        sourceTextCharacteristics: string = ''
+    ): Promise<string | null> {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
@@ -534,7 +570,7 @@ export class GoogleApiClient implements ApiClient {
         const disableThinking = config.get<boolean>('proofread.disableThinking', true);
 
         const configObj: any = {
-            systemInstruction: getSystemPrompt(context),
+            systemInstruction: getSystemPrompt(context, sourceTextCharacteristics),
         };
 
         if (finalTemperature !== undefined) {
@@ -622,7 +658,14 @@ export class OllamaApiClient implements ApiClient {
     }
 
     // 使用 Ollama API 进行校对
-    async proofread(targetText: string, preText: string = '', temperature: number|null = null, context?: vscode.ExtensionContext, repetitionMode?: PromptRepetitionMode): Promise<string | null> {
+    async proofread(
+        targetText: string,
+        preText: string = '',
+        temperature: number|null = null,
+        context?: vscode.ExtensionContext,
+        repetitionMode?: PromptRepetitionMode,
+        sourceTextCharacteristics: string = ''
+    ): Promise<string | null> {
         const logger = Logger.getInstance();
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
@@ -630,7 +673,7 @@ export class OllamaApiClient implements ApiClient {
         const timeout = convertSecondsToMilliseconds(config.get<number>('proofread.timeout', 300), 300); // Ollama本地模型默认5分钟超时
 
         const messages = [
-            { role: 'system', content: getSystemPrompt(context) }
+            { role: 'system', content: getSystemPrompt(context, sourceTextCharacteristics) }
         ];
 
         // 使用传入的重复模式，如果没有则从配置读取
@@ -758,6 +801,8 @@ export async function processJsonFileAsync(
         token?: vscode.CancellationToken;
         context?: vscode.ExtensionContext;
         mdFilePath?: string; // 可选的 markdown 文件路径
+        /** 仅系统默认提示词时生效，注入源文本特性提示词段落 */
+        sourceTextCharacteristics?: string;
     } = {}
 ): Promise<ProcessStats> {
     const logger = Logger.getInstance();
@@ -773,7 +818,8 @@ export async function processJsonFileAsync(
         onProgress,
         onProgressUpdate,
         token,
-        context
+        context,
+        sourceTextCharacteristics = '',
     } = options;
 
     // 读取输入JSON文件
@@ -928,7 +974,14 @@ export async function processJsonFileAsync(
         logger.debug('='.repeat(80));
 
         try {
-            const processedText = await client.proofread(labeledTargetText, preText, temperature, context);
+            const processedText = await client.proofread(
+                labeledTargetText,
+                preText,
+                temperature,
+                context,
+                undefined,
+                sourceTextCharacteristics
+            );
             const elapsed = (Date.now() - startTime) / 1000;
 
             if (processedText) {
@@ -1062,6 +1115,8 @@ export async function processJsonFileAsync(
  * @param beforeParagraphs 前文段落数
  * @param afterParagraphs 后文段落数
  * @param repetitionMode 提示词重复模式（可选，覆盖配置）
+ * @param sourceTextCharacteristics 源文本特性提示词注入正文（仅系统默认提示词时生效；空字符串表示不注入）
+ * @param sourceCharacteristicsDisplayTitle 注入项在通知中的展示标题（如预设名称）；未传时由正文摘要回退
  * @param onItemItems 条目式输出时回调解析出的条目（供持续校对等直接用作待选样例）
  * @param onRawItemOutput 条目式输出时回调 LLM 原始返回（供日志等写入原始结果，不写替换后文本）
  * @returns 校对后的文本
@@ -1078,6 +1133,8 @@ export async function proofreadSelection(
     beforeParagraphs?: number,
     afterParagraphs?: number,
     repetitionMode?: PromptRepetitionMode,
+    sourceTextCharacteristics: string = '',
+    sourceCharacteristicsDisplayTitle?: string,
     onItemItems?: (items: ProofreadItem[]) => void,
     onRawItemOutput?: (raw: string) => void
 ): Promise<string | null> {
@@ -1151,8 +1208,12 @@ export async function proofreadSelection(
     const targetLength = targetText.length;
     const contextLength = contextText.length;
     const referenceLength = referenceText.length;
+    const srcHint =
+        sourceCharacteristicsDisplayTitle !== undefined
+            ? sourceCharacteristicsDisplayTitle
+            : summarizeSourceCharacteristicsForLog(sourceTextCharacteristics);
     vscode.window.showInformationMessage(
-        `Prompt: ${currentPromptName} Rep. ${actualRepetitionMode} | ` +
+        `Prompt: ${currentPromptName} Src. ${srcHint} Rep. ${actualRepetitionMode} | ` +
         `Context: R. ${referenceLength}, C. ${contextLength}, T. ${targetLength} | ` +
         `Model: ${platform}, ${model}, T. ${userTemperature}`
     );
@@ -1172,7 +1233,14 @@ export async function proofreadSelection(
         }
     })();
 
-    let result = await client.proofread(postText, preText, userTemperature, context, actualRepetitionMode);
+    let result = await client.proofread(
+        postText,
+        preText,
+        userTemperature,
+        context,
+        actualRepetitionMode,
+        sourceTextCharacteristics
+    );
 
     if (result && getOutputType(context) === 'item') {
         onRawItemOutput?.(result);
