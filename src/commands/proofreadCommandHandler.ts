@@ -58,7 +58,19 @@ export class ProofreadCommandHandler {
             return;
         }
 
-        // 显示参数确认对话框（在备份之前，如果用户不同意参数则不进行备份）
+        // 源文本特性注入仅在使用系统默认 full/item 提示词时询问；先于参数确认，便于在确认框中展示注入选择
+        const useSystemDefaultPrompt = !!(context && isUsingSystemDefaultPrompt(context));
+        let sourceTextCharacteristics = '';
+        let sourceCharacteristicsDisplayTitle: string | undefined;
+        if (useSystemDefaultPrompt) {
+            const picked = await pickSourceTextCharacteristicsInjection(context!);
+            if (picked === undefined) {
+                return;
+            }
+            sourceTextCharacteristics = picked.injectText;
+            sourceCharacteristicsDisplayTitle = picked.displayTitle;
+        }
+
         const confirmResult = await this.showJsonBatchConfirmation({
             jsonFilePath,
             totalCount: jsonContent.length,
@@ -67,22 +79,15 @@ export class ProofreadCommandHandler {
             rpm,
             maxConcurrent,
             temperature,
-            context
+            context,
+            sourceCharacteristicsInjectSummary: useSystemDefaultPrompt
+                ? sourceCharacteristicsDisplayTitle ??
+                  summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)
+                : undefined
         });
 
         if (!confirmResult) {
             return; // 用户取消操作，不进行备份
-        }
-
-        let sourceTextCharacteristics = '';
-        let sourceCharacteristicsDisplayTitle: string | undefined;
-        if (context && isUsingSystemDefaultPrompt(context)) {
-            const picked = await pickSourceTextCharacteristicsInjection(context);
-            if (picked === undefined) {
-                return;
-            }
-            sourceTextCharacteristics = picked.injectText;
-            sourceCharacteristicsDisplayTitle = picked.displayTitle;
         }
 
         // 用户已确认参数，现在检查并备份输出文件（统一逻辑）
@@ -622,8 +627,20 @@ export class ProofreadCommandHandler {
         maxConcurrent: number;
         temperature: number;
         context?: vscode.ExtensionContext;
+        /** 系统默认提示词时：已在上一环节选择的源文本特性注入摘要（如「无」、预设名） */
+        sourceCharacteristicsInjectSummary?: string;
     }): Promise<boolean> {
-        const { jsonFilePath, totalCount, platform, model, rpm, maxConcurrent, temperature, context } = params;
+        const {
+            jsonFilePath,
+            totalCount,
+            platform,
+            model,
+            rpm,
+            maxConcurrent,
+            temperature,
+            context,
+            sourceCharacteristicsInjectSummary
+        } = params;
 
         // 获取当前提示词显示名称
         const currentPromptName = context
@@ -662,6 +679,9 @@ export class ProofreadCommandHandler {
             '',
             '⚙️ 处理参数:',
             `   • 提示词: ${currentPromptName}`,
+            sourceCharacteristicsInjectSummary !== undefined
+                ? `   • 源文本特性注入: ${sourceCharacteristicsInjectSummary}`
+                : '',
             `   • 提示词重复模式: ${repetitionModeName}`,
             tokenWarning ? tokenWarning : '',
             `   • 平台: ${platform}`,
