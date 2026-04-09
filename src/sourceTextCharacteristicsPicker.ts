@@ -85,7 +85,7 @@ export async function pickSourceTextCharacteristicsInjection(
     if (picked.kind === 'custom') {
         const text = await vscode.window.showInputBox({
             title: '本次临时注入',
-            prompt: '请填写接续说明；固定句会在注入时自动置于文首。',
+            prompt: '“目标文本（target）是一个更大的源文本的一部分。对这个源文本的整体说明如下：”这句话会自动放在你填写的内容之前，请接着这句话往下写。',
             placeHolder: '多行说明可粘贴；留空等同不注入',
         });
         if (text === undefined) {
