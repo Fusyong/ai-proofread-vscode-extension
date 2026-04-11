@@ -29,6 +29,8 @@ const TEST_ERA = {
         { raw: '1387—1389', label: '日本北朝后小松天皇年号' },
         { raw: '1796—1820', label: '清仁宗年号' },
     ],
+    /** raw 无 —：单年，与「710—710」等价（见 parseRawSpan） */
+    试: [{ raw: '710', label: '测试单年' }],
 };
 
 vi.mock('./tableLoader', () => ({
@@ -67,6 +69,16 @@ describe('scanDocumentHai7Era (subset table)', () => {
 
     it('E1: 明万历十五年（1600年）→ 核验错误', () => {
         const r = scan('明万历十五年（1600年）');
+        expect(r.some((e) => e.preferred === '核验错误')).toBe(true);
+    });
+
+    it('E1: raw 仅为单年数字（710）时元年+括注 710 已核验', () => {
+        const r = scan('试元年（710年）');
+        expect(r.some((e) => e.preferred === '已核验')).toBe(true);
+    });
+
+    it('E1: raw 单年时次年超出区间 → 核验错误', () => {
+        const r = scan('试二年（711年）');
         expect(r.some((e) => e.preferred === '核验错误')).toBe(true);
     });
 

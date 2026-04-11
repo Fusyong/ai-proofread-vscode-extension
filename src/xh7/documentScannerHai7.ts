@@ -87,15 +87,27 @@ function parseYearToken(tok: string): number | null {
     return null;
 }
 
-/** 从 raw 字符串解析起止年（支持 1573—1620、前134—前129、910—？ 等） */
+/**
+ * 从 raw 字符串解析起止年（支持 1573—1620、前134—前129、910—？ 等）。
+ * **无 `—` 且仅为一个可解析年份**（如 `710`）时视为**仅一年**：`start === end === 该年`。
+ */
 function parseRawSpan(raw: string): { start: number | null; end: number | null } {
     const n = normalizeRawDash(raw.trim());
     const parts = n.split(/—/);
-    if (parts.length < 2) return { start: null, end: null };
-    return {
-        start: parseYearToken(parts[0]),
-        end: parseYearToken(parts[1]),
-    };
+    if (parts.length >= 2) {
+        return {
+            start: parseYearToken(parts[0]),
+            end: parseYearToken(parts[1]),
+        };
+    }
+    if (parts.length === 1) {
+        const t = parts[0].trim();
+        if (t !== '') {
+            const y = parseYearToken(t);
+            if (y !== null) return { start: y, end: y };
+        }
+    }
+    return { start: null, end: null };
 }
 
 /** absYear 是否在 raw 许可区间内 */
