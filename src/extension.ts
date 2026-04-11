@@ -487,7 +487,14 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.wordCheck.nextOccurrence', () => wordCheckHandler.handleNextOccurrenceCommand()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.showNotes', () => wordCheckHandler.handleShowNotesCommand()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.revealCurrentAndAdvance', () => wordCheckHandler.handleRevealCurrentAndAdvanceCommand()),
-        vscode.commands.registerCommand('ai-proofread.wordCheck.applyReplaceForEntry', () => wordCheckHandler.handleApplyReplaceForEntryCommand()),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.applyReplaceForEntry', (item?: import('./xh7/types').WordCheckEntry) =>
+            wordCheckHandler.handleApplyReplaceForEntryCommand(item)
+        ),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.applyInsertForEntry', (item?: import('./xh7/types').WordCheckEntry) =>
+            wordCheckHandler.handleApplyInsertForEntryCommand(item)
+        ),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.applyReplaceVisible', () => wordCheckHandler.handleApplyReplaceVisibleCommand()),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.applyInsertVisible', () => wordCheckHandler.handleApplyInsertVisibleCommand()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.sortAndFilter', () => wordCheckHandler.handleWordCheckSortAndFilterCommand()),
         vscode.commands.registerCommand('ai-proofread.manageCustomTables', async () => {
             // 按需显示自定义替换表及相关视图

@@ -56,7 +56,7 @@ import {
     setCustomTableEnabled,
 } from '../xh7/customTableCache';
 import { scanDocumentWithCustomTable, scanDocumentWithLiteralRulesWithSegmentation } from '../xh7/documentScannerCustom';
-import { applyReplaceInDocument } from '../xh7/applyReplace';
+import { applyReplaceInDocument, applyInsertAfterRangesInDocument } from '../xh7/applyReplace';
 import {
     DEFAULT_WORD_CHECK_SORT_FILTER,
     type WordCheckSortMode,
@@ -71,6 +71,9 @@ const KEY_LAST_SELECTED_TABLE_IDS = 'ai-proofread.wordCheck.lastSelectedTableIds
 const KEY_LAST_ADD_FOLDER = 'ai-proofread.wordCheck.lastAddFolder';
 const KEY_LAST_IS_REGEX = 'ai-proofread.wordCheck.lastIsRegex';
 const KEY_LAST_MATCH_WORD_BOUNDARY = 'ai-proofread.wordCheck.lastMatchWordBoundary';
+
+/** 替换/插入改文后，树中未刷新条目的 Range 可能错位 */
+const MSG_WORD_CHECK_ANCHOR_MAY_STALE = '结果列表中，条目位置锚点可能已失效。';
 
 export class WordCheckCommandHandler {
     private treeView: vscode.TreeView<WordCheckEntry> | null = null;
@@ -137,6 +140,25 @@ export class WordCheckCommandHandler {
                     : ' · 已筛选';
         }
         this.treeView.title = `${VIEW_BASE_TITLE} (${st.displayEntryCount} 条 / ${st.displayOccurrenceCount} 处)${suffix}`;
+    }
+
+    private getReplaceAffixesFromConfig(): { prefix: string; suffix: string } {
+        const config = vscode.workspace.getConfiguration('ai-proofread.wordCheck');
+        return {
+            prefix: config.get<string>('replacePrefix') ?? '',
+            suffix: config.get<string>('replaceSuffix') ?? '',
+        };
+    }
+
+    /** 从结果树中移除已处理条目；与 refresh([], null) 二选一 */
+    private removeEntriesFromTreeByKey(processed: WordCheckEntry[]): void {
+        if (!this.treeProvider || processed.length === 0) return;
+        const docUri = this.treeProvider.getDocumentUri();
+        if (!docUri) return;
+        const keys = new Set(processed.map((e) => `${e.variant}|${e.preferred}`));
+        const remaining = this.treeProvider.getRawEntries().filter((e) => !keys.has(`${e.variant}|${e.preferred}`));
+        this.treeProvider.refresh(remaining, docUri);
+        this.updateViewTitle();
     }
 
     /**
@@ -501,34 +523,6 @@ export class WordCheckCommandHandler {
             return;
         }
 
-        const applyMode = await vscode.window.showQuickPick(
-            [
-                { label: '应用为提示', value: 'hint' as const },
-                { label: '应用为替换', value: 'replace' as const },
-            ],
-            { placeHolder: '选择应用方式', title: '自定义检查' }
-        );
-        if (!applyMode) return;
-
-        let prefix = '';
-        let suffix = '';
-        if (applyMode.value === 'replace') {
-            const pre = await vscode.window.showInputBox({
-                title: '替换结果前标记',
-                placeHolder: '可为空，如 【',
-                value: '',
-            });
-            if (pre === undefined) return;
-            const suf = await vscode.window.showInputBox({
-                title: '替换结果后标记',
-                placeHolder: '可为空，如 】',
-                value: '',
-            });
-            if (suf === undefined) return;
-            prefix = pre ?? '';
-            suffix = suf ?? '';
-        }
-
         try {
             const entries = await vscode.window.withProgress(
                 {
@@ -607,21 +601,11 @@ export class WordCheckCommandHandler {
             );
 
             if (!this.treeProvider) return;
-            const totalOccurrences = entries.reduce((s, e) => s + e.ranges.length, 0);
             this.treeProvider.refresh(entries, editor.document.uri);
             this.updateViewTitle();
             await focusWordCheckView();
 
-            if (applyMode.value === 'replace' && entries.length > 0) {
-                const ok = await applyReplaceInDocument(editor, entries, prefix, suffix);
-                if (ok) {
-                    vscode.window.showInformationMessage(`已替换 ${totalOccurrences} 处。`);
-                    this.treeProvider.refresh([], null);
-                    this.updateViewTitle();
-                } else {
-                    vscode.window.showErrorMessage('替换失败');
-                }
-            } else if (entries.length === 0) {
+            if (entries.length === 0) {
                 vscode.window.showInformationMessage('当前文档中未发现需要提示的字词。');
             }
         } catch (e) {
@@ -929,9 +913,105 @@ export class WordCheckCommandHandler {
         panel.webview.html = getNotesWebviewHtml(html);
     }
 
+    /** 对筛选后当前可见条目批量替换（前后标记：`ai-proofread.wordCheck.replacePrefix` / `replaceSuffix`） */
+    async handleApplyReplaceVisibleCommand(): Promise<void> {
+        if (!this.treeProvider) return;
+        const rawAll = this.treeProvider.getRawEntries();
+        const visible = this.treeProvider.getEntries();
+        if (visible.reduce((s, e) => s + e.ranges.length, 0) === 0) {
+            vscode.window.showWarningMessage('当前没有可替换的可见条目（请先检查字词或调整排序与筛选）。');
+            return;
+        }
+        const docUri = this.treeProvider.getDocumentUri();
+        if (!docUri) {
+            vscode.window.showWarningMessage('无法获取文档。');
+            return;
+        }
+        const { prefix, suffix } = this.getReplaceAffixesFromConfig();
+        const editor = await vscode.window.showTextDocument(docUri);
+        const { ok, appliedCount, skippedDueToOverlap } = await applyReplaceInDocument(editor, visible, prefix, suffix);
+        if (!ok) {
+            vscode.window.showErrorMessage('替换失败');
+            return;
+        }
+        const allEntriesVisible = rawAll.length > 0 && visible.length === rawAll.length;
+        let msgReplace = `已替换 ${appliedCount} 处。`;
+        if (skippedDueToOverlap > 0) {
+            msgReplace += `因与其它匹配的范围重叠，跳过 ${skippedDueToOverlap} 处。`;
+        }
+        msgReplace += MSG_WORD_CHECK_ANCHOR_MAY_STALE;
+        if (allEntriesVisible) {
+            this.removeEntriesFromTreeByKey(visible);
+            vscode.window.showInformationMessage(msgReplace);
+        } else {
+            this.treeProvider.refresh([], null);
+            this.updateViewTitle();
+            let msgPartial = `已替换 ${appliedCount} 处（仅当前可见条目）。`;
+            if (skippedDueToOverlap > 0) {
+                msgPartial += `因与其它匹配的范围重叠，跳过 ${skippedDueToOverlap} 处。`;
+            }
+            msgPartial += `结果列表已清空，请重新运行字词检查以更新未显示条目的位置。`;
+            msgPartial += MSG_WORD_CHECK_ANCHOR_MAY_STALE;
+            vscode.window.showInformationMessage(msgPartial);
+        }
+    }
+
+    /** 在匹配原文之后插入「前标记+建议+后标记」，不删除原文；仅当前可见条目 */
+    async handleApplyInsertVisibleCommand(): Promise<void> {
+        if (!this.treeProvider) return;
+        const rawAll = this.treeProvider.getRawEntries();
+        const visible = this.treeProvider.getEntries();
+        if (visible.reduce((s, e) => s + e.ranges.length, 0) === 0) {
+            vscode.window.showWarningMessage('当前没有可插入的可见条目（请先检查字词或调整排序与筛选）。');
+            return;
+        }
+        const docUri = this.treeProvider.getDocumentUri();
+        if (!docUri) {
+            vscode.window.showWarningMessage('无法获取文档。');
+            return;
+        }
+        const { prefix, suffix } = this.getReplaceAffixesFromConfig();
+        const editor = await vscode.window.showTextDocument(docUri);
+        const { ok, appliedCount, skippedDueToOverlap } = await applyInsertAfterRangesInDocument(editor, visible, prefix, suffix);
+        if (!ok) {
+            vscode.window.showErrorMessage('插入失败');
+            return;
+        }
+        const allEntriesVisible = rawAll.length > 0 && visible.length === rawAll.length;
+        let msgInsert = `已在 ${appliedCount} 处后插入建议。`;
+        if (skippedDueToOverlap > 0) {
+            msgInsert += `因与其它匹配的范围重叠，跳过 ${skippedDueToOverlap} 处。`;
+        }
+        msgInsert += MSG_WORD_CHECK_ANCHOR_MAY_STALE;
+        if (allEntriesVisible) {
+            this.removeEntriesFromTreeByKey(visible);
+            vscode.window.showInformationMessage(msgInsert);
+        } else {
+            this.treeProvider.refresh([], null);
+            this.updateViewTitle();
+            let msgPartial = `已在 ${appliedCount} 处后插入建议（仅当前可见条目）。`;
+            if (skippedDueToOverlap > 0) {
+                msgPartial += `因与其它匹配的范围重叠，跳过 ${skippedDueToOverlap} 处。`;
+            }
+            msgPartial += `结果列表已清空，请重新运行字词检查以更新未显示条目的位置。`;
+            msgPartial += MSG_WORD_CHECK_ANCHOR_MAY_STALE;
+            vscode.window.showInformationMessage(msgPartial);
+        }
+    }
+
+    /**
+     * 上下文菜单会传入被右键的条目；快捷键等场景无参数，回退到当前 selection / 上次选中。
+     */
+    private resolveEntryFromMenuOrSelection(clicked?: WordCheckEntry): WordCheckEntry | null {
+        if (clicked && Array.isArray(clicked.ranges)) {
+            return clicked;
+        }
+        return this.getSelectedEntry();
+    }
+
     /** 对当前选中条目应用替换（使用配置的前后标记） */
-    async handleApplyReplaceForEntryCommand(): Promise<void> {
-        const entry = this.getSelectedEntry();
+    async handleApplyReplaceForEntryCommand(clicked?: WordCheckEntry): Promise<void> {
+        const entry = this.resolveEntryFromMenuOrSelection(clicked);
         if (!entry || entry.ranges.length === 0) {
             vscode.window.showWarningMessage('请先在字词检查视图中选中一条条目。');
             return;
@@ -941,20 +1021,54 @@ export class WordCheckCommandHandler {
             vscode.window.showWarningMessage('无法获取文档。');
             return;
         }
-        const config = vscode.workspace.getConfiguration('ai-proofread.wordCheck');
-        const prefix = config.get<string>('replacePrefix') ?? '';
-        const suffix = config.get<string>('replaceSuffix') ?? '';
+        const { prefix, suffix } = this.getReplaceAffixesFromConfig();
         const editor = await vscode.window.showTextDocument(docUri);
-        const ok = await applyReplaceInDocument(editor, [entry], prefix, suffix);
-        if (ok) {
-            vscode.window.showInformationMessage(`已替换 ${entry.ranges.length} 处。`);
-            const entries = this.treeProvider?.getRawEntries() ?? [];
-            const remaining = entries.filter((e) => e !== entry);
-            this.treeProvider?.refresh(remaining, docUri);
-            this.updateViewTitle();
-        } else {
+        const { ok, appliedCount, skippedDueToOverlap } = await applyReplaceInDocument(editor, [entry], prefix, suffix);
+        if (!ok) {
             vscode.window.showErrorMessage('替换失败');
+            return;
         }
+        let msgEntry = `已替换 ${appliedCount} 处。`;
+        if (skippedDueToOverlap > 0) {
+            msgEntry += `因与其它匹配的范围重叠，跳过 ${skippedDueToOverlap} 处。`;
+        }
+        msgEntry += MSG_WORD_CHECK_ANCHOR_MAY_STALE;
+        vscode.window.showInformationMessage(msgEntry);
+        const entries = this.treeProvider?.getRawEntries() ?? [];
+        const remaining = entries.filter((e) => e !== entry);
+        this.treeProvider?.refresh(remaining, docUri);
+        this.updateViewTitle();
+    }
+
+    /** 对当前选中条目在匹配后插入建议（使用配置的前后标记，不删原文） */
+    async handleApplyInsertForEntryCommand(clicked?: WordCheckEntry): Promise<void> {
+        const entry = this.resolveEntryFromMenuOrSelection(clicked);
+        if (!entry || entry.ranges.length === 0) {
+            vscode.window.showWarningMessage('请先在字词检查视图中选中一条条目。');
+            return;
+        }
+        const docUri = this.treeProvider?.getDocumentUri();
+        if (!docUri) {
+            vscode.window.showWarningMessage('无法获取文档。');
+            return;
+        }
+        const { prefix, suffix } = this.getReplaceAffixesFromConfig();
+        const editor = await vscode.window.showTextDocument(docUri);
+        const { ok, appliedCount, skippedDueToOverlap } = await applyInsertAfterRangesInDocument(editor, [entry], prefix, suffix);
+        if (!ok) {
+            vscode.window.showErrorMessage('插入失败');
+            return;
+        }
+        let msgEntry = `已在 ${appliedCount} 处后插入建议。`;
+        if (skippedDueToOverlap > 0) {
+            msgEntry += `因与其它匹配的范围重叠，跳过 ${skippedDueToOverlap} 处。`;
+        }
+        msgEntry += MSG_WORD_CHECK_ANCHOR_MAY_STALE;
+        vscode.window.showInformationMessage(msgEntry);
+        const entries = this.treeProvider?.getRawEntries() ?? [];
+        const remaining = entries.filter((e) => e !== entry);
+        this.treeProvider?.refresh(remaining, docUri);
+        this.updateViewTitle();
     }
 
     private getSelectedEntry(): WordCheckEntry | null {

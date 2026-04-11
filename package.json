@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -194,7 +194,21 @@
       },
       {
         "command": "ai-proofread.wordCheck.applyReplaceForEntry",
-        "title": "应用替换（当前条目）"
+        "title": "应用替换（所有匹配处）"
+      },
+      {
+        "command": "ai-proofread.wordCheck.applyInsertForEntry",
+        "title": "应用插入（所有匹配处）"
+      },
+      {
+        "command": "ai-proofread.wordCheck.applyReplaceVisible",
+        "title": "替换",
+        "icon": "$(replace)"
+      },
+      {
+        "command": "ai-proofread.wordCheck.applyInsertVisible",
+        "title": "插入",
+        "icon": "$(insert)"
       },
       {
         "command": "ai-proofread.wordCheck.sortAndFilter",
@@ -747,14 +761,14 @@
         "ai-proofread.wordCheck.replacePrefix": {
           "order": 91,
           "type": "string",
-          "default": "",
-          "description": "字词检查：应用替换时，替换结果前附加的标记（如【）。Ctrl+Enter 应用替换时使用此配置。"
+          "default": "【【",
+          "description": "字词检查：替换/插入建议时，在建议正文前附加的标记。标题栏「替换」「插入」、Ctrl+Enter 单条替换均使用此配置。"
         },
         "ai-proofread.wordCheck.replaceSuffix": {
           "order": 92,
           "type": "string",
-          "default": "",
-          "description": "字词检查：应用替换时，替换结果后附加的标记（如】）。Ctrl+Enter 应用替换时使用此配置。"
+          "default": "】】",
+          "description": "字词检查：替换/插入建议时，在建议正文后附加的标记。标题栏「替换」「插入」、Ctrl+Enter 单条替换均使用此配置。"
         },
         "ai-proofread.numbering.ignoreMarkdownPrefix": {
           "order": 93,
@@ -890,6 +904,16 @@
           "group": "1_sort"
         },
         {
+          "command": "ai-proofread.wordCheck.applyReplaceVisible",
+          "when": "view == ai-proofread.wordCheck",
+          "group": "2_apply@1"
+        },
+        {
+          "command": "ai-proofread.wordCheck.applyInsertVisible",
+          "when": "view == ai-proofread.wordCheck",
+          "group": "2_apply@2"
+        },
+        {
           "command": "ai-proofread.numbering.toggleSimplifiedLevel",
           "when": "view == ai-proofread.numbering",
           "group": "navigation"
@@ -1008,6 +1032,11 @@
         },
         {
           "command": "ai-proofread.wordCheck.applyReplaceForEntry",
+          "group": "wordCheck@2",
+          "when": "view == ai-proofread.wordCheck && viewItem == wordCheckEntry"
+        },
+        {
+          "command": "ai-proofread.wordCheck.applyInsertForEntry",
           "group": "wordCheck@2",
           "when": "view == ai-proofread.wordCheck && viewItem == wordCheckEntry"
         },
@@ -1175,6 +1204,7 @@
     "package": "npx parcel build src/extension.ts --no-source-maps --no-cache && npm run copy-sqljs-dist && npm run copy-jieba-dist",
     "copy-sqljs-dist": "node -e \"const fs=require('fs'),p=require('path'); const src=p.join('node_modules','sql.js','dist'), dst='dist'; fs.copyFileSync(p.join(src,'sql-wasm.js'), p.join(dst,'sql-wasm.js')); fs.copyFileSync(p.join(src,'sql-wasm.wasm'), p.join(dst,'sql-wasm.wasm'));\"",
     "copy-jieba-dist": "node -e \"const fs=require('fs'),p=require('path'); const src=p.join('node_modules','jieba-wasm','pkg','nodejs'), dst='dist'; fs.copyFileSync(p.join(src,'jieba_rs_wasm.js'), p.join(dst,'jieba_rs_wasm.js')); fs.copyFileSync(p.join(src,'jieba_rs_wasm_bg.wasm'), p.join(dst,'jieba_rs_wasm_bg.wasm'));\"",
+    "test": "vitest run",
     "lint": "eslint src --ext ts",
     "package-vsix": "npx vsce package",
     "publish": "npx vsce publish"
@@ -1200,7 +1230,8 @@
     "glob": "^10.3.10",
     "parcel": "^2.11.0",
     "rimraf": "^5.0.5",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.9"
   },
   "targets": {
     "main": {

@@ -35,11 +35,11 @@ function saveOrder(context: vscode.ExtensionContext, keyOrder: string, order: st
     context.workspaceState.update(keyOrder, order);
 }
 
-/** 未保存过时默认只选中第一条；已保存过则原样返回（允许空数组表示全部不勾选） */
-function getSelectedIds(context: vscode.ExtensionContext, keySelected: string, defaultOrder?: CheckType[]): CheckType[] {
+/** 未保存过时默认不勾选；已保存过则原样返回（允许空数组表示全部不勾选） */
+function getSelectedIds(context: vscode.ExtensionContext, keySelected: string): CheckType[] {
     const raw = context.workspaceState.get<string[]>(keySelected);
     if (Array.isArray(raw)) return raw as CheckType[];
-    return defaultOrder?.length ? [defaultOrder[0]] : [];
+    return [];
 }
 
 function saveSelectedIds(context: vscode.ExtensionContext, keySelected: string, ids: string[]): void {
@@ -79,7 +79,7 @@ abstract class BaseCheckTypesTreeDataProvider implements vscode.TreeDataProvider
     }
 
     getTreeItem(element: CheckTypeTreeItem): vscode.TreeItem {
-        const selectedIds = getSelectedIds(this.context, this.keySelected, this.defaultOrder);
+        const selectedIds = getSelectedIds(this.context, this.keySelected);
         const checked = selectedIds.includes(element.id);
         const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
         item.id = element.id;
@@ -100,7 +100,7 @@ abstract class BaseCheckTypesTreeDataProvider implements vscode.TreeDataProvider
     }
 
     setChecked(id: string, checked: boolean): void {
-        let ids = getSelectedIds(this.context, this.keySelected, this.defaultOrder);
+        let ids = getSelectedIds(this.context, this.keySelected);
         if (checked) {
             if (!ids.includes(id as CheckType)) ids = [...ids, id as CheckType];
         } else {
@@ -112,7 +112,7 @@ abstract class BaseCheckTypesTreeDataProvider implements vscode.TreeDataProvider
 
     getOrderedSelectedTypes(): CheckType[] {
         const order = getOrder(this.context, this.keyOrder, this.defaultOrder);
-        const selectedSet = new Set(getSelectedIds(this.context, this.keySelected, this.defaultOrder));
+        const selectedSet = new Set(getSelectedIds(this.context, this.keySelected));
         return order.filter((id) => selectedSet.has(id));
     }
 }

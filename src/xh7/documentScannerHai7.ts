@@ -1,6 +1,23 @@
 /**
  * hai7.json：人名括注、年号与年份核对（自定义检查预置）。
  * 数据：data/hai7.json — person_birth_death、era_years。
+ *
+ * 年号扫描类型与顺序（先表锚 E1–E4，再公历括注 G；全程 consumed 防重叠）：
+ * - **E1**：T1/T2/T3 外层 + 汉字序 + `年` + 括注（阿拉伯单年）；例：明万历十五年（1587年）、嘉庆四年（1799）
+ * - **E2**：同上外层 + 可选 `年` + 括注（label/raw 逗号规则）；例：万历（1573—1620）
+ * - **E3**：同上外层 + 汉字序 + `年`（无括注）；例：明万历十年、万历十五年
+ * - **E4**：同上外层 + `年`（弱提示，「年」后非汉字序则报）；例：万历年、明万历年
+ * - **G1**：缀文 + 公历 + `年` + 括注 + 汉字纪年链（末 `年`）；例：1799年（清仁宗嘉庆四年）
+ * - **G2**：同上 + 括注末 `…\\d+年?`；例：1799年（1799）；外为年号+汉字年+年时与 E1 共用推算
+ *
+ * **T1/T2/T3**（label 去尾「年号」得前缀 P；朝字正文连写如明朝，不用「明（朝）」）：
+ * - T1：`P`+词头；可选插入 `朝`：`明`+`朝`+`神宗`+`万历` → 明朝神宗万历
+ * - T2：`朝代首字`+可选`朝`+词头；例：明万历、明朝万历
+ * - T3：仅词头
+ * - **不核验**：「庙号 + 序 + 年」而无词头/T1/T2 外壳（如神宗十年）— 不在扫描范围内。
+ *
+ * 括注内年号表述合法集与 T1–T3 表面形式一致（由 `collectAllowedBracketEraPhrases` 生成）。
+ * 「…年（…年）」「…年（…\\d+年?）」在 **G** 阶段报出；与 E1–E4 相交则跳过；无法核验 →「无数据」。
  */
 
 import * as vscode from 'vscode';
@@ -14,6 +31,8 @@ const HAI7_ERR_BOTH = '核验错误；多项备核';
 const HAI7_HINT = '备核';
 /** 与表一致且无多义项待决时，仍列出以便浏览 */
 const HAI7_OK = '已核验';
+/** 年号表无可用条目或无法建立核验关系 */
+const HAI7_NO_DATA = '无数据';
 
 /** 转义为 RegExp 字面量 */
 function escapeRegExp(s: string): string {
@@ -159,13 +178,13 @@ export function chineseEraYearToInt(s: string): number | null {
     if (!s) return null;
     const t = s.trim();
     if (t === '元') return 1;
+    /** 「十」单字须在 length===1 的 CJK_DIGIT 分支之前处理（十 不在 CJK_DIGIT 表内） */
+    if (t === '十') return 10;
     if (t.length === 1) {
         const d = CJK_DIGIT[t];
         return d !== undefined && d > 0 ? d : null;
     }
-    if (t === '十') return 10;
     if (t.startsWith('十')) {
-        if (t.length === 1) return 10;
         const u = CJK_DIGIT[t[1]];
         return u !== undefined ? 10 + u : null;
     }
@@ -182,6 +201,285 @@ export function chineseEraYearToInt(s: string): number | null {
     }
     if (/^[一二三四五六七八九]$/.test(t)) return CJK_DIGIT[t] ?? null;
     return null;
+}
+
+/** 括注外「公历」年份：逐位中文数字串 → 非负整数（至少两位） */
+function cjkDigitRunToGregorianYear(s: string): number | null {
+    const t = s.replace(/\s+/g, '');
+    if (t.length < 2) return null;
+    let n = 0;
+    for (const ch of t) {
+        const d = CJK_DIGIT[ch];
+        if (d === undefined || d > 9) return null;
+        n = n * 10 + d;
+    }
+    if (n === 0) return null;
+    return n;
+}
+
+/** 年号在括注内的「第几年」：与 re2/re3 一致 */
+const ERA_ORDINAL_CHARS = '元一二三四五六七八九十百千〇零';
+
+/**
+ * 括注「年号表述+汉字年次+年」：如 清仁宗嘉庆四年 → phrase=清仁宗嘉庆, yi=4
+ */
+function splitGregorianEraBracketInner(inner: string): { eraPhrase: string; yi: number } | null {
+    const t = inner.trim();
+    const rm = t.match(new RegExp(`((?:[${ERA_ORDINAL_CHARS}]\\s*)+)年\\s*$`));
+    if (!rm) return null;
+    const yi = chineseEraYearToInt(rm[1].replace(/\s+/g, ''));
+    if (yi === null) return null;
+    const eraPhrase = t.slice(0, t.length - rm[0].length).trim();
+    if (!eraPhrase) return null;
+    return { eraPhrase, yi };
+}
+
+/**
+ * label「清仁宗年号」→ 前缀「清仁宗」；与词头拼成「清仁宗嘉庆」。
+ * 无 label 或格式不符时退化为仅词头。
+ */
+function buildFullEraExpressionFromRow(eraKey: string, row: Hai7Row): string {
+    const L = row.label?.trim() ?? '';
+    if (!L) return eraKey;
+    if (L.endsWith('年号')) {
+        const prefix = L.slice(0, -2).trim();
+        return prefix ? prefix + eraKey : eraKey;
+    }
+    return L + eraKey;
+}
+
+function normalizeEraPhraseToken(s: string): string {
+    return normalizeLabelForCompare(s).replace(/\s/g, '');
+}
+
+/** 由 label+词头生成正文/括注可出现的外层串（万历、明万历、明朝万历、明神宗万历、明朝神宗万历…） */
+function addEraTextSurfaceStringsToSet(variants: Set<string>, eraKey: string, row: Hai7Row): void {
+    variants.add(eraKey);
+    const L = row.label?.trim() ?? '';
+    if (!L.endsWith('年号')) return;
+    const P = L.slice(0, -2).trim();
+    if (!P) return;
+    const units = [...P];
+    const d0 = units[0];
+    const rest = units.slice(1).join('');
+    variants.add(P + eraKey);
+    variants.add(d0 + eraKey);
+    variants.add(d0 + '朝' + eraKey);
+    if (rest.length > 0) {
+        variants.add(d0 + '朝' + rest + eraKey);
+    }
+}
+
+/** 表中该行允许的括注「年号表述」：词头、全称、省一字头、及 T1/T2 外壳变体 */
+function collectAllowedBracketEraPhrases(eraKey: string, row: Hai7Row): Set<string> {
+    const full = normalizeEraPhraseToken(buildFullEraExpressionFromRow(eraKey, row));
+    const k = normalizeEraPhraseToken(eraKey);
+    const out = new Set<string>();
+    out.add(k);
+    out.add(full);
+    if (full.length > k.length + 1) {
+        const shortened = full.slice(1);
+        if (shortened.length >= k.length) out.add(shortened);
+    }
+    const surf = new Set<string>();
+    addEraTextSurfaceStringsToSet(surf, eraKey, row);
+    for (const s of surf) out.add(normalizeEraPhraseToken(s));
+    return out;
+}
+
+function eraBracketPhraseMatchesRow(eraPhrase: string, eraKey: string, row: Hai7Row): boolean {
+    const s = normalizeEraPhraseToken(eraPhrase);
+    return collectAllowedBracketEraPhrases(eraKey, row).has(s);
+}
+
+/** 按词头长度降序，使「开元」优先于「元」 */
+function pickEraKeyFromBracketPhrase(eraPhrase: string, keysLongestFirst: string[]): string | null {
+    const n = normalizeEraPhraseToken(eraPhrase);
+    for (const k of keysLongestFirst) {
+        const kk = normalizeEraPhraseToken(k);
+        if (n === kk || n.endsWith(kk)) return k;
+    }
+    return null;
+}
+
+/** 紧邻「年（」之前的片段**整段**仅为公历：前99 / 99 / 前中文逐位 / 中文逐位 */
+function parseOuterGregorianYearOnly(outerPrefix: string): number | null {
+    const t = normalizeSpaces(outerPrefix).replace(/\s+/g, '');
+    if (!t) return null;
+    const pa = t.match(/^前(\d+)$/);
+    if (pa) return -parseInt(pa[1], 10);
+    const ma = t.match(/^(\d+)$/);
+    if (ma) return parseInt(ma[1], 10);
+    const pCjk = t.match(/^前((?:[〇零一二三四五六七八九]){2,})$/);
+    if (pCjk) {
+        const n = cjkDigitRunToGregorianYear(pCjk[1]);
+        return n !== null ? -n : null;
+    }
+    const cjk = t.match(/^((?:[〇零一二三四五六七八九]){2,})$/);
+    if (cjk) return cjkDigitRunToGregorianYear(cjk[1]);
+    return null;
+}
+
+/**
+ * 同上，但允许前缀另有正文：先尝试整段为年；再取**末尾**「前?+阿拉伯（至多六位）/逐位中文（至少两位）」。
+ */
+function parseGregorianYearSuffixFromOuterPrefix(outerPrefix: string): number | null {
+    const whole = parseOuterGregorianYearOnly(outerPrefix);
+    if (whole !== null) return whole;
+    const t = normalizeSpaces(outerPrefix).replace(/\s+/g, '');
+    if (!t) return null;
+    const pa = t.match(/前(\d{1,6})$/);
+    if (pa) return -parseInt(pa[1], 10);
+    const pCjk = t.match(/前((?:[〇零一二三四五六七八九]){2,})$/);
+    if (pCjk) {
+        const n = cjkDigitRunToGregorianYear(pCjk[1]);
+        return n !== null ? -n : null;
+    }
+    const ma = t.match(/(\d{1,6})$/);
+    if (ma) return parseInt(ma[1], 10);
+    const cjk = t.match(/((?:[〇零一二三四五六七八九]){2,})$/);
+    if (cjk) return cjkDigitRunToGregorianYear(cjk[1]);
+    return null;
+}
+
+/** outerCompact 可为「缀文+合成锚+汉字年次+年」，自左向右找首个使剩余串匹配「锚+序次+年」的后缀 */
+function parseEraCjkOuterSuffix(
+    outerCompact: string,
+    eraCompositeAlt: string,
+    numChars: string,
+    eraKeysLongestFirst: string[]
+): { eraName: string; yi: number } | null {
+    if (!eraCompositeAlt) return null;
+    const reEo = new RegExp(`^(${eraCompositeAlt})((?:[${numChars}]\\s*)+)年$`, 'u');
+    for (let i = 0; i < outerCompact.length; i++) {
+        const sub = outerCompact.slice(i);
+        const om = sub.match(reEo);
+        if (om) {
+            const yi = chineseEraYearToInt(om[2].replace(/\s+/g, ''));
+            if (yi === null) continue;
+            const eraName = resolveEraKeyFromCompositeMatch(om[1], eraKeysLongestFirst);
+            if (eraName) return { eraName, yi };
+        }
+    }
+    return null;
+}
+
+/** Form A：…年（…年）；Form B：…年（…\\d+年?）合并为一条（同 span） */
+interface MandatoryBracketHit {
+    relStart: number;
+    relEnd: number;
+    full: string;
+    outerPrefix: string;
+    /** Form A 括注内、末位「年」之前的文字（不含「年」） */
+    innerHanCore: string | null;
+    /** Form B 括注内末组阿拉伯数字 */
+    digitYear: number | null;
+}
+
+function collectMandatoryYearBracketHits(text: string): MandatoryBracketHit[] {
+    const map = new Map<string, MandatoryBracketHit>();
+    let m: RegExpExecArray | null;
+
+    const reA = /([^（(\n]+?)年\s*([（(])([\s\S]+?)年\s*([）)])/gu;
+    reA.lastIndex = 0;
+    while ((m = reA.exec(text)) !== null) {
+        const relStart = m.index;
+        const relEnd = m.index + m[0].length;
+        const k = `${relStart},${relEnd}`;
+        const prev = map.get(k);
+        map.set(k, {
+            relStart,
+            relEnd,
+            full: m[0],
+            outerPrefix: m[1],
+            innerHanCore: m[3],
+            digitYear: prev?.digitYear ?? null,
+        });
+    }
+
+    const reB = /([^（(\n]+?)年\s*([（(])([\s\S]*?)(\d+)(年?)\s*([）)])/gu;
+    reB.lastIndex = 0;
+    while ((m = reB.exec(text)) !== null) {
+        const relStart = m.index;
+        const relEnd = m.index + m[0].length;
+        const k = `${relStart},${relEnd}`;
+        const prev = map.get(k);
+        map.set(k, {
+            relStart,
+            relEnd,
+            full: m[0],
+            outerPrefix: m[1],
+            innerHanCore: prev?.innerHanCore ?? null,
+            digitYear: parseInt(m[4], 10),
+        });
+    }
+
+    return [...map.values()];
+}
+
+/** 解析结果可含多条 preferred（同名多项且有一条通过时同时报「已核验」与「多项备核」） */
+function resolveMandatoryYearBracketPreferred(
+    hit: MandatoryBracketHit,
+    era: Record<string, Hai7Row[]>,
+    eraKeysLongestFirst: string[],
+    eraCompositeAlt: string,
+    numChars: string
+): { preferred: string | string[]; rawComment?: string } {
+    const outerAbs = parseGregorianYearSuffixFromOuterPrefix(hit.outerPrefix);
+    const parenIdx = hit.full.search(/[（(]/);
+    const innerForUnc = parenIdx >= 0 ? hit.full.slice(parenIdx) : hit.full;
+
+    if (outerAbs !== null && hit.innerHanCore !== null) {
+        const innerWith年 = hit.innerHanCore + '年';
+        const split = splitGregorianEraBracketInner(innerWith年);
+        if (split) {
+            const eraKey = pickEraKeyFromBracketPhrase(split.eraPhrase, eraKeysLongestFirst);
+            if (eraKey && era[eraKey]?.length) {
+                const rows = era[eraKey];
+                const rowsPhrase = rows.filter((row) => eraBracketPhraseMatchesRow(split.eraPhrase, eraKey, row));
+                const uncertainGr = rowsHaveUncertainty(rows) || textHasUncertainty(innerWith年);
+                const tt = formatHai7RowsTooltip('年号', eraKey, rows);
+                if (rowsPhrase.length === 0) {
+                    return { preferred: uncertainGr ? HAI7_HINT : HAI7_ERR_VERIFY, rawComment: tt };
+                }
+                const matches = matchingRowsForYearIndex(rowsPhrase, split.yi);
+                const hitsY = matches.filter((h) => h.absY === outerAbs);
+                if (hitsY.length === 1) return { preferred: HAI7_OK, rawComment: tt };
+                if (hitsY.length === 0) return { preferred: uncertainGr ? HAI7_HINT : HAI7_ERR_VERIFY, rawComment: tt };
+                return { preferred: [HAI7_OK, HAI7_ERR_MULTI], rawComment: tt };
+            }
+        }
+    }
+
+    if (outerAbs !== null && hit.digitYear !== null) {
+        const unc = textHasUncertainty(innerForUnc);
+        if (outerAbs === hit.digitYear) return { preferred: HAI7_OK };
+        return { preferred: unc ? HAI7_HINT : HAI7_ERR_VERIFY };
+    }
+
+    if (eraCompositeAlt && hit.digitYear !== null) {
+        const outerCompact = hit.outerPrefix.replace(/\s+/g, '') + '年';
+        const parsedEo = parseEraCjkOuterSuffix(outerCompact, eraCompositeAlt, numChars, eraKeysLongestFirst);
+        if (parsedEo && !arabicInnerIsYearRange(String(hit.digitYear))) {
+            const { eraName, yi } = parsedEo;
+            const rows = era[eraName];
+            if (rows?.length) {
+                const innerTok = String(hit.digitYear);
+                const tt = formatHai7RowsTooltip('年号', eraName, rows);
+                const prefs = preferredLabelsForEraCjkArabicBracket(rows, yi, innerTok);
+                return {
+                    preferred: prefs.length === 1 ? prefs[0]! : prefs,
+                    rawComment: tt,
+                };
+            }
+        }
+    }
+
+    const nodataUnc = textHasUncertainty(hit.full);
+    return {
+        preferred: nodataUnc ? HAI7_HINT : HAI7_NO_DATA,
+        rawComment: '括注纪年：年号表无匹配或无法核验，请人工核对',
+    };
 }
 
 /** 每条 raw 上推算第 yearIndex 年对应的公历年份，若落在该条 span 内则记入 */
@@ -222,6 +520,28 @@ function keyToFlexiblePattern(key: string): string {
 function buildFlexibleAlternation(keys: string[]): string {
     const sorted = [...keys].sort((a, b) => b.length - a.length);
     return sorted.map(keyToFlexiblePattern).join('|');
+}
+
+/** 年号正则 alternation：词头 + label 派生的 T1/T2 合成串，最长优先 */
+function buildEraCompositeAlternation(era: Record<string, Hai7Row[]>): string {
+    const variants = new Set<string>();
+    for (const [k, rows] of Object.entries(era)) {
+        for (const row of rows) {
+            addEraTextSurfaceStringsToSet(variants, k, row);
+        }
+    }
+    const sorted = [...variants].sort((a, b) => b.length - a.length);
+    return sorted.map(keyToFlexiblePattern).join('|');
+}
+
+/** 捕获组匹配到的外层串 → JSON 词头（按词头长度降序取后缀命中） */
+function resolveEraKeyFromCompositeMatch(matchedEraPart: string, keysLongestFirst: string[]): string | null {
+    const c = normalizeEraPhraseToken(matchedEraPart);
+    for (const k of keysLongestFirst) {
+        const kk = normalizeEraPhraseToken(k);
+        if (c === kk || c.endsWith(kk)) return k;
+    }
+    return null;
 }
 
 /** 匹配到的文本去掉空白后用于查表（与 JSON 键一致） */
@@ -282,16 +602,20 @@ export function scanDocumentHai7Person(
         const mismatch = !matched;
         const uncertain = rowsHaveUncertainty(rows) || docParsedHasUncertainty(docParsed);
 
-        let preferred: string;
-        if (!mismatch && !ambiguous) preferred = HAI7_OK;
-        else if (!mismatch && ambiguous) preferred = HAI7_ERR_MULTI;
-        else if (mismatch && uncertain) preferred = HAI7_HINT;
-        else if (mismatch && ambiguous) preferred = HAI7_ERR_BOTH;
-        else preferred = HAI7_ERR_VERIFY;
-
         const rangeObj = new vscode.Range(document.positionAt(absStart), document.positionAt(absEnd));
-
-        pushEntry(map, m[0], preferred, rangeObj, formatHai7RowsTooltip('人名', name, rows));
+        const ttPerson = formatHai7RowsTooltip('人名', name, rows);
+        if (!mismatch && !ambiguous) {
+            pushEntry(map, m[0], HAI7_OK, rangeObj, ttPerson);
+        } else if (!mismatch && ambiguous) {
+            pushEntry(map, m[0], HAI7_OK, rangeObj, ttPerson);
+            pushEntry(map, m[0], HAI7_ERR_MULTI, rangeObj, ttPerson);
+        } else if (mismatch && uncertain) {
+            pushEntry(map, m[0], HAI7_HINT, rangeObj, ttPerson);
+        } else if (mismatch && ambiguous) {
+            pushEntry(map, m[0], HAI7_ERR_BOTH, rangeObj, ttPerson);
+        } else {
+            pushEntry(map, m[0], HAI7_ERR_VERIFY, rangeObj, ttPerson);
+        }
     }
 
     // 纯人名（后接非括注）：与年号「年号年」提示类似，不标错误
@@ -321,7 +645,7 @@ export function scanDocumentHai7Person(
  * - 禁止：`130年`、`前130年`、`前130年后头` 等带「年」或多余文字的写法
  */
 function extractYearTokenFromInner(inner: string): number | null {
-    const t = normalizeSpaces(inner);
+    const t = normalizeSpaces(inner).replace(/年\s*$/, '').trim();
     if (t === '？' || t === '?') return null;
     // 允许「130？/前130？」：未知端点
     if (/^前(\d+)[？\?]$/.test(t) || /^(\d+)[？\?]$/.test(t)) return null;
@@ -349,7 +673,34 @@ function arabicMatchesInnerSingleYear(inner: string, absYear: number): boolean {
 }
 
 /**
- * 年号：括注核对、汉字年+范围、汉字年+括注阿拉伯一致、年号年提示。
+ * E1 与 G2 共用：汉字序次 yi + 括注阿拉伯单年 vs 各行推算 absY。
+ * 表内多条且至少一行与括注阿拉伯一致时返回「已核验」「多项备核」两条。
+ */
+function preferredLabelsForEraCjkArabicBracket(rows: Hai7Row[], yi: number | null, inner: string): string[] {
+    const uncertain = rowsHaveUncertainty(rows) || textHasUncertainty(inner);
+    const ambiguous = rows.length > 1;
+    const matches = yi !== null ? matchingRowsForYearIndex(rows, yi) : [];
+
+    if (yi !== null && inner.trim() !== '') {
+        if (arabicInnerIsYearRange(inner)) {
+            return [uncertain ? HAI7_HINT : HAI7_ERR_VERIFY];
+        }
+        const ok = matches.filter((hit) => arabicMatchesInnerSingleYear(inner, hit.absY));
+        if (matches.length === 0) return [uncertain ? HAI7_HINT : HAI7_ERR_VERIFY];
+        if (ok.length === 0) return [uncertain ? HAI7_HINT : HAI7_ERR_VERIFY];
+        if (ambiguous) return [HAI7_OK, HAI7_ERR_MULTI];
+        return [HAI7_OK];
+    }
+
+    if (ambiguous && yi !== null) {
+        const mm = matchingRowsForYearIndex(rows, yi);
+        if (mm.length > 1) return [HAI7_OK, HAI7_ERR_MULTI];
+    }
+    return [HAI7_OK];
+}
+
+/**
+ * 年号：E1–E4 表锚，G1/G2 公历括注；见文件头类型表。
  */
 export function scanDocumentHai7Era(
     document: vscode.TextDocument,
@@ -357,19 +708,17 @@ export function scanDocumentHai7Era(
     range?: vscode.Range
 ): WordCheckEntry[] {
     const data = getHai7Data();
-    if (!data) return [];
-
-    const era = data.era_years;
+    const era = data?.era_years ?? {};
     const keys = Object.keys(era);
-    if (keys.length === 0) return [];
+    const eraCompositeAlt = keys.length > 0 ? buildEraCompositeAlternation(era) : '';
+    const eraKeysLongestFirst = [...keys].sort((a, b) => b.length - a.length);
 
     const scanRange = range ?? new vscode.Range(0, 0, document.lineCount, 0);
     const text = document.getText(scanRange);
     const rangeStartOffset = document.offsetAt(scanRange.start);
-    const alt = buildFlexibleAlternation(keys);
 
     const map = new Map<string, WordCheckEntry>();
-    /** 已覆盖区间 [start,end)：先长后短、先括注再裸形式，避免重复命中与无效扫描 */
+    /** 已覆盖区间 [start,end)：E1→E4 先于 G，同段内长模式优先 */
     const consumed: [number, number][] = [];
 
     function markConsumed(a: number, b: number): void {
@@ -380,135 +729,144 @@ export function scanDocumentHai7Era(
 
     let m: RegExpExecArray | null;
 
-    // （3）年号 + 汉字年 + 年 + 括注 — 汉字数字间可插空白
-    const re3 = new RegExp(
-        `(${alt})((?:[${NUM_CHARS}]\\s*)+)年\\s*([（(])\\s*([^）)]*?)\\s*([）)])`,
-        'gu'
-    );
-    re3.lastIndex = 0;
-    while ((m = re3.exec(text)) !== null) {
-        if (cancelToken?.isCancellationRequested) break;
-        const eraName = canonicalTableKey(m[1]);
-        const cjkNum = m[2].replace(/\s+/g, '');
-        const inner = m[4];
-        const absStart = rangeStartOffset + m.index;
-        const absEnd = absStart + m[0].length;
-        if (rangeOverlapsConsumed(absStart, absEnd, consumed)) continue;
+    if (eraCompositeAlt) {
+        // E1：T1/T2/T3 + 汉字序 + 年 + 括注（阿拉伯单年）
+        const reE1 = new RegExp(
+            `(${eraCompositeAlt})((?:[${NUM_CHARS}]\\s*)+)年\\s*([（(])\\s*([^）)]*?)\\s*([）)])`,
+            'gu'
+        );
+        reE1.lastIndex = 0;
+        while ((m = reE1.exec(text)) !== null) {
+            if (cancelToken?.isCancellationRequested) break;
+            const absStart = rangeStartOffset + m.index;
+            const absEnd = absStart + m[0].length;
+            if (rangeOverlapsConsumed(absStart, absEnd, consumed)) continue;
 
-        const rows = era[eraName];
-        if (!rows?.length) continue;
+            const eraName = resolveEraKeyFromCompositeMatch(m[1], eraKeysLongestFirst);
+            if (!eraName) continue;
+            const rows = era[eraName];
+            if (!rows?.length) continue;
 
-        const yi = chineseEraYearToInt(cjkNum);
-        const matches = yi !== null ? matchingRowsForYearIndex(rows, yi) : [];
-        let mismatchArabic = false;
-        if (yi !== null && inner.trim() !== '') {
-            if (arabicInnerIsYearRange(inner)) {
-                mismatchArabic = true;
+            const cjkNum = m[2].replace(/\s+/g, '');
+            const inner = m[4];
+            const yi = chineseEraYearToInt(cjkNum);
+            const labelsE1 = preferredLabelsForEraCjkArabicBracket(rows, yi, inner);
+            const rangeObj = new vscode.Range(document.positionAt(absStart), document.positionAt(absEnd));
+            const ttE1 = formatHai7RowsTooltip('年号', eraName, rows);
+            for (const p of labelsE1) {
+                pushEntry(map, m[0], p, rangeObj, ttE1);
+            }
+            markConsumed(absStart, absEnd);
+        }
+
+        // E2：同上 + 可选「年」+ 括注（label/raw）
+        const reE2 = new RegExp(`(${eraCompositeAlt})\\s*年?\\s*([（(])\\s*([^）)]*?)\\s*([）)])`, 'gu');
+        reE2.lastIndex = 0;
+        while ((m = reE2.exec(text)) !== null) {
+            if (cancelToken?.isCancellationRequested) break;
+            const absStart = rangeStartOffset + m.index;
+            const absEnd = absStart + m[0].length;
+            if (rangeOverlapsConsumed(absStart, absEnd, consumed)) continue;
+
+            const eraName = resolveEraKeyFromCompositeMatch(m[1], eraKeysLongestFirst);
+            if (!eraName) continue;
+            const rows = era[eraName];
+            if (!rows?.length) continue;
+
+            const inner = m[3];
+            const docParsed = parseBracketInner(inner);
+            const matched = anyRowMatches(rows, docParsed);
+            const ambiguous = rows.length > 1;
+            const mismatch = !matched;
+            const uncertain = rowsHaveUncertainty(rows) || docParsedHasUncertainty(docParsed);
+
+            markConsumed(absStart, absEnd);
+
+            const rangeObjE2 = new vscode.Range(document.positionAt(absStart), document.positionAt(absEnd));
+            const ttE2 = formatHai7RowsTooltip('年号', eraName, rows);
+            if (!mismatch && !ambiguous) {
+                pushEntry(map, m[0], HAI7_OK, rangeObjE2, ttE2);
+            } else if (!mismatch && ambiguous) {
+                pushEntry(map, m[0], HAI7_OK, rangeObjE2, ttE2);
+                pushEntry(map, m[0], HAI7_ERR_MULTI, rangeObjE2, ttE2);
+            } else if (mismatch && uncertain) {
+                pushEntry(map, m[0], HAI7_HINT, rangeObjE2, ttE2);
+            } else if (mismatch && ambiguous) {
+                pushEntry(map, m[0], HAI7_ERR_BOTH, rangeObjE2, ttE2);
             } else {
-                const ok = matches.filter((hit) => arabicMatchesInnerSingleYear(inner, hit.absY));
-                if (matches.length === 0) mismatchArabic = true;
-                else if (ok.length === 0) mismatchArabic = true;
-                else if (ok.length > 1) mismatchArabic = true;
+                pushEntry(map, m[0], HAI7_ERR_VERIFY, rangeObjE2, ttE2);
             }
         }
 
-        const uncertainRe3 = rowsHaveUncertainty(rows) || textHasUncertainty(inner);
-        const rangeObj3 = new vscode.Range(document.positionAt(absStart), document.positionAt(absEnd));
-        if (mismatchArabic) {
-            pushEntry(
-                map,
-                m[0],
-                uncertainRe3 ? HAI7_HINT : HAI7_ERR_VERIFY,
-                rangeObj3,
-                formatHai7RowsTooltip('年号', eraName, rows)
-            );
-        } else {
-            pushEntry(map, m[0], HAI7_OK, rangeObj3, formatHai7RowsTooltip('年号', eraName, rows));
+        // E3：同上 + 汉字序 + 年（无括注）
+        const reE3 = new RegExp(`(${eraCompositeAlt})((?:[${NUM_CHARS}]\\s*)+)年`, 'gu');
+        reE3.lastIndex = 0;
+        while ((m = reE3.exec(text)) !== null) {
+            if (cancelToken?.isCancellationRequested) break;
+            const absStart = rangeStartOffset + m.index;
+            const absEnd = absStart + m[0].length;
+            if (rangeOverlapsConsumed(absStart, absEnd, consumed)) continue;
+
+            const eraName = resolveEraKeyFromCompositeMatch(m[1], eraKeysLongestFirst);
+            if (!eraName) continue;
+            const rows = era[eraName];
+            if (!rows?.length) continue;
+
+            const cjkNum = m[2].replace(/\s+/g, '');
+            const yi = chineseEraYearToInt(cjkNum);
+            if (yi === null) continue;
+            const matches = matchingRowsForYearIndex(rows, yi);
+            const multiMatch = matches.length > 1;
+            const uncertainE3 = rowsHaveUncertainty(rows);
+
+            const rangeObjE3 = new vscode.Range(document.positionAt(absStart), document.positionAt(absEnd));
+            const ttE3 = formatHai7RowsTooltip('年号', eraName, rows);
+            if (matches.length === 0) {
+                pushEntry(map, m[0], uncertainE3 ? HAI7_HINT : HAI7_ERR_VERIFY, rangeObjE3, ttE3);
+            } else if (multiMatch) {
+                pushEntry(map, m[0], HAI7_OK, rangeObjE3, ttE3);
+                pushEntry(map, m[0], HAI7_ERR_MULTI, rangeObjE3, ttE3);
+            } else {
+                pushEntry(map, m[0], HAI7_OK, rangeObjE3, ttE3);
+            }
+            markConsumed(absStart, absEnd);
+        }
+
+        // E4：同上 + 「年」（弱提示；「年」后为汉字序则跳过）
+        const reE4 = new RegExp(`(${eraCompositeAlt})\\s*年`, 'gu');
+        reE4.lastIndex = 0;
+        while ((m = reE4.exec(text)) !== null) {
+            if (cancelToken?.isCancellationRequested) break;
+            const absStart = rangeStartOffset + m.index;
+            const absEnd = absStart + m[0].length;
+            if (rangeOverlapsConsumed(absStart, absEnd, consumed)) continue;
+
+            const eraName = resolveEraKeyFromCompositeMatch(m[1], eraKeysLongestFirst);
+            if (!eraName) continue;
+
+            const tail = text.slice(m.index + m[0].length);
+            if (tail[0] && /[元一二三四五六七八九十百千〇零]/.test(tail[0])) continue;
+
+            markConsumed(absStart, absEnd);
+            const rangeObjE4 = new vscode.Range(document.positionAt(absStart), document.positionAt(absEnd));
+            pushEntry(map, m[0], HAI7_HINT, rangeObjE4, formatHai7RowsTooltip('年号', eraName, era[eraName] ?? []));
+        }
+    }
+
+    // G1/G2：「…年（…年）」「…年（…\\d+年?）」；与 E1–E4 相交则跳过
+    const mandatoryHits = collectMandatoryYearBracketHits(text);
+    for (const h of mandatoryHits) {
+        if (cancelToken?.isCancellationRequested) break;
+        const absStart = rangeStartOffset + h.relStart;
+        const absEnd = rangeStartOffset + h.relEnd;
+        if (rangeOverlapsConsumed(absStart, absEnd, consumed)) continue;
+        const resolved = resolveMandatoryYearBracketPreferred(h, era, eraKeysLongestFirst, eraCompositeAlt, NUM_CHARS);
+        const rangeObjG = new vscode.Range(document.positionAt(absStart), document.positionAt(absEnd));
+        const prefsG = Array.isArray(resolved.preferred) ? resolved.preferred : [resolved.preferred];
+        for (const p of prefsG) {
+            pushEntry(map, h.full, p, rangeObjG, resolved.rawComment);
         }
         markConsumed(absStart, absEnd);
-    }
-
-    // （1）年号 + 可选「年」+ 括注
-    const re1 = new RegExp(`(${alt})\\s*年?\\s*([（(])\\s*([^）)]*?)\\s*([）)])`, 'gu');
-    re1.lastIndex = 0;
-    while ((m = re1.exec(text)) !== null) {
-        if (cancelToken?.isCancellationRequested) break;
-        const absStart = rangeStartOffset + m.index;
-        const absEnd = absStart + m[0].length;
-        if (rangeOverlapsConsumed(absStart, absEnd, consumed)) continue;
-
-        const eraName = canonicalTableKey(m[1]);
-        const inner = m[3];
-        const rows = era[eraName];
-        if (!rows?.length) continue;
-
-        const docParsed = parseBracketInner(inner);
-        const matched = anyRowMatches(rows, docParsed);
-        const ambiguous = rows.length > 1;
-        const mismatch = !matched;
-        const uncertain = rowsHaveUncertainty(rows) || docParsedHasUncertainty(docParsed);
-
-        markConsumed(absStart, absEnd);
-
-        let preferred1: string;
-        if (!mismatch && !ambiguous) preferred1 = HAI7_OK;
-        else if (!mismatch && ambiguous) preferred1 = HAI7_ERR_MULTI;
-        else if (mismatch && uncertain) preferred1 = HAI7_HINT;
-        else if (mismatch && ambiguous) preferred1 = HAI7_ERR_BOTH;
-        else preferred1 = HAI7_ERR_VERIFY;
-
-        const rangeObj = new vscode.Range(document.positionAt(absStart), document.positionAt(absEnd));
-        pushEntry(map, m[0], preferred1, rangeObj, formatHai7RowsTooltip('年号', eraName, rows));
-    }
-
-    // （2）年号 + 汉字年 + 年（无括注）
-    const re2 = new RegExp(`(${alt})((?:[${NUM_CHARS}]\\s*)+)年`, 'gu');
-    re2.lastIndex = 0;
-    while ((m = re2.exec(text)) !== null) {
-        if (cancelToken?.isCancellationRequested) break;
-        const absStart = rangeStartOffset + m.index;
-        const absEnd = absStart + m[0].length;
-        if (rangeOverlapsConsumed(absStart, absEnd, consumed)) continue;
-
-        const eraName = canonicalTableKey(m[1]);
-        const cjkNum = m[2].replace(/\s+/g, '');
-        const rows = era[eraName];
-        if (!rows?.length) continue;
-
-        const yi = chineseEraYearToInt(cjkNum);
-        if (yi === null) continue;
-        const matches = matchingRowsForYearIndex(rows, yi);
-        const multiMatch = matches.length > 1;
-        const uncertainRe2 = rowsHaveUncertainty(rows);
-
-        const rangeObj2 = new vscode.Range(document.positionAt(absStart), document.positionAt(absEnd));
-        if (matches.length === 0) {
-            pushEntry(map, m[0], uncertainRe2 ? HAI7_HINT : HAI7_ERR_VERIFY, rangeObj2, formatHai7RowsTooltip('年号', eraName, rows));
-        } else if (multiMatch) {
-            pushEntry(map, m[0], HAI7_ERR_MULTI, rangeObj2, formatHai7RowsTooltip('年号', eraName, rows));
-        } else {
-            pushEntry(map, m[0], HAI7_OK, rangeObj2, formatHai7RowsTooltip('年号', eraName, rows));
-        }
-        markConsumed(absStart, absEnd);
-    }
-
-    // （4）年号 + 年（信息提示，不标为错误）
-    const re4 = new RegExp(`(${alt})\\s*年`, 'gu');
-    re4.lastIndex = 0;
-    while ((m = re4.exec(text)) !== null) {
-        if (cancelToken?.isCancellationRequested) break;
-        const absStart = rangeStartOffset + m.index;
-        const absEnd = absStart + m[0].length;
-        if (rangeOverlapsConsumed(absStart, absEnd, consumed)) continue;
-
-        const eraName = canonicalTableKey(m[1]);
-        // 完整匹配「年号\s*年」之后：如「万历年间」「万历 年间」在「年」后为「间」等，不能用「年号」截断后判断（会得到「年间」误判）
-        const tail = text.slice(m.index + m[0].length);
-        if (tail[0] && /[元一二三四五六七八九十百千〇零]/.test(tail[0])) continue;
-
-        markConsumed(absStart, absEnd);
-        const rangeObj = new vscode.Range(document.positionAt(absStart), document.positionAt(absEnd));
-        pushEntry(map, m[0], HAI7_HINT, rangeObj, formatHai7RowsTooltip('年号', eraName, era[eraName] ?? []));
     }
 
     return Array.from(map.values());
