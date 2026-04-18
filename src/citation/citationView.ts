@@ -9,7 +9,7 @@ import * as path from 'path';
 import { CitationTreeDataProvider } from './citationTreeProvider';
 import type { CitationTreeNode } from './citationTreeProvider';
 import { ReferenceStore } from './referenceStore';
-import { normalizeLineEndings } from '../utils';
+import { normalizeLineEndings, normIndexToRawIndex } from '../utils';
 
 const VIEW_ID = 'ai-proofread.citation';
 
@@ -103,18 +103,6 @@ function handleSelectNode(
             )
         );
     }
-}
-
-/** 将「规范化字符串」（normalizeLineEndings 后）中的字符索引映射回原始字符串中的字符索引 */
-function normIndexToRawIndex(raw: string, normIndex: number): number {
-    let rawIdx = 0;
-    let normIdx = 0;
-    while (normIdx < normIndex && rawIdx < raw.length) {
-        if (raw[rawIdx] === '\r' && raw[rawIdx + 1] === '\n') rawIdx++;
-        rawIdx++;
-        normIdx++;
-    }
-    return rawIdx;
 }
 
 /** 聚焦引文核对视图 */

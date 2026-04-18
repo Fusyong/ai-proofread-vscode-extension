@@ -291,7 +291,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
     ![树视图（提示词管理、字词检查、引文检查）](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/special_checks.png)
 6. **标题树与段内序号检查**：命令`check numbering hierarchy`。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
 7. **引文核对**：指定本地文献库根目录（默认为根目录下的`references`，文件格式为Markdown，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。需要注意的是，**文献库索引和引文核对的处理单元都是句子**，因此本功能不适用于不成句和没有句末标点的文本，如词语级别的引用、无标点古籍；这样的情况，可以用VSCode自带的多文件全文搜索（Ctrl+Shift+H）功能处理。
-8. **文档内重复句核查**：功能类似引文核对，扫描当前文档或选中范围，按句发现**完全重复**（归一化后与引文核对相同的规则）或**近似重复**（长度分桶 + Jaccard，与引文核对、句子对齐共用 `ai-proofread.alignment` 与 `ai-proofread.jieba` 中的相似度相关设置）。命令为 `scan duplicate sentences in document`（全文）与 `scan duplicate sentences in selection`（选区）。最短句长、归一化选项、繁简转换后再比相似度、长度容差等，与引文核对共用 `ai-proofread.citation` 中的对应项，无需单独配置。
+8. **文档内重复句核查**：功能类似引文核对，扫描当前文档或选中范围，按句发现**完全重复**（归一化后与引文核对相同的规则）与**近似重复**（长度分桶 + Jaccard，与引文核对、句子对齐共用 `ai-proofread.alignment` 与 `ai-proofread.jieba` 中的相似度相关设置）；**默认一次扫描同时给出两类结果**。命令为 `scan duplicate sentences in document`（全文）与 `scan duplicate sentences in selection`（选区）。最短句长、归一化选项、繁简转换后再比相似度、长度容差等，与引文核对共用 `ai-proofread.citation` 中的对应项，无需单独配置。
 9. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
 10.  **OpenCC**：集成了[opencc-js](https://github.com/nk2028/opencc-js)，支持繁简转换，命令为`opencc`和`opencc selection`。
 11. **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。

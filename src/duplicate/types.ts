@@ -2,7 +2,7 @@
  * 文档内重复句核查 — 类型定义（与引文核验共用归一化与相似度配置）
  */
 
-/** 单次出现位置（相对于传入扫描文本的字符偏移） */
+/** 单次出现位置；startOffset/endOffset 为 TextDocument 原始缓冲区中的绝对字符偏移（UTF-16 码元） */
 export interface DuplicateOccurrence {
     /** 在分句列表中的下标 */
     sentenceIndex: number;

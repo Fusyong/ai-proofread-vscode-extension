@@ -5,13 +5,35 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { findDuplicatesInText } from '../duplicate/findDuplicates';
-import type { DuplicateScanMode } from '../duplicate/types';
 import { getJiebaWasm } from '../jiebaLoader';
 import { focusDuplicateView } from '../duplicate/duplicateView';
 import type { DuplicateTreeDataProvider } from '../duplicate/duplicateTreeProvider';
-import { normalizeLineEndings } from '../utils';
+import { normalizeLineEndings, normIndexToRawIndex } from '../utils';
+import type { DuplicateScanResult, DuplicateOccurrence } from '../duplicate/types';
 
 const VIEW_BASE_TITLE = 'Duplicates';
+
+function mapScanResultToDocumentOffsets(
+    result: DuplicateScanResult,
+    rawSlice: string,
+    offsetBase: number
+): DuplicateScanResult {
+    const mapOcc = (occ: DuplicateOccurrence): DuplicateOccurrence => ({
+        ...occ,
+        startOffset: offsetBase + normIndexToRawIndex(rawSlice, occ.startOffset),
+        endOffset: offsetBase + normIndexToRawIndex(rawSlice, occ.endOffset)
+    });
+    return {
+        exactGroups: result.exactGroups.map((g) => ({
+            ...g,
+            occurrences: g.occurrences.map(mapOcc)
+        })),
+        fuzzyGroups: result.fuzzyGroups.map((g) => ({
+            ...g,
+            occurrences: g.occurrences.map(mapOcc)
+        }))
+    };
+}
 
 export class DuplicateCommandHandler {
     constructor(
@@ -29,27 +51,14 @@ export class DuplicateCommandHandler {
         }
     }
 
-    private async pickMode(): Promise<DuplicateScanMode | undefined> {
-        const picked = await vscode.window.showQuickPick(
-            [
-                { label: '完全重复（归一化后相同）', value: 'exact' as const },
-                { label: '近似重复（Jaccard 达阈值）', value: 'fuzzy' as const },
-                { label: '两者都扫描', value: 'both' as const }
-            ],
-            { placeHolder: '选择重复检测方式', title: '文档内重复' }
-        );
-        return picked?.value;
-    }
-
     async handleScanDocument(): Promise<void> {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             vscode.window.showWarningMessage('请先打开要扫描的文档。');
             return;
         }
-        const mode = await this.pickMode();
-        if (mode === undefined) return;
-        await this.runScan(editor, normalizeLineEndings(editor.document.getText()), 0, mode);
+        const rawSlice = editor.document.getText();
+        await this.runScan(editor, normalizeLineEndings(rawSlice), rawSlice, 0);
     }
 
     async handleScanSelection(): Promise<void> {
@@ -63,19 +72,18 @@ export class DuplicateCommandHandler {
             vscode.window.showWarningMessage('请先选中要扫描的文本范围。');
             return;
         }
-        const mode = await this.pickMode();
-        if (mode === undefined) return;
         const range = editor.selection;
-        const text = normalizeLineEndings(doc.getText(range));
+        const rawSlice = doc.getText(range);
+        const text = normalizeLineEndings(rawSlice);
         const offsetBase = doc.offsetAt(range.start);
-        await this.runScan(editor, text, offsetBase, mode);
+        await this.runScan(editor, text, rawSlice, offsetBase);
     }
 
     private async runScan(
         editor: vscode.TextEditor,
         text: string,
-        offsetBase: number,
-        mode: DuplicateScanMode
+        rawSlice: string,
+        offsetBase: number
     ): Promise<void> {
         if (!text.trim()) {
             vscode.window.showWarningMessage('扫描范围为空。');
@@ -96,7 +104,7 @@ export class DuplicateCommandHandler {
         const customDictPath = jiebaCfg.get<string>('customDictPath', '');
 
         let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
-        if (mode !== 'exact' && ngramGranularity === 'word') {
+        if (ngramGranularity === 'word') {
             try {
                 jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
             } catch (e) {
@@ -125,7 +133,7 @@ export class DuplicateCommandHandler {
                         cutMode,
                         jieba,
                         openccT2cnBeforeSimilarity: openccT2cn,
-                        mode,
+                        mode: 'both',
                         cancelToken: token,
                         progress: (msg, done, total) => {
                             progress.report({ message: msg, increment: total > 0 ? 0 : 0 });
@@ -134,19 +142,20 @@ export class DuplicateCommandHandler {
                 }
             );
 
+            const mapped = mapScanResultToDocumentOffsets(result, rawSlice, offsetBase);
+
             if (this.duplicateTreeProvider) {
                 this.duplicateTreeProvider.refresh(
-                    result.exactGroups,
-                    result.fuzzyGroups,
-                    editor.document.uri,
-                    offsetBase
+                    mapped.exactGroups,
+                    mapped.fuzzyGroups,
+                    editor.document.uri
                 );
                 this.updateTitle(result.exactGroups.length, result.fuzzyGroups.length);
                 await focusDuplicateView();
             }
 
-            const nExact = result.exactGroups.length;
-            const nFuzzy = result.fuzzyGroups.length;
+            const nExact = mapped.exactGroups.length;
+            const nFuzzy = mapped.fuzzyGroups.length;
             if (nExact === 0 && nFuzzy === 0) {
                 vscode.window.showInformationMessage('未发现重复句。');
             } else {
@@ -158,7 +167,7 @@ export class DuplicateCommandHandler {
             const msg = e instanceof Error ? e.message : String(e);
             vscode.window.showErrorMessage(`重复扫描失败: ${msg}`);
             if (this.duplicateTreeProvider) {
-                this.duplicateTreeProvider.refresh([], [], null, 0);
+                this.duplicateTreeProvider.refresh([], [], null);
                 this.updateTitle(0, 0);
             }
         }

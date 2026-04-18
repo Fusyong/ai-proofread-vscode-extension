@@ -18,6 +18,21 @@ export function normalizeLineEndings(text: string): string {
 }
 
 /**
+ * 将「规范化字符串」（normalizeLineEndings 后）中的字符索引映射回原始字符串中的字符索引。
+ * VS Code 文档可能为 CRLF，而分句/匹配多在 LF 文本上进行；跳转选区须用此函数把偏移换回 raw。
+ */
+export function normIndexToRawIndex(raw: string, normIndex: number): number {
+    let rawIdx = 0;
+    let normIdx = 0;
+    while (normIdx < normIndex && rawIdx < raw.length) {
+        if (raw[rawIdx] === '\r' && raw[rawIdx + 1] === '\n') rawIdx++;
+        rawIdx++;
+        normIdx++;
+    }
+    return rawIdx;
+}
+
+/**
  * 临时文件管理工具
  */
 export class TempFileManager {

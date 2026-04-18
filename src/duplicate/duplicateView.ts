@@ -27,11 +27,10 @@ export function registerDuplicateView(context: vscode.ExtensionContext): Duplica
             const docUri = treeDataProvider.getDocumentUri();
             if (!docUri) return;
             const occ = treeDataProvider.getOccurrence(node);
-            const base = treeDataProvider.getOffsetBase();
             vscode.workspace.openTextDocument(docUri).then((doc) => {
                 vscode.window.showTextDocument(doc, { preserveFocus: true, preview: false }).then((editor) => {
-                    const start = doc.positionAt(base + occ.startOffset);
-                    const end = doc.positionAt(base + occ.endOffset);
+                    const start = doc.positionAt(occ.startOffset);
+                    const end = doc.positionAt(occ.endOffset);
                     const range = new vscode.Range(start, end);
                     editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
                     editor.selection = new vscode.Selection(start, end);

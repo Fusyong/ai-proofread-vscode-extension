@@ -558,7 +558,10 @@ export class WebviewManager {
                 case 'diffItWithAnotherFile':
                 case 'searchSelectionInPDF':
                 case 'searchSelectionInShidianguji':
-                case 'searchSelectionInAncientbooks': {
+                case 'searchSelectionInAncientbooks':
+                case 'searchSelectionInReferences':
+                case 'duplicateScanDocument':
+                case 'numberingCheck': {
                     // 头部按钮：使用当前编辑窗口文件
                     const cmdMap: Record<string, string> = {
                         splitIntoSentences: 'ai-proofread.splitIntoSentences',
@@ -566,7 +569,10 @@ export class WebviewManager {
                         diffItWithAnotherFile: 'ai-proofread.diffItWithAnotherFile',
                         searchSelectionInPDF: 'ai-proofread.searchSelectionInPDF',
                         searchSelectionInShidianguji: 'ai-proofread.searchSelectionInShidianguji',
-                        searchSelectionInAncientbooks: 'ai-proofread.searchSelectionInAncientbooks'
+                        searchSelectionInAncientbooks: 'ai-proofread.searchSelectionInAncientbooks',
+                        searchSelectionInReferences: 'ai-proofread.searchSelectionInReferences',
+                        duplicateScanDocument: 'ai-proofread.duplicate.scanDocument',
+                        numberingCheck: 'ai-proofread.numbering.check'
                     };
                     await vscode.commands.executeCommand(cmdMap[command]);
                     break;
@@ -661,7 +667,6 @@ export class WebviewManager {
     private generateEmptyStateHtml(): string {
         return this.getBaseHtml(`
             <div class="header">
-                ${this.getHeaderQuickActionsHtml()}
                 <div class="message">选择要校对的主文件，或等待切分/校对完成后查看结果。</div>
             </div>
             <div class="process-section">
@@ -670,6 +675,9 @@ export class WebviewManager {
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('selectMainFile')">选择主文件</button>
                 </div>
+            </div>
+            <div class="panel-footer-commands">
+                ${this.getHeaderQuickActionsHtml()}
             </div>
         `);
     }
@@ -763,67 +771,73 @@ export class WebviewManager {
 
         return this.getBaseHtml(`
             <div class="header">
-                ${this.getHeaderQuickActionsHtml()}
                 <div class="message">${result.message}</div>
             </div>
             ${mainSection}
             ${splitSection}
             ${proofreadSection}
+            <div class="panel-footer-commands">
+                ${this.getHeaderQuickActionsHtml()}
+            </div>
         `, true);
     }
 
-    /** 头部快捷按钮栏（分组、排序，操作对象为当前编辑窗口文件） */
+    /** 常用命令快捷按钮栏（组内 `|`，组间 `||`，操作对象为当前编辑窗口文件） */
     private getHeaderQuickActionsHtml(): string {
+        const sep = '<span class="cmd-sep" aria-hidden="true">|</span>';
+        const groupSep = '<span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>';
         return `
             <p class="header-commands-hint">常用命令（Ctrl+Shift+P 查找全部命令）</p>
             <div class="header-actions">
-                <span class="header-group">
-                    <button class="link-button" onclick="handleAction('convertDocxToMarkdown')" title="AI Proofreader: convert docx to markdown">docx → Markdown</button>
-                    <button class="link-button" onclick="handleAction('convertPdfToMarkdown')" title="AI Proofreader: convert PDF to markdown">PDF → Markdown</button>
-                    <button class="link-button" onclick="handleAction('convertMarkdownToDocx')" title="AI Proofreader: convert markdown to docx">Markdown → docx</button>
-                </span>
-                <span class="config-sep">|</span>
-                <span class="header-group">
-                    <button class="link-button" onclick="handleAction('formatParagraphs')" title="AI Proofreader: format paragraphs">整理段落</button>
-                    <button class="link-button" onclick="handleAction('markTitlesFromToc')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
-                    <button class="link-button" onclick="handleAction('convertQuotes')" title="AI Proofreader: convert quotes to Chinese">半角引号转全角</button>
-                    <button class="link-button" onclick="handleAction('splitIntoSentences')" title="AI Proofreader: split into sentences">切分为句子</button>
-                </span>
-                <span class="config-sep">|</span>
-                <span class="header-group">
-                    <button class="link-button" onclick="handleAction('proofreadSelection')" title="AI Proofreader: proofread selection">校对选中文本</button>
-                    <button class="link-button" onclick="handleAction('proofreadSelectionWithExamples')" title="AI Proofreader: proofread selection with examples">使用样例校对选中</button>
-                    <button class="link-button" onclick="handleAction('continuousProofread')" title="AI Proofreader: continuous proofread">持续校对</button>
-                    <button class="link-button" onclick="handleAction('editProofreadingExamples')" title="AI Proofreader: edit Proofreading examples">编辑校对样例</button>
-                </span>
-                <span class="config-sep">|</span>
-                <span class="header-group">
-                    <button class="link-button" onclick="handleAction('citationOpenView')" title="AI Proofreader: verify citations">核对全文引文</button>
-                    <button class="link-button" onclick="handleAction('citationRebuildIndex')" title="AI Proofreader: build citation reference index">建立引文索引</button>
-                </span>
-                <span class="config-sep">|</span>
-                <span class="header-group">
-                    <button class="link-button" onclick="handleAction('checkWords')" title="AI Proofreader: check words">字词检查</button>
-                    <button class="link-button" onclick="handleAction('manageCustomTables')" title="AI Proofreader: manage custom tables">管理自定义替换表</button>
-                </span>
-                <span class="config-sep">|</span>
-                <span class="header-group">
-                    <button class="link-button" onclick="handleAction('segmentFile')" title="AI Proofreader: segment file">分词</button>
-                    <button class="link-button" onclick="handleAction('segmentFile')" title="AI Proofreader: segment file">词频统计</button>
-                    <button class="link-button" onclick="handleAction('segmentFile')" title="AI Proofreader: segment file">字频统计</button>
-                </span>
-                <span class="config-sep">|</span>
-                <span class="header-group">
-                    <button class="link-button" onclick="handleAction('diffItWithAnotherFile')" title="AI Proofreader: diff it with another file">diff 与另一文件</button>
-                    <button class="link-button" onclick="handleAction('searchSelectionInPDF')" title="AI Proofreader: search selection in PDF">在 PDF 中搜索选中文本</button>
-                    <button class="link-button" onclick="handleAction('searchSelectionInShidianguji')" title="AI Proofreader: search selection in Shidianguji">在识典古籍中搜索选中文本</button>
-                    <button class="link-button" onclick="handleAction('searchSelectionInAncientbooks')" title="AI Proofreader: search selection in Ancientbooks (jingdian)">在中华经典古籍库中搜索选中文本</button>
-                </span>
-                <span class="config-sep">|</span>
-                <span class="header-group">
-                    <button class="link-button" onclick="handleAction('managePrompts')" title="AI Proofreader: manage prompts">管理提示词</button>
-                    <button class="link-button" onclick="handleAction('openSettings')" title="打开设置">打开设置</button>
-                </span>
+                <button type="button" class="link-button" onclick="handleAction('convertDocxToMarkdown')" title="AI Proofreader: convert docx to markdown">docx → Markdown</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('convertPdfToMarkdown')" title="AI Proofreader: convert PDF to markdown">PDF → Markdown</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('convertMarkdownToDocx')" title="AI Proofreader: convert markdown to docx">Markdown → docx</button>
+                ${groupSep}
+                <button type="button" class="link-button" onclick="handleAction('formatParagraphs')" title="AI Proofreader: format paragraphs">整理段落</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('markTitlesFromToc')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('convertQuotes')" title="AI Proofreader: convert quotes to Chinese">半角引号转全角</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('splitIntoSentences')" title="AI Proofreader: split into sentences">切分为句子</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('segmentFile')" title="AI Proofreader: segment file（分词、词频与字频统计）">分词与统计</button>
+                ${groupSep}
+                <button type="button" class="link-button" onclick="handleAction('proofreadSelection')" title="AI Proofreader: proofread selection">校对选中文本</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('proofreadSelectionWithExamples')" title="AI Proofreader: proofread selection with examples">使用样例校对选中</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('continuousProofread')" title="AI Proofreader: continuous proofread">持续校对</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('editProofreadingExamples')" title="AI Proofreader: edit Proofreading examples">编辑校对样例</button>
+                ${groupSep}
+                <button type="button" class="link-button" onclick="handleAction('citationOpenView')" title="AI Proofreader: verify citations">核对全文引文</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('citationRebuildIndex')" title="AI Proofreader: build citation reference index">建立引文索引</button>
+                ${groupSep}
+                <button type="button" class="link-button" onclick="handleAction('checkWords')" title="AI Proofreader: check words">字词检查</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('manageCustomTables')" title="AI Proofreader: manage custom tables">管理自定义替换表</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('numberingCheck')" title="AI Proofreader: check numbering hierarchy">标题序号检查</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('duplicateScanDocument')" title="AI Proofreader: scan duplicate sentences in document">重复句扫描</button>
+                ${groupSep}
+                <button type="button" class="link-button" onclick="handleAction('diffItWithAnotherFile')" title="AI Proofreader: diff it with another file">diff 与另一文件</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('searchSelectionInPDF')" title="AI Proofreader: search selection in PDF">在 PDF 中搜索选中文本</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('searchSelectionInShidianguji')" title="AI Proofreader: search selection in Shidianguji">在识典古籍中搜索选中文本</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('searchSelectionInAncientbooks')" title="AI Proofreader: search selection in Ancientbooks (jingdian)">在中华经典古籍库中搜索选中文本</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('searchSelectionInReferences')" title="AI Proofreader: search selection in References">在 References 中搜索选中文本</button>
+                ${groupSep}
+                <button type="button" class="link-button" onclick="handleAction('managePrompts')" title="AI Proofreader: manage prompts">管理提示词</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('openSettings')" title="打开设置">打开设置</button>
             </div>
         `;
     }
@@ -840,13 +854,8 @@ export class WebviewManager {
     private getBaseHtml(bodyContent: string, includeExtraStyles = false): string {
         const extraStyles = includeExtraStyles ? `
             .hint { font-size: 12px; color: #6B8E9A; margin: 8px 0; }
-            .header-commands-hint { font-size: 12px; color: #6B8E9A; margin: 0 0 6px 0; }
             .consistency-hint { font-style: italic; }
             .warning-box { padding: 10px; margin: 10px 0; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; font-size: 13px; color: #856404; }
-            .header-actions { margin-bottom: 8px; padding-bottom: 8px; font-size: 12px; color: #6B8E9A; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-            .header-group { display: inline-flex; align-items: center; gap: 4px; }
-            .config-sep { margin: 0 6px; color: var(--vscode-panel-border); }
-            .link-button { background: none; border: none; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; padding: 0 4px; text-decoration: underline; }
         ` : '';
         return `
             <!DOCTYPE html>
@@ -858,7 +867,7 @@ export class WebviewManager {
                 <style>
                     body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground);
                         background-color: var(--vscode-editor-background); padding: 16px; line-height: 1.4; }
-                    .header { margin-bottom: 16px; padding-bottom: 12px; }
+                    .header { margin-bottom: 16px; padding-bottom: 12px; width: 100%; min-width: 0; box-sizing: border-box; }
                     .message { font-size: 15px; margin-bottom: 16px; color: #6B8E9A; font-weight: 500; }
                     .process-section { margin-bottom: 20px; padding: 16px; background-color: var(--vscode-editor-background);
                         border: 1px solid var(--vscode-panel-border); border-radius: 6px; }
@@ -877,6 +886,12 @@ export class WebviewManager {
                         cursor: pointer; font-size: 12px; transition: background-color 0.2s; font-weight: 500; }
                     .action-button:hover { background-color: #7A9BA8; }
                     .action-button:disabled { background-color: #B8C5CA; color: #8A9BA0; cursor: not-allowed; }
+                    .panel-footer-commands { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--vscode-panel-border); width: 100%; min-width: 0; box-sizing: border-box; }
+                    .header-commands-hint { font-size: 12px; color: #6B8E9A; margin: 0 0 6px 0; }
+                    .header-actions { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 4px 6px; row-gap: 8px; width: 100%; min-width: 0; box-sizing: border-box; margin: 0; padding: 0; font-size: 12px; color: #6B8E9A; }
+                    .cmd-sep { color: var(--vscode-panel-border); flex: 0 0 auto; user-select: none; padding: 0 1px; }
+                    .cmd-sep--between-groups { padding: 0 5px; letter-spacing: 0.05em; }
+                    .link-button { background: none; border: none; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; line-height: 1.4; padding: 1px 2px; text-decoration: underline; white-space: normal; text-align: left; max-width: 100%; }
                     ${extraStyles}
                     ${ProgressTracker.generateProgressBarCss()}
                 </style>
@@ -1052,6 +1067,9 @@ export class WebviewManager {
                     .header {
                         margin-bottom: 16px;
                         padding-bottom: 12px;
+                        width: 100%;
+                        min-width: 0;
+                        box-sizing: border-box;
                     }
                     .message {
                         font-size: 15px;
@@ -1190,24 +1208,28 @@ export class WebviewManager {
                         font-size: 13px;
                         color: #856404;
                     }
+                    .panel-footer-commands { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--vscode-panel-border); width: 100%; min-width: 0; box-sizing: border-box; }
                     .header-commands-hint { font-size: 12px; color: #6B8E9A; margin: 0 0 6px 0; }
-                    .header-actions { margin-bottom: 8px; padding-bottom: 8px; font-size: 12px; color: #6B8E9A; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-                    .header-group { display: inline-flex; align-items: center; gap: 4px; }
-                    .config-sep { margin: 0 6px; color: var(--vscode-panel-border); }
-                    .link-button { background: none; border: none; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; padding: 0 4px; text-decoration: underline; }
+                    .header-actions { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 4px 6px; row-gap: 8px; width: 100%; min-width: 0; box-sizing: border-box; margin: 0; padding: 0; font-size: 12px; color: #6B8E9A; }
+                    .cmd-sep { color: var(--vscode-panel-border); flex: 0 0 auto; user-select: none; padding: 0 1px; }
+                    .cmd-sep--between-groups { padding: 0 5px; letter-spacing: 0.05em; }
+                    .link-button { background: none; border: none; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; line-height: 1.4; padding: 1px 2px; text-decoration: underline; white-space: normal; text-align: left; max-width: 100%; }
 
                     ${ProgressTracker.generateProgressBarCss()}
                 </style>
             </head>
             <body>
                 <div class="header">
-                    ${this.getHeaderQuickActionsHtml()}
                     <div class="message">${result.message}</div>
                 </div>
 
                 ${mainSectionHtml}
                 ${splitHtml}
                 ${proofreadSectionHtml}
+
+                <div class="panel-footer-commands">
+                    ${this.getHeaderQuickActionsHtml()}
+                </div>
 
                 <script>
                     const vscode = acquireVsCodeApi();

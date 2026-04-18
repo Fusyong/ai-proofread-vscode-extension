@@ -27,28 +27,24 @@ export class DuplicateTreeDataProvider implements vscode.TreeDataProvider<Duplic
     private exactGroups: DuplicateExactGroup[] = [];
     private fuzzyGroups: DuplicateFuzzyGroup[] = [];
     private documentUri: vscode.Uri | null = null;
-    /** 扫描文本在文档中的起始偏移（选区扫描时为选区起点） */
-    private offsetBase = 0;
 
+    /**
+     * @param documentUri 当前扫描的文档
+     * 各 occurrence 的 startOffset/endOffset 已为 **文档原始缓冲区** 中的绝对偏移（已处理 CRLF 与选区）
+     */
     refresh(
         exactGroups: DuplicateExactGroup[],
         fuzzyGroups: DuplicateFuzzyGroup[],
-        documentUri: vscode.Uri | null,
-        offsetBase = 0
+        documentUri: vscode.Uri | null
     ): void {
         this.exactGroups = exactGroups;
         this.fuzzyGroups = fuzzyGroups;
         this.documentUri = documentUri;
-        this.offsetBase = offsetBase;
         this._onDidChangeTreeData.fire();
     }
 
     getDocumentUri(): vscode.Uri | null {
         return this.documentUri;
-    }
-
-    getOffsetBase(): number {
-        return this.offsetBase;
     }
 
     getExactGroups(): DuplicateExactGroup[] {
