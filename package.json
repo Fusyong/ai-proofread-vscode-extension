@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.9.4",
+  "version": "1.9.5",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -11,7 +11,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onView:ai-proofread.welcome"
+    "onView:ai-proofread.welcome",
+    "onView:ai-proofread.duplicate"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -171,6 +172,14 @@
       {
         "command": "ai-proofread.citation.searchInPdf",
         "title": "search citation in PDF"
+      },
+      {
+        "command": "ai-proofread.duplicate.scanDocument",
+        "title": "AI Proofreader: scan duplicate sentences in document"
+      },
+      {
+        "command": "ai-proofread.duplicate.scanSelection",
+        "title": "AI Proofreader: scan duplicate sentences in selection"
       },
       {
         "command": "ai-proofread.checkWords",
@@ -880,6 +889,11 @@
           "when": "aiProofread.showCitationView"
         },
         {
+          "id": "ai-proofread.duplicate",
+          "name": "duplicates",
+          "when": "aiProofread.showDuplicateView"
+        },
+        {
           "id": "ai-proofread.numbering",
           "name": "标题树",
           "when": "aiProofread.showNumberingView"
@@ -1132,6 +1146,16 @@
         {
           "command": "ai-proofread.citation.verifySelection",
           "group": "ai-proofread@12",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.duplicate.scanDocument",
+          "group": "ai-proofread@12.4",
+          "when": "editorTextFocus && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.duplicate.scanSelection",
+          "group": "ai-proofread@12.5",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {

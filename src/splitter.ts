@@ -993,14 +993,21 @@ export function splitChineseSentences(text: string): string[] {
     return sentences.filter(s => s.length > 0);
 }
 
+/** 句在原文中的位置（与 _findSentencePositions 同源） */
+export interface SentenceSpanInText {
+    sentence: string;
+    startLine: number;
+    endLine: number;
+    /** 在 text 中的起始字符下标（含） */
+    startOffset: number;
+    /** 在 text 中的结束字符下标（不含） */
+    endOffset: number;
+}
+
 /**
- * 在原文中查找每个句子的位置并计算行号（内部辅助函数）
- *
- * @param text 原始文本
- * @param sentences 句子列表（按顺序）
- * @returns (sentence, start_line, end_line) 列表
+ * 在原文中查找每个句子的位置并计算行号与字符偏移（内部辅助函数）
  */
-function _findSentencePositions(text: string, sentences: string[]): Array<[string, number, number]> {
+function _findSentencePositionsFull(text: string, sentences: string[]): SentenceSpanInText[] {
     // 调用方已对 text 做 normalizeLineEndings，此处仅含 LF，行间长度为 1
     const lines = text.split('\n');
     const lineStarts: number[] = [];
@@ -1010,7 +1017,7 @@ function _findSentencePositions(text: string, sentences: string[]): Array<[strin
         currentPos += line.length + 1;  // +1 为换行符 \n
     }
 
-    const result: Array<[string, number, number]> = [];
+    const result: SentenceSpanInText[] = [];
     let searchStart = 0;  // 从上次找到的位置之后开始搜索
 
     for (const sentence of sentences) {
@@ -1061,13 +1068,18 @@ function _findSentencePositions(text: string, sentences: string[]): Array<[strin
         const endPos = pos + sentence.length - 1;
         const endLine = _getLineNumber(endPos, lineStarts);
 
-        result.push([sentence, startLine, endLine]);
+        const endOffset = pos + sentence.length;
+        result.push({ sentence, startLine, endLine, startOffset: pos, endOffset });
 
         // 更新搜索起始位置（从当前句子结束位置之后开始）
-        searchStart = pos + sentence.length;
+        searchStart = endOffset;
     }
 
     return result;
+}
+
+function _findSentencePositions(text: string, sentences: string[]): Array<[string, number, number]> {
+    return _findSentencePositionsFull(text, sentences).map((s) => [s.sentence, s.startLine, s.endLine]);
 }
 
 /**
@@ -1136,6 +1148,31 @@ export function splitChineseSentencesWithLineNumbers(
 
     // 在原文中查找每个句子的位置并计算行号
     return _findSentencePositions(text, sentences);
+}
+
+/**
+ * 与 splitChineseSentencesWithLineNumbers 相同分句规则，额外返回每个句子在原文中的字符偏移 [startOffset, endOffset)。
+ * 用于文档内重复核查等需要精确定位的功能。
+ */
+export function splitChineseSentencesWithOffsets(
+    text: string,
+    useSimple: boolean = false
+): SentenceSpanInText[] {
+    if (!text || !text.trim()) {
+        return [];
+    }
+
+    text = normalizeLineEndings(text);
+
+    const sentences = useSimple
+        ? splitChineseSentencesSimple(text)
+        : splitChineseSentences(text);
+
+    if (sentences.length === 0) {
+        return [];
+    }
+
+    return _findSentencePositionsFull(text, sentences);
 }
 
 /** 默认小句分隔符：中文逗号、分号、句号、问号、叹号 */

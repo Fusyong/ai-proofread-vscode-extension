@@ -15,6 +15,8 @@ import { DocumentConvertCommandHandler } from './commands/documentConvertCommand
 import { UtilityCommandHandler } from './commands/utilityCommandHandler';
 import { CitationCommandHandler } from './commands/citationCommandHandler';
 import { registerCitationView } from './citation/citationView';
+import { registerDuplicateView } from './duplicate/duplicateView';
+import { DuplicateCommandHandler } from './commands/duplicateCommandHandler';
 import { WordCheckCommandHandler } from './commands/wordCheckCommandHandler';
 import { NumberingTreeDataProvider } from './numbering/numberingTreeProvider';
 import { registerNumberingView } from './numbering/numberingView';
@@ -78,6 +80,8 @@ export function activate(context: vscode.ExtensionContext) {
     const utilityHandler = new UtilityCommandHandler();
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
     const citationHandler = new CitationCommandHandler(context, citationTreeProvider, citationTreeView);
+    const { provider: duplicateTreeProvider, treeView: duplicateTreeView } = registerDuplicateView(context);
+    const duplicateHandler = new DuplicateCommandHandler(context, duplicateTreeProvider, duplicateTreeView);
     const wordCheckHandler = new WordCheckCommandHandler(context);
     wordCheckHandler.registerView();
     wordCheckHandler.registerCustomTablesView();
@@ -106,6 +110,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', false);
+    vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', false);
@@ -474,6 +479,14 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await citationHandler.handleSearchSelectionInReferencesCommand(editor);
+        }),
+        vscode.commands.registerCommand('ai-proofread.duplicate.scanDocument', async () => {
+            await vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', true);
+            await duplicateHandler.handleScanDocument();
+        }),
+        vscode.commands.registerCommand('ai-proofread.duplicate.scanSelection', async () => {
+            await vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', true);
+            await duplicateHandler.handleScanSelection();
         }),
         vscode.commands.registerCommand('ai-proofread.checkWords', async () => {
             // 按需显示与字词检查相关的视图

@@ -291,12 +291,13 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
     ![树视图（提示词管理、字词检查、引文检查）](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/special_checks.png)
 6. **标题树与段内序号检查**：命令`check numbering hierarchy`。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
 7. **引文核对**：指定本地文献库根目录（默认为根目录下的`references`，文件格式为Markdown，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。需要注意的是，**文献库索引和引文核对的处理单元都是句子**，因此本功能不适用于不成句和没有句末标点的文本，如词语级别的引用、无标点古籍；这样的情况，可以用VSCode自带的多文件全文搜索（Ctrl+Shift+H）功能处理。
-8. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
-9.  **OpenCC**：集成了[opencc-js](https://github.com/nk2028/opencc-js)，支持繁简转换，命令为`opencc`和`opencc selection`。
-10. **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
-11. **按句子切分**：使用`split into sentences`命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子，适合用于编辑校对样例，与其保存时的默认分隔符一致。
-12. **编辑校对样例**：使用`edit proofreading examples`命令，千文已经有介绍。
-13. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
+8. **文档内重复句核查**：功能类似引文核对，扫描当前文档或选中范围，按句发现**完全重复**（归一化后与引文核对相同的规则）或**近似重复**（长度分桶 + Jaccard，与引文核对、句子对齐共用 `ai-proofread.alignment` 与 `ai-proofread.jieba` 中的相似度相关设置）。命令为 `scan duplicate sentences in document`（全文）与 `scan duplicate sentences in selection`（选区）。最短句长、归一化选项、繁简转换后再比相似度、长度容差等，与引文核对共用 `ai-proofread.citation` 中的对应项，无需单独配置。
+9. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
+10.  **OpenCC**：集成了[opencc-js](https://github.com/nk2028/opencc-js)，支持繁简转换，命令为`opencc`和`opencc selection`。
+11. **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
+12. **按句子切分**：使用`split into sentences`命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子，适合用于编辑校对样例，与其保存时的默认分隔符一致。
+13. **编辑校对样例**：使用`edit proofreading examples`命令，千文已经有介绍。
+14. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
 
 ### 3.7. 注意事项
 
@@ -388,8 +389,13 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 6. 更新日志
 
+### v1.9.5
+
+- 特性：核查文档内重复的句子。
+
 ### v1.9.4
 
+- 特性：文档内重复句核查（`scan duplicate sentences in document` / `scan duplicate sentences in selection`），侧栏 **duplicates** 展示完全重复与近似重复组；归一化与相似度相关配置与引文核对、句子对齐共用
 - 优化：重构年号核验逻辑，增加核验形式；补充年号数据
 - 优化：自定义替换功能在替换基础上增加增加插入功能
 - debug：修正跨度仅一年的年号无效问题
