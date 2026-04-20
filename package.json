@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.9.5",
+  "version": "1.9.6",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -31,6 +31,18 @@
       },
       {
         "command": "ai-proofread.prompts.delete",
+        "title": "删除"
+      },
+      {
+        "command": "ai-proofread.dictPrepPrompts.new",
+        "title": "新建词典查询提示词"
+      },
+      {
+        "command": "ai-proofread.dictPrepPrompts.edit",
+        "title": "编辑"
+      },
+      {
+        "command": "ai-proofread.dictPrepPrompts.delete",
         "title": "删除"
       },
       {
@@ -68,6 +80,14 @@
       {
         "command": "ai-proofread.mergeTwoFiles",
         "title": "AI Proofreader: merge two files"
+      },
+      {
+        "command": "ai-proofread.prepareLocalDictReferences",
+        "title": "AI Proofreader: prepare references from local dictionaries (JSON)"
+      },
+      {
+        "command": "ai-proofread.queryLocalDictSelection",
+        "title": "AI Proofreader: query local dictionary for selection"
       },
       {
         "command": "ai-proofread.proofreadFile",
@@ -461,6 +481,76 @@
           ],
           "default": "none",
           "description": "提示词重复模式（基于谷歌研究：重复提示词可提高准确度。注意：会增加输入token，但可能提高校对准确度）"
+        },
+        "ai-proofread.localDicts": {
+          "order": 30,
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "description": "词典ID（稳定标识，用于路由与缓存键）" },
+              "name": { "type": "string", "description": "词典名称（展示用）" },
+              "mdxPath": { "type": "string", "description": "MDX 文件路径（支持绝对路径）" },
+              "tags": { "type": "array", "items": { "type": "string" }, "default": [], "description": "词典标签（如：中文/古汉语/百科/字形等）" },
+              "priority": { "type": "number", "default": 100, "description": "优先级（越小越优先作为回退默认词典）" },
+              "whenToUse": { "type": "string", "default": "", "description": "一句话说明何时使用该词典（供 LLM 路由参考）" }
+            },
+            "required": ["id", "name", "mdxPath"]
+          },
+          "description": "本地 MDict 词典配置（MDX）。用于“本地词典参考准备”流程的词典路由与查询。"
+        },
+        "ai-proofread.dictPrep.maxPointsPerItem": {
+          "order": 31,
+          "type": "number",
+          "default": 6,
+          "minimum": 0,
+          "maximum": 50,
+          "description": "每段（每个 JSON item）最多生成/处理的待查点数量。0 表示不处理。"
+        },
+        "ai-proofread.dictPrep.maxTotalLookupsPerRun": {
+          "order": 32,
+          "type": "number",
+          "default": 200,
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "单次运行本地词典参考准备时，最多执行的查词次数上限（用于避免超大文档耗时过长）。"
+        },
+        "ai-proofread.dictPrep.maxDefinitionChars": {
+          "order": 33,
+          "type": "number",
+          "default": 6000,
+          "minimum": 200,
+          "maximum": 50000,
+          "description": "写入 reference 的单条释义最大字符数（超出会截断）。"
+        },
+        "ai-proofread.dictPrep.cache.enabled": {
+          "order": 34,
+          "type": "boolean",
+          "default": true,
+          "description": "是否缓存查词结果到扩展存储（建议开启以显著加速重复查询）。"
+        },
+        "ai-proofread.dictPrep.cache.ttlHours": {
+          "order": 35,
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 87600,
+          "description": "缓存过期时间（小时）。0 表示永不过期（直到词典路径或查询词变化）。"
+        },
+        "ai-proofread.dictPrep.prompts": {
+          "order": 38,
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "词典查询提示词名称" },
+              "content": { "type": "string", "description": "提示词内容（必须要求模型只输出 JSON，并遵循 lookups 结构）" }
+            },
+            "required": ["name", "content"]
+          },
+          "description": "词典查询提示词列表（用于“本地词典参考准备”流程）。"
         },
         "ai-proofread.proofread.defaultOutputType": {
           "order": 27.5,
@@ -859,6 +949,11 @@
           "when": "aiProofread.showPromptsView"
         },
         {
+          "id": "ai-proofread.dictPrepPrompts",
+          "name": "prompts for dict prep ",
+          "when": "aiProofread.showDictPrepPromptsView"
+        },
+        {
           "id": "ai-proofread.sourceTextCharacteristics",
           "name": "prompts on source text",
           "when": "aiProofread.showSourceTextCharacteristicsView"
@@ -953,6 +1048,11 @@
           "group": "navigation"
         },
         {
+          "command": "ai-proofread.dictPrepPrompts.new",
+          "when": "view == ai-proofread.dictPrepPrompts",
+          "group": "navigation"
+        },
+        {
           "command": "ai-proofread.sourceTextCharacteristics.new",
           "when": "view == ai-proofread.sourceTextCharacteristics",
           "group": "navigation"
@@ -973,6 +1073,16 @@
           "command": "ai-proofread.prompts.delete",
           "group": "prompts@1",
           "when": "view == ai-proofread.prompts && viewItem == promptUser"
+        },
+        {
+          "command": "ai-proofread.dictPrepPrompts.edit",
+          "group": "dictPrepPrompts@1",
+          "when": "view == ai-proofread.dictPrepPrompts && viewItem == dictPrepPromptUser"
+        },
+        {
+          "command": "ai-proofread.dictPrepPrompts.delete",
+          "group": "dictPrepPrompts@1",
+          "when": "view == ai-proofread.dictPrepPrompts && viewItem == dictPrepPromptUser"
         },
         {
           "command": "ai-proofread.sourceTextCharacteristics.edit",
@@ -1164,6 +1274,11 @@
           "when": "editorTextFocus && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
+          "command": "ai-proofread.queryLocalDictSelection",
+          "group": "ai-proofread@13.1",
+          "when": "editorHasSelection"
+        },
+        {
           "command": "ai-proofread.convertQuotes",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
@@ -1197,6 +1312,11 @@
           "command": "ai-proofread.convertMarkdownToDocx",
           "group": "ai-proofread@21",
           "when": "resourceLangId == markdown"
+        },
+        {
+          "command": "ai-proofread.prepareLocalDictReferences",
+          "group": "ai-proofread@30.5",
+          "when": "resourceLangId == json"
         },
         {
           "command": "ai-proofread.proofreadFile",
@@ -1238,6 +1358,7 @@
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
     "jieba-wasm": "^2.4.0",
+    "mdict-js": "^10.0.1",
     "opencc-js": "^1.0.5",
     "sql.js": "^1.10.0"
   },

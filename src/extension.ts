@@ -14,6 +14,7 @@ import { ExamplesCommandHandler } from './commands/examplesCommandHandler';
 import { DocumentConvertCommandHandler } from './commands/documentConvertCommandHandler';
 import { UtilityCommandHandler } from './commands/utilityCommandHandler';
 import { CitationCommandHandler } from './commands/citationCommandHandler';
+import { DictPrepCommandHandler } from './commands/dictPrepCommandHandler';
 import { registerCitationView } from './citation/citationView';
 import { registerDuplicateView } from './duplicate/duplicateView';
 import { DuplicateCommandHandler } from './commands/duplicateCommandHandler';
@@ -32,6 +33,9 @@ import { registerWelcomeView } from './ui/welcomeView';
 import { getJiebaWasm } from './jiebaLoader';
 import { setExtensionContext } from './extensionContextHolder';
 import { convertOpencc, type OpenccLocale } from './opencc';
+import { DictPrepPromptManager } from './localDict/dictPrepPromptManager';
+import { registerDictPrepPromptsView, type DictPrepPromptTreeItem } from './localDict/dictPrepPromptsView';
+import { LocalDictQueryCommandHandler } from './commands/localDictQueryCommandHandler';
 
 const OPENCC_LOCALES: Array<{ id: OpenccLocale; label: string; description: string }> = [
     { id: 'cn', label: 'cn', description: 'Simplified Chinese (Mainland China)' },
@@ -78,6 +82,8 @@ export function activate(context: vscode.ExtensionContext) {
     const examplesHandler = new ExamplesCommandHandler(context);
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
+    const dictPrepHandler = new DictPrepCommandHandler();
+    const localDictQueryHandler = new LocalDictQueryCommandHandler();
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
     const citationHandler = new CitationCommandHandler(context, citationTreeProvider, citationTreeView);
     const { provider: duplicateTreeProvider, treeView: duplicateTreeView } = registerDuplicateView(context);
@@ -96,6 +102,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     const promptManager = PromptManager.getInstance(context);
     const { provider: promptsTreeProvider } = registerPromptsView(context, promptManager);
+    const dictPrepPromptManager = DictPrepPromptManager.getInstance(context);
+    const { provider: dictPrepPromptsTreeProvider } = registerDictPrepPromptsView(context, dictPrepPromptManager);
     const sourceTextCharacteristicManager = SourceTextCharacteristicManager.getInstance(context);
     const { provider: sourceTextCharacteristicsTreeProvider } = registerSourceTextCharacteristicsView(
         context,
@@ -105,6 +113,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // 按需显示 TreeView：默认全部隐藏，由命令显式打开
     vscode.commands.executeCommand('setContext', 'aiProofread.showPromptsView', false);
+    vscode.commands.executeCommand('setContext', 'aiProofread.showDictPrepPromptsView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showDictCheckTypesView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showTgsccCheckTypesView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', false);
@@ -240,6 +249,7 @@ export function activate(context: vscode.ExtensionContext) {
         // 注册提示词管理命令（同时显示 prompts 与源文本特性两个 TreeView，并聚焦 prompts）
         vscode.commands.registerCommand('ai-proofread.managePrompts', async () => {
             await vscode.commands.executeCommand('setContext', 'aiProofread.showPromptsView', true);
+            await vscode.commands.executeCommand('setContext', 'aiProofread.showDictPrepPromptsView', true);
             await vscode.commands.executeCommand('setContext', 'aiProofread.showSourceTextCharacteristicsView', true);
             PromptManager.getInstance(context).managePrompts();
         }),
@@ -258,6 +268,23 @@ export function activate(context: vscode.ExtensionContext) {
             if (el?.id && el.prompt) {
                 await promptManager.deletePrompt(el.id);
                 promptsTreeProvider.refresh();
+            }
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.dictPrepPrompts.new', async () => {
+            await dictPrepPromptManager.addPrompt();
+            dictPrepPromptsTreeProvider.refresh();
+        }),
+        vscode.commands.registerCommand('ai-proofread.dictPrepPrompts.edit', async (el: DictPrepPromptTreeItem) => {
+            if (el?.prompt) {
+                await dictPrepPromptManager.editPrompt(el.prompt);
+                dictPrepPromptsTreeProvider.refresh();
+            }
+        }),
+        vscode.commands.registerCommand('ai-proofread.dictPrepPrompts.delete', async (el: DictPrepPromptTreeItem) => {
+            if (el?.id && el.prompt) {
+                await dictPrepPromptManager.deletePrompt(el.id);
+                dictPrepPromptsTreeProvider.refresh();
             }
         }),
 
@@ -286,6 +313,24 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await utilityHandler.handleMergeTwoFilesCommand(editor);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.prepareLocalDictReferences', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await dictPrepHandler.handlePrepareLocalDictReferencesCommand(editor, context);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.queryLocalDictSelection', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await localDictQueryHandler.handleQuerySelectionCommand(editor, context);
         }),
 
         // 注册在PDF中搜索选中文本命令

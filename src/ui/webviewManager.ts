@@ -448,6 +448,18 @@ export class WebviewManager {
                     }
                     break;
                 }
+                case 'dictPrepJson': {
+                    const jsonPath = this.getSplitJsonPath();
+                    if (!jsonPath) {
+                        vscode.window.showWarningMessage('请先完成切分，或未找到 JSON 文件。');
+                        break;
+                    }
+                    // 该命令依赖当前活动编辑器为 JSON，因此先打开该 JSON
+                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(jsonPath));
+                    await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+                    await vscode.commands.executeCommand('ai-proofread.prepareLocalDictReferences');
+                    break;
+                }
                 case 'showProofreadJson': {
                     const proofreadJsonPath = this.getProofreadJsonPath();
                     if (proofreadJsonPath) {
@@ -556,6 +568,7 @@ export class WebviewManager {
                 case 'splitIntoSentences':
                 case 'segmentFile':
                 case 'diffItWithAnotherFile':
+                case 'queryLocalDictSelection':
                 case 'searchSelectionInPDF':
                 case 'searchSelectionInShidianguji':
                 case 'searchSelectionInAncientbooks':
@@ -567,6 +580,7 @@ export class WebviewManager {
                         splitIntoSentences: 'ai-proofread.splitIntoSentences',
                         segmentFile: 'ai-proofread.segmentFile',
                         diffItWithAnotherFile: 'ai-proofread.diffItWithAnotherFile',
+                        queryLocalDictSelection: 'ai-proofread.queryLocalDictSelection',
                         searchSelectionInPDF: 'ai-proofread.searchSelectionInPDF',
                         searchSelectionInShidianguji: 'ai-proofread.searchSelectionInShidianguji',
                         searchSelectionInAncientbooks: 'ai-proofread.searchSelectionInAncientbooks',
@@ -735,6 +749,7 @@ export class WebviewManager {
                     <button class="action-button" onclick="handleAction('showSplitLog')">查看日志</button>
                     <button class="action-button" onclick="handleAction('showSplitDiff')">比较前后差异</button>
                     <button class="action-button" onclick="handleAction('mergeContext')">合并语境/参考资料</button>
+                    <button class="action-button" onclick="handleAction('dictPrepJson')">查询词典</button>
                     <button class="action-button" onclick="handleAction('proofreadJson')">校对JSON文件</button>
                 </div>
             </div>
@@ -826,6 +841,8 @@ export class WebviewManager {
                 <button type="button" class="link-button" onclick="handleAction('duplicateScanDocument')" title="AI Proofreader: scan duplicate sentences in document">重复句扫描</button>
                 ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('diffItWithAnotherFile')" title="AI Proofreader: diff it with another file">diff 与另一文件</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('queryLocalDictSelection')" title="AI Proofreader: query local dictionary for selection">在词典中查询选中</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('searchSelectionInPDF')" title="AI Proofreader: search selection in PDF">在 PDF 中搜索选中文本</button>
                 ${sep}
@@ -945,6 +962,7 @@ export class WebviewManager {
                     ${splitResult.logFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitLog\')">查看切分日志</button>' : ''}
                     ${splitResult.originalFilePath && splitResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitDiff\')">比较前后差异</button>' : ''}
                     ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'mergeContext\')">合并语境/参考资料</button>' : ''}
+                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'dictPrepJson\')">查询词典</button>' : ''}
                     ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'proofreadJson\')">校对JSON文件</button>' : ''}
                 </div>
             </div>
