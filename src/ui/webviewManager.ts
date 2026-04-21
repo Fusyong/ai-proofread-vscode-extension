@@ -20,6 +20,9 @@ export interface CompanionFiles {
     json: string;
     jsonMd: string;
     log: string;
+    /** 由切分 JSON 派生：basename.dictprep.json */
+    dictPrepJson: string;
+    dictPrepLog: string;
     proofreadJson: string;
     proofreadJsonMd: string;
     proofreadLog: string;
@@ -70,14 +73,25 @@ export function detectCompanionFiles(mainFilePath: string): Partial<CompanionFil
     const dir = path.dirname(mainFilePath);
     const base = path.basename(mainFilePath, path.extname(mainFilePath));
     const result: Partial<CompanionFiles> = {};
-    const candidates: (keyof CompanionFiles)[] = ['json', 'jsonMd', 'log', 'proofreadJson', 'proofreadJsonMd', 'proofreadLog'];
+    const candidates: (keyof CompanionFiles)[] = [
+        'json',
+        'jsonMd',
+        'log',
+        'dictPrepJson',
+        'dictPrepLog',
+        'proofreadJson',
+        'proofreadJsonMd',
+        'proofreadLog',
+    ];
     const paths: Record<keyof CompanionFiles, string> = {
         json: path.join(dir, `${base}.json`),
         jsonMd: path.join(dir, `${base}.json.md`),
         log: path.join(dir, `${base}.log`),
+        dictPrepJson: path.join(dir, `${base}.dictprep.json`),
+        dictPrepLog: path.join(dir, `${base}.dictprep.log`),
         proofreadJson: path.join(dir, `${base}.proofread.json`),
         proofreadJsonMd: path.join(dir, `${base}.proofread.json.md`),
-        proofreadLog: path.join(dir, `${base}.proofread.log`)
+        proofreadLog: path.join(dir, `${base}.proofread.log`),
     };
     for (const key of candidates) {
         if (fs.existsSync(paths[key])) {
@@ -289,6 +303,39 @@ export class WebviewManager {
         return this.currentProcessResult?.proofreadResult?.markdownFilePath ?? (this.currentProcessResult?.companionFiles as any)?.proofreadJsonMd;
     }
 
+    private getDictPrepJsonPath(): string | undefined {
+        const j = this.getSplitJsonPath();
+        return j ? FilePathUtils.getFilePath(j, '.dictprep', '.json') : undefined;
+    }
+
+    private getDictPrepLogPath(): string | undefined {
+        const j = this.getSplitJsonPath();
+        return j ? FilePathUtils.getFilePath(j, '.dictprep', '.log') : undefined;
+    }
+
+    /** 过程文件行：路径后紧跟「打开」 */
+    private filePathRowWithOpenButton(label: string, absolutePath: string, openAction: string): string {
+        const rel = this.getRelativePath(absolutePath);
+        return `
+                    <div class="file-path-row file-path-row--with-actions">
+                        <span class="file-label">${label}</span>
+                        <span class="file-path">${rel}</span>
+                        <span class="file-row-actions">
+                            <button type="button" class="action-button action-button--compact" onclick="handleAction('${openAction}')">打开</button>
+                        </span>
+                    </div>`;
+    }
+
+    /**
+     * 仅当磁盘上已有该文件时渲染一行；尚未生成的过程文件不占位，避免无效按钮。
+     */
+    private filePathRowWithOpenButtonIfExists(label: string, absolutePath: string, openAction: string): string {
+        if (!absolutePath || !fs.existsSync(absolutePath)) {
+            return '';
+        }
+        return this.filePathRowWithOpenButton(label, absolutePath, openAction);
+    }
+
     /**
      * 处理 Webview 消息
      */
@@ -414,6 +461,14 @@ export class WebviewManager {
                     }
                     break;
                 }
+                case 'showSplitJsonMd': {
+                    const mdPath = this.getSplitMarkdownPath();
+                    if (mdPath) {
+                        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(mdPath));
+                        await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+                    }
+                    break;
+                }
                 case 'showSplitLog': {
                     const splitLogPath = this.getSplitLogPath();
                     if (splitLogPath) {
@@ -448,16 +503,51 @@ export class WebviewManager {
                     }
                     break;
                 }
-                case 'dictPrepJson': {
+                case 'dictPrepLlmPlan': {
                     const jsonPath = this.getSplitJsonPath();
                     if (!jsonPath) {
                         vscode.window.showWarningMessage('请先完成切分，或未找到 JSON 文件。');
                         break;
                     }
-                    // 该命令依赖当前活动编辑器为 JSON，因此先打开该 JSON
-                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(jsonPath));
-                    await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
-                    await vscode.commands.executeCommand('ai-proofread.prepareLocalDictReferences');
+                    if ((this as any).dictPrepLlmPlanCallback) {
+                        await (this as any).dictPrepLlmPlanCallback(jsonPath, context);
+                    }
+                    break;
+                }
+                case 'dictPrepLocalMerge': {
+                    const jsonPath = this.getSplitJsonPath();
+                    if (!jsonPath) {
+                        vscode.window.showWarningMessage('请先完成切分，或未找到 JSON 文件。');
+                        break;
+                    }
+                    if ((this as any).dictPrepLocalMergeCallback) {
+                        await (this as any).dictPrepLocalMergeCallback(jsonPath, context);
+                    }
+                    break;
+                }
+                case 'showDictPrepJson': {
+                    const p = this.getDictPrepJsonPath();
+                    if (p && fs.existsSync(p)) {
+                        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(p));
+                        await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+                    } else {
+                        vscode.window.showInformationMessage('尚未生成 .dictprep.json（需先执行「LLM 生成查词计划」）。');
+                    }
+                    break;
+                }
+                case 'showDictPrepLog': {
+                    const p = this.getDictPrepLogPath();
+                    if (p && fs.existsSync(p)) {
+                        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(p));
+                        const ed = await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+                        const lastLine = doc.lineCount - 1;
+                        const lastLen = doc.lineAt(lastLine).text.length;
+                        const end = new vscode.Position(lastLine, lastLen);
+                        ed.selection = new vscode.Selection(end, end);
+                        ed.revealRange(new vscode.Range(end, end), vscode.TextEditorRevealType.InCenter);
+                    } else {
+                        vscode.window.showInformationMessage('尚未生成 .dictprep.log。');
+                    }
                     break;
                 }
                 case 'showProofreadJson': {
@@ -466,6 +556,14 @@ export class WebviewManager {
                         const outputUri = vscode.Uri.file(proofreadJsonPath);
                         const proofreadDoc = await vscode.workspace.openTextDocument(outputUri);
                         await vscode.window.showTextDocument(proofreadDoc, { viewColumn: vscode.ViewColumn.Beside });
+                    }
+                    break;
+                }
+                case 'showProofreadJsonMd': {
+                    const mdPath = this.getProofreadMarkdownPath();
+                    if (mdPath) {
+                        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(mdPath));
+                        await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
                     }
                     break;
                 }
@@ -634,9 +732,21 @@ export class WebviewManager {
         (this as any).splitCallback = callback;
     }
 
-    /** 设置合并语境/参考资料的回调（按 JSON 路径） */
+    /** 设置合并 JSON的回调（按 JSON 路径） */
     public setMergeCallback(callback: (jsonFilePath: string, context: vscode.ExtensionContext) => Promise<void>): void {
         (this as any).mergeCallback = callback;
+    }
+
+    public setDictPrepLlmPlanCallback(
+        callback: (jsonFilePath: string, context: vscode.ExtensionContext) => Promise<void>
+    ): void {
+        (this as any).dictPrepLlmPlanCallback = callback;
+    }
+
+    public setDictPrepLocalMergeCallback(
+        callback: (jsonFilePath: string, context: vscode.ExtensionContext) => Promise<void>
+    ): void {
+        (this as any).dictPrepLocalMergeCallback = callback;
     }
 
     /**
@@ -733,6 +843,8 @@ export class WebviewManager {
         let splitSection = '';
         if (hasJson && comp.json && comp.jsonMd && comp.log) {
             const stats = this.tryReadSplitStats(comp.log);
+            const dictPrepJsonPath = FilePathUtils.getFilePath(comp.json, '.dictprep', '.json');
+            const dictPrepLogPath = FilePathUtils.getFilePath(comp.json, '.dictprep', '.log');
             splitSection = `
             <div class="process-section">
                 <h3>✂️ 切分结果</h3>
@@ -740,17 +852,18 @@ export class WebviewManager {
                     <span class="stat-item">切分片段数: <span class="stat-value">${stats.segmentCount}</span></span>
                 </div></div>` : ''}
                 <div class="file-paths-compact">
-                    <div class="file-path-row"><span class="file-label">JSON:</span><span class="file-path">${this.getRelativePath(comp.json)}</span></div>
-                    <div class="file-path-row"><span class="file-label">JSON.md:</span><span class="file-path">${this.getRelativePath(comp.jsonMd)}</span></div>
-                    <div class="file-path-row"><span class="file-label">日志:</span><span class="file-path">${this.getRelativePath(comp.log)}</span></div>
+                    ${this.filePathRowWithOpenButtonIfExists('JSON:', comp.json, 'showSplitJson')}
+                    ${this.filePathRowWithOpenButtonIfExists('JSON.md:', comp.jsonMd, 'showSplitJsonMd')}
+                    ${this.filePathRowWithOpenButtonIfExists('切分日志:', comp.log, 'showSplitLog')}
+                    ${this.filePathRowWithOpenButtonIfExists('查词过程:', dictPrepJsonPath, 'showDictPrepJson')}
+                    ${this.filePathRowWithOpenButtonIfExists('查词日志:', dictPrepLogPath, 'showDictPrepLog')}
                 </div>
                 <div class="section-actions">
-                    <button class="action-button" onclick="handleAction('showSplitJson')">查看JSON</button>
-                    <button class="action-button" onclick="handleAction('showSplitLog')">查看日志</button>
                     <button class="action-button" onclick="handleAction('showSplitDiff')">比较前后差异</button>
-                    <button class="action-button" onclick="handleAction('mergeContext')">合并语境/参考资料</button>
-                    <button class="action-button" onclick="handleAction('dictPrepJson')">查询词典</button>
-                    <button class="action-button" onclick="handleAction('proofreadJson')">校对JSON文件</button>
+                    <button class="action-button" onclick="handleAction('mergeContext')">合并 JSON</button>
+                    <button class="action-button" onclick="handleAction('dictPrepLlmPlan')" title="第一段：LLM 确定查询候选">LLM 生成查词计划</button>
+                    <button class="action-button" onclick="handleAction('dictPrepLocalMerge')" title="第二段：查询本地词典并写入 reference">查词并入 reference</button>
+                    <button class="action-button" onclick="handleAction('proofreadJson')">LLM 校对 JSON</button>
                 </div>
             </div>
             `;
@@ -769,14 +882,13 @@ export class WebviewManager {
                 </div>
                 ` : ''}
                 <div class="file-paths-compact">
-                    <div class="file-path-row"><span class="file-label">JSON:</span><span class="file-path">${this.getRelativePath(comp.proofreadJson)}</span></div>
-                    <div class="file-path-row"><span class="file-label">JSON.md:</span><span class="file-path">${this.getRelativePath(comp.proofreadJsonMd)}</span></div>
-                    <div class="file-path-row"><span class="file-label">日志:</span><span class="file-path">${this.getRelativePath(comp.proofreadLog)}</span></div>
+                    ${this.filePathRowWithOpenButton('JSON:', comp.proofreadJson, 'showProofreadJson')}
+                    ${this.filePathRowWithOpenButton('JSON.md:', comp.proofreadJsonMd, 'showProofreadJsonMd')}
+                    ${this.filePathRowWithOpenButton('校对日志:', comp.proofreadLog, 'showProofreadLog')}
                 </div>
                 <div class="section-actions">
-                    <button class="action-button" onclick="handleAction('showProofreadJson')">查看JSON</button>
-                    <button class="action-button" onclick="handleAction('showProofreadLog')">查看日志</button>
                     <button class="action-button" onclick="handleAction('showProofreadDiff')">比较前后差异</button>
+                    <button class="action-button" onclick="handleAction('showProofreadItemsTree')">查看校对条目</button>
                     <button class="action-button" onclick="handleAction('generateDiff')">生成差异文件</button>
                     <button class="action-button" onclick="handleAction('generateAlignment')">生成勘误表</button>
                 </div>
@@ -873,6 +985,10 @@ export class WebviewManager {
             .hint { font-size: 12px; color: #6B8E9A; margin: 8px 0; }
             .consistency-hint { font-style: italic; }
             .warning-box { padding: 10px; margin: 10px 0; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; font-size: 13px; color: #856404; }
+            .file-path-row--with-actions { flex-wrap: wrap; align-items: flex-start; }
+            .file-path-row--with-actions .file-path { flex: 1 1 180px; min-width: 0; }
+            .file-row-actions { flex: 0 0 auto; margin-left: 8px; }
+            .action-button--compact { padding: 3px 8px; font-size: 11px; }
         ` : '';
         return `
             <!DOCTYPE html>
@@ -939,31 +1055,30 @@ export class WebviewManager {
             </div>
         ` : '';
 
+        const dictPrepJsonPath = splitResult.jsonFilePath
+            ? FilePathUtils.getFilePath(splitResult.jsonFilePath, '.dictprep', '.json')
+            : '';
+        const dictPrepLogPath = splitResult.jsonFilePath
+            ? FilePathUtils.getFilePath(splitResult.jsonFilePath, '.dictprep', '.log')
+            : '';
+
         return `
             <div class="process-section">
                 <h3>✂️ 切分结果</h3>
                 ${statsHtml}
                 <div class="file-paths-compact">
-                    <div class="file-path-row">
-                        <span class="file-label">JSON结果:</span>
-                        <span class="file-path">${this.getRelativePath(splitResult.jsonFilePath)}</span>
-                    </div>
-                    <div class="file-path-row">
-                        <span class="file-label">Markdown结果:</span>
-                        <span class="file-path">${this.getRelativePath(splitResult.markdownFilePath)}</span>
-                    </div>
-                    <div class="file-path-row">
-                        <span class="file-label">日志文件:</span>
-                        <span class="file-path">${this.getRelativePath(splitResult.logFilePath)}</span>
-                    </div>
+                    ${this.filePathRowWithOpenButtonIfExists('JSON:', splitResult.jsonFilePath, 'showSplitJson')}
+                    ${this.filePathRowWithOpenButtonIfExists('JSON.md:', splitResult.markdownFilePath, 'showSplitJsonMd')}
+                    ${this.filePathRowWithOpenButtonIfExists('切分日志:', splitResult.logFilePath, 'showSplitLog')}
+                    ${this.filePathRowWithOpenButtonIfExists('查词过程:', dictPrepJsonPath, 'showDictPrepJson')}
+                    ${this.filePathRowWithOpenButtonIfExists('查词日志:', dictPrepLogPath, 'showDictPrepLog')}
                 </div>
                 <div class="section-actions">
-                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitJson\')">查看JSON文件</button>' : ''}
-                    ${splitResult.logFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitLog\')">查看切分日志</button>' : ''}
                     ${splitResult.originalFilePath && splitResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitDiff\')">比较前后差异</button>' : ''}
-                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'mergeContext\')">合并语境/参考资料</button>' : ''}
-                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'dictPrepJson\')">查询词典</button>' : ''}
-                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'proofreadJson\')">校对JSON文件</button>' : ''}
+                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'mergeContext\')">合并 JSON</button>' : ''}
+                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'dictPrepLlmPlan\')" title="第一段：LLM 确定查询候选">LLM 生成查词计划</button>' : ''}
+                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'dictPrepLocalMerge\')" title="第二段：查询本地词典并写入 reference">查词并入 reference</button>' : ''}
+                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'proofreadJson\')">LLM 校对 JSON</button>' : ''}
                 </div>
             </div>
         `;
@@ -1000,23 +1115,12 @@ export class WebviewManager {
                 </div>
                 ` : ''}
                 <div class="file-paths-compact">
-                    <div class="file-path-row">
-                        <span class="file-label">JSON结果:</span>
-                        <span class="file-path">${this.getRelativePath(proofreadResult.outputFilePath)}</span>
-                    </div>
-                    <div class="file-path-row">
-                        <span class="file-label">Markdown结果:</span>
-                        <span class="file-path">${this.getRelativePath(proofreadResult.markdownFilePath)}</span>
-                    </div>
-                    <div class="file-path-row">
-                        <span class="file-label">日志文件:</span>
-                        <span class="file-path">${this.getRelativePath(proofreadResult.logFilePath)}</span>
-                    </div>
+                    ${proofreadResult.outputFilePath ? this.filePathRowWithOpenButton('JSON:', proofreadResult.outputFilePath, 'showProofreadJson') : ''}
+                    ${proofreadResult.markdownFilePath ? this.filePathRowWithOpenButton('JSON.md:', proofreadResult.markdownFilePath, 'showProofreadJsonMd') : ''}
+                    ${proofreadResult.logFilePath ? this.filePathRowWithOpenButton('校对日志:', proofreadResult.logFilePath, 'showProofreadLog') : ''}
                 </div>
                 <div class="section-actions">
-                    ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadJson\')">查看JSON文件</button>' : ''}
                     ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadItemsTree\')">查看校对条目</button>' : ''}
-                    ${proofreadResult.logFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadLog\')">查看校对日志</button>' : ''}
                     ${proofreadResult.originalFilePath && proofreadResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadDiff\')">比较前后差异</button>' : ''}
                     ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'generateDiff\')">生成差异文件</button>' : ''}
                     ${proofreadResult.originalFilePath && proofreadResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'generateAlignment\')">生成勘误表</button>' : ''}
@@ -1168,6 +1272,10 @@ export class WebviewManager {
                         align-items: center;
                         font-size: 12px;
                     }
+                    .file-path-row--with-actions { flex-wrap: wrap; align-items: flex-start; }
+                    .file-path-row--with-actions .file-path { flex: 1 1 180px; min-width: 0; }
+                    .file-row-actions { flex: 0 0 auto; margin-left: 8px; }
+                    .action-button--compact { padding: 3px 8px; font-size: 11px; }
                     .file-path-item {
                         margin-bottom: 6px;
                         display: flex;

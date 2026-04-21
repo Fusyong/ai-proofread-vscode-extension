@@ -82,7 +82,7 @@ export function activate(context: vscode.ExtensionContext) {
     const examplesHandler = new ExamplesCommandHandler(context);
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
-    const dictPrepHandler = new DictPrepCommandHandler();
+    const dictPrepHandler = new DictPrepCommandHandler(webviewManager);
     const localDictQueryHandler = new LocalDictQueryCommandHandler();
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
     const citationHandler = new CitationCommandHandler(context, citationTreeProvider, citationTreeView);
@@ -134,6 +134,12 @@ export function activate(context: vscode.ExtensionContext) {
     });
     webviewManager.setMergeCallback((jsonFilePath: string) => {
         return utilityHandler.handleMergeTwoFilesByPath(jsonFilePath);
+    });
+    webviewManager.setDictPrepLlmPlanCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
+        return dictPrepHandler.handleDictPrepLlmPlan(jsonFilePath, ctx);
+    });
+    webviewManager.setDictPrepLocalMergeCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
+        return dictPrepHandler.handleDictPrepLocalMerge(jsonFilePath, ctx);
     });
 
     // 注册所有命令

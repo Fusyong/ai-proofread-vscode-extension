@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.9.6",
+  "version": "1.9.7",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -35,7 +35,7 @@
       },
       {
         "command": "ai-proofread.dictPrepPrompts.new",
-        "title": "新建词典查询提示词"
+        "title": "新建提示词"
       },
       {
         "command": "ai-proofread.dictPrepPrompts.edit",
@@ -47,7 +47,7 @@
       },
       {
         "command": "ai-proofread.sourceTextCharacteristics.new",
-        "title": "新建源提示词"
+        "title": "新建提示词"
       },
       {
         "command": "ai-proofread.sourceTextCharacteristics.edit",
@@ -492,9 +492,9 @@
               "id": { "type": "string", "description": "词典ID（稳定标识，用于路由与缓存键）" },
               "name": { "type": "string", "description": "词典名称（展示用）" },
               "mdxPath": { "type": "string", "description": "MDX 文件路径（支持绝对路径）" },
-              "tags": { "type": "array", "items": { "type": "string" }, "default": [], "description": "词典标签（如：中文/古汉语/百科/字形等）" },
+              "tags": { "type": "array", "items": { "type": "string" }, "default": [], "description": "词典标签（如：中文、古汉语、百科等）" },
               "priority": { "type": "number", "default": 100, "description": "优先级（越小越优先作为回退默认词典）" },
-              "whenToUse": { "type": "string", "default": "", "description": "一句话说明何时使用该词典（供 LLM 路由参考）" }
+              "whenToUse": { "type": "string", "default": "", "description": "一句话说明何时使用该词典（供大语言模型参考）" }
             },
             "required": ["id", "name", "mdxPath"]
           },
@@ -511,9 +511,9 @@
         "ai-proofread.dictPrep.maxTotalLookupsPerRun": {
           "order": 32,
           "type": "number",
-          "default": 200,
+          "default": 100,
           "minimum": 1,
-          "maximum": 10000,
+          "maximum": 500,
           "description": "单次运行本地词典参考准备时，最多执行的查词次数上限（用于避免超大文档耗时过长）。"
         },
         "ai-proofread.dictPrep.maxDefinitionChars": {
