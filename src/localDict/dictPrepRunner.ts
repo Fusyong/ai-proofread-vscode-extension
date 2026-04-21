@@ -7,6 +7,7 @@ import { MdictClient, type LookupMode } from './mdictClient';
 import { buildDictPrepSystemPrompt, buildDictPrepUserPrompt, parseDictPrepPlan, type DictPrepLookupPoint } from './dictPrepPrompt';
 import { llmGenerateJson } from './dictPrepLlm';
 import { convertOpencc } from '../opencc';
+import { stripHtmlToText } from './htmlToText';
 
 export interface DictPrepRunStats {
     totalItems: number;
@@ -81,26 +82,6 @@ function buildLookupVariantsForTraditional(term: string): string[] {
         return [base, t];
     }
     return [base];
-}
-
-function stripHtmlToText(html: string): string {
-    const s = String(html ?? '');
-    if (!s) return s;
-    let out = s.replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
-    out = out.replace(/<\s*br\s*\/?\s*>/gi, '\n');
-    out = out.replace(/<\s*\/\s*p\s*>/gi, '\n');
-    out = out.replace(/<\s*\/\s*div\s*>/gi, '\n');
-    out = out.replace(/<[^>]+>/g, '');
-    out = out
-        .replace(/&nbsp;/gi, ' ')
-        .replace(/&lt;/gi, '<')
-        .replace(/&gt;/gi, '>')
-        .replace(/&amp;/gi, '&')
-        .replace(/&quot;/gi, '"')
-        .replace(/&#39;/g, "'");
-    out = out.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    out = out.replace(/\n{3,}/g, '\n\n');
-    return out.trim();
 }
 
 function limitCleanText(s: string, maxChars: number): string {
@@ -397,16 +378,28 @@ export async function mergeDictPrepReferencesFromPlans(
                 continue;
             }
 
-            // 对该 point：不在命中后立即停止；遍历所有候选/词典/变体后取“净文本最长”的那条
-            let best:
-                | {
-                      h: { dictName: string; dictId: string; queryTerm: string; matchedKey: string; mode: LookupMode };
-                      cleaned: string;
-                      digest: string;
-                      term: string;
-                      dictIdForLegacy: string;
-                  }
-                | undefined;
+            // 对该 point：不在命中后立即停止；遍历所有候选/词典/变体后做“同名分组择优”：
+            // - 同名（同 dict + 同 matchedKey）的多条条目要同时输出（如辞海7的“李白”两条）
+            // - 用组内“最长净文本”的长度代表该组长度
+            // - 再与其它不同名组比较，最终只取“最长的一组”（可能是 1 条，也可能是同名多条）
+            const MAX_ENTRIES_PER_GROUP = 6;
+            type PickedEntry = {
+                h: { dictName: string; dictId: string; queryTerm: string; matchedKey: string; mode: LookupMode };
+                cleaned: string;
+                digest: string;
+                term: string;
+                dictIdForLegacy: string;
+            };
+            const groups = new Map<
+                string,
+                {
+                    dictId: string;
+                    dictName: string;
+                    matchedKey: string;
+                    entriesByDigest: Map<string, PickedEntry>;
+                    groupLen: number; // max cleaned length within group
+                }
+            >();
             for (const dict of dictTryList) {
                 if (totalLookupsExecuted >= maxTotalLookupsPerRun) break;
 
@@ -453,8 +446,23 @@ export async function mergeDictPrepReferencesFromPlans(
                                     continue;
                                 }
 
-                                if (!best || cleaned.length > best.cleaned.length) {
-                                    best = {
+                                const groupKey = `${h.dictId}::${h.matchedKey}`;
+                                let g = groups.get(groupKey);
+                                if (!g) {
+                                    g = {
+                                        dictId: h.dictId,
+                                        dictName: h.dictName,
+                                        matchedKey: h.matchedKey,
+                                        entriesByDigest: new Map<string, PickedEntry>(),
+                                        groupLen: 0,
+                                    };
+                                    groups.set(groupKey, g);
+                                }
+                                g.groupLen = Math.max(g.groupLen, cleaned.length);
+
+                                const prev = g.entriesByDigest.get(digest);
+                                if (!prev || cleaned.length > prev.cleaned.length) {
+                                    g.entriesByDigest.set(digest, {
                                         h: {
                                             dictName: h.dictName,
                                             dictId: h.dictId,
@@ -466,7 +474,7 @@ export async function mergeDictPrepReferencesFromPlans(
                                         digest,
                                         term,
                                         dictIdForLegacy: dict.id,
-                                    };
+                                    });
                                 }
                             }
                         }
@@ -474,31 +482,42 @@ export async function mergeDictPrepReferencesFromPlans(
                 }
             }
 
-            if (best) {
-                const legacyKey = buildDedupKeyLegacy(best.dictIdForLegacy, best.term, mode);
-                const header = `【本地词典】${best.h.dictName}｜${best.h.matchedKey}`;
-                const fingerprint = `${header}\n\n${best.cleaned}`;
-                const beginTag = buildLocalDictEntryBeginTag(best.digest);
-                if (!reference.includes(beginTag) && !reference.includes(fingerprint) && !reference.includes(legacyKey)) {
-                    const block = formatReferenceBlockV2({
-                        dictName: best.h.dictName,
-                        dictId: best.h.dictId,
-                        queryTerm: best.h.queryTerm,
-                        matchedKey: best.h.matchedKey,
-                        mode: best.h.mode,
-                        definition: best.cleaned,
-                        digest: best.digest,
-                    });
-                    reference = reference ? `${reference}\n\n${block}` : block;
-                    resultItem.hits.push({
-                        pointId: p.pointId,
-                        dictId: best.h.dictId,
-                        queryTerm: best.h.queryTerm,
-                        matchedKey: best.h.matchedKey,
-                        mode: best.h.mode,
-                    });
-                    totalHits++;
+            // 选出“最长的一组”
+            const bestGroup = [...groups.values()].sort((a, b) => b.groupLen - a.groupLen)[0];
+            if (!bestGroup) {
+                continue;
+            }
+
+            const picked = [...bestGroup.entriesByDigest.values()]
+                .sort((a, b) => b.cleaned.length - a.cleaned.length)
+                .slice(0, MAX_ENTRIES_PER_GROUP);
+
+            for (const one of picked) {
+                const legacyKey = buildDedupKeyLegacy(one.dictIdForLegacy, one.term, mode);
+                const header = `【本地词典】${one.h.dictName}｜${one.h.matchedKey}`;
+                const fingerprint = `${header}\n\n${one.cleaned}`;
+                const beginTag = buildLocalDictEntryBeginTag(one.digest);
+                if (reference.includes(beginTag) || reference.includes(fingerprint) || reference.includes(legacyKey)) {
+                    continue;
                 }
+                const block = formatReferenceBlockV2({
+                    dictName: one.h.dictName,
+                    dictId: one.h.dictId,
+                    queryTerm: one.h.queryTerm,
+                    matchedKey: one.h.matchedKey,
+                    mode: one.h.mode,
+                    definition: one.cleaned,
+                    digest: one.digest,
+                });
+                reference = reference ? `${reference}\n\n${block}` : block;
+                resultItem.hits.push({
+                    pointId: p.pointId,
+                    dictId: one.h.dictId,
+                    queryTerm: one.h.queryTerm,
+                    matchedKey: one.h.matchedKey,
+                    mode: one.h.mode,
+                });
+                totalHits++;
             }
         }
 

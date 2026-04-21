@@ -1351,7 +1351,8 @@
     "test": "vitest run",
     "lint": "eslint src --ext ts",
     "package-vsix": "npx vsce package",
-    "publish": "npx vsce publish"
+    "publish": "npx vsce publish",
+    "mdict:debug": "node scripts/mdict-debug.js"
   },
   "dependencies": {
     "@google/genai": "^0.7.0",

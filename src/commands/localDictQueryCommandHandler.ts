@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ErrorUtils } from '../utils';
 import { resolveLocalDictConfigs, ensureDictFilesExist } from '../localDict/dictConfig';
 import { MdictClient } from '../localDict/mdictClient';
+import { stripHtmlToText } from '../localDict/htmlToText';
 
 export class LocalDictQueryCommandHandler {
     public async handleQuerySelectionCommand(
@@ -60,23 +61,28 @@ export class LocalDictQueryCommandHandler {
                 dictName: string;
                 matchedKey: string;
                 definition: string;
+                entryIndex: number; // 1-based within the same dict+key query
             }> = [];
 
             for (const d of targets) {
-                const hit = await client.lookup(d, term, 'exact', {
+                const many = await client.lookupMany(d, term, 'exact', {
                     prefixMaxCandidates: 0,
                     minPrefixLength: 999,
                     maxDefinitionChars,
                     cacheEnabled,
                     cacheTtlHours,
                 });
-                if (hit) {
-                    hits.push({
-                        dictId: hit.dictId,
-                        dictName: hit.dictName,
-                        matchedKey: hit.matchedKey,
-                        definition: hit.definition,
-                    });
+                if (many.length > 0) {
+                    for (let i = 0; i < many.length; i++) {
+                        const hit = many[i];
+                        hits.push({
+                            dictId: hit.dictId,
+                            dictName: hit.dictName,
+                            matchedKey: hit.matchedKey,
+                            definition: hit.definition,
+                            entryIndex: i + 1,
+                        });
+                    }
                 }
             }
 
@@ -91,7 +97,7 @@ export class LocalDictQueryCommandHandler {
 
 function buildMarkdownResult(
     term: string,
-    hits: Array<{ dictId: string; dictName: string; matchedKey: string; definition: string }>
+    hits: Array<{ dictId: string; dictName: string; matchedKey: string; definition: string; entryIndex: number }>
 ): string {
     const lines: string[] = [];
     lines.push(`# 本地词典查询`);
@@ -107,12 +113,13 @@ function buildMarkdownResult(
     }
 
     for (const h of hits) {
-        lines.push(`## ${escapeMd(h.dictName)}（${escapeMd(h.dictId)}）`);
+        const suffix = hits.filter((x) => x.dictId === h.dictId).length > 1 ? ` #${h.entryIndex}` : '';
+        lines.push(`## ${escapeMd(h.dictName)}（${escapeMd(h.dictId)}）${suffix}`);
         lines.push('');
         lines.push(`- 词条：**${escapeMd(h.matchedKey)}**`);
         lines.push('');
-        // 释义通常为 HTML，保留原样，便于复制到 reference
-        lines.push(h.definition);
+        // 与“查词并入 JSON”流程保持一致：清理 HTML 后输出净文本，避免标签间内容粘连
+        lines.push(stripHtmlToText(h.definition));
         lines.push('');
     }
     return lines.join('\n');

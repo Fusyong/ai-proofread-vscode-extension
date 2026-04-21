@@ -10,7 +10,8 @@ dist/sql-wasm.[0-9a-f]*.js
 **/.eslintrc.json
 **/*.map
 **/*.ts
-test
+test/**
+scripts/**
 *.code-workspace
 *.psd
 *.vsix

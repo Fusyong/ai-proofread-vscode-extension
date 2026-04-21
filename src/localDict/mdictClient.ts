@@ -147,10 +147,12 @@ export class MdictClient {
             if (!res) return null;
             if (Array.isArray(res)) {
                 // mixed mode: array of { keyText, definition }
-                const exact = res.find((x) => x?.keyText === term && typeof x?.definition === 'string');
-                if (exact) return { matchedKey: exact.keyText, definition: exact.definition };
-                const first = res.find((x) => typeof x?.definition === 'string' && typeof x?.keyText === 'string');
-                return first ? { matchedKey: first.keyText, definition: first.definition } : null;
+                const exact = res.find((x) => (x?.keyText ?? x?.key) === term && typeof x?.definition === 'string');
+                if (exact) return { matchedKey: exact.keyText ?? exact.key, definition: exact.definition };
+                const first = res.find(
+                    (x) => typeof x?.definition === 'string' && (typeof x?.keyText === 'string' || typeof x?.key === 'string')
+                );
+                return first ? { matchedKey: first.keyText ?? first.key, definition: first.definition } : null;
             }
             if (typeof res.definition === 'string' && typeof res.keyText === 'string') {
                 // exact match expected
@@ -171,9 +173,13 @@ export class MdictClient {
             if (!res) return [];
             if (Array.isArray(res)) {
                 const out: Array<{ matchedKey: string; definition: string }> = [];
+                const termCmp = normalizeForCompare(term);
                 for (const x of res) {
-                    if (x?.keyText !== term) continue;
-                    const keyText = x.keyText;
+                    const keyText = typeof x?.keyText === 'string' ? x.keyText : typeof x?.key === 'string' ? x.key : '';
+                    if (!keyText) continue;
+                    // 有些词典同一“显示词条”可能在底层 keyText 含不可见字符/空白差异（如 NBSP/零宽空格）
+                    // 这里用更宽松的比较，以便返回同名多条
+                    if (normalizeForCompare(keyText) !== termCmp) continue;
                     const defDirect = typeof x?.definition === 'string' ? x.definition : '';
                     if (defDirect) {
                         out.push({ matchedKey: keyText, definition: defDirect });
@@ -182,15 +188,46 @@ export class MdictClient {
                     // 有些词典返回的是索引项，需要用 offset 解析 definition
                     const rofset = x?.rofset ?? x?.recordStartOffset;
                     if (typeof rofset === 'number') {
-                        const def = mdict.parse_defination(keyText, rofset);
-                        if (typeof def === 'string' && def) {
-                            out.push({ matchedKey: keyText, definition: def });
-                        }
+                        const data = mdict.parse_defination(keyText, rofset);
+                        const def = extractDefinition(data);
+                        if (def) out.push({ matchedKey: keyText, definition: def });
                     }
                 }
                 return out;
             }
-            if (typeof res.definition === 'string' && typeof res.keyText === 'string') {
+            if (typeof res?.definition === 'string' && typeof res?.keyText === 'string') {
+                // mdict-js 在某些词典（如辞海7）会对重复 key 只返回第一条。
+                // 若底层已缓存 keyList，可尝试枚举同 key 的多条记录并按 offset 解码。
+                const keyList: any[] | undefined = Array.isArray((mdict as any)?.keyList) ? (mdict as any).keyList : undefined;
+                if (keyList && keyList.length > 0) {
+                    const termCmp = normalizeForCompare(term);
+                    const dups = keyList.filter((k) => normalizeForCompare(k?.keyText) === termCmp);
+                    if (dups.length > 1) {
+                        const out: Array<{ matchedKey: string; definition: string }> = [];
+                        for (const k of dups) {
+                            const keyText = String(k?.keyText ?? '');
+                            const startoffset = k?.recordStartOffset;
+                            const nextStart = k?.nextRecordStartOffset;
+                            if (typeof startoffset !== 'number' || typeof nextStart !== 'number') continue;
+
+                            // parse_defination 在重复 key 的“后续条目”上会因为 nextStart 计算方式导致返回空串；
+                            // 这里直接调用内部解码函数，并显式传入 nextStart。
+                            try {
+                                const rid = typeof (mdict as any)._reduceRecordBlock === 'function' ? (mdict as any)._reduceRecordBlock(startoffset) : null;
+                                const data =
+                                    rid != null && typeof (mdict as any)._decodeRecordBlockByRBID === 'function'
+                                        ? (mdict as any)._decodeRecordBlockByRBID(rid, keyText, startoffset, nextStart)
+                                        : mdict.parse_defination(keyText, startoffset);
+                                const def = extractDefinition(data);
+                                if (def) out.push({ matchedKey: keyText, definition: def });
+                            } catch {
+                                // ignore single entry failures
+                            }
+                        }
+                        if (out.length > 0) return out;
+                    }
+                }
+
                 return res.keyText === term ? [{ matchedKey: res.keyText, definition: res.definition }] : [];
             }
             return [];
@@ -211,22 +248,25 @@ export class MdictClient {
             const list = mdict.prefix(term);
             if (!Array.isArray(list) || list.length === 0) return null;
             const candidates = list.slice(0, Math.max(1, maxCandidates));
-            const exact = candidates.find((x: any) => x?.keyText === term);
+            const getKey = (x: any): string => (typeof x?.keyText === 'string' ? x.keyText : typeof x?.key === 'string' ? x.key : '');
+            const exact = candidates.find((x: any) => getKey(x) === term);
             const picked = exact ?? candidates[0];
-            if (!picked?.keyText) return null;
+            const pickedKey = getKey(picked);
+            if (!pickedKey) return null;
 
-            if (typeof picked.definition === 'string') {
-                return { matchedKey: picked.keyText, definition: picked.definition };
+            if (typeof picked?.definition === 'string') {
+                return { matchedKey: pickedKey, definition: picked.definition };
             }
-            const rofset = picked.rofset ?? picked.recordStartOffset;
+            const rofset = picked?.rofset ?? picked?.recordStartOffset;
             if (typeof rofset === 'number') {
-                const def = mdict.parse_defination(picked.keyText, rofset);
-                if (typeof def === 'string' && def) return { matchedKey: picked.keyText, definition: def };
+                const data = mdict.parse_defination(pickedKey, rofset);
+                const def = extractDefinition(data);
+                if (def) return { matchedKey: pickedKey, definition: def };
             }
             // fallback: try lookup on picked key
-            const res = mdict.lookup(picked.keyText);
+            const res = mdict.lookup(pickedKey);
             if (res && typeof res.definition === 'string') {
-                return { matchedKey: res.keyText ?? picked.keyText, definition: res.definition };
+                return { matchedKey: res.keyText ?? pickedKey, definition: res.definition };
             }
             return null;
         } catch (e) {
@@ -266,6 +306,30 @@ export class MdictClient {
 
 function normalizeTerm(s: string): string {
     return (s ?? '').trim();
+}
+
+function extractDefinition(data: any): string {
+    if (!data) return '';
+    if (typeof data === 'string') return data;
+    if (typeof data?.definition === 'string') return data.definition;
+    return '';
+}
+
+function normalizeForCompare(s: string): string {
+    const raw = String(s ?? '');
+    // 去掉常见“看不见/不稳定”的空白字符，并做 Unicode 兼容归一化，提升同名多条命中率
+    const noSpace = raw
+        .replace(/\s+/g, '')
+        .replace(/\u00A0/g, '') // NBSP
+        .replace(/\u200B/g, '') // zero-width space
+        .replace(/\u200C/g, '') // zero-width non-joiner
+        .replace(/\u200D/g, '') // zero-width joiner
+        .replace(/\uFEFF/g, ''); // zero-width no-break space (BOM)
+    try {
+        return noSpace.normalize('NFKC');
+    } catch {
+        return noSpace;
+    }
 }
 
 function limitText(s: string, maxChars: number): string {
