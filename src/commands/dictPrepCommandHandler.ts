@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { getDictPrepPromptDisplayName } from '../localDict/dictPrepPromptManager';
-import { mergeDictPrepReferencesFromPlans, planDictPrepQueriesOnly } from '../localDict/dictPrepRunner';
+import { mergeDictPrepReferencesFromPlans, planDictPrepQueriesOnly, type DictPrepResultMergeMode } from '../localDict/dictPrepRunner';
 import { ConfigManager, ErrorUtils } from '../utils';
 import { ProcessResult, SplitResult, WebviewManager } from '../ui/webviewManager';
 import { ProgressTracker } from '../progressTracker';
@@ -61,8 +61,6 @@ export class DictPrepCommandHandler {
                 if (!ok) return;
                 await this.runDictPrepLlmWithUi(jsonFilePath, context);
             } else if (picked.value === 'local') {
-                const ok = await this.showDictPrepLocalConfirmation(jsonFilePath, parsed.length);
-                if (!ok) return;
                 await this.runDictPrepLocalWithUi(jsonFilePath, context);
             } else {
                 const ok = await this.showDictPrepContinuousConfirmation(jsonFilePath, parsed.length, context);
@@ -106,8 +104,6 @@ export class DictPrepCommandHandler {
                 vscode.window.showErrorMessage('JSON 文件格式不正确。');
                 return;
             }
-            const ok = await this.showDictPrepLocalConfirmation(jsonFilePath, parsed.length);
-            if (!ok) return;
             await this.runDictPrepLocalWithUi(jsonFilePath, context);
         } catch (e) {
             ErrorUtils.showError(e, '本地查词合并失败：');
@@ -162,12 +158,12 @@ export class DictPrepCommandHandler {
         await vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
-                title: '词典准备：LLM 规划中…',
+                title: '查词准备：LLM 规划中…',
                 cancellable: true,
             },
             async (progress, token) => {
                 let progressTracker: ProgressTracker | undefined = new ProgressTracker(jsonContent, (pt) => {
-                    this.pushDictPrepPanel(jsonFilePath, context, '词典准备：LLM 生成查词计划中…', pt);
+                    this.pushDictPrepPanel(jsonFilePath, context, '查词准备：LLM 生成查词计划中…', pt);
                 });
 
                 try {
@@ -197,22 +193,24 @@ export class DictPrepCommandHandler {
     private async runDictPrepLocalWithUi(jsonFilePath: string, context: vscode.ExtensionContext): Promise<void> {
         const raw = fs.readFileSync(jsonFilePath, 'utf8');
         const jsonContent = JSON.parse(raw) as Array<{ target: string }>;
+        const mergeMode = await this.pickDictPrepResultMergeMode(jsonFilePath);
 
         await vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
-                title: '词典准备：本地查词中…',
+                title: '查词准备：本地查词中…',
                 cancellable: true,
             },
             async (progress, token) => {
                 let progressTracker: ProgressTracker | undefined = new ProgressTracker(jsonContent, (pt) => {
-                    this.pushDictPrepPanel(jsonFilePath, context, '词典准备：本地查词并写入 reference…', pt);
+                    this.pushDictPrepPanel(jsonFilePath, context, '查词准备：本地查词并写入 reference…', pt);
                 });
 
                 try {
                     const stats = await mergeDictPrepReferencesFromPlans({
                         jsonFilePath,
                         context,
+                        mergeMode,
                         onProgress: (m) => {
                             progress.report({ message: m.slice(0, 120) });
                         },
@@ -233,6 +231,18 @@ export class DictPrepCommandHandler {
         );
     }
 
+    private async pickDictPrepResultMergeMode(_jsonFilePath: string): Promise<DictPrepResultMergeMode> {
+        const picked = await vscode.window.showQuickPick(
+            [
+                { label: '新建一次查词结果（保留历史）', id: 'append_new_run' as const, description: '推荐：每次运行作为一条 run 记录' },
+                { label: '覆盖旧的查词结果', id: 'overwrite' as const, description: '清空旧 runs，仅保留本次结果' },
+                { label: '追加到上一次结果（允许重复）', id: 'append_to_last_run' as const, description: '把本次结果追加到最后一次 run' },
+            ],
+            { title: '查词结果合并方式', ignoreFocusOut: true }
+        );
+        return picked?.id ?? 'append_new_run';
+    }
+
     private async runDictPrepBothWithUi(jsonFilePath: string, context: vscode.ExtensionContext): Promise<void> {
         const raw = fs.readFileSync(jsonFilePath, 'utf8');
         const jsonContent = JSON.parse(raw) as Array<{ target: string }>;
@@ -240,13 +250,13 @@ export class DictPrepCommandHandler {
         await vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
-                title: '词典准备：执行中…',
+                title: '查词准备：执行中…',
                 cancellable: true,
             },
             async (progress, token) => {
                 try {
                     let pt1: ProgressTracker | undefined = new ProgressTracker(jsonContent, (p) => {
-                        this.pushDictPrepPanel(jsonFilePath, context, '词典准备（1/2）：LLM 生成查词计划…', p);
+                        this.pushDictPrepPanel(jsonFilePath, context, '查词准备（1/2）：LLM 生成查词计划…', p);
                     });
                     const s1 = await planDictPrepQueriesOnly({
                         jsonFilePath,
@@ -265,7 +275,7 @@ export class DictPrepCommandHandler {
                     progress.report({ message: '规划完成，开始本地查词…' });
 
                     let pt2: ProgressTracker | undefined = new ProgressTracker(jsonContent, (p) => {
-                        this.pushDictPrepPanel(jsonFilePath, context, '词典准备（2/2）：本地查词并写入 reference…', p);
+                        this.pushDictPrepPanel(jsonFilePath, context, '查词准备（2/2）：本地查词并写入 reference…', p);
                     });
                     const s2 = await mergeDictPrepReferencesFromPlans({
                         jsonFilePath,
@@ -278,7 +288,7 @@ export class DictPrepCommandHandler {
                     pt2 = undefined;
 
                     vscode.window.showInformationMessage(
-                        `词典准备完成：规划 ${s1.totalPointsPlanned} 个查询点；查词 ${s2.totalLookupsExecuted} 次，命中 ${s2.totalHits} 条。`
+                        `查词准备完成：规划 ${s1.totalPointsPlanned} 个查询点；查词 ${s2.totalLookupsExecuted} 次，命中 ${s2.totalHits} 条。`
                     );
                 } finally {
                     this.webviewManager.refreshPanelContent(context);
@@ -320,7 +330,7 @@ export class DictPrepCommandHandler {
         );
 
         const msg = [
-            '📋 词典准备 — LLM 生成查词计划',
+            '📋 查词准备 — LLM 生成查词计划',
             '',
             `📁 文件: ${jsonFilePath}`,
             `📊 片段数: ${totalCount}`,
@@ -336,32 +346,6 @@ export class DictPrepCommandHandler {
             `   • 重试: ${retryDelay} 秒间隔，最多 ${retryAttempts} 次`,
             '',
             '本步仅调用 LLM 写入 .dictprep.json，不修改各段 reference。',
-            '',
-            '是否开始？',
-        ].join('\n');
-
-        const result = await vscode.window.showInformationMessage(msg, { modal: true }, '确认开始');
-        return result === '确认开始';
-    }
-
-    private async showDictPrepLocalConfirmation(jsonFilePath: string, totalCount: number): Promise<boolean> {
-        const config = vscode.workspace.getConfiguration('ai-proofread');
-        const maxLookups = config.get<number>('dictPrep.maxTotalLookupsPerRun', 200);
-        const maxDef = config.get<number>('dictPrep.maxDefinitionChars', 6000);
-        const cacheOn = config.get<boolean>('dictPrep.cache.enabled', true);
-
-        const msg = [
-            '📋 词典准备 — 查词并入 JSON',
-            '',
-            `📁 文件: ${jsonFilePath}`,
-            `📊 片段数: ${totalCount}`,
-            '',
-            '⚙️ 参数:',
-            `   • 总查词次数上限: ${maxLookups}`,
-            `   • 释义最大长度: ${maxDef}`,
-            `   • 词典缓存: ${cacheOn ? '开' : '关'}`,
-            '',
-            '依赖已存在的「LLM 规划」过程文件（.dictprep.json，stage=llm_planned）。',
             '',
             '是否开始？',
         ].join('\n');
@@ -400,7 +384,7 @@ export class DictPrepCommandHandler {
         );
 
         const msg = [
-            '📋 词典准备 — 两步连续',
+            '📋 查词准备 — 两步连续',
             '',
             `📁 文件: ${jsonFilePath}`,
             `📊 片段数: ${totalCount}`,

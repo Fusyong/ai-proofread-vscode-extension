@@ -1,10 +1,12 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
+import { createHash } from 'crypto';
 import { FilePathUtils, Logger } from '../utils';
 import { ensureDictFilesExist, pickDefaultDictId, resolveLocalDictConfigs, type ResolvedLocalDictConfigItem } from './dictConfig';
 import { MdictClient, type LookupMode } from './mdictClient';
 import { buildDictPrepSystemPrompt, buildDictPrepUserPrompt, parseDictPrepPlan, type DictPrepLookupPoint } from './dictPrepPrompt';
 import { llmGenerateJson } from './dictPrepLlm';
+import { convertOpencc } from '../opencc';
 
 export interface DictPrepRunStats {
     totalItems: number;
@@ -14,9 +16,13 @@ export interface DictPrepRunStats {
     totalPointsPlanned: number;
 }
 
-export interface DictPrepProcessItem {
+export interface DictPrepPlanItem {
     index: number; // 1-based
     plannedPoints: DictPrepLookupPoint[];
+}
+
+export interface DictPrepResultItem {
+    index: number; // 1-based
     hits: Array<{
         pointId: string;
         dictId: string;
@@ -27,19 +33,30 @@ export interface DictPrepProcessItem {
     errors: string[];
 }
 
-/** 过程文件阶段：llm_planned = 仅完成 LLM 规划；local_merged = 已写入 reference */
-export type DictPrepProcessStage = 'llm_planned' | 'local_merged';
+export type DictPrepResultMergeMode = 'overwrite' | 'append_new_run' | 'append_to_last_run';
 
-export interface DictPrepProcessFile {
-    version: '0.2.0';
-    stage: DictPrepProcessStage;
-    sourceJsonPath: string;
+export interface DictPrepResultRun {
+    runId: string;
     startedAt: string;
-    llmFinishedAt?: string;
     finishedAt?: string;
-    dicts: Array<{ id: string; name: string; mdxPath: string }>;
     stats?: DictPrepRunStats;
-    items: DictPrepProcessItem[];
+    items: DictPrepResultItem[];
+}
+
+export interface DictPrepProcessFileV030 {
+    version: '0.3.0';
+    sourceJsonPath: string;
+    dicts: Array<{ id: string; name: string; mdxPath: string }>;
+    plan: {
+        runId: string;
+        startedAt: string;
+        finishedAt?: string;
+        stats?: DictPrepRunStats;
+        items: DictPrepPlanItem[];
+    };
+    result?: {
+        runs: DictPrepResultRun[];
+    };
 }
 
 export interface DictPrepProgressHooks {
@@ -49,6 +66,53 @@ export interface DictPrepProgressHooks {
     /** 每完成一条的本地查词后调用（0-based 索引） */
     onAfterItemMerged?: (itemIndex: number) => void;
     token?: vscode.CancellationToken;
+}
+
+function sanitizeLookupTerm(term: string): string {
+    // 查词阶段：统一移除候选词中的所有空白字符（如“李 白”→“李白”）
+    return String(term ?? '').replace(/\s+/g, '').trim();
+}
+
+function buildLookupVariantsForTraditional(term: string): string[] {
+    const base = sanitizeLookupTerm(term);
+    if (!base) return [];
+    const t = convertOpencc(base, 'cn', 't');
+    if (t && t !== base) {
+        return [base, t];
+    }
+    return [base];
+}
+
+function stripHtmlToText(html: string): string {
+    const s = String(html ?? '');
+    if (!s) return s;
+    let out = s.replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
+    out = out.replace(/<\s*br\s*\/?\s*>/gi, '\n');
+    out = out.replace(/<\s*\/\s*p\s*>/gi, '\n');
+    out = out.replace(/<\s*\/\s*div\s*>/gi, '\n');
+    out = out.replace(/<[^>]+>/g, '');
+    out = out
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&amp;/gi, '&')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/g, "'");
+    out = out.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    out = out.replace(/\n{3,}/g, '\n\n');
+    return out.trim();
+}
+
+function limitCleanText(s: string, maxChars: number): string {
+    const text = String(s ?? '');
+    if (!text) return text;
+    if (!maxChars || maxChars <= 0) return text;
+    if (text.length <= maxChars) return text;
+    return text.slice(0, maxChars) + '\n\n[...已截断...]';
+}
+
+function sha1(text: string): string {
+    return createHash('sha1').update(text).digest('hex').slice(0, 12);
 }
 
 function resolveSystemPrompt(context: vscode.ExtensionContext): string {
@@ -128,13 +192,22 @@ export async function planDictPrepQueriesOnly(
     const processPath = FilePathUtils.getFilePath(params.jsonFilePath, '.dictprep', '.json');
     const logPath = FilePathUtils.getFilePath(params.jsonFilePath, '.dictprep', '.log');
 
-    const proc: DictPrepProcessFile = {
-        version: '0.2.0',
-        stage: 'llm_planned',
+    const nowIso = new Date().toISOString();
+    const planRunId = `plan-${nowIso}`;
+    const existing = fs.existsSync(processPath) ? (JSON.parse(fs.readFileSync(processPath, 'utf8')) as any) : undefined;
+    const existingRuns: DictPrepResultRun[] =
+        existing?.version === '0.3.0' && Array.isArray(existing?.result?.runs) ? (existing.result.runs as DictPrepResultRun[]) : [];
+
+    const proc: DictPrepProcessFileV030 = {
+        version: '0.3.0',
         sourceJsonPath: params.jsonFilePath,
-        startedAt: new Date().toISOString(),
         dicts: dicts.map((d) => ({ id: d.id, name: d.name, mdxPath: d.mdxPathResolved })),
-        items: [],
+        plan: {
+            runId: planRunId,
+            startedAt: nowIso,
+            items: [],
+        },
+        result: { runs: existingRuns },
     };
     fs.writeFileSync(processPath, JSON.stringify(proc, null, 2), 'utf8');
 
@@ -177,8 +250,8 @@ export async function planDictPrepQueriesOnly(
         const planned = plan.lookups.slice(0, maxPointsPerItem);
         totalPointsPlanned += planned.length;
 
-        const processItem: DictPrepProcessItem = { index: itemNo, plannedPoints: planned, hits: [], errors: [] };
-        proc.items.push(processItem);
+        const planItem: DictPrepPlanItem = { index: itemNo, plannedPoints: planned };
+        proc.plan.items.push(planItem);
         fs.writeFileSync(processPath, JSON.stringify(proc, null, 2), 'utf8');
         processedItems++;
         params.onAfterItemPlanned?.(idx);
@@ -191,9 +264,8 @@ export async function planDictPrepQueriesOnly(
         totalHits: 0,
         totalPointsPlanned,
     };
-    proc.stats = stats;
-    proc.llmFinishedAt = new Date().toISOString();
-    proc.stage = 'llm_planned';
+    proc.plan.stats = stats;
+    proc.plan.finishedAt = new Date().toISOString();
     fs.writeFileSync(processPath, JSON.stringify(proc, null, 2), 'utf8');
 
     appendLog(
@@ -213,6 +285,7 @@ export async function mergeDictPrepReferencesFromPlans(
     params: {
         jsonFilePath: string;
         context: vscode.ExtensionContext;
+        mergeMode?: DictPrepResultMergeMode;
     } & DictPrepProgressHooks
 ): Promise<DictPrepRunStats> {
     const logger = Logger.getInstance();
@@ -237,17 +310,27 @@ export async function mergeDictPrepReferencesFromPlans(
     const logPath = FilePathUtils.getFilePath(params.jsonFilePath, '.dictprep', '.log');
 
     if (!fs.existsSync(processPath)) {
-        throw new Error('未找到词典准备过程文件（.dictprep.json）。请先执行「LLM 生成查词计划」。');
+        throw new Error('未找到查词准备过程文件（.dictprep.json）。请先执行「LLM 生成查词计划」。');
     }
 
-    const procRaw = JSON.parse(fs.readFileSync(processPath, 'utf8')) as DictPrepProcessFile & { version?: string };
-    if (procRaw.version !== '0.2.0' || procRaw.stage !== 'llm_planned') {
-        throw new Error(
-            '当前 .dictprep.json 不是「仅 LLM 规划」状态。请重新执行「LLM 生成查词计划」，或删除旧过程文件后重试。'
-        );
+    const procAny = JSON.parse(fs.readFileSync(processPath, 'utf8')) as any;
+    if (procAny?.version !== '0.3.0') {
+        throw new Error('过程文件版本不匹配：需要 0.3.0。请重新执行「LLM 生成查词计划」。');
+    }
+    if (!Array.isArray(procAny?.plan?.items)) {
+        throw new Error('过程文件中未找到查词规划（plan.items）。请先执行「LLM 生成查词计划」。');
     }
 
-    const proc = procRaw as DictPrepProcessFile;
+    const planItems: DictPrepPlanItem[] = procAny.plan.items as DictPrepPlanItem[];
+    const existingRuns: DictPrepResultRun[] = Array.isArray(procAny?.result?.runs) ? (procAny.result.runs as DictPrepResultRun[]) : [];
+
+    const mergeMode: DictPrepResultMergeMode = params.mergeMode ?? 'append_new_run';
+    const nowIso = new Date().toISOString();
+    const run: DictPrepResultRun = {
+        runId: `run-${nowIso}`,
+        startedAt: nowIso,
+        items: [],
+    };
 
     const raw = fs.readFileSync(params.jsonFilePath, 'utf8');
     const items = JSON.parse(raw);
@@ -264,22 +347,21 @@ export async function mergeDictPrepReferencesFromPlans(
 
     appendLog(logPath, `Phase local Start: ${new Date().toLocaleString()}`, params.onProgress);
 
-    const plannedIndexSet = new Set(proc.items.map((p) => p.index - 1));
+    const plannedIndexSet = new Set(planItems.map((p) => p.index - 1));
     for (let i = 0; i < items.length; i++) {
         if (!plannedIndexSet.has(i)) {
             params.onAfterItemMerged?.(i);
         }
     }
 
-    for (const processItem of proc.items) {
+    for (const planItem of planItems) {
         if (params.token?.isCancellationRequested) {
             break;
         }
 
-        const idx = processItem.index - 1;
+        const idx = planItem.index - 1;
         if (idx < 0 || idx >= items.length) {
-            processItem.errors.push(`条目 index=${processItem.index} 超出 JSON 范围`);
-            fs.writeFileSync(processPath, JSON.stringify(proc, null, 2), 'utf8');
+            run.items.push({ index: planItem.index, hits: [], errors: [`条目 index=${planItem.index} 超出 JSON 范围`] });
             continue;
         }
 
@@ -290,66 +372,133 @@ export async function mergeDictPrepReferencesFromPlans(
             continue;
         }
 
-        totalPointsPlanned += processItem.plannedPoints.length;
-        processItem.hits = [];
-        processItem.errors = [];
+        totalPointsPlanned += planItem.plannedPoints.length;
+        const resultItem: DictPrepResultItem = { index: planItem.index, hits: [], errors: [] };
 
         let reference: string = typeof item.reference === 'string' ? item.reference : '';
-        const planned = processItem.plannedPoints;
+        const planned = planItem.plannedPoints;
 
         for (const p of planned) {
             if (totalLookupsExecuted >= maxTotalLookupsPerRun) {
-                processItem.errors.push(`达到总查词上限 ${maxTotalLookupsPerRun}，中止后续查询点`);
+                resultItem.errors.push(`达到总查词上限 ${maxTotalLookupsPerRun}，中止后续查询点`);
                 break;
             }
             const mode: LookupMode = 'exact';
-            const candidates = (p.candidates ?? []).slice(0, 3);
+            const candidates = (p.candidates ?? [])
+                .map((c) => sanitizeLookupTerm(c))
+                .filter((c) => !!c)
+                .slice(0, 3);
             if (candidates.length === 0) continue;
 
             const preferredDictId = p.dictId && dicts.some((d) => d.id === p.dictId) ? p.dictId : null;
             const dictTryList = buildDictTryList(dicts, preferredDictId, defaultDictId);
             if (dictTryList.length === 0) {
-                processItem.errors.push(`pointId=${p.pointId}: 未能确定词典`);
+                resultItem.errors.push(`pointId=${p.pointId}: 未能确定词典`);
                 continue;
             }
 
-            let hitFound = false;
+            // 对该 point：不在命中后立即停止；遍历所有候选/词典/变体后取“净文本最长”的那条
+            let best:
+                | {
+                      h: { dictName: string; dictId: string; queryTerm: string; matchedKey: string; mode: LookupMode };
+                      cleaned: string;
+                      digest: string;
+                      term: string;
+                      dictIdForLegacy: string;
+                  }
+                | undefined;
             for (const dict of dictTryList) {
                 if (totalLookupsExecuted >= maxTotalLookupsPerRun) break;
 
                 for (const c of candidates) {
                     if (totalLookupsExecuted >= maxTotalLookupsPerRun) break;
-                    totalLookupsExecuted++;
 
-                    const dedupKey = buildDedupKey(dict.id, c, mode);
-                    if (reference.includes(dedupKey)) {
-                        continue;
-                    }
+                    // 同一候选词：先查原样（去空白），未命中再查繁体（若不同）
+                    const variants = buildLookupVariantsForTraditional(c);
+                    for (const term of variants) {
+                        if (totalLookupsExecuted >= maxTotalLookupsPerRun) break;
+                        totalLookupsExecuted++;
 
-                    const hit = await client.lookup(dict, c, mode, {
-                        prefixMaxCandidates: 0,
-                        minPrefixLength: 999,
-                        maxDefinitionChars,
-                        cacheEnabled,
-                        cacheTtlHours,
-                    });
-                    if (hit) {
-                        const block = formatReferenceBlock(hit, dedupKey);
-                        reference = reference ? `${reference}\n\n${block}` : block;
-                        processItem.hits.push({
-                            pointId: p.pointId,
-                            dictId: hit.dictId,
-                            queryTerm: hit.queryTerm,
-                            matchedKey: hit.matchedKey,
-                            mode: hit.mode,
-                        });
-                        totalHits++;
-                        hitFound = true;
-                        break;
+                        appendLog(
+                            logPath,
+                            `Lookup ${totalLookupsExecuted}/${maxTotalLookupsPerRun}: item=${planItem.index} pointId=${p.pointId} dict=${dict.id} term=${term}`,
+                            params.onProgress
+                        );
+
+                        let hits: Awaited<ReturnType<typeof client.lookupMany>> = [];
+                        try {
+                            hits = await client.lookupMany(dict, term, mode, {
+                                prefixMaxCandidates: 0,
+                                minPrefixLength: 999,
+                                maxDefinitionChars,
+                                cacheEnabled,
+                                cacheTtlHours,
+                            });
+                        } catch (e) {
+                            const msg = e instanceof Error ? e.message : String(e);
+                            resultItem.errors.push(`pointId=${p.pointId} dict=${dict.id} term=${term}: lookup failed: ${msg}`);
+                            appendLog(logPath, `Lookup ERROR: ${msg}`, params.onProgress);
+                            continue;
+                        }
+                        if (hits.length > 0) {
+                            for (const h of hits) {
+                                const cleaned = limitCleanText(stripHtmlToText(h.definition), maxDefinitionChars);
+                                const digest = sha1(`${h.matchedKey}\n${cleaned}`);
+
+                                const legacyKey = buildDedupKeyLegacy(dict.id, term, mode);
+                                const header = `【本地词典】${h.dictName}｜${h.matchedKey}`;
+                                const fingerprint = `${header}\n\n${cleaned}`;
+                                const beginTag = buildLocalDictEntryBeginTag(digest);
+                                if (reference.includes(beginTag) || reference.includes(fingerprint) || reference.includes(legacyKey)) {
+                                    continue;
+                                }
+
+                                if (!best || cleaned.length > best.cleaned.length) {
+                                    best = {
+                                        h: {
+                                            dictName: h.dictName,
+                                            dictId: h.dictId,
+                                            queryTerm: h.queryTerm,
+                                            matchedKey: h.matchedKey,
+                                            mode: h.mode,
+                                        },
+                                        cleaned,
+                                        digest,
+                                        term,
+                                        dictIdForLegacy: dict.id,
+                                    };
+                                }
+                            }
+                        }
                     }
                 }
+            }
 
-                if (hitFound) break;
+            if (best) {
+                const legacyKey = buildDedupKeyLegacy(best.dictIdForLegacy, best.term, mode);
+                const header = `【本地词典】${best.h.dictName}｜${best.h.matchedKey}`;
+                const fingerprint = `${header}\n\n${best.cleaned}`;
+                const beginTag = buildLocalDictEntryBeginTag(best.digest);
+                if (!reference.includes(beginTag) && !reference.includes(fingerprint) && !reference.includes(legacyKey)) {
+                    const block = formatReferenceBlockV2({
+                        dictName: best.h.dictName,
+                        dictId: best.h.dictId,
+                        queryTerm: best.h.queryTerm,
+                        matchedKey: best.h.matchedKey,
+                        mode: best.h.mode,
+                        definition: best.cleaned,
+                        digest: best.digest,
+                    });
+                    reference = reference ? `${reference}\n\n${block}` : block;
+                    resultItem.hits.push({
+                        pointId: p.pointId,
+                        dictId: best.h.dictId,
+                        queryTerm: best.h.queryTerm,
+                        matchedKey: best.h.matchedKey,
+                        mode: best.h.mode,
+                    });
+                    totalHits++;
+                }
             }
         }
 
@@ -357,8 +506,8 @@ export async function mergeDictPrepReferencesFromPlans(
             item.reference = reference;
         }
 
+        run.items.push(resultItem);
         fs.writeFileSync(params.jsonFilePath, JSON.stringify(items, null, 2), 'utf8');
-        fs.writeFileSync(processPath, JSON.stringify(proc, null, 2), 'utf8');
         processedItems++;
         params.onAfterItemMerged?.(idx);
     }
@@ -370,10 +519,35 @@ export async function mergeDictPrepReferencesFromPlans(
         totalHits,
         totalPointsPlanned,
     };
-    proc.stats = stats;
-    proc.stage = 'local_merged';
-    proc.finishedAt = new Date().toISOString();
-    fs.writeFileSync(processPath, JSON.stringify(proc, null, 2), 'utf8');
+    run.stats = stats;
+    run.finishedAt = new Date().toISOString();
+
+    const nextRuns = (() => {
+        if (mergeMode === 'overwrite') return [run];
+        if (mergeMode === 'append_to_last_run' && existingRuns.length > 0) {
+            const last = existingRuns[existingRuns.length - 1];
+            last.items.push(...run.items);
+            last.stats = run.stats;
+            last.finishedAt = run.finishedAt;
+            return existingRuns;
+        }
+        return [...existingRuns, run];
+    })();
+
+    const procOut: DictPrepProcessFileV030 = {
+        version: '0.3.0',
+        sourceJsonPath: params.jsonFilePath,
+        dicts: dicts.map((d) => ({ id: d.id, name: d.name, mdxPath: d.mdxPathResolved })),
+        plan: {
+            runId: String(procAny.plan?.runId ?? 'plan-unknown'),
+            startedAt: String(procAny.plan?.startedAt ?? ''),
+            finishedAt: procAny.plan?.finishedAt as any,
+            stats: procAny.plan?.stats as any,
+            items: planItems,
+        },
+        result: { runs: nextRuns },
+    };
+    fs.writeFileSync(processPath, JSON.stringify(procOut, null, 2), 'utf8');
 
     appendLog(
         logPath,
@@ -409,6 +583,21 @@ export async function prepareReferencesFromLocalDicts(
 }
 
 function buildDedupKey(dictId: string, term: string, mode: LookupMode): string {
+    const t = sanitizeLookupTerm(term);
+    return `<!-- ai-proofread:dictref dictId=${dictId} mode=${mode} term=${escapeAttr(t)} -->`;
+}
+
+function buildLocalDictEntryBeginTag(sha1Digest: string): string {
+    // 仅保留 sha1 作为轻量去重键；不写 dictId/dictName/headword 等元信息
+    return `<!-- ai-proofread:localDictEntry begin sha1=${sha1Digest} -->`;
+}
+
+function buildLocalDictEntryEndTag(): string {
+    return `<!-- ai-proofread:localDictEntry end -->`;
+}
+
+function buildDedupKeyLegacy(dictId: string, term: string, mode: LookupMode): string {
+    // 兼容旧版：曾把连续空白折叠为单空格（而非完全移除）
     const t = (term ?? '').trim().replace(/\s+/g, ' ');
     return `<!-- ai-proofread:dictref dictId=${dictId} mode=${mode} term=${escapeAttr(t)} -->`;
 }
@@ -423,6 +612,29 @@ function formatReferenceBlock(
 ): string {
     const header = `【本地词典】${hit.dictName}（${hit.dictId}） | mode=${hit.mode} | query=${hit.queryTerm} | hit=${hit.matchedKey}`;
     return [dedupKey, header, '', hit.definition, '<!-- ai-proofread:dictref end -->'].join('\n');
+}
+
+function formatReferenceBlockV2(
+    hit: {
+        dictName: string;
+        dictId: string;
+        queryTerm: string;
+        matchedKey: string;
+        mode: LookupMode;
+        definition: string;
+        digest: string;
+    },
+): string {
+    const begin = buildLocalDictEntryBeginTag(hit.digest);
+    // LLM 友好：仅保留来源与词头，去掉 query/mode 等“对校对无用”的元信息
+    const header = `【本地词典】${hit.dictName}｜${hit.matchedKey}`;
+    return [
+        begin,
+        header,
+        '',
+        hit.definition,
+        buildLocalDictEntryEndTag(),
+    ].join('\n');
 }
 
 function buildDictTryList(

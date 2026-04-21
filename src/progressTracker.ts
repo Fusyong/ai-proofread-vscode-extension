@@ -168,7 +168,7 @@ export class ProgressTracker {
         return `
             <div class="progress-container">
                 <div class="progress-header">
-                    <h4>校对进度</h4>
+                    <h4>处理进度</h4>
                     <div class="progress-stats-inline">
                         <span class="stat-item">段落: <span class="stat-value">${stats.completedItems}/${stats.totalItems} (${stats.progressPercentage.toFixed(1)}%)</span></span>
                         <span class="stat-item">字符: <span class="stat-value">${stats.completedChars}/${stats.totalChars} (${stats.charProgressPercentage.toFixed(1)}%)</span></span>

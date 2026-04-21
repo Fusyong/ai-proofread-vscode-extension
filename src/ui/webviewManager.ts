@@ -875,7 +875,7 @@ export class WebviewManager {
             const hasUnfinished = (nullCount ?? 0) > 0;
             proofreadSection = `
             <div class="process-section">
-                <h3>✏️ 校对结果</h3>
+                <h3>✏️ 处理结果</h3>
                 ${hasUnfinished ? `
                 <div class="warning-box">
                     ⚠️ 有 <strong>${nullCount}</strong> 条未完成校对（.proofread.json 中为 null）。重新校对时将只处理未完成的条目。
@@ -1095,7 +1095,7 @@ export class WebviewManager {
         const proofreadContent = result.proofreadResult ? this.generateProofreadResultContent(result.proofreadResult) : '';
         return `
             <div class="process-section">
-                <h3>✏️ 校对结果</h3>
+                <h3>✏️ 处理结果</h3>
                 ${progressHtml}
                 ${proofreadContent}
             </div>

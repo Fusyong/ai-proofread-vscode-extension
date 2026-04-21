@@ -95,6 +95,44 @@ export class MdictClient {
         };
     }
 
+    /**
+     * 返回同名多条的全部命中（目前仅 exact 支持多条；prefix 仍只返回 1 条）。
+     * 注意：为避免 globalState 过大，这里不做持久化缓存；如有需要可后续改为按条缓存。
+     */
+    public async lookupMany(
+        dict: ResolvedLocalDictConfigItem,
+        term: string,
+        mode: LookupMode,
+        options: {
+            prefixMaxCandidates: number;
+            minPrefixLength: number;
+            maxDefinitionChars: number;
+            cacheEnabled: boolean;
+            cacheTtlHours: number;
+        }
+    ): Promise<DictLookupHit[]> {
+        const queryTerm = term;
+        const normalized = normalizeTerm(term);
+        if (!normalized) return [];
+
+        const mdict = this.getOrCreateDict(dict.mdxPathResolved);
+        const hits = (() => {
+            if (mode === 'exact') return this.lookupExactMany(mdict, normalized);
+            const one = this.lookupPrefix(mdict, normalized, options.prefixMaxCandidates, options.minPrefixLength);
+            return one ? [one] : [];
+        })();
+
+        return hits.map((h) => ({
+            dictId: dict.id,
+            dictName: dict.name,
+            queryTerm,
+            matchedKey: h.matchedKey,
+            mode,
+            // 不在此处截断：词典释义往往是 HTML，后续会先清理 HTML 再按“净文本长度”截断
+            definition: h.definition,
+        }));
+    }
+
     private getOrCreateDict(mdxPathResolved: string): any {
         const existing = this.dictInstances.get(mdxPathResolved);
         if (existing) return existing;
@@ -124,6 +162,41 @@ export class MdictClient {
         } catch (e) {
             this.logger.warn(`[MdictClient] exact 查询失败: ${String(e)}`);
             return null;
+        }
+    }
+
+    private lookupExactMany(mdict: any, term: string): Array<{ matchedKey: string; definition: string }> {
+        try {
+            const res = mdict.lookup(term);
+            if (!res) return [];
+            if (Array.isArray(res)) {
+                const out: Array<{ matchedKey: string; definition: string }> = [];
+                for (const x of res) {
+                    if (x?.keyText !== term) continue;
+                    const keyText = x.keyText;
+                    const defDirect = typeof x?.definition === 'string' ? x.definition : '';
+                    if (defDirect) {
+                        out.push({ matchedKey: keyText, definition: defDirect });
+                        continue;
+                    }
+                    // 有些词典返回的是索引项，需要用 offset 解析 definition
+                    const rofset = x?.rofset ?? x?.recordStartOffset;
+                    if (typeof rofset === 'number') {
+                        const def = mdict.parse_defination(keyText, rofset);
+                        if (typeof def === 'string' && def) {
+                            out.push({ matchedKey: keyText, definition: def });
+                        }
+                    }
+                }
+                return out;
+            }
+            if (typeof res.definition === 'string' && typeof res.keyText === 'string') {
+                return res.keyText === term ? [{ matchedKey: res.keyText, definition: res.definition }] : [];
+            }
+            return [];
+        } catch (e) {
+            this.logger.warn(`[MdictClient] exactMany 查询失败: ${String(e)}`);
+            return [];
         }
     }
 
