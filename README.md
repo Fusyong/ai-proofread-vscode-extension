@@ -147,7 +147,40 @@ Additionally, you can also set your own prompts for other text processing scenar
 - **priority**: 优先级（越小越优先）
 - **tags/whenToUse**: 辅助 LLM 选择词典（可选）
 
-**LLM 自动确定查询点，批量写入 JSON 的 reference**：
+**配置示例（三本词典）**：下面假定三部 MDX 均在您机器上的固定目录；`priority` 越小，在未命中 LLM 指定词典、或需按序回退时越靠前。路径在 JSON 中可用正斜杠 `/`，与 Windows 路径等价。
+
+```json
+    "ai-proofread.localDicts": [
+        {
+            "id": "ci...",
+            "name": "...",
+            "mdxPath": ".../...mdx",
+            "priority": 10,
+            "tags": ["现代汉语", "古代汉语", "百科知识"],
+            "whenToUse": "百科性条目、通用词语。查找专名、百科知识类词条优先。"
+        },
+        {
+            "id": "ci...",
+            "name": "...",
+            "mdxPath": ".../...mdx",
+            "priority": 20,
+            "tags": ["古汉语", "字源", "典故"],
+            "whenToUse": "古汉语、典故、字源与书面文言。查找语言、文学、文字类词条优先。"
+        },
+        {
+            "id": "hy...",
+            "name": "...",
+            "mdxPath": ".../...mdx",
+            "priority": 30,
+            "tags": ["古汉语", "现代汉语", "书证"],
+            "whenToUse": "需长条释义或较多书证时可与...、...互为补充。"
+        }
+    ]
+```
+
+将上述键值对并入 `settings.json` 里 `ai-proofread` 对应配置即可（若已有 `localDicts`，可整段替换或手工合并）。若希望随仓库携带相对路径，可把 `mdxPath` 写成 `"${workspaceFolder}/…/词典.mdx"`。
+
+**LLM 自动确定查询点，查询后批量写入 JSON 的 reference**：
 
 在批量校对前，让 LLM 阅读每个 `target` 片段，先提出“需要查词典的点”，再自动查本地词典，把结果写进每条的 `reference`，作为校对准备过程。
 
@@ -171,8 +204,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 扩展提供了独立的“词典查询提示词”管理视图（侧栏 `dict prep prompts`），可新建/编辑/删除，并选择一条作为当前提示词。
 
 - 若未选择自定义提示词，则使用系统内置提示词。
-- 注意：词典查询提示词必须要求模型**只输出 JSON**，且输出结构为 `{\"lookups\":[...]}`。
-
+- 注意：词典查询提示词必须要求模型**只输出 JSON**，且输出结构为 `{\"lookups\":[...]}`（详见源码`dictPrepPrompt.ts`）。
 
 
 ### 3.2. 校对文本选段和JSON文档
@@ -431,9 +463,9 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ### v1.9.7
 
-- 特性：本地词典参考准备拆成两段——「LLM 生成查词计划」与「查词并入 reference」；过程文件 `.dictprep.json` 使用 `stage`（`llm_planned` / `local_merged`）区分阶段。
+- 特性：本地词典参考准备拆成两段——「LLM 生成查词计划」与「查词并入 JSON」；过程文件 `.dictprep.json` 使用 `stage`（`llm_planned` / `local_merged`）区分阶段。
 - 特性：两段流程在调用 LLM 或本地查词前均有参数确认弹窗；执行中在通知栏与校对面板显示与 JSON 批量校对类似的进度条。
-- 特性：校对面板切分/校对区块中，过程文件路径后提供「打开」按钮；词典准备拆为「LLM 生成查词计划」「查词并入 reference」两个操作按钮。
+- 特性：校对面板切分/校对区块中，过程文件路径后提供「打开」按钮；词典准备拆为「LLM 生成查词计划」「查词并入 JSON」两个操作按钮。
 - 命令 `AI Proofreader: prepare references from local dictionaries (JSON)` 改为先选择上述三种模式之一（仅规划 / 仅查词 / 两步连续）。
 
 ### v1.9.6

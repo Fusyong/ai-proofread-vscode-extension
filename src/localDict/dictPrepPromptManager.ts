@@ -9,7 +9,7 @@ export interface DictPrepPrompt {
 export const SYSTEM_DICT_PREP_PROMPT_NAME = '';
 
 export function getDictPrepPromptDisplayName(name: string): string {
-    return name === SYSTEM_DICT_PREP_PROMPT_NAME ? '系统默认提示词（词典查询）' : name;
+    return name === SYSTEM_DICT_PREP_PROMPT_NAME ? '系统默认提示词（专名）' : name;
 }
 
 export class DictPrepPromptManager {

@@ -862,7 +862,7 @@ export class WebviewManager {
                     <button class="action-button" onclick="handleAction('showSplitDiff')">比较前后差异</button>
                     <button class="action-button" onclick="handleAction('mergeContext')">合并 JSON</button>
                     <button class="action-button" onclick="handleAction('dictPrepLlmPlan')" title="第一段：LLM 确定查询候选">LLM 生成查词计划</button>
-                    <button class="action-button" onclick="handleAction('dictPrepLocalMerge')" title="第二段：查询本地词典并写入 reference">查词并入 reference</button>
+                    <button class="action-button" onclick="handleAction('dictPrepLocalMerge')" title="第二段：查询本地词典并写入 reference">查词并入 JSON</button>
                     <button class="action-button" onclick="handleAction('proofreadJson')">LLM 校对 JSON</button>
                 </div>
             </div>
@@ -1077,7 +1077,7 @@ export class WebviewManager {
                     ${splitResult.originalFilePath && splitResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitDiff\')">比较前后差异</button>' : ''}
                     ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'mergeContext\')">合并 JSON</button>' : ''}
                     ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'dictPrepLlmPlan\')" title="第一段：LLM 确定查询候选">LLM 生成查词计划</button>' : ''}
-                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'dictPrepLocalMerge\')" title="第二段：查询本地词典并写入 reference">查词并入 reference</button>' : ''}
+                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'dictPrepLocalMerge\')" title="第二段：查询本地词典并写入 reference">查词并入 JSON</button>' : ''}
                     ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'proofreadJson\')">LLM 校对 JSON</button>' : ''}
                 </div>
             </div>

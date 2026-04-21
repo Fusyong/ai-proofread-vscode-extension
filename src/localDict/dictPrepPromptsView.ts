@@ -30,7 +30,7 @@ export class DictPrepPromptsTreeDataProvider implements vscode.TreeDataProvider<
     getChildren(): DictPrepPromptTreeItem[] {
         const prompts = this.manager.getPrompts();
         return [
-            { id: SYSTEM_ITEM_ID, label: '系统默认提示词（词典查询）', isSystem: true },
+            { id: SYSTEM_ITEM_ID, label: '系统默认提示词（专名）', isSystem: true },
             ...prompts.map((p) => ({ id: p.name, label: p.name, prompt: p })),
         ];
     }
@@ -70,7 +70,7 @@ export function registerDictPrepPromptsView(
             if (!sel) return;
             const id = (sel.id ?? '') as string;
             const labelText = typeof sel.label === 'string' ? sel.label : (sel.label as { label?: string }).label ?? '';
-            const name = id === SYSTEM_ITEM_ID || labelText === '系统默认提示词（词典查询）' ? SYSTEM_DICT_PREP_PROMPT_NAME : id;
+            const name = id === SYSTEM_ITEM_ID || labelText === '系统默认提示词（专名）' ? SYSTEM_DICT_PREP_PROMPT_NAME : id;
             await manager.setCurrentPrompt(name);
             provider.refresh();
         })

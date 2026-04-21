@@ -351,7 +351,7 @@ export class DictPrepCommandHandler {
         const cacheOn = config.get<boolean>('dictPrep.cache.enabled', true);
 
         const msg = [
-            '📋 词典准备 — 查词并入 reference',
+            '📋 词典准备 — 查词并入 JSON',
             '',
             `📁 文件: ${jsonFilePath}`,
             `📊 片段数: ${totalCount}`,
