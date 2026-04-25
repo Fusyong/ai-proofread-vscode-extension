@@ -344,6 +344,16 @@ export class WebviewManager {
 
         try {
             switch (command) {
+                case 'showMainFile': {
+                    const mainPath = this.mainFilePath ?? this.getMainFilePath();
+                    if (!mainPath) {
+                        vscode.window.showWarningMessage('请先选择主文件');
+                        break;
+                    }
+                    const doc = await vscode.workspace.openTextDocument(mainPath);
+                    await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+                    break;
+                }
                 case 'selectMainFile': {
                     const uris = await vscode.window.showOpenDialog({
                         canSelectFiles: true,
@@ -821,10 +831,7 @@ export class WebviewManager {
             <div class="process-section">
                 <h3>📄 主文件</h3>
                 <div class="file-paths-compact">
-                    <div class="file-path-row">
-                        <span class="file-label">主文件:</span>
-                        <span class="file-path">${this.getRelativePath(mainPath)}</span>
-                    </div>
+                    ${this.filePathRowWithOpenButton('主文件:', mainPath, 'showMainFile')}
                 </div>
                 ${lengthMismatch ? `
                 <div class="warning-box">
@@ -855,7 +862,7 @@ export class WebviewManager {
                     ${this.filePathRowWithOpenButtonIfExists('JSON:', comp.json, 'showSplitJson')}
                     ${this.filePathRowWithOpenButtonIfExists('JSON.md:', comp.jsonMd, 'showSplitJsonMd')}
                     ${this.filePathRowWithOpenButtonIfExists('切分日志:', comp.log, 'showSplitLog')}
-                    ${this.filePathRowWithOpenButtonIfExists('查词过程:', dictPrepJsonPath, 'showDictPrepJson')}
+                    ${this.filePathRowWithOpenButtonIfExists('查词计划:', dictPrepJsonPath, 'showDictPrepJson')}
                     ${this.filePathRowWithOpenButtonIfExists('查词日志:', dictPrepLogPath, 'showDictPrepLog')}
                 </div>
                 <div class="section-actions">
@@ -875,7 +882,7 @@ export class WebviewManager {
             const hasUnfinished = (nullCount ?? 0) > 0;
             proofreadSection = `
             <div class="process-section">
-                <h3>✏️ 处理结果</h3>
+                <h3>✏️ 校对结果</h3>
                 ${hasUnfinished ? `
                 <div class="warning-box">
                     ⚠️ 有 <strong>${nullCount}</strong> 条未完成校对（.proofread.json 中为 null）。重新校对时将只处理未完成的条目。
@@ -1070,7 +1077,7 @@ export class WebviewManager {
                     ${this.filePathRowWithOpenButtonIfExists('JSON:', splitResult.jsonFilePath, 'showSplitJson')}
                     ${this.filePathRowWithOpenButtonIfExists('JSON.md:', splitResult.markdownFilePath, 'showSplitJsonMd')}
                     ${this.filePathRowWithOpenButtonIfExists('切分日志:', splitResult.logFilePath, 'showSplitLog')}
-                    ${this.filePathRowWithOpenButtonIfExists('查词过程:', dictPrepJsonPath, 'showDictPrepJson')}
+                    ${this.filePathRowWithOpenButtonIfExists('查词计划:', dictPrepJsonPath, 'showDictPrepJson')}
                     ${this.filePathRowWithOpenButtonIfExists('查词日志:', dictPrepLogPath, 'showDictPrepLog')}
                 </div>
                 <div class="section-actions">
@@ -1095,7 +1102,7 @@ export class WebviewManager {
         const proofreadContent = result.proofreadResult ? this.generateProofreadResultContent(result.proofreadResult) : '';
         return `
             <div class="process-section">
-                <h3>✏️ 处理结果</h3>
+                <h3>✏️ 校对结果</h3>
                 ${progressHtml}
                 ${proofreadContent}
             </div>
@@ -1146,10 +1153,7 @@ export class WebviewManager {
             <div class="process-section">
                 <h3>📄 主文件</h3>
                 <div class="file-paths-compact">
-                    <div class="file-path-row">
-                        <span class="file-label">主文件:</span>
-                        <span class="file-path">${this.getRelativePath(mainPath)}</span>
-                    </div>
+                    ${this.filePathRowWithOpenButton('主文件:', mainPath, 'showMainFile')}
                 </div>
                 ${lengthMismatch ? `
                 <div class="warning-box">
