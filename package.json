@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.9.7",
+  "version": "1.9.6",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -379,8 +379,8 @@
         "ai-proofread.proofread.models.aliyun": {
           "order": 12,
           "type": "string",
-          "default": "qwen3-max",
-          "description": "阿里云百炼平台模型,如: qwen3-max, qwen-max-latest, qwen-max,  qwen-plus-latest, qwen-plus, deepseek-v3, (推理模型deepseek-r1容易失败且费用高)"
+          "default": "qwen3.6-max-preview",
+          "description": "阿里云百炼平台模型,如: qwen3.6-max-preview, qwen3-max, qwen3.6-flash, deepseek-v3（推理模型如 deepseek-r1 易失败、费用高）"
         },
         "ai-proofread.apiKeys.deepseek": {
           "order": 13,
@@ -391,8 +391,8 @@
         "ai-proofread.proofread.models.deepseek": {
           "order": 14,
           "type": "string",
-          "default": "deepseek-chat",
-          "description": "Deepseek开放平台模型,如: deepseek-chat（推理模型deepseek-reasoner容易失败且费用高）"
+          "default": "deepseek-v4-pro",
+          "description": "Deepseek开放平台模型: deepseek-v4-pro、deepseek-v4-flash 等。旧名 deepseek-chat 将于 2026/07/24 起废弃"
         },
         "ai-proofread.apiKeys.google": {
           "order": 15,
@@ -422,7 +422,7 @@
           "order": 20,
           "type": "boolean",
           "default": true,
-          "description": "禁用模型思考功能（一般语言文字校对建议禁用，以提高速度，充分利用模型知识。目前仅适用于Gemini 2.5系列模型，且无法在 Gemini 2.5 Pro 上停用）"
+          "description": "禁用思考模式：阿里云百炼（OpenAI 兼容）发送 `enable_thinking: false`；DeepSeek v4 发送 `thinking: disabled`；一般校对建议保持关闭。Google Gemini 2.5 用思考预算；在 Gemini 2.5 Pro 上无法完全停用思考"
         },
         "ai-proofread.proofread.retryAttempts": {
           "order": 21,

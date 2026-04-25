@@ -313,9 +313,17 @@ export class DeepseekApiClient implements ApiClient {
             messages,
         };
 
-        if (finalTemperature !== undefined) {
-            requestBody.temperature = finalTemperature;
+        const disableThinking = config.get<boolean>('proofread.disableThinking', true);
+        if (disableThinking) {
+            requestBody.thinking = { type: 'disabled' as const };
         } else {
+            requestBody.thinking = { type: 'enabled' as const };
+            requestBody.reasoning_effort = 'high' as const;
+        }
+
+        // 思考模式开启时 temperature 等不生效，仅关闭思考时发送
+        if (finalTemperature !== undefined && disableThinking) {
+            requestBody.temperature = finalTemperature;
         }
 
         // 打印完整对话到控制台（调试用，仅在启用调试模式时输出）
@@ -454,6 +462,11 @@ export class AliyunApiClient implements ApiClient {
             model: this.model,
             messages,
         };
+
+        // 百炼 Qwen3 等混合式模型通过 enable_thinking 控制思考，见
+        // https://www.alibabacloud.com/help/en/model-studio/deep-thinking
+        const disableThinking = config.get<boolean>('proofread.disableThinking', true);
+        requestBody.enable_thinking = !disableThinking;
 
         if (finalTemperature !== undefined) {
             requestBody.temperature = finalTemperature;
@@ -811,7 +824,7 @@ export async function processJsonFileAsync(
         startCount = 1,
         stopCount,
         platform = 'deepseek',
-        model = 'deepseek-chat',
+        model = 'deepseek-v4-pro',
         rpm = 15,
         maxConcurrent = 3,
         temperature = 1,

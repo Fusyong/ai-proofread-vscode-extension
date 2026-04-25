@@ -1,5 +1,8 @@
 !!! caution 
-    默认平台已经由DeepSeek改成阿里云百炼。只有DeepSeek账号的用户须手动改回DeepSeek。
+    DeepSeek默认支持v4 pro，请**关注价格变动并测试效果**；旧版2026/07/24 前可用（可用阿里云百炼平台deepseek-v3作为替代）
+
+    默认平台已经由DeepSeek改成阿里云百炼。只有DeepSeek账号的用户须手动改回DeepSeek。（可用阿里云百炼平台deepseek-v3作为替代）
+
 
 *QQ群“ai-proofreader 校对插件”：1055031650*
 
@@ -137,7 +140,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 #### 3.1.5 检索本地词典，组织参考资料（实验功能）
 
-本扩展支持查询本地 MDict 词典（`.mdx`），把词典释义整理到 JSON 条目的 `reference` 字段中，用作后续校对的参考资料。
+本扩展支持由大模型查询有本地 MDict 词典（`.mdx`），把词典释义整理到 JSON 条目的 `reference` 字段中，用作后续校对的参考资料。
 
 **配置本地词典**：在设置中配置 `ai-proofread.localDicts`（可配置多本词典，按 `priority` 控制回退顺序；数值越小越优先）：
 
@@ -152,7 +155,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 ```json
     "ai-proofread.localDicts": [
         {
-            "id": "ci...",
+            "id": "cidian...",
             "name": "...",
             "mdxPath": ".../...mdx",
             "priority": 10,
@@ -160,7 +163,7 @@ Additionally, you can also set your own prompts for other text processing scenar
             "whenToUse": "百科性条目、通用词语。查找专名、百科知识类词条优先。"
         },
         {
-            "id": "ci...",
+            "id": "cidian...",
             "name": "...",
             "mdxPath": ".../...mdx",
             "priority": 20,
@@ -168,7 +171,7 @@ Additionally, you can also set your own prompts for other text processing scenar
             "whenToUse": "古汉语、典故、字源与书面文言。查找语言、文学、文字类词条优先。"
         },
         {
-            "id": "hy...",
+            "id": "cidian...",
             "name": "...",
             "mdxPath": ".../...mdx",
             "priority": 30,
@@ -180,19 +183,9 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 将上述键值对并入 `settings.json` 里 `ai-proofread` 对应配置即可（若已有 `localDicts`，可整段替换或手工合并）。若希望随仓库携带相对路径，可把 `mdxPath` 写成 `"${workspaceFolder}/…/词典.mdx"`。
 
-**LLM 自动确定查询点，查询后批量写入 JSON 的 reference**：
+**LLM 自动确定查询点，本地查询后写入 JSON 的 reference**：
 
-在批量校对前，让 LLM 阅读每个 `target` 片段，先提出“需要查词典的点”，再自动查本地词典，把结果写进每条的 `reference`，作为校对准备过程。
-
-流程：
-
-1. 打开已切分的 JSON 文件（对象数组，至少包含 `target` 字段）
-2. 从右键菜单或命令面板执行 `AI Proofreader: prepare references from local dictionaries (JSON)`
-3. 扩展会对每个 JSON 条目执行：
-   - **LLM 提取查询点**：为每个查询点提出 2–3 个候选词（按优先级），并指定优先查询的词典（dictId）
-   - **本地查词（exact）**：在指定词典中按候选词顺序逐个查询，命中第一个即停止；若该词典均未命中，则按 `priority` 回退到其他词典继续查
-   - **写入 reference**：把命中的释义以“词典查询块”的形式追加到该条目的 `reference` 字段
-   - **去重**：重复运行不会无限追加相同的查询块
+在批量校对前，让 LLM 阅读每个 `target` 片段，先提出“需要查词典的点”；再自动查询本地词典，把结果写进每条的 `reference`，作为校对准备过程。
 
 输出文件：
 
@@ -467,16 +460,12 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 6. 更新日志
 
-### v1.9.7
-
-- 特性：本地词典参考准备拆成两段——「LLM 生成查词计划」与「查词并入 JSON」；过程文件 `.dictprep.json` 使用 `stage`（`llm_planned` / `local_merged`）区分阶段。
-- 特性：两段流程在调用 LLM 或本地查词前均有参数确认弹窗；执行中在通知栏与校对面板显示与 JSON 批量校对类似的进度条。
-- 特性：校对面板切分/校对区块中，过程文件路径后提供「打开」按钮；查词准备拆为「LLM 生成查词计划」「查词并入 JSON」两个操作按钮。
-- 命令 `AI Proofreader: prepare references from local dictionaries (JSON)` 改为先选择上述三种模式之一（仅规划 / 仅查词 / 两步连续）。
 
 ### v1.9.6
 
-- 特性：核对工具书的工作流：由LLM确定文本中需要查询工具书的问题点，一个点提出两三个查询词语；然后查询本地mdx词典，合并到reference中，供校对时使用。
+- 优化：DeepSeek默认支持v4，非思考模式
+- 特性：核对工具书的工作流，分为两段：「LLM 生成查词计划」，由LLM确定文本中需要查询工具书的词语；「查词并入 JSON」，然后查询本地mdx词典，合并到reference中，供校对时使用。
+- 优化：校对面板，文件路径后提供「打开」按钮，替代原有查看按钮
 
 ### v1.9.5
 

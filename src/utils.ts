@@ -257,7 +257,16 @@ export class ConfigManager {
      * @returns 模型名称
      */
     public getModel(platform: string): string {
-        return this.config.get<string>(`proofread.models.${platform}`, 'deepseek-chat');
+        const fallbackByPlatform: Record<string, string> = {
+            aliyun: 'qwen3.6-max-preview',
+            deepseek: 'deepseek-v4-pro',
+            google: 'gemini-2.5-pro-exp-03-25',
+            ollama: 'gemma3:1b',
+        };
+        return this.config.get<string>(
+            `proofread.models.${platform}`,
+            fallbackByPlatform[platform] ?? 'deepseek-v4-pro'
+        );
     }
 
     /**

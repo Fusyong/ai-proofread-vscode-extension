@@ -51,6 +51,8 @@ export async function llmGenerateJson(params: {
                     userPrompt: params.userPrompt,
                     temperature,
                     timeout,
+                    useAliyunEnableThinking: true,
+                    disableThinking: config.get<boolean>('proofread.disableThinking', true),
                 });
             }
             // deepseek default
@@ -62,6 +64,8 @@ export async function llmGenerateJson(params: {
                 userPrompt: params.userPrompt,
                 temperature,
                 timeout,
+                useDeepseekThinking: true,
+                disableThinking: config.get<boolean>('proofread.disableThinking', true),
             });
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
@@ -85,20 +89,50 @@ async function callOpenAICompatible(params: {
     userPrompt: string;
     temperature: number;
     timeout: number;
+    /** 仅对 DeepSeek v4 等传递 thinking / reasoning_effort，见 https://api-docs.deepseek.com/zh-cn/guides/thinking_mode */
+    useDeepseekThinking?: boolean;
+    /** 百炼 Qwen3 等：OpenAI 兼容模式下的 `enable_thinking` */
+    useAliyunEnableThinking?: boolean;
+    disableThinking?: boolean;
 }): Promise<string> {
     if (!params.apiKey) {
         throw new Error('未配置 API 密钥');
     }
+    const disableThinking = params.disableThinking ?? true;
+    const requestBody: Record<string, unknown> = {
+        model: params.model,
+        messages: [
+            { role: 'system', content: params.systemPrompt },
+            { role: 'user', content: params.userPrompt },
+        ],
+    };
+
+    if (params.useAliyunEnableThinking) {
+        requestBody.enable_thinking = !disableThinking;
+    }
+
+    if (params.useDeepseekThinking) {
+        if (disableThinking) {
+            requestBody.thinking = { type: 'disabled' };
+        } else {
+            requestBody.thinking = { type: 'enabled' };
+            requestBody.reasoning_effort = 'high';
+        }
+    }
+
+    if (params.temperature !== undefined) {
+        if (params.useDeepseekThinking) {
+            if (disableThinking) {
+                requestBody.temperature = params.temperature;
+            }
+        } else {
+            requestBody.temperature = params.temperature;
+        }
+    }
+
     const resp = await axios.post(
         `${params.baseUrl}/chat/completions`,
-        {
-            model: params.model,
-            messages: [
-                { role: 'system', content: params.systemPrompt },
-                { role: 'user', content: params.userPrompt },
-            ],
-            temperature: params.temperature,
-        },
+        requestBody,
         {
             headers: {
                 Authorization: `Bearer ${params.apiKey}`,
