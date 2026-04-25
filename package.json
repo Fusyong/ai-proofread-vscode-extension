@@ -392,7 +392,7 @@
           "order": 14,
           "type": "string",
           "default": "deepseek-v4-pro",
-          "description": "Deepseek开放平台模型: deepseek-v4-pro、deepseek-v4-flash 等。旧名 deepseek-chat 将于 2026/07/24 起废弃"
+          "description": "Deepseek开放平台模型: deepseek-v4-pro、deepseek-v4-flash 等。旧模型 deepseek-chat 将于 2026/07/24 起废弃"
         },
         "ai-proofread.apiKeys.google": {
           "order": 15,
