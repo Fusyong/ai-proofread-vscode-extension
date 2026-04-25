@@ -70,18 +70,39 @@ export interface DictPrepProgressHooks {
 }
 
 function sanitizeLookupTerm(term: string): string {
-    // 查词阶段：统一移除候选词中的所有空白字符（如“李 白”→“李白”）
-    return String(term ?? '').replace(/\s+/g, '').trim();
+    // 查词阶段：仅删除“汉字前后”的空白，其它空白保留
+    // 例：`李 白` → `李白`；`Foo 李 白 Bar` → `Foo李白Bar`；`Foo Bar` 保持不变
+    const s = String(term ?? '').trim();
+    if (!s) return s;
+    // 使用 Unicode 属性：Han 脚本（CJK 汉字）；u 标志保证属性转义可用
+    return s
+        .replace(/([\p{Script=Han}])\s+/gu, '$1')
+        .replace(/\s+([\p{Script=Han}])/gu, '$1');
 }
 
-function buildLookupVariantsForTraditional(term: string): string[] {
+/**
+ * 基于 OpenCC 做简⇄繁双向转换，返回“可选变体”（不含原词）。
+ * 约定：调用方应先查原词；仅当变体与原词不同且需要时再查变体。
+ */
+function buildOpenccAltTerms(term: string): string[] {
     const base = sanitizeLookupTerm(term);
     if (!base) return [];
-    const t = convertOpencc(base, 'cn', 't');
-    if (t && t !== base) {
-        return [base, t];
-    }
-    return [base];
+
+    // 双向都做一遍：输入可能本来就是繁体，或包含可互转的地区词。
+    const t2cn = convertOpencc(base, 't', 'cn');
+    const cn2t = convertOpencc(base, 'cn', 't');
+
+    const out: string[] = [];
+    const push = (x: string) => {
+        const s = sanitizeLookupTerm(x);
+        if (!s) return;
+        if (s === base) return;
+        if (out.includes(s)) return;
+        out.push(s);
+    };
+    push(t2cn);
+    push(cn2t);
+    return out;
 }
 
 function limitCleanText(s: string, maxChars: number): string {
@@ -406,10 +427,12 @@ export async function mergeDictPrepReferencesFromPlans(
                 for (const c of candidates) {
                     if (totalLookupsExecuted >= maxTotalLookupsPerRun) break;
 
-                    // 同一候选词：先查原样（去空白），未命中再查繁体（若不同）
-                    const variants = buildLookupVariantsForTraditional(c);
-                    for (const term of variants) {
-                        if (totalLookupsExecuted >= maxTotalLookupsPerRun) break;
+                    // 同一候选词：先查原样（去空白）；仅当 opencc 转换后“不同”且原样未命中时，再查转换后的词。
+                    const baseTerm = sanitizeLookupTerm(c);
+                    if (!baseTerm) continue;
+
+                    const execLookupAndCollect = async (term: string): Promise<number> => {
+                        if (totalLookupsExecuted >= maxTotalLookupsPerRun) return 0;
                         totalLookupsExecuted++;
 
                         appendLog(
@@ -431,53 +454,67 @@ export async function mergeDictPrepReferencesFromPlans(
                             const msg = e instanceof Error ? e.message : String(e);
                             resultItem.errors.push(`pointId=${p.pointId} dict=${dict.id} term=${term}: lookup failed: ${msg}`);
                             appendLog(logPath, `Lookup ERROR: ${msg}`, params.onProgress);
-                            continue;
+                            return 0;
                         }
-                        if (hits.length > 0) {
-                            for (const h of hits) {
-                                const cleaned = limitCleanText(stripHtmlToText(h.definition), maxDefinitionChars);
-                                const digest = sha1(`${h.matchedKey}\n${cleaned}`);
 
-                                const legacyKey = buildDedupKeyLegacy(dict.id, term, mode);
-                                const header = `【本地词典】${h.dictName}｜${h.matchedKey}`;
-                                const fingerprint = `${header}\n\n${cleaned}`;
-                                const beginTag = buildLocalDictEntryBeginTag(digest);
-                                if (reference.includes(beginTag) || reference.includes(fingerprint) || reference.includes(legacyKey)) {
-                                    continue;
-                                }
+                        if (hits.length === 0) return 0;
 
-                                const groupKey = `${h.dictId}::${h.matchedKey}`;
-                                let g = groups.get(groupKey);
-                                if (!g) {
-                                    g = {
-                                        dictId: h.dictId,
+                        for (const h of hits) {
+                            const cleaned = limitCleanText(stripHtmlToText(h.definition), maxDefinitionChars);
+                            const digest = sha1(`${h.matchedKey}\n${cleaned}`);
+
+                            const legacyKey = buildDedupKeyLegacy(dict.id, term, mode);
+                            const header = `【本地词典】${h.dictName}｜${h.matchedKey}`;
+                            const fingerprint = `${header}\n\n${cleaned}`;
+                            const beginTag = buildLocalDictEntryBeginTag(digest);
+                            if (reference.includes(beginTag) || reference.includes(fingerprint) || reference.includes(legacyKey)) {
+                                continue;
+                            }
+
+                            const groupKey = `${h.dictId}::${h.matchedKey}`;
+                            let g = groups.get(groupKey);
+                            if (!g) {
+                                g = {
+                                    dictId: h.dictId,
+                                    dictName: h.dictName,
+                                    matchedKey: h.matchedKey,
+                                    entriesByDigest: new Map<string, PickedEntry>(),
+                                    groupLen: 0,
+                                };
+                                groups.set(groupKey, g);
+                            }
+                            g.groupLen = Math.max(g.groupLen, cleaned.length);
+
+                            const prev = g.entriesByDigest.get(digest);
+                            if (!prev || cleaned.length > prev.cleaned.length) {
+                                g.entriesByDigest.set(digest, {
+                                    h: {
                                         dictName: h.dictName,
+                                        dictId: h.dictId,
+                                        queryTerm: h.queryTerm,
                                         matchedKey: h.matchedKey,
-                                        entriesByDigest: new Map<string, PickedEntry>(),
-                                        groupLen: 0,
-                                    };
-                                    groups.set(groupKey, g);
-                                }
-                                g.groupLen = Math.max(g.groupLen, cleaned.length);
-
-                                const prev = g.entriesByDigest.get(digest);
-                                if (!prev || cleaned.length > prev.cleaned.length) {
-                                    g.entriesByDigest.set(digest, {
-                                        h: {
-                                            dictName: h.dictName,
-                                            dictId: h.dictId,
-                                            queryTerm: h.queryTerm,
-                                            matchedKey: h.matchedKey,
-                                            mode: h.mode,
-                                        },
-                                        cleaned,
-                                        digest,
-                                        term,
-                                        dictIdForLegacy: dict.id,
-                                    });
-                                }
+                                        mode: h.mode,
+                                    },
+                                    cleaned,
+                                    digest,
+                                    term,
+                                    dictIdForLegacy: dict.id,
+                                });
                             }
                         }
+                        return hits.length;
+                    };
+
+                    const baseHitCount = await execLookupAndCollect(baseTerm);
+                    if (baseHitCount > 0) {
+                        // 原词已命中：不再额外查 opencc 变体，避免无意义的查词开销。
+                        continue;
+                    }
+
+                    const altTerms = buildOpenccAltTerms(baseTerm);
+                    for (const alt of altTerms) {
+                        if (totalLookupsExecuted >= maxTotalLookupsPerRun) break;
+                        await execLookupAndCollect(alt);
                     }
                 }
             }
