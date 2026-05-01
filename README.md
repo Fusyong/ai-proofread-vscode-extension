@@ -207,12 +207,12 @@ Additionally, you can also set your own prompts for other text processing scenar
 2. 选中要校对的段落，不宜过长
 3. 从右键菜单、命令面板（Ctrl+Shift+P）中选择 Proofread Selection
 4. 可选择上下文范围、参考文件和温度。加入上下文是为大语言模型提供语境，以便参考，并保持一致性。参考文件可以是相关的词条、更权威的文献等。模型温度较低时，随机性、创造性、稳定性较低；反之则随机性、创造性、不稳定性变高。可以参考模型文档进行测试。**使用不同温度多遍校对，或许可以覆盖不同的问题，值得尝试。**
-5. 校对结束后会打开 diff；**关闭右侧校对结果文档时**可选择是否将结果**写回选区**。若选择接受写回，扩展会在工作区 `.proofread/editorial-memory.md` 中累积**项目级编辑记忆**（含 `## 全局`、`## 按文档结构` 下各 `### path`、`## 近期记忆`），并在下一次校对时在请求中注入 `<editorial_memory>`、`<editorial_memory_recent>`、`<editorial_memory_reference>` 与 `<current_proofread_context>`（可在设置 `ai-proofread.editorialMemory.*` 中开关与限长）。自定义提示词若需利用记忆，请在提示词中说明这些标签的含义。并生成 `.proofread` 下日志，以便再次查看结果。**`## 近期记忆` 中与本轮对应的时间线条目**：由扩展用**句子对齐**筛出有**实质改动**的句式要点写出摘要（忽略仅空白、转行等可归一化为相同的情形），避免把整块原文与改后正文简单截断填入；若在设置中开启了接受写回后的 **LLM 合并**（`editorialMemory.mergeAfterAccept`），模型还可选输出单行 `recent_append` 精炼要点——提示词要求其风格与全局/按结构记忆条目一致且**不写整段书稿**。详情见源码 `recentSentenceSummary.ts`、`mergeRound.ts`。
+5. 校对结束后会打开 diff；**关闭右侧校对结果文档时**可选择是否将结果**写回选区**。**普通 Proofread Selection** 不会读写 `editorial-memory.md`。只有使用 **Proofread Selection with Memory**（见下一条）时，才会在校对前注入、在接受写回后更新工作区的 `.proofread/editorial-memory.md`（含 `## 全局`、`## 按文档结构` 下各 `### path`、`## 近期记忆`），并在请求中附带 `<editorial_memory>`、`<editorial_memory_recent>`、`<editorial_memory_reference>` 与 `<current_proofread_context>`；注入限额、合并与其它行为由设置 `ai-proofread.editorialMemory.*`（**无「总开关」**，是否启用记忆仅靠上述两条命令区分）。自定义提示词若需利用记忆，须使用 **Proofread Selection with Memory** 并在提示词中说明这些标签的含义。扩展会写入 `.proofread` 下的日志。**`## 近期记忆` 中与本轮对应的时间线条目**：由扩展用**句子对齐**筛出有**实质改动**的句式要点写出摘要（忽略仅空白、转行等可归一化为相同的情形）；若在设置中开启了 **`editorialMemory.mergeAfterAccept`**，合并 LLM 还可选输出单行 `recent_append` 精炼要点。详情见源码 `recentSentenceSummary.ts`、`mergeRound.ts`。
 
 #### 3.2.1a. 项目级编辑记忆与 reconcile
 
 - **校对面板**快捷栏中为「校对选中文本」「校对选中（编辑记忆）」两个按钮；命令面板或右键亦可运行 **Proofread Selection** / **Proofread Selection with Memory**。
-- **「AI Proofreader: proofread selection with memory」**与普通 Proofread Selection 的对话与 diff 流程相同，但**本次**强制启用记忆的注入与接受写回；若你在设置里关闭了 `ai-proofread.editorialMemory.enabled`，仍可用该命令单次启用记忆。
+- **「AI Proofreader: proofread selection with memory」**与普通 Proofread Selection 的流程相同（上下文、reference、diff 等均一致），但**仅本条命令**会为本次校对读写 `editorial-memory.md`，普通 **Proofread Selection** 不涉及记忆。
 - 记忆文件路径：`<工作区根>/.proofread/editorial-memory.md`。
 - 大改标题或章节结构后，可在命令面板运行 **「AI Proofreader: reconcile editorial memory with document headings」**，由模型给出 `old_path` → `new_path` 的 JSON 映射，扩展校验当前稿 TOC 后**仅机械改写** `### path:` 行；详情写入 `.proofread/editorial-memory.reconcile.log.md`。
 - **「AI Proofreader: clear editorial memory file」** 可将记忆恢复为空白模板（写盘前可按设置生成 `.bak`）。

@@ -343,7 +343,7 @@ export class ProofreadCommandHandler {
     }
 
     /**
-     * 校对选中：本次强制启用编辑记忆（忽略 settings 里 `editorialMemory.enabled=false`）。
+     * 校对选中并启用编辑记忆：`editorial-memory.md` 注入与接受写回（无单独设置开关，仅用本命令）。
      */
     public async handleProofreadSelectionWithMemoryCommand(
         editor: vscode.TextEditor,
@@ -354,7 +354,7 @@ export class ProofreadCommandHandler {
 
     /**
      * 执行校对选中文本的核心流程
-     * @param editorialMemoryForceEnabled 为 true 时本次强制注入并写回记忆
+     * @param editorialMemoryForceEnabled 为 true：与「Proofread Selection with Memory」等价；为 false/undefined：普通选段不写记忆。
      */
     private async executeProofreadSelectionFlow(
         editor: vscode.TextEditor,
@@ -607,7 +607,7 @@ export class ProofreadCommandHandler {
                             result,
                             fileExt
                         );
-                        if (diffRes.applied) {
+                        if (diffRes.applied && editorialMemoryForceEnabled === true) {
                             try {
                                 await runEditorialMemoryAfterAccept({
                                     documentUri: editor.document.uri,
@@ -620,9 +620,7 @@ export class ProofreadCommandHandler {
                                     platform,
                                     model,
                                     items: itemChanges,
-                                    ...(editorialMemoryForceEnabled === true
-                                        ? { editorialMemoryForceEnabled: true }
-                                        : {}),
+                                    editorialMemoryForceEnabled: true,
                                 });
                             } catch {
                                 /* 记忆更新失败不阻断 */

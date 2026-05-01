@@ -906,14 +906,8 @@
             }
           }
         },
-        "ai-proofread.editorialMemory.enabled": {
-          "order": 96,
-          "type": "boolean",
-          "default": true,
-          "description": "启用项目级 editorial-memory.md：校对前注入记忆，接受写回后更新。"
-        },
         "ai-proofread.editorialMemory.backupBeforeWrite": {
-          "order": 97,
+          "order": 96,
           "type": "boolean",
           "default": true,
           "description": "写入 editorial-memory.md 前若文件已存在则生成带时间戳的 .bak 备份。"
@@ -968,7 +962,7 @@
           "order": 105,
           "type": "boolean",
           "default": true,
-          "description": "接受写回后调用轻量 LLM 将本轮合并进记忆（失败则写入 merge-fallback 近期行）。"
+          "description": "在用「Proofread Selection with Memory」并接受写回时，完成后调用轻量 LLM 将本轮合并进记忆（失败则写入 merge-fallback 近期行）；普通 Proofread Selection 不涉及记忆。"
         },
         "ai-proofread.editorialMemory.mergeWindowMaxChars": {
           "order": 106,

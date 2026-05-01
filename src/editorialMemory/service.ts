@@ -29,7 +29,6 @@ export function getDocumentRelativeId(uri: vscode.Uri): string {
 function readConfig() {
     const c = vscode.workspace.getConfiguration('ai-proofread');
     return {
-        enabled: c.get<boolean>('editorialMemory.enabled', true),
         backupBeforeWrite: c.get<boolean>('editorialMemory.backupBeforeWrite', true),
         maxFileChars: c.get<number>('editorialMemory.maxFileChars', 200_000),
         injectMatchedMaxChars: c.get<number>('editorialMemory.injectMatchedMaxChars', 12_000),
@@ -205,11 +204,10 @@ export async function buildEditorialMemoryXml(
     selectionStartLine: number,
     editorialMemoryForceEnabled?: boolean
 ): Promise<string> {
-    const cfg = readConfig();
-    const memoryOn = editorialMemoryForceEnabled === true || cfg.enabled;
-    if (!memoryOn) {
+    if (editorialMemoryForceEnabled !== true) {
         return '';
     }
+    const cfg = readConfig();
     const memPath = FilePathUtils.getEditorialMemoryPath(documentUri);
     const parsed = loadOrInit(memPath);
     const { headingPath, nearestHeadingLevel } = getMarkdownHeadingBreadcrumb(fullText, selectionStartLine);
@@ -280,15 +278,15 @@ export interface AfterAcceptArgs {
     platform: string;
     model: string;
     items?: Array<{ original: string; corrected: string }>;
-    /** 为 true 时忽略 `editorialMemory.enabled=false`，仍为本次校对注入并写回记忆 */
+    /** 为 true：本次校对启用记忆注入与接受写回（由「Proofread Selection with Memory」传入） */
     editorialMemoryForceEnabled?: boolean;
 }
 
 export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Promise<void> {
-    const cfg = readConfig();
-    if (!cfg.enabled && args.editorialMemoryForceEnabled !== true) {
+    if (args.editorialMemoryForceEnabled !== true) {
         return;
     }
+    const cfg = readConfig();
     const memPath = FilePathUtils.getEditorialMemoryPath(args.documentUri);
     const parsed = loadOrInit(memPath);
     const { headingPath } = getMarkdownHeadingBreadcrumb(args.fullText, args.selectionStartLine);

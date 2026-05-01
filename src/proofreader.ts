@@ -1134,7 +1134,7 @@ export async function processJsonFileAsync(
  * @param sourceCharacteristicsDisplayTitle 注入项在通知中的展示标题（如预设名称）；未传时由正文摘要回退
  * @param onItemItems 条目式输出时回调解析出的条目（如条目式提示词场景的后续处理）
  * @param onRawItemOutput 条目式输出时回调 LLM 原始返回（供日志等写入原始结果，不写替换后文本）
- * @param editorialMemoryForceEnabled 为 true 时在设置关闭记忆的情况下仍注入 `buildEditorialMemoryXml`
+ * @param editorialMemoryForceEnabled 为 true 时在请求中拼接编辑记忆注入（仅用「Proofread Selection with Memory」时使用）
  * @returns 校对后的文本
  */
 export async function proofreadSelection(
@@ -1211,18 +1211,20 @@ export async function proofreadSelection(
     if (contextText && contextText.trim() !== targetText.trim()) {
         preText += `\n<context>\n${contextText}\n</context>`;
     }
-    try {
-        const emXml = await buildEditorialMemoryXml(
-            editor.document.uri,
-            editor.document.getText(),
-            selection.start.line,
-            editorialMemoryForceEnabled
-        );
-        if (emXml) {
-            preText += emXml;
+    if (editorialMemoryForceEnabled === true) {
+        try {
+            const emXml = await buildEditorialMemoryXml(
+                editor.document.uri,
+                editor.document.getText(),
+                selection.start.line,
+                true
+            );
+            if (emXml) {
+                preText += emXml;
+            }
+        } catch {
+            /* 记忆注入失败不阻断校对 */
         }
-    } catch {
-        /* 记忆注入失败不阻断校对 */
     }
     const postText = `<target>\n${targetText}\n</target>`;
 
