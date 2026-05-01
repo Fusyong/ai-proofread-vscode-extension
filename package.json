@@ -369,7 +369,7 @@
           "order": 12,
           "type": "string",
           "default": "qwen3.6-max-preview",
-          "description": "阿里云百炼平台模型,如: qwen3.6-max-preview, qwen3-max, qwen3.6-flash, deepseek-v3（推理模型如 deepseek-r1 易失败、费用高）"
+          "description": "阿里云百炼平台模型,如: qwen3.6-max-preview, qwen3-max, qwen3.6-plus, qwen3.6-flash, deepseek-v3（推理模型如 deepseek-r1 易失败、费用高）"
         },
         "ai-proofread.apiKeys.deepseek": {
           "order": 13,
