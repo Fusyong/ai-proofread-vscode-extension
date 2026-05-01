@@ -9,6 +9,12 @@ import { summarizeRoundSentenceAligned } from './recentSentenceSummary';
 import type { MemoryRoundContext } from './schemaV2';
 import { clipText, createEmptyActiveV2, createEmptyArchiveV2, formatCurrentRoundsForPrompt, formatMemoryEntryLine } from './schemaV2';
 
+const INJECT_GLOBAL_MAX_CHARS = 5_500;
+const INJECT_CURRENT_ROUNDS_MAX_CHARS = 16_000;
+const PATCH_CONTEXT_MAX_CHARS = 8_000;
+const PATCH_PROMPT_GLOBAL_MAX_CHARS = 8_000;
+const PATCH_PROMPT_CURRENT_ROUNDS_MAX_CHARS = 12_000;
+
 /** 工作区内相对路径（POSIX），无工作区则 basename */
 export function getDocumentRelativeId(uri: vscode.Uri): string {
     const folder = vscode.workspace.getWorkspaceFolder(uri);
@@ -25,11 +31,6 @@ function readConfig() {
     return {
         mergeAfterAccept: c.get<boolean>('editorialMemory.mergeAfterAccept', true),
         mergeModelOverride: c.get<string>('editorialMemory.mergeModelOverride', ''),
-        mergePromptGlobalMaxChars: c.get<number>('editorialMemory.mergePromptGlobalMaxChars', 8000),
-        mergePromptCurrentRoundsMaxChars: c.get<number>('editorialMemory.mergePromptCurrentRoundsMaxChars', 12000),
-        patchContextMaxChars: c.get<number>('editorialMemory.patchContextMaxChars', 8000),
-        injectMemoryGlobalMaxChars: c.get<number>('editorialMemory.injectMemoryGlobalMaxChars', 5500),
-        injectMemoryCurrentMaxChars: c.get<number>('editorialMemory.injectMemoryCurrentMaxChars', 16000),
         globalActiveMax: c.get<number>('editorialMemory.globalActiveMax', 30),
         currentProofreadRoundsMax: c.get<number>('editorialMemory.currentProofreadRoundsMax', 3),
     };
@@ -50,8 +51,8 @@ export async function buildEditorialMemoryXml(
     const documentId = getDocumentRelativeId(documentUri);
     const sel = typeof selectionStartLine === 'number' ? `L${selectionStartLine + 1}` : '';
 
-    const g = clipText(active.global.map(formatMemoryEntryLine).join('\n'), cfg.injectMemoryGlobalMaxChars);
-    const cur = clipText(formatCurrentRoundsForPrompt(active.currentRounds), cfg.injectMemoryCurrentMaxChars);
+    const g = clipText(active.global.map(formatMemoryEntryLine).join('\n'), INJECT_GLOBAL_MAX_CHARS);
+    const cur = clipText(formatCurrentRoundsForPrompt(active.currentRounds), INJECT_CURRENT_ROUNDS_MAX_CHARS);
 
     const ctx = `<editorial_proofread_context>
 document: ${documentId}
@@ -94,8 +95,8 @@ export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Prom
     const round: MemoryRoundContext = {
         document_id: getDocumentRelativeId(args.documentUri),
         selection_range: args.selectionRangeLabel,
-        original_selected: clipText(args.originalSelected, cfg.patchContextMaxChars),
-        final_selected: clipText(args.finalSelected, cfg.patchContextMaxChars),
+        original_selected: clipText(args.originalSelected, PATCH_CONTEXT_MAX_CHARS),
+        final_selected: clipText(args.finalSelected, PATCH_CONTEXT_MAX_CHARS),
         item_level_changes: args.items,
         user_edited_away_from_model: userEdited,
     };
@@ -108,8 +109,8 @@ export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Prom
             round,
             globalMax: cfg.globalActiveMax,
             maxProofreadRounds: d,
-            globalPromptMaxChars: cfg.mergePromptGlobalMaxChars,
-            currentRoundsPromptMaxChars: cfg.mergePromptCurrentRoundsMaxChars,
+            globalPromptMaxChars: PATCH_PROMPT_GLOBAL_MAX_CHARS,
+            currentRoundsPromptMaxChars: PATCH_PROMPT_CURRENT_ROUNDS_MAX_CHARS,
         });
         const mergeModel = cfg.mergeModelOverride.trim() || args.model;
         const patch = await runMemoryPatchLlm(args.platform, mergeModel, user);
@@ -134,7 +135,7 @@ export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Prom
             const sum = summarizeRoundSentenceAligned(
                 args.originalSelected,
                 args.finalSelected,
-                cfg.patchContextMaxChars
+                PATCH_CONTEXT_MAX_CHARS
             );
             const fb = applyGlobalOpsAndPushCurrentRound({
                 active,
@@ -151,7 +152,7 @@ export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Prom
         const sum = summarizeRoundSentenceAligned(
             args.originalSelected,
             args.finalSelected,
-            cfg.patchContextMaxChars
+            PATCH_CONTEXT_MAX_CHARS
         );
         const fb = applyGlobalOpsAndPushCurrentRound({
             active,

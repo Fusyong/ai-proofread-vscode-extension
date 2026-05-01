@@ -925,36 +925,6 @@
           "default": 3,
           "description": "保留最近几次校对的扁平合并稿（currentRounds，默认 3）；轮次间文本归一化完全相同则不入栈。单次轮内条数不限。"
         },
-        "ai-proofread.editorialMemory.injectMemoryGlobalMaxChars": {
-          "order": 99,
-          "type": "number",
-          "default": 5500,
-          "description": "校对注入时 <editorial_memory_global> 最大字符数。"
-        },
-        "ai-proofread.editorialMemory.injectMemoryCurrentMaxChars": {
-          "order": 100,
-          "type": "number",
-          "default": 16000,
-          "description": "校对注入时最近 d 次扁平稿（<editorial_memory_current_rounds>）最大字符数。"
-        },
-        "ai-proofread.editorialMemory.mergePromptGlobalMaxChars": {
-          "order": 101,
-          "type": "number",
-          "default": 8000,
-          "description": "patch LLM 用户提示中全局快照最大字符数。"
-        },
-        "ai-proofread.editorialMemory.mergePromptCurrentRoundsMaxChars": {
-          "order": 102,
-          "type": "number",
-          "default": 12000,
-          "description": "patch LLM 用户提示中「最近 d 次扁平校对记忆」区块最大字符数。"
-        },
-        "ai-proofread.editorialMemory.patchContextMaxChars": {
-          "order": 103,
-          "type": "number",
-          "default": 8000,
-          "description": "传给 patch LLM 的选区原文/终稿每项最大字符（超出截断）。"
-        },
         "ai-proofread.editorialMemory.mergeAfterAccept": {
           "order": 104,
           "type": "boolean",
