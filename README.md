@@ -1,7 +1,7 @@
 !!! caution 
     因DeepSeek V3最终版本（0324）以后的校对效果不理想，默认平台已经由DeepSeek改成阿里云百炼。只有DeepSeek账号的用户须手动改回DeepSeek。（可用阿里云百炼平台deepseek-v3作为替代）
 
-    DeepSeek默认支持v4 pro，请**关注价格变动并测试效果**；旧版2026/07/24 前可用
+    DeepSeek 平台默认支持 deepseek-v4-flash，如果你改为deepseek-v4-pro，还需要**关注价格变动并测试效果**；旧版 deepseek-chat 在 2026/07/24 前仍可用
 
 *QQ群“ai-proofreader 校对插件”：1055031650*
 
