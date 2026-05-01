@@ -163,6 +163,17 @@ export class FilePathUtils {
     }
 
     /**
+     * 项目级编辑记忆 `.proofread/editorial-memory.md`（与 {@link getExamplesPath} 相同的工作区根规则）
+     */
+    public static getEditorialMemoryPath(anchorUri: vscode.Uri): string {
+        const folder = vscode.workspace.getWorkspaceFolder(anchorUri);
+        const rootDir = folder
+            ? folder.uri.fsPath
+            : (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? path.dirname(anchorUri.fsPath));
+        return path.join(rootDir, '.proofread', 'editorial-memory.md');
+    }
+
+    /**
      * 如果文件已存在，将其备份为带时间戳的.bak文件
      * @param filePath 文件路径
      * @param deleteOriginal 是否在备份后删除原文件（默认 false）

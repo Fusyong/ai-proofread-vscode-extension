@@ -11,6 +11,7 @@ import { GoogleGenAI } from "@google/genai";
 import { ConfigManager, Logger } from './utils';
 import { convertQuotes } from './quoteConverter';
 import { buildTitleBasedContext, buildParagraphBasedContext } from './splitter';
+import { buildEditorialMemoryXml } from './editorialMemory/service';
 import { ProgressTracker, ProgressUpdateCallback } from './progressTracker';
 import { parseItemOutput, type ProofreadItem } from './itemOutputParser';
 import { applyItemReplacements } from './itemReplacer';
@@ -82,6 +83,7 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `
     4. 前后文不一致的问题；
 5. 核对参考资料和上下文中的信息，对照上下文中的格式，如果发现有错误或不一致，也要加以改正。
 6. 对于外文文本，同样参照上面的要求，并结合该文种的校对惯例进行校对。
+7. 若提示中出现 \`<editorial_memory>\`、\`<editorial_memory_recent>\`、\`<editorial_memory_reference>\` 与 \`<current_proofread_context>\`：其中 \`heading_path\` 标明当前选段在稿内结构中的位置；**全局**体例以 \`<editorial_memory>\` 内 \`## 全局\` 为准；近期时间线不得覆盖已固化的全局/当前节规则；参考块仅作辅证，与当前 \`target\` 明显无关时可忽略。若记忆与正文冲突，以当前正文为准。
 
 </task>
 {{source_text_characteristics}}
@@ -1206,6 +1208,14 @@ export async function proofreadSelection(
     let preText = referenceText ? `<reference>\n${referenceText}\n</reference>` : '';
     if (contextText && contextText.trim() !== targetText.trim()) {
         preText += `\n<context>\n${contextText}\n</context>`;
+    }
+    try {
+        const emXml = await buildEditorialMemoryXml(editor.document.uri, editor.document.getText(), selection.start.line);
+        if (emXml) {
+            preText += emXml;
+        }
+    } catch {
+        /* 记忆注入失败不阻断校对 */
     }
     const postText = `<target>\n${targetText}\n</target>`;
 

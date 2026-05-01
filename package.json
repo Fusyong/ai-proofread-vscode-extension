@@ -337,6 +337,14 @@
         "title": "AI Proofreader: stop continuous proofread"
       },
       {
+        "command": "ai-proofread.editorialMemory.reconcile",
+        "title": "AI Proofreader: reconcile editorial memory with document headings"
+      },
+      {
+        "command": "ai-proofread.editorialMemory.clear",
+        "title": "AI Proofreader: clear editorial memory file"
+      },
+      {
         "command": "ai-proofread.showProofreadItemsTree",
         "title": "AI Proofreader: show proofread items tree"
       },
@@ -918,8 +926,120 @@
             }
           }
         },
-        "ai-proofread.debug.enableConsoleLog": {
+        "ai-proofread.editorialMemory.enabled": {
           "order": 96,
+          "type": "boolean",
+          "default": true,
+          "description": "启用项目级 editorial-memory.md：校对前注入记忆，接受写回后更新。"
+        },
+        "ai-proofread.editorialMemory.backupBeforeWrite": {
+          "order": 97,
+          "type": "boolean",
+          "default": true,
+          "description": "写入 editorial-memory.md 前若文件已存在则生成带时间戳的 .bak 备份。"
+        },
+        "ai-proofread.editorialMemory.maxFileChars": {
+          "order": 98,
+          "type": "number",
+          "default": 200000,
+          "description": "editorial-memory.md 最大字符数，超出时从尾部裁近期或结构块。"
+        },
+        "ai-proofread.editorialMemory.injectMatchedMaxChars": {
+          "order": 99,
+          "type": "number",
+          "default": 12000,
+          "description": "校对请求中 <editorial_memory> 主块（全局+匹配 path）字符上限。"
+        },
+        "ai-proofread.editorialMemory.injectReferenceMaxChars": {
+          "order": 100,
+          "type": "number",
+          "default": 8000,
+          "description": "<editorial_memory_reference> 总字符上限。"
+        },
+        "ai-proofread.editorialMemory.injectReferenceMaxBlocks": {
+          "order": 101,
+          "type": "number",
+          "default": 12,
+          "description": "参考区最多包含的完整 path 块数（不切半块）。"
+        },
+        "ai-proofread.editorialMemory.injectRecentMaxChars": {
+          "order": 102,
+          "type": "number",
+          "default": 4000,
+          "description": "<editorial_memory_recent> 字符上限。"
+        },
+        "ai-proofread.editorialMemory.injectMatchedMode": {
+          "order": 103,
+          "type": "string",
+          "enum": [
+            "prefixThenNarrow",
+            "ancestorChainOnly"
+          ],
+          "default": "prefixThenNarrow",
+          "description": "主记忆 path 筛选：prefixThenNarrow 先宽前缀再超限时缩为祖先链；ancestorChainOnly 始终仅用当前节+上级链。"
+        },
+        "ai-proofread.editorialMemory.injectIncludeChildPathDepth": {
+          "order": 104,
+          "type": "number",
+          "default": 1,
+          "description": "纳入当前 heading 之下子 path 的最大层级深度（0 表示不含子节）。"
+        },
+        "ai-proofread.editorialMemory.mergeAfterAccept": {
+          "order": 105,
+          "type": "boolean",
+          "default": true,
+          "description": "接受写回后调用轻量 LLM 将本轮合并进记忆（失败则写入 merge-fallback 近期行）。"
+        },
+        "ai-proofread.editorialMemory.mergeWindowMaxChars": {
+          "order": 106,
+          "type": "number",
+          "default": 24000,
+          "description": "写时合并 LLM 输入窗口（全局+相关 path）字符上限。"
+        },
+        "ai-proofread.editorialMemory.mergeModelOverride": {
+          "order": 107,
+          "type": "string",
+          "default": "",
+          "description": "写时合并专用模型名（留空则用当前校对同一 platform 的模型）。"
+        },
+        "ai-proofread.editorialMemory.attentionScoreBase": {
+          "order": 108,
+          "type": "number",
+          "default": 1,
+          "description": "每次接受写回命中 path 时 attention_score 基础增量。"
+        },
+        "ai-proofread.editorialMemory.attentionScoreBonusUserEdit": {
+          "order": 109,
+          "type": "number",
+          "default": 2,
+          "description": "用户在 diff 中相对模型输出有手改时的额外增量。"
+        },
+        "ai-proofread.editorialMemory.attentionScoreMax": {
+          "order": 110,
+          "type": "number",
+          "default": 99,
+          "description": "单块 attention_score 上限。"
+        },
+        "ai-proofread.editorialMemory.recentMaxRounds": {
+          "order": 111,
+          "type": "number",
+          "default": 40,
+          "description": "## 近期记忆 最多保留的条数（新在上）。"
+        },
+        "ai-proofread.editorialMemory.recentMaxChars": {
+          "order": 112,
+          "type": "number",
+          "default": 12000,
+          "description": "## 近期记忆 节内总字符上限。"
+        },
+        "ai-proofread.editorialMemory.roundMaxChars": {
+          "order": 113,
+          "type": "number",
+          "default": 8000,
+          "description": "写时合并传给模型的 original/final 选段最大字符（超出截断）。"
+        },
+        "ai-proofread.debug.enableConsoleLog": {
+          "order": 114,
           "type": "boolean",
           "default": false,
           "description": "在开发者工具控制台原样输出每次提交给大模型的完整请求。",

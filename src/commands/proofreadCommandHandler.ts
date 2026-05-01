@@ -6,7 +6,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { processJsonFileAsync, proofreadSelection } from '../proofreader';
-import { showDiff } from '../differ';
+import { showSelectionProofreadDiffWithApply } from '../differ';
+import { runEditorialMemoryAfterAccept } from '../editorialMemory/service';
 import { FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
 import { getPromptDisplayName } from '../promptManager';
 import { isUsingSystemDefaultPrompt, pickSourceTextCharacteristicsInjection } from '../sourceTextCharacteristicsPicker';
@@ -550,12 +551,15 @@ export class ProofreadCommandHandler {
             }, async (progress) => {
                 try {
                     // 固定原始文本以免用户操作
-                    const originalText = editor.document.getText(editor.selection);
+                    const range = new vscode.Range(editor.selection.start, editor.selection.end);
+                    const sel = new vscode.Selection(range.start, range.end);
+                    const originalText = editor.document.getText(range);
                     const fileExt = path.extname(editor.document.fileName);
                     let rawItemOutput: string | undefined;
+                    let itemChanges: Array<{ original: string; corrected: string }> | undefined;
                     const result = await proofreadSelection(
                         editor,
-                        editor.selection,
+                        sel,
                         platform,
                         model,
                         contextLevel,
@@ -567,7 +571,11 @@ export class ProofreadCommandHandler {
                         actualRepetitionMode,
                         sourceTextCharacteristics,
                         sourceCharacteristicsDisplayTitle,
-                        undefined,
+                        (items) => {
+                            itemChanges = items
+                                .filter((i) => i.corrected != null)
+                                .map((i) => ({ original: i.original, corrected: i.corrected! }));
+                        },
                         (raw) => { rawItemOutput = raw; }
                     );
 
@@ -601,8 +609,32 @@ export class ProofreadCommandHandler {
                             `Model: ${platform}, ${model}, T. ${userTemperature}`
                         );
 
-                        // 显示差异
-                        await showDiff(context, originalText, result, fileExt, false);
+                        const diffRes = await showSelectionProofreadDiffWithApply(
+                            context,
+                            editor.document,
+                            range,
+                            originalText,
+                            result,
+                            fileExt
+                        );
+                        if (diffRes.applied) {
+                            try {
+                                await runEditorialMemoryAfterAccept({
+                                    documentUri: editor.document.uri,
+                                    fullText: editor.document.getText(),
+                                    selectionStartLine: range.start.line,
+                                    selectionRangeLabel: `L${range.start.line + 1}C${range.start.character}–L${range.end.line + 1}C${range.end.character}`,
+                                    originalSelected: originalText,
+                                    finalSelected: diffRes.finalText,
+                                    modelOutput: result,
+                                    platform,
+                                    model,
+                                    items: itemChanges,
+                                });
+                            } catch {
+                                /* 记忆更新失败不阻断 */
+                            }
+                        }
                     } else {
                         vscode.window.showErrorMessage('校对失败，请重试。');
                     }

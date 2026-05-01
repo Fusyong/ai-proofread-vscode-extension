@@ -439,6 +439,37 @@ export async function handleFileSplit(
 }
 
 /**
+ * 从指定行向上解析 Markdown 标题栈，得到面包屑（与 {@link buildTitleBasedContext} 相同的 `#` 行规则）
+ */
+export function getMarkdownHeadingBreadcrumb(
+    text: string,
+    lineIndex: number
+): { headingPath: string; nearestHeadingLevel: number } {
+    const norm = normalizeLineEndings(text);
+    const lines = norm.split('\n');
+    const stack: { level: number; title: string }[] = [];
+    const end = Math.max(0, Math.min(lineIndex, lines.length - 1));
+    for (let i = 0; i <= end; i++) {
+        const line = lines[i];
+        const m = line.match(/^(#{1,6})\s+(.+)$/);
+        if (!m) {
+            continue;
+        }
+        const level = m[1].length;
+        let title = m[2].trim().replace(/\s+#+\s*$/, '');
+        while (stack.length > 0 && stack[stack.length - 1].level >= level) {
+            stack.pop();
+        }
+        stack.push({ level, title });
+    }
+    if (stack.length === 0) {
+        return { headingPath: '(无标题)', nearestHeadingLevel: 0 };
+    }
+    const headingPath = stack.map((s) => s.title).join(' > ');
+    return { headingPath, nearestHeadingLevel: stack[stack.length - 1].level };
+}
+
+/**
  * 构建基于标题级别的上下文
  * @param text 完整文本
  * @param selectionStartLine 选中文本起始行号（从0开始）

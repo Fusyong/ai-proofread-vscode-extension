@@ -5,7 +5,7 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { PromptManager } from './promptManager';
-import { TempFileManager, ConfigManager, Logger } from './utils';
+import { TempFileManager, ConfigManager, Logger, FilePathUtils } from './utils';
 import { WebviewManager } from './ui/webviewManager';
 import { FileSplitCommandHandler } from './commands/fileSplitCommandHandler';
 import { ProofreadCommandHandler } from './commands/proofreadCommandHandler';
@@ -25,6 +25,8 @@ import { SegmentTreeDataProvider } from './numbering/segmentTreeProvider';
 import { registerSegmentView } from './numbering/segmentView';
 import { NumberingCheckCommandHandler } from './commands/numberingCheckCommandHandler';
 import { ContinuousProofreadCommandHandler } from './commands/continuousProofreadCommandHandler';
+import { runReconcileForActiveDocument } from './editorialMemory/reconcileApply';
+import { clearEditorialMemory } from './editorialMemory/service';
 import { registerPromptsView, type PromptTreeItem } from './promptsView';
 import { SourceTextCharacteristicManager } from './sourceTextCharacteristicManager';
 import { registerSourceTextCharacteristicsView, type SourceCharacteristicTreeItem } from './sourceTextCharacteristicsView';
@@ -98,7 +100,7 @@ export function activate(context: vscode.ExtensionContext) {
     const segmentProvider = new SegmentTreeDataProvider();
     const { treeView: segmentTreeView } = registerSegmentView(context, segmentProvider);
     const numberingHandler = new NumberingCheckCommandHandler(context, numberingProvider, numberingTreeView, segmentProvider, segmentTreeView);
-    const continuousProofreadHandler = new ContinuousProofreadCommandHandler(examplesHandler);
+    const continuousProofreadHandler = new ContinuousProofreadCommandHandler();
 
     const promptManager = PromptManager.getInstance(context);
     const { provider: promptsTreeProvider } = registerPromptsView(context, promptManager);
@@ -624,6 +626,33 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.continuousProofread.stop', () =>
             continuousProofreadHandler.handleStopCommand()
         ),
+        vscode.commands.registerCommand('ai-proofread.editorialMemory.reconcile', async () => {
+            const ed = vscode.window.activeTextEditor;
+            if (!ed) {
+                vscode.window.showWarningMessage('请先打开要重对齐的文档。');
+                return;
+            }
+            const memPath = FilePathUtils.getEditorialMemoryPath(ed.document.uri);
+            const platform = configManager.getPlatform();
+            const model = configManager.getModel(platform);
+            await runReconcileForActiveDocument(memPath, ed.document.uri, platform, model);
+        }),
+        vscode.commands.registerCommand('ai-proofread.editorialMemory.clear', async () => {
+            const ed = vscode.window.activeTextEditor;
+            if (!ed) {
+                vscode.window.showWarningMessage('请先打开任意工作区文件以定位 .proofread 目录。');
+                return;
+            }
+            const pick = await vscode.window.showWarningMessage(
+                '将把工作区内 editorial-memory.md 恢复为空白模板（可先备份），是否继续？',
+                { modal: true },
+                '清空'
+            );
+            if (pick === '清空') {
+                await clearEditorialMemory(ed.document.uri);
+                vscode.window.showInformationMessage('已清空 editorial-memory.md。');
+            }
+        }),
         vscode.commands.registerCommand('ai-proofread.showProofreadItemsTree', async () => {
             await vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', true);
             await new Promise((r) => setTimeout(r, 50));

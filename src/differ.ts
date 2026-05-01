@@ -62,6 +62,60 @@ async function openDiffView(
 }
 
 /**
+ * 选段校对：打开 diff，关闭右侧临时稿时询问是否写回原选区，并返回是否已写回及终稿文本。
+ */
+export async function showSelectionProofreadDiffWithApply(
+    context: vscode.ExtensionContext,
+    document: vscode.TextDocument,
+    range: vscode.Range,
+    originalText: string,
+    proofreadText: string,
+    fileExt: string
+): Promise<{ applied: boolean; finalText: string }> {
+    const tempFileManager = TempFileManager.getInstance(context);
+    const originalUri = await tempFileManager.createTempFile(originalText, fileExt);
+    const proofreadUri = await tempFileManager.createTempFile(proofreadText, fileExt);
+    await openDiffView(
+        originalUri,
+        proofreadUri,
+        false,
+        '校对：原文 ↔ 结果（关闭右侧时选择是否写回选区）'
+    );
+
+    return new Promise((resolve) => {
+        const sub = vscode.workspace.onDidCloseTextDocument(async (doc) => {
+            if (doc.uri.toString() !== proofreadUri.toString()) {
+                return;
+            }
+            sub.dispose();
+            const finalText = doc.getText();
+            const pick = await vscode.window.showQuickPick(
+                [
+                    { label: '接受并写回选区', value: 'accept' as const },
+                    { label: '放弃', value: 'skip' as const },
+                ],
+                { placeHolder: '是否将校对结果写入选区？', ignoreFocusOut: true }
+            );
+            if (pick?.value !== 'accept') {
+                resolve({ applied: false, finalText });
+                return;
+            }
+            const docUri = document.uri;
+            const ed =
+                vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === docUri.toString()) ??
+                (await vscode.window.showTextDocument(document));
+            const ok = await ed.edit((eb) => eb.replace(range, finalText));
+            if (!ok) {
+                vscode.window.showErrorMessage('写回选区失败。');
+                resolve({ applied: false, finalText });
+                return;
+            }
+            resolve({ applied: true, finalText });
+        });
+    });
+}
+
+/**
  * 生成jsdiff文件
  * @param originalFile 原始文件路径
  * @param proofreadFile 校对后的文件路径

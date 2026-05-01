@@ -1,6 +1,6 @@
 /**
  * 持续发现与监督校对命令处理器
- * 从当前位置取段 → 校对 → diff 复核 → 保存 → 收集样例 → 确认 → 继续
+ * 从当前位置取段 → 校对 → diff 复核 → 接受写回 → 更新 editorial-memory → 继续
  */
 
 import * as vscode from 'vscode';
@@ -10,9 +10,8 @@ import { proofreadSelection } from '../proofreader';
 import { isUsingSystemDefaultPrompt, pickSourceTextCharacteristicsInjection } from '../sourceTextCharacteristicsPicker';
 import { TempFileManager, FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
 import type { ProofreadItem } from '../itemOutputParser';
-import { getSegmentFromPositionWithMode, splitChineseSentencesSimple } from '../splitter';
-import { normalizeLineEndings } from '../utils';
-import type { ExamplesCommandHandler } from './examplesCommandHandler';
+import { getSegmentFromPositionWithMode } from '../splitter';
+import { runEditorialMemoryAfterAccept } from '../editorialMemory/service';
 
 interface ContinuousProofreadConfig {
     platform: string;
@@ -31,16 +30,11 @@ interface ContinuousProofreadConfig {
     splitLevels: number[];
 }
 
-interface CandidateExample {
-    input: string;
-    output: string;
-}
-
 export class ContinuousProofreadCommandHandler {
     private configManager = ConfigManager.getInstance();
     private statusBarItem: vscode.StatusBarItem;
     private extensionContext: vscode.ExtensionContext | undefined; // 用于终止时清除配置
-    constructor(private examplesHandler: ExamplesCommandHandler) {
+    constructor() {
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
     }
     private session: {
@@ -50,9 +44,10 @@ export class ContinuousProofreadCommandHandler {
         segmentIndex: number;
         proofreadUri: vscode.Uri | undefined;
         currentSegmentEndOffset: number | undefined;
-        awaitingExamplesConfirmation: boolean;
         diffCloseListener: vscode.Disposable | undefined;
-        currentSegmentItems: ProofreadItem[] | undefined; // 条目式输出时本段解析出的条目，直接用作待选样例
+        currentSegmentItems: ProofreadItem[] | undefined;
+        /** 本段模型输出原文（未含用户在 diff 右侧手改） */
+        lastProofreadModelText: string | undefined;
     } | null = null;
 
     dispose(): void {
@@ -74,35 +69,6 @@ export class ContinuousProofreadCommandHandler {
 
     private setContextActive(active: boolean): void {
         vscode.commands.executeCommand('setContext', 'aiProofreadContinuousProofreadActive', active);
-    }
-
-    /**
-     * 按分隔符切分文本（与 examplesCommandHandler 一致）
-     */
-    private splitBySeparator(text: string, separator: number | string): string[] {
-        const normalized = normalizeLineEndings(text);
-        const trimmed = normalized.trim();
-        if (!trimmed) return [];
-        const parts = typeof separator === 'number'
-            ? trimmed.split(new RegExp(`\\n{${separator},}`))
-            : trimmed.split(separator);
-        return parts.map(s => s.trim()).filter(s => s.length > 0);
-    }
-
-    /**
-     * 从原文和修改后文本提取待选样例
-     * 流程：先用 split into sentences 默认设置（splitChineseSentencesSimple）分切，再用 2 个换行符（一个空行）分切，再收集
-     */
-    private extractCandidateExamples(originalText: string, finalText: string): CandidateExample[] {
-        const sentenceSeparator = '\n\n'; // 2 个换行符（一个空行），与 split into sentences 默认一致
-        const normalizedA = splitChineseSentencesSimple(originalText).join(sentenceSeparator);
-        const normalizedB = splitChineseSentencesSimple(finalText).join(sentenceSeparator);
-        const partsA = this.splitBySeparator(normalizedA, 2);
-        const partsB = this.splitBySeparator(normalizedB, 2);
-        const minLen = Math.min(partsA.length, partsB.length);
-        if (minLen === 0) return [];
-        return Array.from({ length: minLen }, (_, i) => ({ input: partsA[i], output: partsB[i] }))
-            .filter(({ input, output }) => input !== output && input.trim() !== '' && output.trim() !== '');
     }
 
     /**
@@ -316,133 +282,6 @@ export class ContinuousProofreadCommandHandler {
     }
 
     /**
-     * 显示样例确认 Webview（jsdiff 展示每条变化）
-     */
-    private async showExamplesConfirmationWebview(
-        context: vscode.ExtensionContext,
-        examples: CandidateExample[],
-        examplesPath: string
-    ): Promise<number[] | 'cancel'> {
-        return new Promise((resolve) => {
-            let resolved = false;
-            const doResolve = (value: number[] | 'cancel') => {
-                if (!resolved) {
-                    resolved = true;
-                    resolve(value);
-                }
-            };
-
-            const panel = vscode.window.createWebviewPanel(
-                'continuousProofreadExamples',
-                '选择要保留的校对样例',
-                vscode.ViewColumn.Beside,
-                { enableScripts: true }
-            );
-
-            const diffScriptUri = panel.webview.asWebviewUri(
-                vscode.Uri.joinPath(context.extensionUri, 'node_modules', 'diff', 'dist', 'diff.js')
-            );
-
-            const examplesJson = JSON.stringify(examples.map(e => ({ input: e.input, output: e.output })));
-
-            panel.webview.html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-body { font-family: var(--vscode-font-family); padding: 1em; }
-.example-item { margin: 1em 0; padding: 0.8em; border: 1px solid var(--vscode-panel-border); border-radius: 4px; }
-.example-item label { display: flex; align-items: flex-start; gap: 0.5em; cursor: pointer; }
-.example-item input[type=checkbox] { margin-top: 4px; flex-shrink: 0; }
-.diff-display { white-space: pre-wrap; word-wrap: break-word; font-size: 13px; line-height: 1.5; margin-top: 0.4em; }
-.diff-display span.added { color: #0e639c; text-decoration: underline 2px; }
-.diff-display span.removed { color: #c72222; text-decoration: dotted underline 2px; }
-.buttons { margin-top: 1em; display: flex; gap: 0.5em; }
-button { padding: 0.4em 1em; cursor: pointer; }
-</style>
-<script src="${diffScriptUri}"></script>
-</head>
-<body>
-<h3>勾选要保留为样例的条目（每条展示 input→output 变化）</h3>
-<div id="examples"></div>
-<div class="buttons">
-  <button id="btnConfirm" onclick="confirmSelection()" autofocus>确认选择</button>
-  <button onclick="selectAll()">全部保留</button>
-  <button onclick="selectNone()">全部抛弃</button>
-  <button onclick="cancel()">取消</button>
-  <button onclick="stopProofread()">终止校对</button>
-</div>
-<script>
-const examples = ${examplesJson};
-const segmenter = new Intl.Segmenter('zh', { granularity: 'word' });
-
-function renderDiff(a, b) {
-  const diff = Diff.diffWordsWithSpace(a, b, segmenter);
-  return diff.map(part => {
-    const span = document.createElement('span');
-    span.className = part.added ? 'added' : part.removed ? 'removed' : '';
-    span.textContent = part.value;
-    return span.outerHTML;
-  }).join('');
-}
-
-const container = document.getElementById('examples');
-examples.forEach((ex, i) => {
-  const div = document.createElement('div');
-  div.className = 'example-item';
-  div.innerHTML = '<label><input type="checkbox" data-idx="' + i + '"> <div class="diff-display">' + renderDiff(ex.input, ex.output) + '</div></label>';
-  container.appendChild(div);
-});
-
-function getSelectedIndices() {
-  return Array.from(document.querySelectorAll('input[type=checkbox]:checked')).map(cb => parseInt(cb.dataset.idx, 10));
-}
-
-function selectAll() {
-  document.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = true; });
-}
-function selectNone() {
-  document.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = false; });
-}
-
-function confirmSelection() {
-  const vscode = acquireVsCodeApi();
-  vscode.postMessage({ type: 'confirm', selectedIndices: getSelectedIndices() });
-}
-function cancel() {
-  const vscode = acquireVsCodeApi();
-  vscode.postMessage({ type: 'cancel' });
-}
-function stopProofread() {
-  const vscode = acquireVsCodeApi();
-  vscode.postMessage({ type: 'stop' });
-}
-document.addEventListener('DOMContentLoaded', function() {
-  document.getElementById('btnConfirm')?.focus();
-});
-</script>
-</body>
-</html>`;
-
-            panel.webview.onDidReceiveMessage((msg: { type: string; selectedIndices?: number[] }) => {
-                if (msg.type === 'confirm') {
-                    doResolve(msg.selectedIndices ?? []);
-                    panel.dispose();
-                } else if (msg.type === 'cancel') {
-                    doResolve('cancel');
-                    panel.dispose();
-                } else if (msg.type === 'stop') {
-                    this.handleStopCommand();
-                    doResolve('cancel');
-                    panel.dispose();
-                }
-            });
-
-            panel.onDidDispose(() => doResolve('cancel'));
-        });
-    }
-
-    /**
      * 主入口：启动持续校对
      */
     public async handleContinuousProofreadCommand(context: vscode.ExtensionContext): Promise<void> {
@@ -469,9 +308,9 @@ document.addEventListener('DOMContentLoaded', function() {
             segmentIndex: 0,
             proofreadUri: undefined,
             currentSegmentEndOffset: undefined,
-            awaitingExamplesConfirmation: false,
             diffCloseListener: undefined,
             currentSegmentItems: undefined,
+            lastProofreadModelText: undefined,
         };
         this.setContextActive(true);
         await this.runLoop(context, referenceFile);
@@ -510,10 +349,6 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     public async handleSkipCommand(context: vscode.ExtensionContext): Promise<void> {
         if (!this.session) return;
-        if (this.session.awaitingExamplesConfirmation) {
-            vscode.window.showInformationMessage('请先在样例确认面板中点击「确认选择」或「取消」。');
-            return;
-        }
         if (this.session.currentSegmentEndOffset !== undefined) {
             this.session.startOffset = this.session.currentSegmentEndOffset;
             this.session.segmentIndex += 1;
@@ -570,37 +405,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const originalText = segResult.segment;
-        const examples: CandidateExample[] =
-            this.session.currentSegmentItems && this.session.currentSegmentItems.length > 0
-                ? this.session.currentSegmentItems.filter((i) => i.corrected != null).map((i) => ({ input: i.original, output: i.corrected! }))
-                : this.extractCandidateExamples(originalText, finalText);
+        const modelOut = this.session.lastProofreadModelText ?? finalText;
+        const items = this.session.currentSegmentItems
+            ?.filter((i) => i.corrected != null)
+            .map((i) => ({ original: i.original, corrected: i.corrected! }));
         this.session.currentSegmentItems = undefined;
-        const examplesPath = FilePathUtils.getExamplesPath(doc.uri);
+        this.session.lastProofreadModelText = undefined;
+        this.session.proofreadUri = undefined;
 
-        if (examples.length > 0 && examplesPath) {
-            this.updateStatusBar(`选择要保留的样例 (${examples.length} 条) | Enter 确认 Esc 取消 | Ctrl+Alt+Q 停止`, true);
-            this.session.awaitingExamplesConfirmation = true;
-            const result = await this.showExamplesConfirmationWebview(context, examples, examplesPath);
-            this.session.awaitingExamplesConfirmation = false;
-            this.session.proofreadUri = undefined;
-
-            if (result !== 'cancel' && result.length > 0) {
-                const examplesToAdd = result
-                    .filter(i => i >= 0 && i < examples.length)
-                    .map(i => examples[i]);
-                if (examplesToAdd.length > 0) {
-                    const added = await this.examplesHandler.appendExamplesAndShow(examplesPath, examplesToAdd);
-                    if (added > 0) {
-                        const skipped = examplesToAdd.length - added;
-                        const msg = skipped > 0
-                            ? `已添加 ${added} 条样例到 examples.md（${skipped} 条已存在已跳过）`
-                            : `已添加 ${added} 条样例到 examples.md`;
-                        vscode.window.showInformationMessage(msg);
-                    }
-                }
-            }
-        } else {
-            this.session.proofreadUri = undefined;
+        try {
+            await runEditorialMemoryAfterAccept({
+                documentUri: doc.uri,
+                fullText: editor.document.getText(),
+                selectionStartLine: segmentRange.start.line,
+                selectionRangeLabel: `L${segmentRange.start.line + 1}C${segmentRange.start.character}–L${segmentRange.end.line + 1}C${segmentRange.end.character}`,
+                originalSelected: originalText,
+                finalSelected: finalText,
+                modelOutput: modelOut,
+                platform: config.platform,
+                model: config.model,
+                items,
+            });
+        } catch {
+            /* 记忆失败不阻断持续校对 */
         }
 
         this.session.startOffset = doc.offsetAt(segmentRange.end);
@@ -691,6 +518,10 @@ document.addEventListener('DOMContentLoaded', function() {
             vscode.window.showErrorMessage('校对失败，请重试。');
             this.handleStopCommand();
             return;
+        }
+
+        if (this.session) {
+            this.session.lastProofreadModelText = result;
         }
 
         const fileExt = path.extname(document.fileName) || '.md';
