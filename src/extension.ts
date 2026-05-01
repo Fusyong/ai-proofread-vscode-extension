@@ -10,7 +10,7 @@ import { WebviewManager } from './ui/webviewManager';
 import { FileSplitCommandHandler } from './commands/fileSplitCommandHandler';
 import { ProofreadCommandHandler } from './commands/proofreadCommandHandler';
 import { FileCompareCommandHandler } from './commands/fileCompareCommandHandler';
-import { ExamplesCommandHandler } from './commands/examplesCommandHandler';
+import { SplitIntoSentencesCommandHandler } from './commands/splitIntoSentencesCommandHandler';
 import { DocumentConvertCommandHandler } from './commands/documentConvertCommandHandler';
 import { UtilityCommandHandler } from './commands/utilityCommandHandler';
 import { CitationCommandHandler } from './commands/citationCommandHandler';
@@ -80,7 +80,7 @@ export function activate(context: vscode.ExtensionContext) {
     const fileSplitHandler = new FileSplitCommandHandler(webviewManager);
     const proofreadHandler = new ProofreadCommandHandler(webviewManager);
     const fileCompareHandler = new FileCompareCommandHandler(context);
-    const examplesHandler = new ExamplesCommandHandler(context);
+    const splitIntoSentencesHandler = new SplitIntoSentencesCommandHandler();
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
     const dictPrepHandler = new DictPrepCommandHandler(webviewManager);
@@ -245,11 +245,8 @@ export function activate(context: vscode.ExtensionContext) {
             }
             await proofreadHandler.handleProofreadSelectionWithMemoryCommand(editor, context);
         }),
-        vscode.commands.registerCommand('ai-proofread.editProofreadingExamples', async () => {
-            await examplesHandler.handleEditProofreadingExamplesCommand();
-        }),
         vscode.commands.registerCommand('ai-proofread.splitIntoSentences', async () => {
-            await examplesHandler.handleSplitIntoSentencesCommand();
+            await splitIntoSentencesHandler.handleSplitIntoSentencesCommand();
         }),
 
         // 注册提示词管理命令（同时显示 prompts 与源文本特性两个 TreeView，并聚焦 prompts）

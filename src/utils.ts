@@ -150,20 +150,7 @@ export class FilePathUtils {
     }
 
     /**
-     * 获取 .proofread/examples.md 路径
-     * @param anchorUri 锚点 URI（如当前文档或 diff 侧文档），用于确定工作区
-     * @returns examples.md 的完整路径。有工作区时用工作区根目录，无工作区时用文档所在目录
-     */
-    public static getExamplesPath(anchorUri: vscode.Uri): string {
-        const folder = vscode.workspace.getWorkspaceFolder(anchorUri);
-        const rootDir = folder
-            ? folder.uri.fsPath
-            : (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? path.dirname(anchorUri.fsPath));
-        return path.join(rootDir, '.proofread', 'examples.md');
-    }
-
-    /**
-     * 项目级编辑记忆 `.proofread/editorial-memory.md`（与 {@link getExamplesPath} 相同的工作区根规则）
+     * 项目级编辑记忆 `.proofread/editorial-memory.md`（工作区根与无工作区锚点规则）
      */
     public static getEditorialMemoryPath(anchorUri: vscode.Uri): string {
         const folder = vscode.workspace.getWorkspaceFolder(anchorUri);

@@ -102,10 +102,6 @@
         "title": "AI Proofreader: proofread selection with memory"
       },
       {
-        "command": "ai-proofread.editProofreadingExamples",
-        "title": "AI Proofreader: edit Proofreading examples"
-      },
-      {
         "command": "ai-proofread.splitIntoSentences",
         "title": "AI Proofreader: split into sentences"
       },

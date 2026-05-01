@@ -13,10 +13,10 @@
 | 能力 | 说明 |
 |------|------|
 | **文档准备** | **校对面板** 有 docx/PDF （可选）、整理段落、标记标题、切分等**按钮** |
-| **校对路径** | ① 选段：`proofread selection`（或 **`proofread selection with memory`**）；② 长文档：**校对面板** 切分 →「校对 JSON 文件」；样例可作 reference 时在选段流程中选参考文件指向 `.proofread/examples.md` |
+| **校对路径** | ① 选段：`proofread selection`（或 **`proofread selection with memory`**）；② 长文档：**校对面板** 切分 →「校对 JSON 文件」；需要 reference 时在选段或合并 JSON 流程中自选文本/Markdown 文件 |
 | **结果查看** | **校对面板**「比较前后差异」「生成勘误表」**按钮**；或 diff 命令 |
 | **辅助功能** | **校对面板** 有字词检查、引文核对等**按钮**；**侧栏**有 words checked、citations、标题树等**视图** |
-| **用户扩展能力** | 自定义提示词、校对样例、自定义替换表、jieba 词典、标题/序号规则，见 [第六节](#六用户扩展能力) |
+| **用户扩展能力** | 自定义提示词、自定义替换表、jieba 词典、标题/序号规则，见 [第六节](#六用户扩展能力) |
 
 ---
 
@@ -55,7 +55,7 @@
 | 任务 | 操作（优先用 UI） |
 |------|-------------------|
 | 校对这一小段 | 选中文字 → **右键** → **proofread selection**（或 **proofread selection with memory**）；或 **校对面板** 顶部对应按钮 |
-| 要带 `.proofread/examples.md` | 同上走选段校对，在流程中选「使用参考文件」并指定该文件 |
+| 要带固定参考全文 | 选段校对时选「使用参考文件」指定路径；或对 JSON **Merge Two Files** 并入 Markdown |
 
 ### 1.3 练习册（题 + 答案需一起校对）
 
@@ -247,8 +247,7 @@ flowchart LR
 | AI Proofreader: proofread file ⭐ | 批量校对当前打开的 JSON 文件 |
 | AI Proofreader: proofread selection ⭐ | 校对当前选中的文本（选段校对） |
 | AI Proofreader: proofread selection with memory ⭐ | 选段校对并强制启用项目编辑记忆注入与写回 |
-| AI Proofreader: edit Proofreading examples | 编辑校对样例（基于选中文本或 diff 窗口） |
-| AI Proofreader: split into sentences | 将文本切分为句子（用于整理校对样例等） |
+| AI Proofreader: split into sentences | 将整篇或选区按简易中文分句，并用所选分隔符连接 |
 | **比较与结果呈现** | |
 | AI Proofreader: diff it with another file ⭐ | 比较两个文件差异（内置 diff / 生成 HTML 差异 / 生成勘误表） |
 | AI Proofreader: search selection in PDF | 在同名 PDF 中搜索当前选中文本（需 SumatraPDF） |
@@ -320,7 +319,6 @@ flowchart LR
 | 扩展项 | 入口 / 配置 | 简要说明 |
 |--------|-------------|----------|
 | **自定义提示词** | **校对面板**「管理提示词」；**侧栏 prompts 视图** 新建/编辑/删除 | 可做翻译、专项核查、注释等，不限于校对；需说明 target、reference、context 三种文本 |
-| **校对样例** | 命令 **edit Proofreading examples**；文件 `.proofread/examples.md` | 积累「原文→修改」样例；选段校对时可通过「参考文件」指定该文件并入 `<reference>`；可手动编辑 |
 | **自定义替换表** | **校对面板**「管理自定义替换表」；**侧栏 custom checks 视图** 加载 .txt | 字词检查用，支持正则；可积累勘误表生成的 `.word-errors.csv` 中的错词 |
 | **jieba 自定义词典** | 设置 `jieba.customDictPath` | 分词、词频、勘误表对齐等用；格式：每行「词语 词频 词性」 |
 | **标题层级规则** | 设置 `numbering.customLevels` | 标题树检查用；自定义序号格式（如「前言」「单一单元」） |

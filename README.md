@@ -27,7 +27,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 ### 2.1. 校对文档中的选段
 
 1. Ctrl+N新建文档，后缀设为`.md`（markdown文档），把你需要校对的文字粘贴到这里，选中其中的一段文字
-2. 在所选文字上打开右键菜单，使用其中的`AI proofreader: proofread selection`项校对选中文本
+2. 在所选文字上打开右键菜单，使用其中的 **AI Proofreader: proofread selection** 校对选中文本；若你希望**在本次校对中无视设置里关闭的编辑记忆**、始终注入并接受写回 `editorial-memory.md`，可选用 **AI Proofreader: proofread selection with memory**
 3. 弹出选项对话框时全部回车，即使用默认值
 4. 最后会自动展示校对前后的差异，效果如下，深红表示原文变动，深绿表示结果变动：
 
@@ -113,7 +113,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 !!! note 切分文档依赖两种标记
     本扩展默认用户需要校对的文档为[markdown格式](https://www.markdownguide.org/basic-syntax/)，文档切分依赖markdown文档中的两种标记：（1）空行。在markdown中，一个或多个空行表示分段，没有空行的断行在渲染时被忽略，即合并为一段。**至少要有合适的空行，否则无法切分。**（2）各级标题。如`## `开头的是二级标题。
 
-还有一个**把文本切分为句子的命令**，split into sentences，可用于整理校对样例等场合。
+还有一个**把文本切分为句子的命令**（split into sentences），可对整篇或选中部分重新分句并插入分隔符，便于文稿整理。
 
 #### 3.1.4. 合并JSON，组织语境
 
@@ -123,7 +123,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 假设你校对一本书，切分后得到包含300个target的JSON文件。那么可以准备相同数量、一一对应的上下文和参考文献，切分成包含相同数量target的JSON文件。然后使用合并命令，将上下文文本中的target作为context合并，将参考文本中的target作为reference合并。
 
-也可以合并一个Markdown文件，比如后面会说到的 `.proofread/examples.md`，即每一个JSON项都合并一次这个文本。
+也可以选择**任意 Markdown 文件**作为来源，让每个 JSON 项都合并一次该文件（常用于统一下发同一段体裁说明、用词规范等参考全文）。
 
 **合并 JSON 文件 (Merge Two Files)：**
 
@@ -207,17 +207,18 @@ Additionally, you can also set your own prompts for other text processing scenar
 2. 选中要校对的段落，不宜过长
 3. 从右键菜单、命令面板（Ctrl+Shift+P）中选择 Proofread Selection
 4. 可选择上下文范围、参考文件和温度。加入上下文是为大语言模型提供语境，以便参考，并保持一致性。参考文件可以是相关的词条、更权威的文献等。模型温度较低时，随机性、创造性、稳定性较低；反之则随机性、创造性、不稳定性变高。可以参考模型文档进行测试。**使用不同温度多遍校对，或许可以覆盖不同的问题，值得尝试。**
-5. 校对结束后会打开 diff；**关闭右侧校对结果文档时**可选择是否将结果**写回选区**。若选择接受写回，扩展会在工作区 `.proofread/editorial-memory.md` 中累积**项目级编辑记忆**（含 `## 全局`、`## 按文档结构` 下各 `### path`、`## 近期记忆`），并在下一次校对时在请求中注入 `<editorial_memory>`、`<editorial_memory_recent>`、`<editorial_memory_reference>` 与 `<current_proofread_context>`（可在设置 `ai-proofread.editorialMemory.*` 中开关与限长）。自定义提示词若需利用记忆，请在提示词中说明这些标签的含义。并生成 `.proofread` 下日志，以便再次查看结果。
+5. 校对结束后会打开 diff；**关闭右侧校对结果文档时**可选择是否将结果**写回选区**。若选择接受写回，扩展会在工作区 `.proofread/editorial-memory.md` 中累积**项目级编辑记忆**（含 `## 全局`、`## 按文档结构` 下各 `### path`、`## 近期记忆`），并在下一次校对时在请求中注入 `<editorial_memory>`、`<editorial_memory_recent>`、`<editorial_memory_reference>` 与 `<current_proofread_context>`（可在设置 `ai-proofread.editorialMemory.*` 中开关与限长）。自定义提示词若需利用记忆，请在提示词中说明这些标签的含义。并生成 `.proofread` 下日志，以便再次查看结果。**`## 近期记忆` 中与本轮对应的时间线条目**：由扩展用**句子对齐**筛出有**实质改动**的句式要点写出摘要（忽略仅空白、转行等可归一化为相同的情形），避免把整块原文与改后正文简单截断填入；若在设置中开启了接受写回后的 **LLM 合并**（`editorialMemory.mergeAfterAccept`），模型还可选输出单行 `recent_append` 精炼要点——提示词要求其风格与全局/按结构记忆条目一致且**不写整段书稿**。详情见源码 `recentSentenceSummary.ts`、`mergeRound.ts`。
 
 #### 3.2.1a. 项目级编辑记忆与 reconcile
 
-- 命令面板 / 编辑器右键中还有 **「AI Proofreader: proofread selection with memory」**：与普通 Proofread Selection 流程相同，但**本次会话**强制打开记忆的注入与接受写回；若你在设置里关闭了 `ai-proofread.editorialMemory.enabled`，仍可用该命令单次启用记忆。
-- 记忆文件路径：`<工作区根>/.proofread/editorial-memory.md`（与 `examples.md` 同目录）。
+- **校对面板**快捷栏中为「校对选中文本」「校对选中（编辑记忆）」两个按钮；命令面板或右键亦可运行 **Proofread Selection** / **Proofread Selection with Memory**。
+- **「AI Proofreader: proofread selection with memory」**与普通 Proofread Selection 的对话与 diff 流程相同，但**本次**强制启用记忆的注入与接受写回；若你在设置里关闭了 `ai-proofread.editorialMemory.enabled`，仍可用该命令单次启用记忆。
+- 记忆文件路径：`<工作区根>/.proofread/editorial-memory.md`。
 - 大改标题或章节结构后，可在命令面板运行 **「AI Proofreader: reconcile editorial memory with document headings」**，由模型给出 `old_path` → `new_path` 的 JSON 映射，扩展校验当前稿 TOC 后**仅机械改写** `### path:` 行；详情写入 `.proofread/editorial-memory.reconcile.log.md`。
 - **「AI Proofreader: clear editorial memory file」** 可将记忆恢复为空白模板（写盘前可按设置生成 `.bak`）。
 - 若记忆含不宜入库的内容，可在仓库 `.gitignore` 中加入 `.proofread/editorial-memory.md`；备份文件形如 `editorial-memory.md-YYYYMMDD-HHmmss.bak`，可按需忽略 `.proofread/*.bak`。
 
-若要使用 `.proofread/examples.md` 作为参考文本，可走 **Proofread Selection**（或 **proofread selection with memory**）流程，在选择「是否使用参考文件？」时选 **是**，然后指定 `.proofread/examples.md`。积累样例仍可运行 **edit Proofreading examples**。合并 JSON 为批量校对拼装 reference 的行为不变。
+选段校对时若需要参考书稿外的全文（如体例摘要、词条摘录），在选择「是否使用参考文件？」时选 **是** 并选定 Markdown 或其他文本文件即可；**Merge Two Files** 批量合并 reference 的流程不变。
 
 #### 3.2.2. 校对切分好的JSON文档
 
@@ -356,9 +357,8 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 9. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
 10.  **OpenCC**：集成了[opencc-js](https://github.com/nk2028/opencc-js)，支持繁简转换，命令为`opencc`和`opencc selection`。
 11. **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
-12. **按句子切分**：使用`split into sentences`命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子，适合用于编辑校对样例，与其保存时的默认分隔符一致。
-13. **编辑校对样例**：使用`edit proofreading examples`命令，千文已经有介绍。
-14. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
+12. **按句子切分**：使用 `split into sentences` 命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子。
+13. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
 
 ### 3.7. 注意事项
 
@@ -452,10 +452,15 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 6. 更新日志
 
+### v1.10.0
+
+- **编辑记忆**：接受写回后写入 **「近期记忆」时间线** 时，改用**句子对齐 + 实质改动过滤**生成摘要条目（不写整段原文与终稿；仅空白/转行等归一化后相同则记为「无实质改动」等）；可选的合并 LLM 字段 **`recent_append`** 明确约束为与全局及按文档结构条目风格一致的短句，严禁整段 target。
+- **移除**：命令 **`AI Proofreader: edit Proofreading examples`**（`ai-proofread.editProofreadingExamples`）及向 `.proofread/examples.md` 写入 `<example>` 块的整条链路；不再有扩展内置的「校对样例库」编辑与写入逻辑。
+- （与 **v1.9.6** 列出的移除项同属当前行为：已无 `proofread selection with examples`、`continuous proofread` 及相关快捷键；需要 reference 时请用选段/合并流程自选文本文件。）
 
 ### v1.9.6
 
-- **移除**：命令 `proofread selection with examples`、`continuous proofread`（及接受/跳过/停止子命令）、持续校对实现与相关快捷键；改用选段校对时手动选择参考文件（可指向 `.proofread/examples.md`）及 **`proofread selection with memory`**。
+- **移除**：命令 `proofread selection with examples`、`continuous proofread`（及接受/跳过/停止子命令）、持续校对实现与相关快捷键；改用选段校对时手动选择参考文件及 **`proofread selection with memory`**。
 - 优化：阿里云百炼平台默认支持qwen3.6-max-preview，非思考模式；DeepSeek平台默认支持deepseek-v4-pro，非思考模式
 - 特性：核对工具书的工作流，分为两段：「LLM 生成查词计划」，由LLM确定文本中需要查询工具书的词语；「查词并入 JSON」，然后查询本地mdx词典，合并到reference中，供校对时使用。
 - 优化：校对面板，文件路径后提供「打开」按钮，替代原有查看按钮
@@ -512,11 +517,11 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ### v1.7.0
 
-- 特性：持续发现与监督校对流程（实验功能），即带样例校对，审改校对结果并收集样例，再次带样例校对，如此循环。是对现有几个功能的集成
+- 特性：持续发现与监督校对流程（实验功能），即带样例校对，审改校对结果并收集样例，再次带样例校对，如此循环。是对现有几个功能的集成。**（现已移除：** 对应命令与快捷键见 **v1.9.6**；请以项目级 `editorial-memory.md`、选段校对手动 reference、**proofread selection with memory** 等替代。**）**
 - 特性：标题树与段内序号检查
 - 特性：比较文件时自动收集错误词语与正确词语对，以便整理后用作自定义替换表
 - 优化：扩展结果面板为校对面板，即全流程控制面板
-- 特性：编辑校对样例；使用样例校对选中文本；合并JSON功能时可以合并一个Markdown文件，比如校对样例文件；切分为句子的命令。
+- 特性：合并 JSON 时可合并 Markdown 作为每条 reference/context；切分为句子的命令。（历史上的「校对样例 / examples.md / edit proofreading examples」能力已先后在 v1.9.6、v1.10.0 移除；见当前版 changelog。）
 - 特性：用户加载非正则自定义替换表时允许指定是否按词语边界匹配
 - 优化：取消jieba调用失败时保持静默并使用备用方案的行为，改为报告并停止处理。
 - bugfix：删除opencc-js
@@ -693,12 +698,17 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 7. 开发命令
 
+Windows 若在 **PowerShell** 里直接运行 `npm` 报错「禁止运行脚本」（`PSSecurityException`），可任选其一：命令行改用 **`npm.cmd`**（例如 `npm.cmd run compile`）；或在 VS Code / Cursor 中按 **`Ctrl+Shift+B`** 使用本仓库自带的默认生成任务（`.vscode/tasks.json` 调用 `npm.cmd run compile`）；或在当前用户下执行 `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` 后再使用 `npm run …`。
+
 ```bash
 # 安装依赖
 npm install
 
 # 首次开发需先执行一次打包，确保 sql.js 和 jieba-wasm 已复制到 dist
 npm run package
+
+# 单次编译扩展（等价于 Ctrl+Shift+B 默认生成任务）
+npm run compile
 
 # 开发时实时编译
 npm run watch

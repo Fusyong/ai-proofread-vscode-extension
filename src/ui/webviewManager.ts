@@ -697,9 +697,6 @@ export class WebviewManager {
                     await vscode.commands.executeCommand(cmdMap[command]);
                     break;
                 }
-                case 'editProofreadingExamples':
-                    await vscode.commands.executeCommand('ai-proofread.editProofreadingExamples');
-                    break;
                 case 'citationRebuildIndex':
                     await vscode.commands.executeCommand('ai-proofread.citation.rebuildIndex');
                     break;
@@ -937,8 +934,6 @@ export class WebviewManager {
                 <button type="button" class="link-button" onclick="handleAction('proofreadSelection')" title="AI Proofreader: proofread selection">校对选中文本</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('proofreadSelectionWithMemory')" title="AI Proofreader: proofread selection with memory">校对选中（编辑记忆）</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('editProofreadingExamples')" title="AI Proofreader: edit Proofreading examples">编辑校对样例</button>
                 ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('citationOpenView')" title="AI Proofreader: verify citations">核对全文引文</button>
                 ${sep}
