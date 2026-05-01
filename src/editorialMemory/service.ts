@@ -11,6 +11,7 @@ import {
     buildReferenceSet,
     docMatches,
 } from './window';
+import { summarizeRoundSentenceAligned } from './recentSentenceSummary';
 import { runMergeLlm, validateSectionPaths } from './mergeRound';
 import type { MergeLlmResult } from './types';
 
@@ -295,7 +296,7 @@ export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Prom
     const userEdited = args.finalSelected !== args.modelOutput;
 
     const ts = new Date().toISOString();
-    const sum = summarizeRound(args.originalSelected, args.finalSelected, cfg.roundMaxChars);
+    const sum = summarizeRoundSentenceAligned(args.originalSelected, args.finalSelected, cfg.roundMaxChars);
     const bullet = `- \`[${ts}]\` ${documentId} / \`${headingPath}\`：${sum}`;
     prependRecentBullet(parsed, bullet, cfg.recentMaxRounds, cfg.recentMaxChars);
 
@@ -351,15 +352,6 @@ export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Prom
         FilePathUtils.backupFileIfExists(memPath, false);
     }
     fs.writeFileSync(memPath, out, 'utf8');
-}
-
-function summarizeRound(a: string, b: string, max: number): string {
-    const na = normalizeLineEndings(a).trim();
-    const nb = normalizeLineEndings(b).trim();
-    if (na === nb) {
-        return '无文本差异。';
-    }
-    return `忌/旧样摘要 → 宜/定稿：` + clip(`「${na.slice(0, 120)}」→「${nb.slice(0, 120)}」`, max);
 }
 
 export async function clearEditorialMemory(uri: vscode.Uri): Promise<void> {
