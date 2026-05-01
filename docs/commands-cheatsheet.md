@@ -118,7 +118,7 @@ flowchart LR
         S1["打开 Markdown"]
         S2["选中一段文字"]
         S3["proofread selection<br/>（或 with memory 强制记忆）"]
-        S4["查看 diff → 接受则写回选区/<br/>editorial-memory"]
+        S4["查看 diff → 写回选区/<br/>memory.json 记忆"]
         S1 --> S2 --> S3 --> S4
     end
 

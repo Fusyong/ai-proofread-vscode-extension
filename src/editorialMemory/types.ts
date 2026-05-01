@@ -14,20 +14,3 @@ export interface ParsedEditorialMemory {
     recentSectionBody: string;
     pendingBlocks: EditorialPathBlock[];
 }
-
-export interface MergeRoundPayload {
-    document_id: string;
-    heading_path: string;
-    selection_range: string;
-    original_selected: string;
-    final_selected: string;
-    item_level_changes?: Array<{ original: string; corrected: string }>;
-    user_edited_away_from_model: boolean;
-}
-
-export interface MergeLlmResult {
-    global_md: string;
-    sections: Array<{ path: string; body_md: string }>;
-    classification_notes?: string;
-    recent_append?: string;
-}

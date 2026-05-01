@@ -343,7 +343,7 @@ export class ProofreadCommandHandler {
     }
 
     /**
-     * 校对选中并启用编辑记忆：`editorial-memory.md` 注入与接受写回（无单独设置开关，仅用本命令）。
+     * 校对选中并启用编辑记忆：`editorial-memory.json` / `editorial-memory-archive.json`（v2）注入与接受写回。
      */
     public async handleProofreadSelectionWithMemoryCommand(
         editor: vscode.TextEditor,

@@ -619,22 +619,22 @@ export function activate(context: vscode.ExtensionContext) {
             const model = configManager.getModel(platform);
             await runReconcileForActiveDocument(memPath, ed.document.uri, platform, model);
         }),
-        vscode.commands.registerCommand('ai-proofread.editorialMemory.clear', async () => {
-            const ed = vscode.window.activeTextEditor;
-            if (!ed) {
-                vscode.window.showWarningMessage('请先打开任意工作区文件以定位 .proofread 目录。');
-                return;
-            }
-            const pick = await vscode.window.showWarningMessage(
-                '将把工作区内 editorial-memory.md 恢复为空白模板（可先备份），是否继续？',
-                { modal: true },
-                '清空'
-            );
-            if (pick === '清空') {
-                await clearEditorialMemory(ed.document.uri);
-                vscode.window.showInformationMessage('已清空 editorial-memory.md。');
-            }
-        }),
+            vscode.commands.registerCommand('ai-proofread.editorialMemory.clear', async () => {
+                const ed = vscode.window.activeTextEditor;
+                if (!ed) {
+                    vscode.window.showWarningMessage('请先打开任意工作区文件以定位 .proofread 目录。');
+                    return;
+                }
+                const pick = await vscode.window.showWarningMessage(
+                    '将把工作区内 editorial-memory.json 与 editorial-memory-archive.json 恢复为空（可先备份），是否继续？',
+                    { modal: true },
+                    '清空'
+                );
+                if (pick === '清空') {
+                    await clearEditorialMemory(ed.document.uri);
+                    vscode.window.showInformationMessage('已清空活跃与存档编辑记忆 JSON。');
+                }
+            }),
         vscode.commands.registerCommand('ai-proofread.showProofreadItemsTree', async () => {
             await vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', true);
             await new Promise((r) => setTimeout(r, 50));

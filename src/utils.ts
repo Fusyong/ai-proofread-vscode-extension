@@ -149,15 +149,28 @@ export class FilePathUtils {
         }
     }
 
-    /**
-     * 项目级编辑记忆 `.proofread/editorial-memory.md`（工作区根与无工作区锚点规则）
-     */
-    public static getEditorialMemoryPath(anchorUri: vscode.Uri): string {
+    private static editorialMemoryRootDir(anchorUri: vscode.Uri): string {
         const folder = vscode.workspace.getWorkspaceFolder(anchorUri);
-        const rootDir = folder
+        return folder
             ? folder.uri.fsPath
             : (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? path.dirname(anchorUri.fsPath));
-        return path.join(rootDir, '.proofread', 'editorial-memory.md');
+    }
+
+    /**
+     * v2：活跃编辑记忆 `.proofread/editorial-memory.json`
+     */
+    public static getEditorialMemoryPath(anchorUri: vscode.Uri): string {
+        return path.join(this.editorialMemoryRootDir(anchorUri), '.proofread', 'editorial-memory.json');
+    }
+
+    /** v2：存档记忆 `.proofread/editorial-memory-archive.json` */
+    public static getEditorialMemoryArchivePath(anchorUri: vscode.Uri): string {
+        return path.join(this.editorialMemoryRootDir(anchorUri), '.proofread', 'editorial-memory-archive.json');
+    }
+
+    /** v1 遗留 `.proofread/editorial-memory.md`（仅迁移时读取） */
+    public static getEditorialMemoryLegacyMarkdownPath(anchorUri: vscode.Uri): string {
+        return path.join(this.editorialMemoryRootDir(anchorUri), '.proofread', 'editorial-memory.md');
     }
 
     /**

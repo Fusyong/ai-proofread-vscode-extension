@@ -28,7 +28,8 @@ out
 Thumbs.db
 
 # AI Proofreader 项目记忆（含书稿信息时可忽略版本库）
-# .proofread/editorial-memory.md
+# .proofread/editorial-memory.json
+# .proofread/editorial-memory-archive.json
 # .proofread/*.bak
 
 # 临时文件
