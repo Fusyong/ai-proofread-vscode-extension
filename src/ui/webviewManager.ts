@@ -420,13 +420,11 @@ export class WebviewManager {
                     break;
                 }
                 case 'proofreadSelection':
-                case 'proofreadSelectionWithExamples': {
-                    // 头部按钮：使用当前编辑窗口文件
-                    await vscode.commands.executeCommand(
-                        command === 'proofreadSelection' ? 'ai-proofread.proofreadSelection' : 'ai-proofread.proofreadSelectionWithExamples'
-                    );
+                    await vscode.commands.executeCommand('ai-proofread.proofreadSelection');
                     break;
-                }
+                case 'proofreadSelectionWithMemory':
+                    await vscode.commands.executeCommand('ai-proofread.proofreadSelectionWithMemory');
+                    break;
                 case 'convertDocxToMarkdown':
                     await vscode.commands.executeCommand('ai-proofread.convertDocxToMarkdown');
                     break;
@@ -702,9 +700,6 @@ export class WebviewManager {
                 case 'editProofreadingExamples':
                     await vscode.commands.executeCommand('ai-proofread.editProofreadingExamples');
                     break;
-                case 'continuousProofread':
-                    await vscode.commands.executeCommand('ai-proofread.continuousProofread');
-                    break;
                 case 'citationRebuildIndex':
                     await vscode.commands.executeCommand('ai-proofread.citation.rebuildIndex');
                     break;
@@ -941,9 +936,7 @@ export class WebviewManager {
                 ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('proofreadSelection')" title="AI Proofreader: proofread selection">校对选中文本</button>
                 ${sep}
-                <button type="button" class="link-button" onclick="handleAction('proofreadSelectionWithExamples')" title="AI Proofreader: proofread selection with examples">使用样例校对选中</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('continuousProofread')" title="AI Proofreader: continuous proofread">持续校对</button>
+                <button type="button" class="link-button" onclick="handleAction('proofreadSelectionWithMemory')" title="AI Proofreader: proofread selection with memory">校对选中（编辑记忆）</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('editProofreadingExamples')" title="AI Proofreader: edit Proofreading examples">编辑校对样例</button>
                 ${groupSep}

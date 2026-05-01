@@ -1132,8 +1132,9 @@ export async function processJsonFileAsync(
  * @param repetitionMode 提示词重复模式（可选，覆盖配置）
  * @param sourceTextCharacteristics 源文本特性提示词注入正文（仅系统默认提示词时生效；空字符串表示不注入）
  * @param sourceCharacteristicsDisplayTitle 注入项在通知中的展示标题（如预设名称）；未传时由正文摘要回退
- * @param onItemItems 条目式输出时回调解析出的条目（供持续校对等直接用作待选样例）
+ * @param onItemItems 条目式输出时回调解析出的条目（如条目式提示词场景的后续处理）
  * @param onRawItemOutput 条目式输出时回调 LLM 原始返回（供日志等写入原始结果，不写替换后文本）
+ * @param editorialMemoryForceEnabled 为 true 时在设置关闭记忆的情况下仍注入 `buildEditorialMemoryXml`
  * @returns 校对后的文本
  */
 export async function proofreadSelection(
@@ -1151,7 +1152,8 @@ export async function proofreadSelection(
     sourceTextCharacteristics: string = '',
     sourceCharacteristicsDisplayTitle?: string,
     onItemItems?: (items: ProofreadItem[]) => void,
-    onRawItemOutput?: (raw: string) => void
+    onRawItemOutput?: (raw: string) => void,
+    editorialMemoryForceEnabled?: boolean
 ): Promise<string | null> {
     // 获取选中的文本
     const selectedText = editor.document.getText(selection);
@@ -1210,7 +1212,12 @@ export async function proofreadSelection(
         preText += `\n<context>\n${contextText}\n</context>`;
     }
     try {
-        const emXml = await buildEditorialMemoryXml(editor.document.uri, editor.document.getText(), selection.start.line);
+        const emXml = await buildEditorialMemoryXml(
+            editor.document.uri,
+            editor.document.getText(),
+            selection.start.line,
+            editorialMemoryForceEnabled
+        );
         if (emXml) {
             preText += emXml;
         }

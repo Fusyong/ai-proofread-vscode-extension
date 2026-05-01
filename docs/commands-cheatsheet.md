@@ -13,7 +13,7 @@
 | 能力 | 说明 |
 |------|------|
 | **文档准备** | **校对面板** 有 docx/PDF （可选）、整理段落、标记标题、切分等**按钮** |
-| **三种校对方式** | ① 选段校对：选中 → **右键** proofread selection；② 长文档：**校对面板** 选主文件 → 点「切分文档」→ 点「校对JSON文件」；③ 持续校对：**校对面板** 点「持续校对」或 **右键** |
+| **校对路径** | ① 选段：`proofread selection`（或 **`proofread selection with memory`**）；② 长文档：**校对面板** 切分 →「校对 JSON 文件」；样例可作 reference 时在选段流程中选参考文件指向 `.proofread/examples.md` |
 | **结果查看** | **校对面板**「比较前后差异」「生成勘误表」**按钮**；或 diff 命令 |
 | **辅助功能** | **校对面板** 有字词检查、引文核对等**按钮**；**侧栏**有 words checked、citations、标题树等**视图** |
 | **用户扩展能力** | 自定义提示词、校对样例、自定义替换表、jieba 词典、标题/序号规则，见 [第六节](#六用户扩展能力) |
@@ -54,8 +54,8 @@
 
 | 任务 | 操作（优先用 UI） |
 |------|-------------------|
-| 校对这一小段 | 选中文字 → **右键** → **proofread selection**；或 **校对面板** 顶部点 **「校对选中文本」** |
-| 持续校对 | **校对面板** 点 **「持续校对」**，或 **右键** → continuous proofread；每段完成后关闭 diff 窗口，在弹窗中选择 **「接受并继续」**、**「放弃」** 或 **「终止校对」** |
+| 校对这一小段 | 选中文字 → **右键** → **proofread selection**（或 **proofread selection with memory**）；或 **校对面板** 顶部对应按钮 |
+| 要带 `.proofread/examples.md` | 同上走选段校对，在流程中选「使用参考文件」并指定该文件 |
 
 ### 1.3 练习册（题 + 答案需一起校对）
 
@@ -110,15 +110,15 @@
 
 ## 三、典型业务流程（Mermaid 图）
 
-### 3.1 三种校对方式
+### 3.1 两种主要校对路径
 
 ```mermaid
 flowchart LR
     subgraph 方式一["选段校对"]
         S1["打开 Markdown"]
         S2["选中一段文字"]
-        S3["proofread selection <br> 校对选中"]
-        S4["查看 diff 结果"]
+        S3["proofread selection<br/>（或 with memory 强制记忆）"]
+        S4["查看 diff → 接受则写回选区/<br/>editorial-memory"]
         S1 --> S2 --> S3 --> S4
     end
 
@@ -129,14 +129,6 @@ flowchart LR
         L4["proofread file <br> 批量校对文件"]
         L5["结果面板 / diff / 勘误表"]
         L1 --> L2 --> L3 --> L4 --> L5
-    end
-
-    subgraph 方式三["持续校对"]
-        C1["打开文档"]
-        C2["continuous proofread <br> 命令面板/右键"]
-        C3["逐段 diff 复核"]
-        C4["接受/放弃/终止"]
-        C1 --> C2 --> C3 --> C4
     end
 ```
 
@@ -254,9 +246,7 @@ flowchart LR
 | AI Proofreader: open proofreading panel ⭐ | 打开 **校对面板**（集中了切分、校对、比较等**按钮**，是主要 UI 入口） |
 | AI Proofreader: proofread file ⭐ | 批量校对当前打开的 JSON 文件 |
 | AI Proofreader: proofread selection ⭐ | 校对当前选中的文本（选段校对） |
-| AI Proofreader: proofread selection with examples | 带样例校对选中文本（参考 .proofread/examples.md） |
-| AI Proofreader: continuous proofread ⭐ | 持续发现与监督校对（实验功能，命令面板或右键菜单） |
-| AI Proofreader: stop continuous proofread | 终止持续校对 |
+| AI Proofreader: proofread selection with memory ⭐ | 选段校对并强制启用项目编辑记忆注入与写回 |
 | AI Proofreader: edit Proofreading examples | 编辑校对样例（基于选中文本或 diff 窗口） |
 | AI Proofreader: split into sentences | 将文本切分为句子（用于整理校对样例等） |
 | **比较与结果呈现** | |
@@ -330,7 +320,7 @@ flowchart LR
 | 扩展项 | 入口 / 配置 | 简要说明 |
 |--------|-------------|----------|
 | **自定义提示词** | **校对面板**「管理提示词」；**侧栏 prompts 视图** 新建/编辑/删除 | 可做翻译、专项核查、注释等，不限于校对；需说明 target、reference、context 三种文本 |
-| **校对样例** | 命令 **edit Proofreading examples**；文件 `.proofread/examples.md` | 积累「原文→修改」样例，供「带样例校对」「持续校对」参考；可手动编辑 |
+| **校对样例** | 命令 **edit Proofreading examples**；文件 `.proofread/examples.md` | 积累「原文→修改」样例；选段校对时可通过「参考文件」指定该文件并入 `<reference>`；可手动编辑 |
 | **自定义替换表** | **校对面板**「管理自定义替换表」；**侧栏 custom checks 视图** 加载 .txt | 字词检查用，支持正则；可积累勘误表生成的 `.word-errors.csv` 中的错词 |
 | **jieba 自定义词典** | 设置 `jieba.customDictPath` | 分词、词频、勘误表对齐等用；格式：每行「词语 词频 词性」 |
 | **标题层级规则** | 设置 `numbering.customLevels` | 标题树检查用；自定义序号格式（如「前言」「单一单元」） |

@@ -201,10 +201,12 @@ function appendMergeFallback(parsed: ParsedEditorialMemory, headingPath: string,
 export async function buildEditorialMemoryXml(
     documentUri: vscode.Uri,
     fullText: string,
-    selectionStartLine: number
+    selectionStartLine: number,
+    editorialMemoryForceEnabled?: boolean
 ): Promise<string> {
     const cfg = readConfig();
-    if (!cfg.enabled) {
+    const memoryOn = editorialMemoryForceEnabled === true || cfg.enabled;
+    if (!memoryOn) {
         return '';
     }
     const memPath = FilePathUtils.getEditorialMemoryPath(documentUri);
@@ -277,11 +279,13 @@ export interface AfterAcceptArgs {
     platform: string;
     model: string;
     items?: Array<{ original: string; corrected: string }>;
+    /** 为 true 时忽略 `editorialMemory.enabled=false`，仍为本次校对注入并写回记忆 */
+    editorialMemoryForceEnabled?: boolean;
 }
 
 export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Promise<void> {
     const cfg = readConfig();
-    if (!cfg.enabled) {
+    if (!cfg.enabled && args.editorialMemoryForceEnabled !== true) {
         return;
     }
     const memPath = FilePathUtils.getEditorialMemoryPath(args.documentUri);
