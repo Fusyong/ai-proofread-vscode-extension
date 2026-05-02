@@ -446,13 +446,11 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ### v1.10.0
 
-- **编辑记忆 v2**：扁平轮次栈在 patch 失败或未开 LLM 时，仍用**句子对齐摘要**压入 `currentRounds`；全局由 `global_ops` 维护 `repeated` 强度；不再使用「按文档 path」与「近期 j」分层。
-- **移除**：命令 **`AI Proofreader: edit Proofreading examples`**（`ai-proofread.editProofreadingExamples`）及向 `.proofread/examples.md` 写入 `<example>` 块的整条链路；不再有扩展内置的「校对样例库」编辑与写入逻辑。
-- （与 **v1.9.6** 列出的移除项同属当前行为：已无 `proofread selection with examples`、`continuous proofread` 及相关快捷键；需要 reference 时请用选段/合并流程自选文本文件。）
+- **重构**：把带样例校对 `proofread selection with examples` 和持续校对 `continuous proofread` 相关功能重构为 **`proofread selection with memory`**
+- 优化：阿里云百炼平台默认支持改回qwen3-max；DeepSeek平台默认支持改为deepseek-v4-flash，非思考模式
 
 ### v1.9.6
 
-- **移除**：命令 `proofread selection with examples`、`continuous proofread`（及接受/跳过/停止子命令）、持续校对实现与相关快捷键；改用选段校对时手动选择参考文件及 **`proofread selection with memory`**。
 - 优化：阿里云百炼平台默认支持qwen3.6-max-preview，非思考模式；DeepSeek平台默认支持deepseek-v4-pro，非思考模式
 - 特性：核对工具书的工作流，分为两段：「LLM 生成查词计划」，由LLM确定文本中需要查询工具书的词语；「查词并入 JSON」，然后查询本地mdx词典，合并到reference中，供校对时使用。
 - 优化：校对面板，文件路径后提供「打开」按钮，替代原有查看按钮

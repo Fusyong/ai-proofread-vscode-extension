@@ -1265,13 +1265,21 @@ export async function proofreadSelection(
         }
     })();
 
-    let result = await client.proofread(
-        postText,
-        preText,
-        userTemperature,
-        context,
-        actualRepetitionMode,
-        sourceTextCharacteristics
+    let result = await vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title: '正在校对文本...',
+            cancellable: false
+        },
+        async () =>
+            client.proofread(
+                postText,
+                preText,
+                userTemperature,
+                context,
+                actualRepetitionMode,
+                sourceTextCharacteristics
+            )
     );
 
     if (result && getOutputType(context) === 'item') {
