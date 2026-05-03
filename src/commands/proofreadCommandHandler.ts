@@ -532,7 +532,7 @@ export class ProofreadCommandHandler {
                 sourceCharacteristicsDisplayTitle = picked.displayTitle;
             }
 
-            // 发起请求前锁定选区与原文；通知区「正在校对文本...」仅在 proofreader 内发起 LLM 请求期间显示
+            // 发起请求前锁定选区与原文；进度为 Window（状态栏侧），避免与「校对完成」通知抢占同一通知槽
             const range = new vscode.Range(editor.selection.start, editor.selection.end);
             const sel = new vscode.Selection(range.start, range.end);
             const originalText = editor.document.getText(range);
@@ -584,6 +584,9 @@ export class ProofreadCommandHandler {
                 const resultForLog = rawItemOutput !== undefined ? rawItemOutput : result;
                 const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nSrcHint: ${sourceCharacteristicsDisplayTitle ?? summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)}\nRepetitionMode: ${repetitionModeName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${resultForLog}\n${'='.repeat(50)}\n\n`;
                 fs.appendFileSync(logFilePath, logMessage, 'utf8');
+
+                // 让步一轮事件循环，确保窗口进度已收起后再弹出通知（避免与进度 UI 叠在一起）
+                await new Promise<void>((resolve) => setImmediate(resolve));
 
                 // 显示信息消息，包含提示词重复模式（使用键名）
                 const targetLength = editor.document.getText(editor.selection).length;

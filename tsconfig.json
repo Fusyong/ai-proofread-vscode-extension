@@ -11,5 +11,6 @@
     "skipLibCheck": true,
     "moduleResolution": "node16"
   },
+  "include": ["src/**/*"],
   "exclude": ["node_modules", ".vscode-test"]
 }

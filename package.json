@@ -2,17 +2,13 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
   },
   "categories": [
     "Other"
-  ],
-  "activationEvents": [
-    "onView:ai-proofread.welcome",
-    "onView:ai-proofread.duplicate"
   ],
   "main": "./dist/extension.js",
   "contributes": {

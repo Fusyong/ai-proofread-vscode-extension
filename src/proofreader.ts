@@ -15,12 +15,27 @@ import { buildEditorialMemoryXml } from './editorialMemory/service';
 import { ProgressTracker, ProgressUpdateCallback } from './progressTracker';
 import { parseItemOutput, type ProofreadItem } from './itemOutputParser';
 import { applyItemReplacements } from './itemReplacer';
-import { SYSTEM_PROMPT_NAME_FULL, SYSTEM_PROMPT_NAME_ITEM, getPromptDisplayName } from './promptManager';
+import { SYSTEM_PROMPT_NAME_FULL, SYSTEM_PROMPT_NAME_ITEM } from './promptManager';
 import { getExtensionContext } from './extensionContextHolder';
-import { formatSourceCharacteristicsBlock, summarizeSourceCharacteristicsForLog } from './sourceTextCharacteristics';
+import { formatSourceCharacteristicsBlock } from './sourceTextCharacteristics';
 
 // 加载环境变量
 dotenv.config();
+
+/** OpenAI 兼容（axios）接口：非网络类失败时的日志；401/403 指向密钥与平台配置 */
+function logAxiosNonNetworkFailure(logger: Logger, error: unknown): void {
+    if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        if (status === 401 || status === 403) {
+            logger.error(
+                `API 认证失败（HTTP ${status}）：请检查设置「ai-proofread.apiKeys」中当前平台的密钥是否正确、未过期，并与所选服务商一致`,
+                error
+            );
+            return;
+        }
+    }
+    logger.error('API调用出错（非网络错误，不重试）', error);
+}
 
 // 默认输出格式（全文输出）
 const DEFAULT_OUTPUT_FORMAT = `
@@ -373,7 +388,7 @@ export class DeepseekApiClient implements ApiClient {
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                 } else {
                     // 非网络错误，不重试
-                    logger.error('API调用出错（非网络错误，不重试）', error);
+                    logAxiosNonNetworkFailure(logger, error);
                     return null;
                 }
             }
@@ -520,7 +535,7 @@ export class AliyunApiClient implements ApiClient {
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                 } else {
                     // 非网络错误，不重试
-                    logger.error('API调用出错（非网络错误，不重试）', error);
+                    logAxiosNonNetworkFailure(logger, error);
                     return null;
                 }
             }
@@ -787,7 +802,7 @@ export class OllamaApiClient implements ApiClient {
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                 } else {
                     // 非网络错误，不重试
-                    logger.error('API调用出错（非网络错误，不重试）', error);
+                    logAxiosNonNetworkFailure(logger, error);
                     return null;
                 }
             }
@@ -1131,7 +1146,7 @@ export async function processJsonFileAsync(
  * @param afterParagraphs 后文段落数
  * @param repetitionMode 提示词重复模式（可选，覆盖配置）
  * @param sourceTextCharacteristics 源文本特性提示词注入正文（仅系统默认提示词时生效；空字符串表示不注入）
- * @param sourceCharacteristicsDisplayTitle 注入项在通知中的展示标题（如预设名称）；未传时由正文摘要回退
+ * @param sourceCharacteristicsDisplayTitle 注入项在日志/完成摘要中的展示标题（如预设名称）
  * @param onItemItems 条目式输出时回调解析出的条目（如条目式提示词场景的后续处理）
  * @param onRawItemOutput 条目式输出时回调 LLM 原始返回（供日志等写入原始结果，不写替换后文本）
  * @param editorialMemoryForceEnabled 为 true 时在请求中拼接编辑记忆注入（仅用「Proofread Selection with Memory」时使用）
@@ -1228,29 +1243,10 @@ export async function proofreadSelection(
     }
     const postText = `<target>\n${targetText}\n</target>`;
 
-    const promptCtx = context ?? getExtensionContext();
-    const currentPromptName = promptCtx
-        ? getPromptDisplayName(promptCtx.globalState.get<string>('currentPrompt', SYSTEM_PROMPT_NAME_FULL) ?? SYSTEM_PROMPT_NAME_FULL)
-        : '系统默认提示词（full）';
-
     // 获取提示词重复模式（使用传入的参数，如果没有则从配置读取）
     const actualRepetitionMode = repetitionMode || getPromptRepetitionMode();
 
-    // 显示校对信息
-    const targetLength = targetText.length;
-    const contextLength = contextText.length;
-    const referenceLength = referenceText.length;
-    const srcHint =
-        sourceCharacteristicsDisplayTitle !== undefined
-            ? sourceCharacteristicsDisplayTitle
-            : summarizeSourceCharacteristicsForLog(sourceTextCharacteristics);
-    vscode.window.showInformationMessage(
-        `Prompt: ${currentPromptName} Src. ${srcHint} Rep. ${actualRepetitionMode} | ` +
-        `Context: R. ${referenceLength}, C. ${contextLength}, T. ${targetLength} | ` +
-        `Model: ${platform}, ${model}, T. ${userTemperature}`
-    );
-
-    // 调用API进行校对
+    // 调用API进行校对（进度使用 Window，避免与随后 handler 的 InformationMessage 共用通知区导致进度看似不消失）
     const client = (() => {
         switch (platform) {
             case 'google':
@@ -1267,7 +1263,7 @@ export async function proofreadSelection(
 
     let result = await vscode.window.withProgress(
         {
-            location: vscode.ProgressLocation.Notification,
+            location: vscode.ProgressLocation.Window,
             title: '正在校对文本...',
             cancellable: false
         },
@@ -1281,6 +1277,8 @@ export async function proofreadSelection(
                 sourceTextCharacteristics
             )
     );
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
 
     if (result && getOutputType(context) === 'item') {
         onRawItemOutput?.(result);

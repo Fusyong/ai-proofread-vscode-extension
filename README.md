@@ -444,7 +444,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 6. 更新日志
 
-### v1.10.0
+### v1.10.1
 
 - **重构**：把带样例校对 `proofread selection with examples` 和持续校对 `continuous proofread` 相关功能重构为 **`proofread selection with memory`**
 - 优化：阿里云百炼平台默认支持改回qwen3-max；DeepSeek平台默认支持改为deepseek-v4-flash，非思考模式
