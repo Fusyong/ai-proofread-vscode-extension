@@ -933,7 +933,7 @@ export class WebviewManager {
                 ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('proofreadSelection')" title="AI Proofreader: proofread selection">校对选中文本</button>
                 ${sep}
-                <button type="button" class="link-button" onclick="handleAction('proofreadSelectionWithMemory')" title="AI Proofreader: proofread selection with memory">校对选中（编辑记忆）</button>
+                <button type="button" class="link-button" onclick="handleAction('proofreadSelectionWithMemory')" title="AI Proofreader: proofread selection with memory">校对选中（带编辑记忆）</button>
                 ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('citationOpenView')" title="AI Proofreader: verify citations">核对全文引文</button>
                 ${sep}

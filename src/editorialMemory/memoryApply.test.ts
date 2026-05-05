@@ -9,15 +9,14 @@ vi.mock('vscode', () => ({
 }));
 
 import { applyGlobalOpsAndPushCurrentRound } from './applyMemoryPatch';
-import { migrateV1MarkdownToV2 } from './memoryPersistV2';
 import { createEmptyActiveV2, createEmptyArchiveV2, normalizeFlatBody, normalizeMemoryEntry } from './schemaV2';
 
 describe('applyGlobalOpsAndPushCurrentRound', () => {
     it('evicts lowest weight global when over cap', () => {
         const active = createEmptyActiveV2();
         active.global = [
-            normalizeMemoryEntry({ id: 'a', original: 'x', changedTo: 'y', weight: 1, repeated: 1 }),
-            normalizeMemoryEntry({ id: 'b', original: 'p', changedTo: 'q', weight: 9, repeated: 1 }),
+            normalizeMemoryEntry({ id: 'a', original: 'x', changedTo: 'y', weight: 1 }),
+            normalizeMemoryEntry({ id: 'b', original: 'p', changedTo: 'q', weight: 9 }),
         ];
         const archive = createEmptyArchiveV2();
         const { active: out, archive: ar } = applyGlobalOpsAndPushCurrentRound({
@@ -74,33 +73,5 @@ describe('applyGlobalOpsAndPushCurrentRound', () => {
         });
         expect(rDup.active.currentRounds.length).toBe(2);
         expect(normalizeFlatBody(rDup.active.currentRounds[0].body)).toBe(normalizeFlatBody('本轮 C'));
-    });
-});
-
-describe('migrateV1MarkdownToV2', () => {
-    it('imports global bullets and merges v1 recent into one current round', () => {
-        const md = `<!-- ai-proofread:editorial-memory v1 -->
-
-## 全局
-
-- 全局一条
-
-## 按文档结构
-
-### path: 章 > 节
-- 节内
-
-## 近期记忆
-
-- 近期一条
-
-## 结构已变更待核对
-
-`;
-        const { active, archive } = migrateV1MarkdownToV2(md, { globalMax: 10 });
-        expect(active.global.length).toBeGreaterThanOrEqual(1);
-        expect(active.currentRounds.length).toBe(1);
-        expect(active.currentRounds[0].body).toContain('近期一条');
-        expect(archive.entries.some((e) => e.original === '[migrated:v1-structure-path-blocks]')).toBe(true);
     });
 });

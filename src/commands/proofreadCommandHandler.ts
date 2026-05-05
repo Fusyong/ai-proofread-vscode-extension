@@ -12,6 +12,14 @@ import { FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
 import { getPromptDisplayName } from '../promptManager';
 import { isUsingSystemDefaultPrompt, pickSourceTextCharacteristicsInjection } from '../sourceTextCharacteristicsPicker';
 import { summarizeSourceCharacteristicsForLog } from '../sourceTextCharacteristics';
+import {
+    buildDefaultProofreadSelectionWithMemoryConfig,
+    mapConfigToSelectionContext,
+    readOrCreateProofreadSelectionWithMemoryConfig,
+    resolveReferenceFileUris,
+    resolveSourceTextHint,
+    type ProofreadSelectionWithMemoryConfig
+} from '../proofreadSelectionWithMemoryConfig';
 import { WebviewManager, ProcessResult } from '../ui/webviewManager';
 import { ProgressTracker } from '../progressTracker';
 
@@ -362,11 +370,7 @@ export class ProofreadCommandHandler {
         editorialMemoryForceEnabled?: boolean
     ): Promise<void> {
         try {
-            // 获取配置
             const platform = this.configManager.getPlatform();
-            const model = this.configManager.getModel(platform);
-            const temperature = this.configManager.getTemperature();
-
             // 检查API密钥是否已配置
             const apiKey = this.configManager.getApiKey(platform);
             if (!apiKey) {
@@ -378,6 +382,11 @@ export class ProofreadCommandHandler {
                 if (result === '是') {
                     await vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread.apiKeys');
                 }
+                return;
+            }
+
+            if (editorialMemoryForceEnabled === true) {
+                await this.executeProofreadSelectionWithMemoryFromConfig(editor, context);
                 return;
             }
 
@@ -532,104 +541,222 @@ export class ProofreadCommandHandler {
                 sourceCharacteristicsDisplayTitle = picked.displayTitle;
             }
 
-            // 发起请求前锁定选区与原文；进度为 Window（状态栏侧），避免与「校对完成」通知抢占同一通知槽
-            const range = new vscode.Range(editor.selection.start, editor.selection.end);
-            const sel = new vscode.Selection(range.start, range.end);
-            const originalText = editor.document.getText(range);
-            const fileExt = path.extname(editor.document.fileName);
-            let rawItemOutput: string | undefined;
-            let itemChanges: Array<{ original: string; corrected: string }> | undefined;
-
-            const result = await proofreadSelection(
+            await this.runProofreadSelectionWithResolvedParams(
                 editor,
-                sel,
-                platform,
-                model,
-                contextLevel,
-                referenceFile,
-                userTemperature ? parseFloat(userTemperature) : undefined,
                 context,
-                beforeParagraphs,
-                afterParagraphs,
-                actualRepetitionMode,
-                sourceTextCharacteristics,
-                sourceCharacteristicsDisplayTitle,
-                (items) => {
-                    itemChanges = items
-                        .filter((i) => i.corrected != null)
-                        .map((i) => ({ original: i.original, corrected: i.corrected! }));
-                },
-                (raw) => {
-                    rawItemOutput = raw;
+                {
+                    contextLevel,
+                    beforeParagraphs,
+                    afterParagraphs,
+                    referenceFile,
+                    userTemperature: parseFloat(userTemperature),
+                    actualRepetitionMode: (actualRepetitionMode ?? 'none') as 'none' | 'target' | 'all',
+                    sourceTextCharacteristics,
+                    sourceCharacteristicsDisplayTitle
                 },
                 editorialMemoryForceEnabled
             );
-
-            if (result) {
-                // 获取当前使用的提示词显示名称
-                const currentPromptName = context
-                    ? getPromptDisplayName(context.globalState.get<string>('currentPrompt', ''))
-                    : '系统默认提示词（full）';
-
-                // 获取提示词重复模式显示名称（用于日志）
-                const repetitionModeNames: { [key: string]: string } = {
-                    'none': '不重复',
-                    'target': '仅重复目标文档',
-                    'all': '重复完整对话流程'
-                };
-                const repetitionModeName = actualRepetitionMode ? repetitionModeNames[actualRepetitionMode] || '不重复' : '不重复';
-
-                // 把参数和校对结果写入日志：条目式输出时写 LLM 原始返回，否则写替换后结果
-                const logFilePath = FilePathUtils.getFilePath(editor.document.uri.fsPath, '.proofread', '.log');
-                const resultForLog = rawItemOutput !== undefined ? rawItemOutput : result;
-                const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nSrcHint: ${sourceCharacteristicsDisplayTitle ?? summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)}\nRepetitionMode: ${repetitionModeName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${resultForLog}\n${'='.repeat(50)}\n\n`;
-                fs.appendFileSync(logFilePath, logMessage, 'utf8');
-
-                // 让步一轮事件循环，确保窗口进度已收起后再弹出通知（避免与进度 UI 叠在一起）
-                await new Promise<void>((resolve) => setImmediate(resolve));
-
-                // 显示信息消息，包含提示词重复模式（使用键名）
-                const targetLength = editor.document.getText(editor.selection).length;
-                const contextLength = contextLevel ? '已设置' : 'none';
-                const referenceLength = referenceFile ? '已设置' : 'none';
-                vscode.window.showInformationMessage(
-                    `校对完成 | Prompt: ${currentPromptName} Src. ${sourceCharacteristicsDisplayTitle ?? summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)} Rep. ${actualRepetitionMode} | ` +
-                    `Context: R. ${referenceLength}, C. ${contextLength}, T. ${targetLength} | ` +
-                    `Model: ${platform}, ${model}, T. ${userTemperature}`
-                );
-
-                const diffRes = await showSelectionProofreadDiffWithApply(
-                    context,
-                    editor.document,
-                    range,
-                    originalText,
-                    result,
-                    fileExt
-                );
-                if (diffRes.applied && editorialMemoryForceEnabled === true) {
-                    try {
-                        await runEditorialMemoryAfterAccept({
-                            documentUri: editor.document.uri,
-                            fullText: editor.document.getText(),
-                            selectionStartLine: range.start.line,
-                            selectionRangeLabel: `L${range.start.line + 1}C${range.start.character}–L${range.end.line + 1}C${range.end.character}`,
-                            originalSelected: originalText,
-                            finalSelected: diffRes.finalText,
-                            modelOutput: result,
-                            platform,
-                            model,
-                            items: itemChanges,
-                            editorialMemoryForceEnabled: true,
-                        });
-                    } catch {
-                        /* 记忆更新失败不阻断 */
-                    }
-                }
-            } else {
-                vscode.window.showErrorMessage('校对失败，请重试。');
-            }
         } catch (error) {
             ErrorUtils.showError(error, '校对过程中出错：');
+        }
+    }
+
+    /**
+     * 「Proofread Selection with Memory」：从工作区 `.proofread/proofread-selection-with-memory.json` 读参（缺失则生成默认）。
+     */
+    private async executeProofreadSelectionWithMemoryFromConfig(
+        editor: vscode.TextEditor,
+        context: vscode.ExtensionContext
+    ): Promise<void> {
+        const folder =
+            vscode.workspace.getWorkspaceFolder(editor.document.uri) ?? vscode.workspace.workspaceFolders?.[0];
+        if (!folder) {
+            await vscode.window.showErrorMessage(
+                '「Proofread Selection with Memory」需要打开工作区文件夹，以便读取或生成 .proofread/proofread-selection-with-memory.json。'
+            );
+            return;
+        }
+
+        const wsCfg = vscode.workspace.getConfiguration('ai-proofread');
+        const repRaw = wsCfg.get<string>('proofread.promptRepetition', 'none');
+        const repetitionDefault = (repRaw === 'target' || repRaw === 'all' ? repRaw : 'none') as
+            | 'none'
+            | 'target'
+            | 'all';
+
+        const defaults = buildDefaultProofreadSelectionWithMemoryConfig(
+            this.configManager.getTemperature(),
+            repetitionDefault
+        );
+
+        let cfgBundle: { config: ProofreadSelectionWithMemoryConfig; configPath: string; created: boolean };
+        try {
+            cfgBundle = readOrCreateProofreadSelectionWithMemoryConfig(editor.document.uri, defaults);
+        } catch (e) {
+            ErrorUtils.showError(e, '校对参数配置文件：');
+            return;
+        }
+
+        const { config, created, configPath } = cfgBundle;
+        if (created) {
+            void vscode.window.showInformationMessage(`已生成默认参数文件，可按需编辑后再运行：${configPath}`);
+        }
+
+        const { contextLevel, beforeParagraphs, afterParagraphs } = mapConfigToSelectionContext(config);
+
+        let referenceFile: vscode.Uri[] | undefined;
+        try {
+            const uris = resolveReferenceFileUris(folder, config.referenceFiles);
+            referenceFile = uris.length > 0 ? uris : undefined;
+        } catch (e) {
+            ErrorUtils.showError(e, '参考文件路径：');
+            return;
+        }
+
+        const st = resolveSourceTextHint(config.sourceTextHint, context);
+        if (!st.ok) {
+            const action = await vscode.window.showErrorMessage(st.message, '管理提示词');
+            if (action === '管理提示词') {
+                await vscode.commands.executeCommand('ai-proofread.managePrompts');
+            }
+            return;
+        }
+
+        await this.runProofreadSelectionWithResolvedParams(
+            editor,
+            context,
+            {
+                contextLevel,
+                beforeParagraphs,
+                afterParagraphs,
+                referenceFile,
+                userTemperature: config.temperature,
+                actualRepetitionMode: config.repetitionMode,
+                sourceTextCharacteristics: st.result.injectText,
+                sourceCharacteristicsDisplayTitle: st.result.displayTitle
+            },
+            true
+        );
+    }
+
+    private async runProofreadSelectionWithResolvedParams(
+        editor: vscode.TextEditor,
+        context: vscode.ExtensionContext,
+        params: {
+            contextLevel?: string;
+            beforeParagraphs: number;
+            afterParagraphs: number;
+            referenceFile?: vscode.Uri[];
+            userTemperature: number;
+            actualRepetitionMode: 'none' | 'target' | 'all';
+            sourceTextCharacteristics: string;
+            sourceCharacteristicsDisplayTitle: string | undefined;
+        },
+        editorialMemoryForceEnabled?: boolean
+    ): Promise<void> {
+        const platform = this.configManager.getPlatform();
+        const model = this.configManager.getModel(platform);
+        const {
+            contextLevel,
+            beforeParagraphs,
+            afterParagraphs,
+            referenceFile,
+            userTemperature,
+            actualRepetitionMode,
+            sourceTextCharacteristics,
+            sourceCharacteristicsDisplayTitle
+        } = params;
+
+        const range = new vscode.Range(editor.selection.start, editor.selection.end);
+        const sel = new vscode.Selection(range.start, range.end);
+        const originalText = editor.document.getText(range);
+        const fileExt = path.extname(editor.document.fileName);
+        let rawItemOutput: string | undefined;
+        let itemChanges: Array<{ original: string; corrected: string }> | undefined;
+
+        const result = await proofreadSelection(
+            editor,
+            sel,
+            platform,
+            model,
+            contextLevel,
+            referenceFile,
+            userTemperature,
+            context,
+            beforeParagraphs,
+            afterParagraphs,
+            actualRepetitionMode,
+            sourceTextCharacteristics,
+            sourceCharacteristicsDisplayTitle,
+            (items) => {
+                itemChanges = items
+                    .filter((i) => i.corrected != null)
+                    .map((i) => ({ original: i.original, corrected: i.corrected! }));
+            },
+            (raw) => {
+                rawItemOutput = raw;
+            },
+            editorialMemoryForceEnabled
+        );
+
+        if (result) {
+            const currentPromptName = context
+                ? getPromptDisplayName(context.globalState.get<string>('currentPrompt', ''))
+                : '系统默认提示词（full）';
+
+            const repetitionModeNames: { [key: string]: string } = {
+                none: '不重复',
+                target: '仅重复目标文档',
+                all: '重复完整对话流程'
+            };
+            const repetitionModeName =
+                actualRepetitionMode ? repetitionModeNames[actualRepetitionMode] || '不重复' : '不重复';
+
+            const logFilePath = FilePathUtils.getFilePath(editor.document.uri.fsPath, '.proofread', '.log');
+            const resultForLog = rawItemOutput !== undefined ? rawItemOutput : result;
+            const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nSrcHint: ${sourceCharacteristicsDisplayTitle ?? summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)}\nRepetitionMode: ${repetitionModeName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${resultForLog}\n${'='.repeat(50)}\n\n`;
+            fs.appendFileSync(logFilePath, logMessage, 'utf8');
+
+            await new Promise<void>((resolve) => setImmediate(resolve));
+
+            const targetLength = editor.document.getText(editor.selection).length;
+            const contextLength = contextLevel ? '已设置' : 'none';
+            const referenceLength = referenceFile ? '已设置' : 'none';
+            vscode.window.showInformationMessage(
+                `校对完成 | Prompt: ${currentPromptName} Src. ${sourceCharacteristicsDisplayTitle ?? summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)} Rep. ${actualRepetitionMode} | ` +
+                    `Context: R. ${referenceLength}, C. ${contextLength}, T. ${targetLength} | ` +
+                    `Model: ${platform}, ${model}, T. ${userTemperature}`
+            );
+
+            const diffRes = await showSelectionProofreadDiffWithApply(
+                context,
+                editor.document,
+                range,
+                originalText,
+                result,
+                fileExt
+            );
+            if (diffRes.applied && editorialMemoryForceEnabled === true) {
+                try {
+                    await runEditorialMemoryAfterAccept({
+                        documentUri: editor.document.uri,
+                        fullText: editor.document.getText(),
+                        selectionStartLine: range.start.line,
+                        selectionRangeLabel: `L${range.start.line + 1}C${range.start.character}–L${range.end.line + 1}C${range.end.character}`,
+                        originalSelected: originalText,
+                        finalSelected: diffRes.finalText,
+                        modelOutput: result,
+                        platform,
+                        model,
+                        items: itemChanges,
+                        editorialMemoryForceEnabled: true
+                    });
+                } catch {
+                    /* 记忆更新失败不阻断 */
+                }
+            }
+        } else {
+            vscode.window.showErrorMessage('校对失败，请重试。');
         }
     }
 

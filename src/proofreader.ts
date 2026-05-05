@@ -98,7 +98,7 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `
     4. 前后文不一致的问题；
 5. 核对参考资料和上下文中的信息，对照上下文中的格式，如果发现有错误或不一致，也要加以改正。
 6. 对于外文文本，同样参照上面的要求，并结合该文种的校对惯例进行校对。
-7. 若提示中出现编辑记忆：\`<editorial_memory_global>\`（体例通则，含 repeated/weight）、\`<editorial_memory_current_rounds>\`（最近若干次校对的合并扁平稿，新在上）、\`<editorial_proofread_context>\`（当前文档与选区）。若无明显关联可忽略对应块。**若记忆与正文冲突，以当前正文为准。**
+7. 若提示中出现编辑记忆：\`<editorial_memory_global>\`（体例通则：\`original\`/\`changedTo\`/\`weight\`，可选 \`<note>\` 修改说明）、\`<editorial_memory_current_rounds>\`（最近若干次合并要点，可含【例】/【规律】前缀；新在上）、\`<editorial_proofread_context>\`（当前文档与选区）。若无明显关联可忽略对应块。**若记忆与正文冲突，以当前正文为准。**
 
 </task>
 {{source_text_characteristics}}
@@ -343,11 +343,6 @@ export class DeepseekApiClient implements ApiClient {
             requestBody.temperature = finalTemperature;
         }
 
-        // 打印完整对话到控制台（调试用，仅在启用调试模式时输出）
-        logger.debug('='.repeat(80));
-        logger.debug('[DeepseekApiClient] 完整对话内容:', requestBody);
-        logger.debug('='.repeat(80));
-
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
@@ -364,6 +359,8 @@ export class DeepseekApiClient implements ApiClient {
                     }
                 );
 
+                logger.debugLlmRoundtrip('[DeepseekApiClient]', requestBody, response.data);
+
                 let result = response.data.choices[0].message.content;
                 result = result.replace('\n</target>', '').replace('<target>\n', '');
                 return result;
@@ -375,6 +372,10 @@ export class DeepseekApiClient implements ApiClient {
                                      errorMessage.includes('ECONNRESET') ||
                                      errorMessage.includes('ENOTFOUND') ||
                                      errorMessage.includes('ECONNREFUSED');
+
+                if (attempt === retryAttempts || !isNetworkError) {
+                    logger.debugLlmFailure('[DeepseekApiClient]', requestBody, error);
+                }
 
                 if (attempt === retryAttempts) {
                     // 最后一次尝试失败
@@ -490,11 +491,6 @@ export class AliyunApiClient implements ApiClient {
         } else {
         }
 
-        // 打印完整对话到控制台（调试用，仅在启用调试模式时输出）
-        logger.debug('='.repeat(80));
-        logger.debug('[AliyunApiClient] 完整对话内容:', requestBody);
-        logger.debug('='.repeat(80));
-
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
@@ -511,6 +507,8 @@ export class AliyunApiClient implements ApiClient {
                     }
                 );
 
+                logger.debugLlmRoundtrip('[AliyunApiClient]', requestBody, response.data);
+
                 let result = response.data.choices[0].message.content;
                 result = result.replace('\n</target>', '').replace('<target>\n', '');
                 return result;
@@ -522,6 +520,10 @@ export class AliyunApiClient implements ApiClient {
                                      errorMessage.includes('ECONNRESET') ||
                                      errorMessage.includes('ENOTFOUND') ||
                                      errorMessage.includes('ECONNREFUSED');
+
+                if (attempt === retryAttempts || !isNetworkError) {
+                    logger.debugLlmFailure('[AliyunApiClient]', requestBody, error);
+                }
 
                 if (attempt === retryAttempts) {
                     // 最后一次尝试失败
@@ -619,15 +621,15 @@ export class GoogleApiClient implements ApiClient {
             };
         }
 
-        // 打印完整对话到控制台（调试用，仅在启用调试模式时输出）
-        logger.debug('='.repeat(80));
-        logger.debug('[GoogleApiClient] 完整对话内容:', {
-            systemInstruction: configObj.systemInstruction,
-            contents: contents,
-            temperature: configObj.temperature,
-            thinkingConfig: configObj.thinkingConfig
-        });
-        logger.debug('='.repeat(80));
+        const googleRequestSnapshot = {
+            model: this.model,
+            config: {
+                systemInstruction: configObj.systemInstruction,
+                temperature: configObj.temperature,
+                thinkingConfig: configObj.thinkingConfig,
+            },
+            contents,
+        };
 
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
@@ -639,6 +641,14 @@ export class GoogleApiClient implements ApiClient {
                     contents: contents,
                 });
 
+                let responseSnapshot: unknown = { text: response.text ?? null };
+                try {
+                    responseSnapshot = JSON.parse(JSON.stringify(response));
+                } catch {
+                    /* SDK 对象可能无法完整序列化，保留 text */
+                }
+                logger.debugLlmRoundtrip('[GoogleApiClient]', googleRequestSnapshot, responseSnapshot);
+
                 return response.text || null;
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
@@ -647,6 +657,10 @@ export class GoogleApiClient implements ApiClient {
                                      errorMessage.includes('timeout') ||
                                      errorMessage.includes('ECONNRESET') ||
                                      errorMessage.includes('ENOTFOUND');
+
+                if (attempt === retryAttempts || !isNetworkError) {
+                    logger.debugLlmFailure('[GoogleApiClient]', googleRequestSnapshot, error);
+                }
 
                 if (attempt === retryAttempts) {
                     // 最后一次尝试失败
@@ -758,11 +772,6 @@ export class OllamaApiClient implements ApiClient {
         } else {
         }
 
-        // 打印完整对话到控制台（调试用，仅在启用调试模式时输出）
-        logger.debug('='.repeat(80));
-        logger.debug('[OllamaApiClient] 完整对话内容:', requestBody);
-        logger.debug('='.repeat(80));
-
         // 重试机制
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
@@ -778,6 +787,8 @@ export class OllamaApiClient implements ApiClient {
                     }
                 );
 
+                logger.debugLlmRoundtrip('[OllamaApiClient]', requestBody, response.data);
+
                 let result = response.data.message.content;
                 result = result.replace('\n</target>', '').replace('<target>\n', '');
                 return result;
@@ -789,6 +800,10 @@ export class OllamaApiClient implements ApiClient {
                                      errorMessage.includes('ECONNRESET') ||
                                      errorMessage.includes('ENOTFOUND') ||
                                      errorMessage.includes('ECONNREFUSED');
+
+                if (attempt === retryAttempts || !isNetworkError) {
+                    logger.debugLlmFailure('[OllamaApiClient]', requestBody, error);
+                }
 
                 if (attempt === retryAttempts) {
                     // 最后一次尝试失败
@@ -993,15 +1008,6 @@ export async function processJsonFileAsync(
 
         const startTime = Date.now();
         await rateLimiter.wait();
-
-        // 打印完整对话信息到控制台（调试用，仅在启用调试模式时输出）
-        logger.debug('='.repeat(80));
-        logger.debug(`[JSON批量校对] 段落 No. ${index + 1}/${totalCount}:`, {
-            preText: preText || '(空)',
-            targetText: labeledTargetText,
-            temperature: temperature
-        });
-        logger.debug('='.repeat(80));
 
         try {
             const processedText = await client.proofread(

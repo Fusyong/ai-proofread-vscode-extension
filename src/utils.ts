@@ -4,6 +4,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import axios from 'axios';
 
 /**
  * 将任意换行符统一为 LF（\n）。
@@ -157,6 +158,13 @@ export class FilePathUtils {
     }
 
     /**
+     * 与 `.proofread/`、编辑记忆等工作区根路径一致：优先包含文档的工作区文件夹，否则首个根文件夹或文档所在目录。
+     */
+    public static getProofreadWorkspaceRoot(anchorUri: vscode.Uri): string {
+        return this.editorialMemoryRootDir(anchorUri);
+    }
+
+    /**
      * v2：活跃编辑记忆 `.proofread/editorial-memory.json`
      */
     public static getEditorialMemoryPath(anchorUri: vscode.Uri): string {
@@ -166,11 +174,6 @@ export class FilePathUtils {
     /** v2：存档记忆 `.proofread/editorial-memory-archive.json` */
     public static getEditorialMemoryArchivePath(anchorUri: vscode.Uri): string {
         return path.join(this.editorialMemoryRootDir(anchorUri), '.proofread', 'editorial-memory-archive.json');
-    }
-
-    /** v1 遗留 `.proofread/editorial-memory.md`（仅迁移时读取） */
-    public static getEditorialMemoryLegacyMarkdownPath(anchorUri: vscode.Uri): string {
-        return path.join(this.editorialMemoryRootDir(anchorUri), '.proofread', 'editorial-memory.md');
     }
 
     /**
@@ -325,13 +328,61 @@ export class Logger {
     }
 
     /**
-     * 是否在开发者工具控制台原样输出提交给 LLM 的完整负载（每次读取配置，改开关后立即生效）
+     * 是否在开发者工具控制台原样输出 LLM 请求与响应（每次读取配置，改开关后立即生效）
      */
     private isLlmPayloadConsoleLogEnabled(): boolean {
         if (process.env.AI_PROOFREAD_DEBUG === 'true') {
             return true;
         }
         return vscode.workspace.getConfiguration('ai-proofread').get<boolean>('debug.enableConsoleLog', false) === true;
+    }
+
+    private stringifyDebugPayload(data: unknown): string {
+        try {
+            if (typeof data === 'string') {
+                return data;
+            }
+            return JSON.stringify(
+                data,
+                (_k, v) => (typeof v === 'bigint' ? v.toString() : v),
+                2
+            );
+        } catch {
+            try {
+                return String(data);
+            } catch {
+                return '[unserializable]';
+            }
+        }
+    }
+
+    /**
+     * 开发者工具：打印单次 LLM 调用的请求与响应（受 ai-proofread.debug.enableConsoleLog 控制）
+     */
+    public debugLlmRoundtrip(tag: string, requestPayload: unknown, responsePayload: unknown): void {
+        if (!this.isLlmPayloadConsoleLogEnabled()) {
+            return;
+        }
+        const sep = '='.repeat(80);
+        console.log(`${sep}\n[DEBUG][LLM REQ] ${tag}\n${this.stringifyDebugPayload(requestPayload)}`);
+        console.log(`[DEBUG][LLM RES] ${tag}\n${this.stringifyDebugPayload(responsePayload)}\n${sep}`);
+    }
+
+    /**
+     * 开发者工具：请求失败时打印请求体与错误（含 axios 响应体若存在）
+     */
+    public debugLlmFailure(tag: string, requestPayload: unknown, error: unknown): void {
+        if (!this.isLlmPayloadConsoleLogEnabled()) {
+            return;
+        }
+        let extra = '';
+        if (axios.isAxiosError(error)) {
+            extra = `\n[DEBUG][LLM ERR axios] status=${error.response?.status ?? 'n/a'}\n${this.stringifyDebugPayload(error.response?.data)}`;
+        }
+        const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        console.log(
+            `[DEBUG][LLM ERR] ${tag}\n${this.stringifyDebugPayload(requestPayload)}\n${msg}${extra}\n${'='.repeat(80)}`
+        );
     }
 
     public info(message: string): void {
@@ -347,7 +398,7 @@ export class Logger {
     }
 
     /**
-     * 调试日志：在启用「控制台输出 LLM 提交内容」时输出（完整对象经 JSON 格式化，与请求体字段一致）
+     * 通用调试日志（非 LLM 专用）；LLM 往返请用 debugLlmRoundtrip / debugLlmFailure
      */
     public debug(message: string, data?: any): void {
         if (!this.isLlmPayloadConsoleLogEnabled()) {

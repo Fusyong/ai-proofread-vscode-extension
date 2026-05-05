@@ -3,13 +3,25 @@ import { GoogleGenAI } from '@google/genai';
 import * as vscode from 'vscode';
 import { ConfigManager, Logger } from '../utils';
 
+function googleMemoryRequestSnapshot(params: { model: string; system: string; user: string; temperature: number }) {
+    return {
+        model: params.model,
+        config: {
+            systemInstruction: params.system,
+            temperature: params.temperature,
+            thinkingConfig: { thinkingBudget: 0 },
+        },
+        contents: params.user,
+    };
+}
+
 function msSeconds(sec: number | undefined, def: number): number {
     const s = typeof sec === 'number' && !Number.isNaN(sec) ? sec : def;
     return s * 1000;
 }
 
 /**
- * 单次 system + user 对话（用于记忆合并 / reconcile，不走校对专用 getSystemPrompt）
+ * 单次 system + user 对话（用于记忆合并，不走校对专用 getSystemPrompt）
  */
 export async function editorialMemoryChat(
     platform: string,
@@ -31,6 +43,7 @@ export async function editorialMemoryChat(
             return null;
         }
         const ai = new GoogleGenAI({ apiKey });
+        const gReq = googleMemoryRequestSnapshot({ model, system, user, temperature });
         for (let attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
                 const res = await ai.models.generateContent({
@@ -42,8 +55,16 @@ export async function editorialMemoryChat(
                     },
                     contents: user,
                 });
+                let resSnap: unknown = { text: res.text ?? null };
+                try {
+                    resSnap = JSON.parse(JSON.stringify(res));
+                } catch {
+                    /* ignore */
+                }
+                logger.debugLlmRoundtrip('[editorialMemoryChat/google]', gReq, resSnap);
                 return res.text || null;
             } catch (e) {
+                logger.debugLlmFailure('[editorialMemoryChat/google]', gReq, e);
                 logger.error('[editorialMemoryChat] google', e);
                 if (attempt < retryAttempts) {
                     await new Promise((r) => setTimeout(r, retryDelay));
@@ -78,6 +99,7 @@ export async function editorialMemoryChat(
     const disableThinking = config.get<boolean>('proofread.disableThinking', true);
 
     for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+        let bodyForLog: unknown = { url, platform, model };
         try {
             if (platform === 'ollama') {
                 const body = {
@@ -89,7 +111,9 @@ export async function editorialMemoryChat(
                     ],
                     options: { temperature },
                 };
+                bodyForLog = body;
                 const res = await axios.post(url, body, { headers, timeout });
+                logger.debugLlmRoundtrip(`[editorialMemoryChat/${platform}]`, body, res.data);
                 const c = res.data?.message?.content;
                 return typeof c === 'string' ? c : null;
             }
@@ -109,10 +133,13 @@ export async function editorialMemoryChat(
                 body.enable_thinking = !disableThinking;
             }
 
+            bodyForLog = body;
             const res = await axios.post(url, body, { headers, timeout });
+            logger.debugLlmRoundtrip(`[editorialMemoryChat/${platform}]`, body, res.data);
             const text = res.data?.choices?.[0]?.message?.content;
             return typeof text === 'string' ? text : null;
         } catch (e) {
+            logger.debugLlmFailure(`[editorialMemoryChat/${platform}]`, bodyForLog, e);
             logger.error('[editorialMemoryChat] request', e);
             if (attempt < retryAttempts) {
                 await new Promise((r) => setTimeout(r, retryDelay));

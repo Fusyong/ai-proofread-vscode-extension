@@ -177,16 +177,12 @@ export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Prom
 export async function clearEditorialMemory(uri: vscode.Uri): Promise<void> {
     const jsonPath = FilePathUtils.getEditorialMemoryPath(uri);
     const archPath = FilePathUtils.getEditorialMemoryArchivePath(uri);
-    const legacyMd = FilePathUtils.getEditorialMemoryLegacyMarkdownPath(uri);
     const c = vscode.workspace.getConfiguration('ai-proofread');
     const backup = c.get<boolean>('editorialMemory.backupBeforeWrite', true);
     FilePathUtils.ensureDirExists(path.dirname(jsonPath));
     if (backup) {
         FilePathUtils.backupFileIfExists(jsonPath, false);
         FilePathUtils.backupFileIfExists(archPath, false);
-        if (fs.existsSync(legacyMd)) {
-            FilePathUtils.backupFileIfExists(legacyMd, false);
-        }
     }
     fs.writeFileSync(jsonPath, JSON.stringify(createEmptyActiveV2(), null, 2), 'utf8');
     fs.writeFileSync(archPath, JSON.stringify(createEmptyArchiveV2(), null, 2), 'utf8');

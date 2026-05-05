@@ -7,23 +7,37 @@ import type {
 } from './schemaV2';
 import { clipText, formatCurrentRoundsForPrompt, formatMemoryEntryLine } from './schemaV2';
 
+/** 合并模型输出的本轮扁平稿上限（程序截断） */
+const CURRENT_ROUND_FLAT_OUTPUT_MAX = 6000;
+
 const PATCH_SYSTEM = `你是图书编辑助理，维护两类编辑记忆：
 
-1) **全局 global**：体例级、跨文档通则。每条为结构化字段：original / changedTo 表「忌/原 → 宜/终」，**repeated** 表示同类问题在稿中反复出现的强度（整数 ≥1），**weight** 为优先级（0–1000）。
-2) **本轮扁平 current_round_flat**：用自然语言或短 bullet **只写本次校对值得记住的要点合并稿**（不要把整段 target 贴入）。此段将写入「最近 d 次校对」栈供下次参考，与历史轮次 **去重**：若与上一轮合并稿归一化后完全相同，程序会丢弃，故请写出有信息量的差异表述。
+1) **全局 global**（体例级、可跨片段复用）
+   - 每条：**original** / **changedTo** 表示「忌/原 → 宜/终」；**weight** 为优先级（0–1000）。
+   - **note**（可选）：**修改说明**。语法、逻辑、承接、体例通则类：优先在 note 里写**规律与适用条件**（可一句话）；original/changedTo 可用极简对照或典型短语。
+   - **字词、专名、标点等字面错误**：可直接把 **original/changedTo 写成例词或很短例句**，note 可省略或仅点睛。
+   - 同类问题反复出现：**bump_weight** / **set_weight**，勿新增语义重复的 add。
+
+2) **本轮扁平 current_round_flat**（写入「最近 d 次校对」栈，与历史归一化去重）
+   - 不要粘贴整段 target。
+   - 建议用前缀区分类型（可选但推荐）：行首 **【例】** 字词/专名等可直接写例；**【规律】** 语法、逻辑、体例等写规则要点（可附极简例，勿堆砌）。
+   - 一条 bullet 一件事；宁可少而准。
+
+【否定示例 — 禁止】
+- 把半段、整段书稿抄进 original/changedTo 或 current_round_flat。
+- 空泛废话：「注意通顺」「认真校对」等无操作价值的话。
+- 与已有 global **语义重复**仍再 add 一条（应 bump_weight）。
+- current_round_flat 只有「已修改」「无」而无实质要点（若无新知则 substantive=false 且 flat 可空）。
 
 你只输出 **一个 JSON 对象**（勿用围栏外文字）。字段：
-- substantive: boolean — 本轮是否有值得写入记忆的新知。
+- substantive: boolean
 - global_ops: 数组，**仅**作用于 global：
-  { "op":"add","entry":{ "original":"…","changedTo":"…","repeated":1,"weight":5 } }
+  { "op":"add","entry":{ "original":"…","changedTo":"…","weight":5,"note":"可选，修改说明" } }
   { "op":"remove","id":"…" }
   { "op":"set_weight","id":"…","weight":10 }
   { "op":"bump_weight","id":"…","delta":3 }
-  add 时不要填 id。**repeated** 在 global 表示重复强度；若仅是复现已知全局点，优先 bump_weight / 调 repeated 而非堆 duplicate 条目。
-  remove 的条目会进存档。
-- current_round_flat: 字符串，本轮合并后的扁平校对记忆（可多行）。若 substantive 为 false 可给空串或极短说明。
-
-禁止粘贴大段书稿原文；简洁为主。`;
+  add 时不要填 id。remove 的条目会进存档。
+- current_round_flat: 字符串（可多行）。substantive 为 false 时可 "" 或极短说明。`;
 
 /** 将旧版 tier ops 中 global 部分转为 global_ops（忽略 recent/current/move） */
 function legacyOpsToGlobalOps(raw: unknown[]): GlobalMemoryPatchOp[] {
@@ -42,8 +56,8 @@ function legacyOpsToGlobalOps(raw: unknown[]): GlobalMemoryPatchOp[] {
                     entry: {
                         original: ent.original as string,
                         changedTo: ent.changedTo as string,
-                        repeated: typeof ent.repeated === 'number' ? ent.repeated : undefined,
                         weight: typeof ent.weight === 'number' ? ent.weight : undefined,
+                        note: typeof ent.note === 'string' ? ent.note : undefined,
                     },
                 });
             }
@@ -110,8 +124,10 @@ export async function runMemoryPatchLlm(
         if (global_ops.length === 0 && Array.isArray(j.ops)) {
             global_ops = legacyOpsToGlobalOps(j.ops);
         }
-        const current_round_flat =
-            typeof j.current_round_flat === 'string' ? j.current_round_flat : '';
+        const current_round_flat = clipText(
+            typeof j.current_round_flat === 'string' ? j.current_round_flat : '',
+            CURRENT_ROUND_FLAT_OUTPUT_MAX
+        );
         return {
             substantive: Boolean(j.substantive),
             global_ops,

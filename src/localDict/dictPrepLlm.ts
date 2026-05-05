@@ -99,6 +99,7 @@ async function callOpenAICompatible(params: {
         throw new Error('未配置 API 密钥');
     }
     const disableThinking = params.disableThinking ?? true;
+    const logger = Logger.getInstance();
     const requestBody: Record<string, unknown> = {
         model: params.model,
         messages: [
@@ -130,22 +131,26 @@ async function callOpenAICompatible(params: {
         }
     }
 
-    const resp = await axios.post(
-        `${params.baseUrl}/chat/completions`,
-        requestBody,
-        {
+    const endpoint = `${params.baseUrl}/chat/completions`;
+    const reqLabel = { url: endpoint, body: requestBody };
+    try {
+        const resp = await axios.post(endpoint, requestBody, {
             headers: {
                 Authorization: `Bearer ${params.apiKey}`,
                 'Content-Type': 'application/json',
             },
             timeout: params.timeout,
+        });
+        logger.debugLlmRoundtrip('[dictPrepLlm/OpenAICompatible]', reqLabel, resp.data);
+        const text = resp?.data?.choices?.[0]?.message?.content;
+        if (!text || typeof text !== 'string') {
+            throw new Error('LLM 返回空结果');
         }
-    );
-    const text = resp?.data?.choices?.[0]?.message?.content;
-    if (!text || typeof text !== 'string') {
-        throw new Error('LLM 返回空结果');
+        return text;
+    } catch (e) {
+        logger.debugLlmFailure('[dictPrepLlm/OpenAICompatible]', reqLabel, e);
+        throw e;
     }
-    return text;
 }
 
 async function callGoogle(params: {
@@ -154,10 +159,11 @@ async function callGoogle(params: {
     userPrompt: string;
     temperature: number;
 }): Promise<string> {
+    const logger = Logger.getInstance();
     const apiKey = ConfigManager.getInstance().getApiKey('google');
     if (!apiKey) throw new Error('未配置 Google Gemini API 密钥');
     const ai = new GoogleGenAI({ apiKey });
-    const resp = await ai.models.generateContent({
+    const reqSnap = {
         model: params.model,
         config: {
             systemInstruction: params.systemPrompt,
@@ -165,10 +171,31 @@ async function callGoogle(params: {
             thinkingConfig: { thinkingBudget: 0 },
         },
         contents: params.userPrompt,
-    });
-    const text = resp.text;
-    if (!text) throw new Error('LLM 返回空结果');
-    return text;
+    };
+    try {
+        const resp = await ai.models.generateContent({
+            model: params.model,
+            config: {
+                systemInstruction: params.systemPrompt,
+                temperature: params.temperature,
+                thinkingConfig: { thinkingBudget: 0 },
+            },
+            contents: params.userPrompt,
+        });
+        let resSnap: unknown = { text: resp.text ?? null };
+        try {
+            resSnap = JSON.parse(JSON.stringify(resp));
+        } catch {
+            /* ignore */
+        }
+        logger.debugLlmRoundtrip('[dictPrepLlm/google]', reqSnap, resSnap);
+        const text = resp.text;
+        if (!text) throw new Error('LLM 返回空结果');
+        return text;
+    } catch (e) {
+        logger.debugLlmFailure('[dictPrepLlm/google]', reqSnap, e);
+        throw e;
+    }
 }
 
 async function callOllama(params: {
@@ -178,22 +205,27 @@ async function callOllama(params: {
     temperature: number;
     timeout: number;
 }): Promise<string> {
+    const logger = Logger.getInstance();
     const baseUrl = ConfigManager.getInstance().getApiKey('ollama') || 'http://localhost:11434';
-    const resp = await axios.post(
-        `${baseUrl}/api/chat`,
-        {
-            model: params.model,
-            stream: false,
-            messages: [
-                { role: 'system', content: params.systemPrompt },
-                { role: 'user', content: params.userPrompt },
-            ],
-            options: { temperature: params.temperature },
-        },
-        { timeout: params.timeout }
-    );
-    const text = resp?.data?.message?.content;
-    if (!text || typeof text !== 'string') throw new Error('LLM 返回空结果');
-    return text;
+    const url = `${baseUrl.replace(/\/$/, '')}/api/chat`;
+    const body = {
+        model: params.model,
+        stream: false,
+        messages: [
+            { role: 'system', content: params.systemPrompt },
+            { role: 'user', content: params.userPrompt },
+        ],
+        options: { temperature: params.temperature },
+    };
+    try {
+        const resp = await axios.post(url, body, { timeout: params.timeout });
+        logger.debugLlmRoundtrip('[dictPrepLlm/ollama]', { url, body }, resp.data);
+        const text = resp?.data?.message?.content;
+        if (!text || typeof text !== 'string') throw new Error('LLM 返回空结果');
+        return text;
+    } catch (e) {
+        logger.debugLlmFailure('[dictPrepLlm/ollama]', { url, body }, e);
+        throw e;
+    }
 }
 

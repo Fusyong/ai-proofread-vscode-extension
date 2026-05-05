@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.10.1",
+  "version": "1.10.2",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -311,11 +311,6 @@
       {
         "command": "ai-proofread.numbering.defineSegmentPattern",
         "title": "定义段内序号"
-      },
-      {
-        "command": "ai-proofread.editorialMemory.reconcile",
-        "title": "AI Proofreader: reconcile editorial memory (v2 deprecated — 仅用提示)",
-        "deprecationMessage": "编辑记忆 v2 已取消与章节 path 的对齐。"
       },
       {
         "command": "ai-proofread.editorialMemory.clear",
@@ -907,38 +902,43 @@
           "order": 96,
           "type": "boolean",
           "default": true,
-          "description": "写入 editorial-memory.json / editorial-memory-archive.json 前若文件已存在则生成带时间戳的 .bak 备份。"
+          "description": "写入 editorial-memory.json / editorial-memory-archive.json 前若文件已存在则生成带时间戳的 .bak 备份。",
+          "markdownDescription": "写入 **editorial-memory.json** / **editorial-memory-archive.json** 前若文件已存在则生成带时间戳的 `.bak` 备份。"
         },
         "ai-proofread.editorialMemory.globalActiveMax": {
           "order": 97,
           "type": "number",
           "default": 30,
-          "description": "活跃记忆中「全局」层最大条数；超员时程序将低权重条目移入存档。"
+          "description": "活跃记忆中「全局」层最大条数；超员时程序将低权重条目移入存档。",
+          "markdownDescription": "活跃记忆中 **全局**（`original` / `changedTo` / `weight` 0–1000，可选 `note`）最大条数；超员时程序将 **weight** 较低的条目移入存档。"
         },
         "ai-proofread.editorialMemory.currentProofreadRoundsMax": {
           "order": 98,
           "type": "number",
           "default": 3,
-          "description": "保留最近几次校对的扁平合并稿（currentRounds，默认 3）；轮次间文本归一化完全相同则不入栈。单次轮内条数不限。"
+          "description": "保留最近几次校对的扁平合并稿（currentRounds，默认 3）；轮次间文本归一化完全相同则不入栈。单次轮内条数不限。",
+          "markdownDescription": "保留最近几次校对的扁平合并稿（**currentRounds**，默认 3）；轮次间文本归一化完全相同则不入栈。单次轮内条数不限。"
         },
         "ai-proofread.editorialMemory.mergeAfterAccept": {
           "order": 104,
           "type": "boolean",
           "default": true,
-          "description": "接受写回后调用 LLM 输出 global_ops 与本轮 current_round_flat；关闭则仅用程序摘要压入扁平轮次栈。"
+          "description": "接受写回后调用 LLM 输出 global_ops 与本轮 current_round_flat；关闭则仅用程序摘要压入扁平轮次栈。",
+          "markdownDescription": "接受写回后调用 LLM 输出 **`global_ops`**（维护全局：`add` / `remove` / `set_weight` / `bump_weight`；`add` 含 **weight** 与可选 **`note`** 修改说明）与 **`current_round_flat`**（可用 **【例】** / **【规律】** 前缀）；关闭则仅用程序摘要压入 **currentRounds** 栈。"
         },
         "ai-proofread.editorialMemory.mergeModelOverride": {
           "order": 105,
           "type": "string",
           "default": "",
-          "description": "记忆 patch 专用模型名（留空则用当前校对所用 platform 的模型）。"
+          "description": "记忆 patch 专用模型名（留空则用当前校对所用 platform 的模型）。",
+          "markdownDescription": "编辑记忆合并（patch）专用模型名；留空则使用当前校对所选 **platform** 的模型。"
         },
         "ai-proofread.debug.enableConsoleLog": {
           "order": 114,
           "type": "boolean",
           "default": false,
-          "description": "在开发者工具控制台原样输出每次提交给大模型的完整请求。",
-          "markdownDescription": "开启后，在 **开发者工具 → 控制台**（*Help → Toggle Developer Tools*）中原样输出每次提交给大模型的完整内容，与扩展发往 API 的负载一致。长文本会完整打印，可能影响性能。"
+          "description": "在开发者工具控制台输出与大模型交互的完整请求与响应。",
+          "markdownDescription": "开启后，在 **开发者工具 → 控制台**（*Help → Toggle Developer Tools*）中输出每次 LLM 调用的 **请求与响应**（OpenAI 兼容接口为 HTTP 返回 JSON；Google 为可序列化的 SDK 结果摘要）。涵盖：**校对**（DeepSeek / 阿里云 / Google / Ollama）、**编辑记忆合并**（`editorialMemoryChat`）、**词典准备**（`dictPrepLlm`）。失败时额外输出 axios 错误响应体（若有）。长文本会完整打印，可能影响性能。"
         }
       }
     },

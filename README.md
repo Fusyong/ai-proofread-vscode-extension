@@ -1,6 +1,5 @@
 !!! caution 
-    因DeepSeek V3最终版本（0324）以后的校对效果不理想，默认平台已经由DeepSeek改成阿里云百炼。只有DeepSeek账号的用户须手动改回DeepSeek。（可用阿里云百炼平台deepseek-v3作为替代）
-
+    因DeepSeek V3最终版本（0324）以后的校对效果不理想，默认平台已经由DeepSeek改成阿里云百炼。只有DeepSeek账号的用户须手动改回DeepSeek（也可用阿里云百炼平台deepseek-v3作为替代）。
     DeepSeek 平台默认支持 deepseek-v4-flash，如果你改为deepseek-v4-pro，还需要**关注价格变动并测试效果**；旧版 deepseek-chat 在 2026/07/24 前仍可用
 
 *QQ群“ai-proofreader 校对插件”：1055031650*
@@ -27,7 +26,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 ### 2.1. 校对文档中的选段
 
 1. Ctrl+N新建文档，后缀设为`.md`（markdown文档），把你需要校对的文字粘贴到这里，选中其中的一段文字
-2. 在所选文字上打开右键菜单，使用其中的 **AI Proofreader: proofread selection** 校对选中文本；若要使用**编辑记忆 v2**（校对前注入、接受写回后用 LLM 维护活跃记忆），请选用 **AI Proofreader: proofread selection with memory**
+2. 在所选文字上打开右键菜单，使用其中的 `AI Proofreader: proofread selection` 校对选中文本
 3. 弹出选项对话框时全部回车，即使用默认值
 4. 最后会自动展示校对前后的差异，效果如下，深红表示原文变动，深绿表示结果变动：
 
@@ -199,7 +198,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 - 注意：词典查询提示词必须要求模型**只输出 JSON**，且输出结构为 `{\"lookups\":[...]}`（详见源码`dictPrepPrompt.ts`）。
 
 
-### 3.2. 校对文本选段和JSON文档
+### 3.2. 校对
 
 #### 3.2.1. 校对Markdown文档中选中的片段
 
@@ -207,18 +206,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 2. 选中要校对的段落，不宜过长
 3. 从右键菜单、命令面板（Ctrl+Shift+P）中选择 Proofread Selection
 4. 可选择上下文范围、参考文件和温度。加入上下文是为大语言模型提供语境，以便参考，并保持一致性。参考文件可以是相关的词条、更权威的文献等。模型温度较低时，随机性、创造性、稳定性较低；反之则随机性、创造性、不稳定性变高。可以参考模型文档进行测试。**使用不同温度多遍校对，或许可以覆盖不同的问题，值得尝试。**
-5. 校对结束后会打开 diff；**关闭右侧校对结果文档时**可选择是否将结果**写回选区**。**普通 Proofread Selection** 不会读写编辑记忆 JSON。**Proofread Selection with Memory** 会在接受写回后更新 **`.proofread/editorial-memory.json`**：**全局**为带 `repeated`/`weight` 的结构化条目（超员低权重入存档）；**最近 d 次（默认 3）**校对的**扁平合并稿**栈 `currentRounds`（轮次间归一化完全相同则去重，单轮内不限条数）。注入：`<editorial_memory_global>`、`<editorial_memory_current_rounds>`、`<editorial_proofread_context>`。写回时 LLM 产出 `global_ops` + `current_round_flat`（或由程序摘要压栈），详见 `mergeAfterAccept` 等 `ai-proofread.editorialMemory.*` 设置。
+5. 校对结束后会打开 diff；**关闭右侧校对结果文档时**可选择是否将结果**写回选区**。**普通 Proofread Selection** 不会读写编辑记忆 JSON。**Proofread Selection with Memory** 会在接受写回后更新 **`.proofread/editorial-memory.json`**：**全局**为结构化条目（`original` / `changedTo` / **`weight`**；可选 **`note`** 修改说明；超员时**低 weight**先入存档）；**最近 d 次（默认 3）**校对的**扁平合并稿**栈 `currentRounds`（轮次间归一化完全相同则去重，单轮内不限条数）。注入：`<editorial_memory_global>`、`<editorial_memory_current_rounds>`、`<editorial_proofread_context>`。写回时 LLM 产出 `global_ops` + `current_round_flat`（或由程序摘要压栈），详见 `mergeAfterAccept` 等 `ai-proofread.editorialMemory.*` 设置。
 
-#### 3.2.1a. 项目级编辑记忆（v2）
-
-- **校对面板**快捷栏中为「校对选中文本」「校对选中（编辑记忆）」两个按钮；命令面板或右键亦可运行 **Proofread Selection** / **Proofread Selection with Memory**。
-- **「Proofread Selection with Memory」**与普通 Proofread Selection 的流程相同（上下文、reference、diff 等），但**仅本条命令**会读写活跃/存档 JSON，普通 Proofread Selection 不涉及记忆。
-- 路径：`<工作区根>/.proofread/editorial-memory.json`（活跃）、`editorial-memory-archive.json`（存档）。首次若仅有旧版 **`editorial-memory.md`**，扩展会在读写时迁移为 JSON，并为旧 `.md` 生成 `.bak`。
-- **「AI Proofreader: reconcile editorial memory …」**：记忆 v2 已无「按文稿 path」结构；该命令仅提示说明，不再改文件。
-- **清空记忆**：可将活跃与存档 JSON 恢复为空（可先备份）。
-- `.gitignore` 建议按需忽略 `.proofread/editorial-memory*.json`、`.proofread/*.bak`。
-
-选段校对时若需要参考书稿外的全文（如体例摘要、词条摘录），在选择「是否使用参考文件？」时选 **是** 并选定 Markdown 或其他文本文件即可；**Merge Two Files** 批量合并 reference 的流程不变。
 
 #### 3.2.2. 校对切分好的JSON文档
 
@@ -228,6 +217,28 @@ Additionally, you can also set your own prompts for other text processing scenar
 4. 在校对面板中有进度、结果等信息。可中途取消校对。下次接着校对，会根据校对结果`文档.proofread.json`文件中的记录，跳过已经完成的部分；如果切分结果`文档.json`与校对结果`文档.proofread.json`条目数不一致，则会提示你手动对齐，或删除结果文档，从头重新校对。
 5. 最后会提示你查看结果：JSON结果、前后差异、日志文件，以及生成差异文件（类似带修改标记的Word文档）。
 6. 如有未完成的条目，可重新校对，重新校对时只处理未完成的条目
+
+#### 3.2.3. 带记忆地校对选段，并自动维护项目级编辑记忆（实验功能）
+
+!!! caution 费用警告
+    本工作模式比起Proofread Selection来，每次都要提交编辑记忆给大模型参考，并合并新的编辑记忆，因此会消耗多得多的token。
+
+1. 选中要校对的文本，运行 `Proofread Selection with Memory`命令面板：会把已有项目级编辑记忆注入请求供模型参考；接受写回后按设置更新记忆（普通 `Proofread Selection` 不读写记忆 JSON）
+2. 与普通 `Proofread Selection` 不同，本命令从工作区配置文件 `<工作区根>/.proofread/proofread-selection-with-memory.json` 读取设置。若文件不存在，扩展会生成一份默认模板
+   - `contextMode`（字符串，三选一）
+    - `"none"` — 不使用上下文
+    - `"adjacentParagraphs"` — 前后邻段，须配合以下参数：
+        - `beforeParagraphs` / `afterParagraphs`（整数）：取值 `0`～`10`
+    - `"headingScope"` — 按 Markdown 标题包裹范围，须配合以下参数：
+        - `headingLevel`（整数）： `1`～`6`，对应一级～六级标题上下文
+   - `referenceFiles`（字符串数组）：相对工作区根的路径，建议正斜杠（如 `"notes/ref.md"`）；空数组 `[]` 表示不用参考文件；若有多项仅第一项参与注入
+   - `temperature`（数字）：`[0, 2)`（大于等于 0、小于 2）
+   - `repetitionMode`（字符串，三选一）
+        - `"none"`（不重复）
+        - `"target"`（仅重复 target）
+        - `"all"`（重复参考+语境+target 整段流程）
+   - `sourceTextHint`（字符串，可选）：省略或 `""` 或 `"none"` — 不注入源文本特性。否则须为源文本特性提示词的内置 id或名称。可通过「管理提示词」维护提示词后再写进 JSON
+3. 编辑记忆文件路径：`<工作区根>/.proofread/editorial-memory.json`（活跃）、`editorial-memory-archive.json`（存档）。
 
 ### 3.3. 比较（diff）校对前后的文件差异
 
@@ -252,7 +263,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 为了写好提示词，你需要了解本扩展的工作原理：
 
 1. 把你的提示词作为系统命令/系统提示词交给大模型
-2. 在第一轮对话中提交`<reference>${reference}</reference>`和`<context>${context}</context>`；若启用编辑记忆，还会附带 `<editorial_memory_global>`、`<editorial_memory_current_rounds>`、`<editorial_proofread_context>`；
+2. 在第一轮对话中提交`<reference>${reference}</reference>`和`<context>${context}</context>`；若启用编辑记忆，还会附带 `<editorial_memory_global>`（全局通则，含 **weight**、可选修改说明 **note**）、`<editorial_memory_current_rounds>`（可含 **【例】** / **【规律】** 前缀）、`<editorial_proofread_context>`；
 3. 在第二轮对话中提交`<target>${target}</target>`
 4. 接收、处理第二轮对话的输出作为结果
 
@@ -443,6 +454,11 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 10. 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
 
 ## 6. 更新日志
+
+### v1.10.2
+
+- 优化：proofread selection with memory 不再提示用户选择参数，而是通过 `.proofread` 中的设置文件控制参数
+- 优化：所有流程中与LLM交互的内容（请求和返回）都通过debug.enableConsoleLog控制是否打印到控制台
 
 ### v1.10.1
 
