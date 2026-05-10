@@ -6,6 +6,58 @@ export interface ProofreadItem {
     original: string;
     corrected?: string;
     explanation?: string;
+    /** 模型给出的置信度，0–1；缺省表示未标注（兼容旧输出） */
+    confidence?: number;
+}
+
+/** 将 JSON 中的 confidence 字段规范为 0–1；无法识别时返回 undefined */
+export function normalizeItemConfidence(raw: unknown): number | undefined {
+    if (raw === null || raw === undefined) {
+        return undefined;
+    }
+    if (typeof raw === 'number') {
+        if (!Number.isFinite(raw)) {
+            return undefined;
+        }
+        if (raw >= 0 && raw <= 1) {
+            return raw;
+        }
+        if (raw > 1 && raw <= 100) {
+            return Math.min(1, Math.max(0, raw / 100));
+        }
+        if (raw < 0) {
+            return 0;
+        }
+        if (raw > 100) {
+            return 1;
+        }
+        return undefined;
+    }
+    if (typeof raw === 'string') {
+        const t = raw.trim();
+        if (t === '') {
+            return undefined;
+        }
+        const numPart = t.endsWith('%') ? t.slice(0, -1).trim() : t;
+        const n = Number(numPart);
+        if (!Number.isFinite(n)) {
+            return undefined;
+        }
+        if (t.endsWith('%')) {
+            return Math.min(1, Math.max(0, n / 100));
+        }
+        return normalizeItemConfidence(n);
+    }
+    return undefined;
+}
+
+/** 树视图等界面展示用（百分数） */
+export function formatConfidencePercent(confidence: number | undefined): string | undefined {
+    if (confidence === undefined || !Number.isFinite(confidence)) {
+        return undefined;
+    }
+    const pct = Math.round(confidence * 100);
+    return `${pct}%`;
 }
 
 /** 整块字符串正好是单个围栏（兼容旧正则行为） */
@@ -14,17 +66,25 @@ const JSON_CODE_BLOCK_RE = /^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/;
 /** 文中的 ``` / ```json 围栏，匹配多个块以便在说明文字后仍可提取 */
 const FENCED_BLOCK_G_RE = /```(?:json)?\s*([\s\S]*?)```/gi;
 
-function mapItemEntries(
-    items: Array<{ original?: string; corrected?: string; explanation?: string } | null | undefined>
-): ProofreadItem[] {
+type RawProofreadItem = {
+    original?: string;
+    corrected?: string;
+    explanation?: string;
+    confidence?: unknown;
+};
+
+function mapItemEntries(items: Array<RawProofreadItem | null | undefined>): ProofreadItem[] {
     return items
-        .filter((x): x is { original: string; corrected?: string; explanation?: string } =>
-            x != null && typeof x === 'object' && typeof x.original === 'string')
-        .map((x) => ({
-            original: String(x.original),
-            corrected: x.corrected != null ? String(x.corrected) : undefined,
-            explanation: x.explanation != null && x.explanation !== '' ? String(x.explanation) : undefined,
-        }));
+        .filter((x): x is RawProofreadItem => x != null && typeof x === 'object' && typeof x.original === 'string')
+        .map((x) => {
+            const confidence = normalizeItemConfidence(x.confidence);
+            return {
+                original: String(x.original),
+                corrected: x.corrected != null ? String(x.corrected) : undefined,
+                explanation: x.explanation != null && x.explanation !== '' ? String(x.explanation) : undefined,
+                ...(confidence !== undefined ? { confidence } : {}),
+            };
+        });
 }
 
 /** 仅从合法 JSON 对象中读取 `items` 数组（必须存在且为数组） */
@@ -36,9 +96,7 @@ function itemsFromParsed(parsed: unknown): ProofreadItem[] | null {
     if (!Array.isArray(o.items)) {
         return null;
     }
-    return mapItemEntries(
-        o.items as Array<{ original?: string; corrected?: string; explanation?: string } | null | undefined>
-    );
+    return mapItemEntries(o.items as Array<RawProofreadItem | null | undefined>);
 }
 
 /**

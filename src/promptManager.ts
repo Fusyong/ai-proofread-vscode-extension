@@ -10,11 +10,33 @@ export type PromptOutputType = 'full' | 'item' | 'other';
 export const SYSTEM_PROMPT_NAME_FULL = '';
 /** 当前选中的为「系统默认提示词（item）」时，globalState 中 currentPrompt 的值 */
 export const SYSTEM_PROMPT_NAME_ITEM = '__system_item__';
+/** 预置「表述正常化（full）」在 globalState 中的存值 */
+export const SYSTEM_PROMPT_NAME_NORMALIZATION_FULL = '__preset_normalization_full__';
+/** 预置「表述正常化（item）」在 globalState 中的存值 */
+export const SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM = '__preset_normalization_item__';
+/** 预置「硬伤发现（item）」在 globalState 中的存值（仅条目输出） */
+export const SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM = '__preset_hard_issue_item__';
+/** 预置「对应关系核对（item）」在 globalState 中的存值（仅条目输出） */
+export const SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM = '__preset_correspondence_check_item__';
+
+function isReservedPromptStorageName(name: string): boolean {
+    return (
+        name === SYSTEM_PROMPT_NAME_ITEM ||
+        name === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL ||
+        name === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM ||
+        name === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM ||
+        name === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM
+    );
+}
 
 /** 将存值转为显示名称（供无 PromptManager 的调用方使用） */
 export function getPromptDisplayName(name: string): string {
     if (name === SYSTEM_PROMPT_NAME_FULL) return '系统默认提示词（full）';
     if (name === SYSTEM_PROMPT_NAME_ITEM) return '系统默认提示词（item）';
+    if (name === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) return '表述正常化（full）';
+    if (name === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) return '表述正常化（item）';
+    if (name === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) return '硬伤发现（item）';
+    if (name === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) return '对应关系核对（item）';
     return name || '系统默认提示词（full）';
 }
 
@@ -44,7 +66,7 @@ export class PromptManager {
         return config.get<Prompt[]>('prompts', []) ?? [];
     }
 
-    /** 当前选中的提示词名称（globalState 存值：'' | '__system_item__' | 自定义 name） */
+    /** 当前选中的提示词名称（globalState 存值：内置模板含 '' / '__system_item__' / '__preset_*__'，或自定义 name） */
     public getCurrentPromptName(): string {
         return this.context.globalState.get<string>('currentPrompt', SYSTEM_PROMPT_NAME_FULL) ?? SYSTEM_PROMPT_NAME_FULL;
     }
@@ -54,10 +76,14 @@ export class PromptManager {
         const name = this.getCurrentPromptName();
         if (name === SYSTEM_PROMPT_NAME_FULL) return '系统默认提示词（full）';
         if (name === SYSTEM_PROMPT_NAME_ITEM) return '系统默认提示词（item）';
+        if (name === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) return '表述正常化（full）';
+        if (name === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) return '表述正常化（item）';
+        if (name === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) return '硬伤发现（item）';
+        if (name === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) return '对应关系核对（item）';
         return name;
     }
 
-    /** 设为当前使用的提示词；name 为 SYSTEM_PROMPT_NAME_FULL 表示系统全文，SYSTEM_PROMPT_NAME_ITEM 表示系统条目 */
+    /** 设为当前使用的提示词；空串为系统默认全文，__system_item__ 为系统默认条目，__preset_*__ 为其他预置 */
     public async setCurrentPrompt(name: string): Promise<void> {
         await this.context.globalState.update('currentPrompt', name);
     }
@@ -70,7 +96,7 @@ export class PromptManager {
             placeHolder: '例如：通用校对、学术论文校对等',
         });
         if (!name) return;
-        if (name === SYSTEM_PROMPT_NAME_ITEM) {
+        if (isReservedPromptStorageName(name)) {
             vscode.window.showWarningMessage('该名称为系统保留，请使用其他名称。');
             return;
         }
@@ -82,7 +108,7 @@ export class PromptManager {
         const outputTypePick = await vscode.window.showQuickPick(
             [
                 { label: '全文', value: 'full' as const },
-                { label: '条目', value: 'item' as const, description: 'original+corrected+explanation' },
+                { label: '条目', value: 'item' as const, description: 'original+corrected+confidence+explanation' },
                 { label: '其他', value: 'other' as const },
             ],
             { placeHolder: '选择输出类型', ignoreFocusOut: true }
@@ -105,7 +131,7 @@ export class PromptManager {
             placeHolder: '例如：通用校对、学术论文校对等',
         });
         if (!name) return;
-        if (name === SYSTEM_PROMPT_NAME_ITEM) {
+        if (isReservedPromptStorageName(name)) {
             vscode.window.showWarningMessage('该名称为系统保留，请使用其他名称。');
             return;
         }
@@ -119,7 +145,7 @@ export class PromptManager {
         const outputTypePick = await vscode.window.showQuickPick(
             [
                 { label: '全文', value: 'full' as const },
-                { label: '条目', value: 'item' as const, description: 'original+corrected+explanation' },
+                { label: '条目', value: 'item' as const, description: 'original+corrected+confidence+explanation' },
                 { label: '其他', value: 'other' as const },
             ],
             { placeHolder: '选择输出类型', ignoreFocusOut: true, title: '输出类型' }

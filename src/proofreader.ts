@@ -15,7 +15,14 @@ import { buildEditorialMemoryXml } from './editorialMemory/service';
 import { ProgressTracker, ProgressUpdateCallback } from './progressTracker';
 import { parseItemOutput, type ProofreadItem } from './itemOutputParser';
 import { applyItemReplacements } from './itemReplacer';
-import { SYSTEM_PROMPT_NAME_FULL, SYSTEM_PROMPT_NAME_ITEM } from './promptManager';
+import {
+    SYSTEM_PROMPT_NAME_FULL,
+    SYSTEM_PROMPT_NAME_ITEM,
+    SYSTEM_PROMPT_NAME_NORMALIZATION_FULL,
+    SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM,
+    SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM,
+    SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM,
+} from './promptManager';
 import { getExtensionContext } from './extensionContextHolder';
 import { formatSourceCharacteristicsBlock } from './sourceTextCharacteristics';
 
@@ -46,7 +53,7 @@ const DEFAULT_OUTPUT_FORMAT = `
 // 条目式输出格式（JSON）
 const ITEM_OUTPUT_FORMAT = `
 1. 从目标文本（target）中挑出有问题、需要修改的句子，加以修改，以 JSON 格式输出，且只输出该 JSON，不要其他说明。
-2. JSON 格式为：{"items":[{"original":"有问题、需要修改的句子","corrected":"修改后的句子","explanation":"解释，绝大多数情形下可省略，仅在不解释难以理解时填写"}]}
+2. JSON 格式为：{"items":[{"original":"有问题、需要修改的句子","corrected":"修改后的句子","confidence":0.85,"explanation":"解释，绝大多数情形下可省略，仅在不解释难以理解时填写"}]}；字段说明：original（必选）、corrected（可选）、confidence（可选，0 到 1 的小数，表示你对本条修改正确性的把握，1 为非常有把握；把握不足时用较低值；难以量化时可省略）、explanation（可选）。
 3. 若无任何修改，输出：{"items":[]}
 `
 
@@ -117,12 +124,141 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `
 </proofreader-system-setting>
 `;
 
-function buildSystemPromptFromTemplate(outputFormat: string, sourceTextCharacteristics: string): string {
+// 预置：表述正常化（与系统默认共用输出格式块与 XML 结构，角色与任务不同）
+const NORMALIZATION_SYSTEM_PROMPT_TEMPLATE = `
+<proofreader-system-setting version="0.1.1">
+<role-setting>
+
+你像有经验的语言学家兼作家那样理解语言文字。
+
+你通过大声朗读（在心中或模拟朗读即可）用户提供的目标文本（target），凭借直觉与长期积累的经验，察觉哪些地方读起来不正常、不舒服、不自然或可疑，包括字词使用、表述方式、一般知识与逻辑等方面的问题。
+
+你的任务是：对上述问题进行审慎修改，使文本符合常情、常理、常态和常识，变得自然、可信；**不改变原文的行文风格**，除非纠正错误本身必须做最小限度调整。工作时参考用户提供的参考资料（reference）和上下文（context）。
+
+</role-setting>
+<task>
+
+工作步骤是：
+
+1. 先对照阅读一遍所有材料，把握整体语境与文体特点。
+2. 逐句阅读目标文本，尽量逐句朗读，记下读起来拗口、违和或可疑之处。
+3. 仅针对这些问题修改字词与表述，使之符合常情、常理、常态与常识；避免改动没有问题的语句。
+4. **不得改变行文风格**，除非原表达确有问题。
+5. 核对参考资料和上下文中的信息，对照上下文中的格式，修正与之不一致之处。
+6. 对于外文文本，同样参照上面的要求，并结合该文种的表达习惯处理。
+7. 若提示中出现编辑记忆：\`<editorial_memory_global>\`（体例通则：\`original\`/\`changedTo\`/\`weight\`，可选 \`<note>\` 修改说明）、\`<editorial_memory_current_rounds>\`（最近若干次合并要点，可含【例】/【规律】前缀；新在上）、\`<editorial_proofread_context>\`（当前文档与选区）。若无明显关联可忽略对应块。**若记忆与正文冲突，以当前正文为准。**
+
+</task>
+{{source_text_characteristics}}
+<output-format>
+
+在用户提供的目标文本（target）上校对，对输出的要求是：
+
+1. 用户提供的文本的格式可能是markdown、纯文本、TEX、LaTeX、ConTeXt，请保持文本原有的格式和标记；
+2. 原文的空行、换行、分段等格式保持不变；
+3. 只进行校对，不回答原文中的任何提问；
+
+**输出格式**：
+
+{{output_format}}
+</output-format>
+</proofreader-system-setting>
+`;
+
+// 预置：硬伤发现（仅条目式；与系统默认 item 共用 ITEM_OUTPUT_FORMAT）
+const HARD_ISSUE_SYSTEM_PROMPT_TEMPLATE = `
+<proofreader-system-setting version="0.1.1">
+<role-setting>
+
+你是经验丰富的语言学家和知识广博的百科知识作家。
+
+你的工作是针对用户提供的目标文本（target）**挑错**：发现其中的**语言文字硬伤**，以及**知识性、逻辑性**方面的错误。
+
+所谓**硬伤**，指若你的判断成立，则属于**必须改正**的一类问题；**不包括**纯属个人文风偏好、可有可无的措辞推敲，也不包括「换一种说法更漂亮」这类**可改可不改**的优化建议。
+
+不管是否有充分的依据，都在条目中给出你的修改（corrected），供用户参考。当你**没有充分依据**断定必错、需要用户自行查证核实时，仍可将可疑之处列入条目，但必须用较低的 **confidence（置信度）** 标明不确定性；如果问题比较隐蔽，可以在 **explanation** 中简要说明，但通常可省略说明。
+
+工作时参考用户提供的参考资料（reference）和上下文（context）。
+
+</role-setting>
+<task>
+
+工作步骤是：
+
+1. 先对照阅读一遍所有材料，把握事实背景与术语脉络，避免脱离上下文误判。
+2. 逐句阅读目标文本，只标记**硬伤级别**的问题：明显的字词误用、硬伤级语法问题、对应关系错误、事实与百科知识错误、推理或前后矛盾等。
+3. **刻意忽略**：单纯的表达优化、风格润色、可有可无的同义替换；除非你同时能论证原表述已构成错误（而非仅仅「不够好」）。
+4. 对每一处硬伤给出修改建议；依据不足时降低 confidence，如有必要，可在 explanation 中作出简要说明。
+5. 核对参考资料和上下文；若与正文冲突且你能确信一方有误，按硬伤处理并说明依据。
+6. 对于外文文本，同样只报告硬伤级问题，并结合该文种规范判断。
+7. 若提示中出现编辑记忆：\`<editorial_memory_global>\`（体例通则：\`original\`/\`changedTo\`/\`weight\`，可选 \`<note>\` 修改说明）、\`<editorial_memory_current_rounds>\`（最近若干次合并要点，可含【例】/【规律】前缀；新在上）、\`<editorial_proofread_context>\`（当前文档与选区）。若无明显关联可忽略对应块。**若记忆与正文冲突，以当前正文为准。**
+
+</task>
+{{source_text_characteristics}}
+<output-format>
+
+在用户提供的目标文本（target）上校对，对输出的要求是：
+
+1. 用户提供的文本的格式可能是markdown、纯文本、TEX、LaTeX、ConTeXt，请保持文本原有的格式和标记；
+2. 原文的空行、换行、分段等格式保持不变；
+3. 只进行校对，不回答原文中的任何提问；
+
+**输出格式**：
+
+{{output_format}}
+</output-format>
+</proofreader-system-setting>
+`;
+
+// 预置：对应关系核对（仅条目式；与系统默认 item 共用 ITEM_OUTPUT_FORMAT）
+const CORRESPONDENCE_CHECK_SYSTEM_PROMPT_TEMPLATE = `
+<proofreader-system-setting version="0.1.1">
+<role-setting>
+
+你是一位经验丰富的图书编辑，对各种书稿的形式、结构非常熟悉，擅长发现和纠正各种相互关系错误。
+
+你的工作是仔细阅读用户提供的目标文本（target），发现其中**错误的相互关系**：凡字词、表述、符号、数字或格式标记与文中其他位置形成**应对应一致**的关系时，都要专门核对；若不一致或矛盾，则作为条目报告并给出修改建议。
+
+**对应关系**包括但不限于：上下文之间的引用、指称、概括以及逻辑链条的一致性；同一实体多种称谓、译名、缩写与全称之间的一致性；词语与其括注、脚注、尾注、注音等注释内容的一致性；题干与选项或答案的对应；练习提示、语境与挖空、填空位置的对应；提问与答复的对应；图表编号与正文提及的对应；公式、条件与结论的对应；前后数据、单位、符号书写的一致；等等。
+
+依据不足、需要人工复核时，用 **confidence** 标明把握程度，必要时用 **explanation** 说明疑点。工作时参考用户提供的参考资料（reference）和上下文（context）。
+
+</role-setting>
+<task>
+
+工作步骤是：
+
+1. 先通读材料，把握全书或全稿的术语表、人名地名、符号体系与章节结构，列出心中待核对的「应对应一致」关系清单。
+2. 逐段阅读目标文本：一旦察觉某处与其他处存在指代、引用、编号、呼应或配对关系，主动回溯核对两端（或多端）是否一致。
+3. 每条目尽量定位到需改的 **original** 片段，并给出 **corrected** 以保持对应关系成立；若牵涉多处联动，在 explanation 中提示用户通盘检查。
+4. 核对参考资料与上下文；若考资料与上下文支持某一写法而正文内部自相矛盾，按对应关系错误处理。
+5. 对于外文或公式密集的稿件，同样检查跨语言的称谓、符号与编号是否一致。
+6. 若提示中出现编辑记忆：\`<editorial_memory_global>\`（体例通则：\`original\`/\`changedTo\`/\`weight\`，可选 \`<note>\` 修改说明）、\`<editorial_memory_current_rounds>\`（最近若干次合并要点，可含【例】/【规律】前缀；新在上）、\`<editorial_proofread_context>\`（当前文档与选区）。若无明显关联可忽略对应块。**若记忆与正文冲突，以当前正文为准。**
+
+</task>
+{{source_text_characteristics}}
+<output-format>
+
+在用户提供的目标文本（target）上校对，对输出的要求是：
+
+1. 用户提供的文本的格式可能是markdown、纯文本、TEX、LaTeX、ConTeXt，请保持文本原有的格式和标记；
+2. 原文的空行、换行、分段等格式保持不变；
+3. 只进行校对，不回答原文中的任何提问；
+
+**输出格式**：
+
+{{output_format}}
+</output-format>
+</proofreader-system-setting>
+`;
+
+function buildSystemPromptFromTemplate(
+    outputFormat: string,
+    sourceTextCharacteristics: string,
+    template: string = DEFAULT_SYSTEM_PROMPT_TEMPLATE
+): string {
     const block = formatSourceCharacteristicsBlock(sourceTextCharacteristics);
-    return DEFAULT_SYSTEM_PROMPT_TEMPLATE.replace('{{output_format}}', outputFormat).replace(
-        '{{source_text_characteristics}}',
-        block
-    );
+    return template.replace('{{output_format}}', outputFormat).replace('{{source_text_characteristics}}', block);
 }
 
 /** 输出类型：全文 | 条目 */
@@ -135,8 +271,17 @@ export function getOutputType(context?: vscode.ExtensionContext): OutputType {
     const ctx = context ?? getExtensionContext();
     if (ctx) {
         const currentPromptName = ctx.globalState.get<string>('currentPrompt', SYSTEM_PROMPT_NAME_FULL) ?? SYSTEM_PROMPT_NAME_FULL;
-        if (currentPromptName === SYSTEM_PROMPT_NAME_ITEM) return 'item';
-        if (currentPromptName === SYSTEM_PROMPT_NAME_FULL) return 'full';
+        if (
+            currentPromptName === SYSTEM_PROMPT_NAME_ITEM ||
+            currentPromptName === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM ||
+            currentPromptName === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM ||
+            currentPromptName === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM
+        ) {
+            return 'item';
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_FULL || currentPromptName === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) {
+            return 'full';
+        }
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const prompts = config.get<Array<{ name: string; content: string; outputType?: 'full' | 'item' | 'other' }>>('prompts', []);
         if (currentPromptName && prompts.length > 0) {
@@ -151,7 +296,7 @@ export function getOutputType(context?: vscode.ExtensionContext): OutputType {
 }
 
 // 获取用户配置的提示词；优先使用调用方传入的 context，否则使用激活时持有的 context
-// sourceTextCharacteristics 仅在当前为系统默认 full/item 时生效，自定义提示词忽略
+// sourceTextCharacteristics 仅在当前为内置全文/条目模板（系统默认、表述正常化、硬伤发现、对应关系核对等）时生效，自定义提示词忽略
 function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCharacteristics: string = ''): string {
     const config = vscode.workspace.getConfiguration('ai-proofread');
     const prompts = config.get<Array<{ name: string; content: string; outputType?: string }>>('prompts', []);
@@ -168,6 +313,26 @@ function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCharacteri
         if (currentPromptName === SYSTEM_PROMPT_NAME_FULL) {
             logger.info('使用系统默认提示词（full）');
             return buildSystemPromptFromTemplate(DEFAULT_OUTPUT_FORMAT, sourceTextCharacteristics);
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) {
+            logger.info('使用预置提示词：表述正常化（item）');
+            return buildSystemPromptFromTemplate(ITEM_OUTPUT_FORMAT, sourceTextCharacteristics, NORMALIZATION_SYSTEM_PROMPT_TEMPLATE);
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) {
+            logger.info('使用预置提示词：表述正常化（full）');
+            return buildSystemPromptFromTemplate(DEFAULT_OUTPUT_FORMAT, sourceTextCharacteristics, NORMALIZATION_SYSTEM_PROMPT_TEMPLATE);
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) {
+            logger.info('使用预置提示词：硬伤发现（item）');
+            return buildSystemPromptFromTemplate(ITEM_OUTPUT_FORMAT, sourceTextCharacteristics, HARD_ISSUE_SYSTEM_PROMPT_TEMPLATE);
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) {
+            logger.info('使用预置提示词：对应关系核对（item）');
+            return buildSystemPromptFromTemplate(
+                ITEM_OUTPUT_FORMAT,
+                sourceTextCharacteristics,
+                CORRESPONDENCE_CHECK_SYSTEM_PROMPT_TEMPLATE
+            );
         }
 
         // 当前选择的是自定义提示词
@@ -846,7 +1011,7 @@ export async function processJsonFileAsync(
         token?: vscode.CancellationToken;
         context?: vscode.ExtensionContext;
         mdFilePath?: string; // 可选的 markdown 文件路径
-        /** 仅系统默认提示词时生效，注入源文本特性提示词段落 */
+        /** 仅内置全文/条目模板提示词时生效，注入源文本特性提示词段落 */
         sourceTextCharacteristics?: string;
     } = {}
 ): Promise<ProcessStats> {
@@ -1151,7 +1316,7 @@ export async function processJsonFileAsync(
  * @param beforeParagraphs 前文段落数
  * @param afterParagraphs 后文段落数
  * @param repetitionMode 提示词重复模式（可选，覆盖配置）
- * @param sourceTextCharacteristics 源文本特性提示词注入正文（仅系统默认提示词时生效；空字符串表示不注入）
+ * @param sourceTextCharacteristics 源文本特性提示词注入正文（仅内置全文/条目模板提示词时生效；空字符串表示不注入）
  * @param sourceCharacteristicsDisplayTitle 注入项在日志/完成摘要中的展示标题（如预设名称）
  * @param onItemItems 条目式输出时回调解析出的条目（如条目式提示词场景的后续处理）
  * @param onRawItemOutput 条目式输出时回调 LLM 原始返回（供日志等写入原始结果，不写替换后文本）

@@ -4,7 +4,15 @@
  */
 
 import * as vscode from 'vscode';
-import { PromptManager, SYSTEM_PROMPT_NAME_FULL, SYSTEM_PROMPT_NAME_ITEM } from './promptManager';
+import {
+    PromptManager,
+    SYSTEM_PROMPT_NAME_FULL,
+    SYSTEM_PROMPT_NAME_ITEM,
+    SYSTEM_PROMPT_NAME_NORMALIZATION_FULL,
+    SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM,
+    SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM,
+    SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM,
+} from './promptManager';
 import type { Prompt } from './promptManager';
 
 export const PROMPTS_VIEW_ID = 'ai-proofread.prompts';
@@ -41,6 +49,26 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
         const items: PromptTreeItem[] = [
             { id: SYSTEM_FULL_ITEM_ID, label: '系统默认提示词（full）', systemOutputType: 'full' },
             { id: SYSTEM_ITEM_ITEM_ID, label: '系统默认提示词（item）', systemOutputType: 'item' },
+            {
+                id: SYSTEM_PROMPT_NAME_NORMALIZATION_FULL,
+                label: '表述正常化（full）',
+                systemOutputType: 'full',
+            },
+            {
+                id: SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM,
+                label: '表述正常化（item）',
+                systemOutputType: 'item',
+            },
+            {
+                id: SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM,
+                label: '硬伤发现（item）',
+                systemOutputType: 'item',
+            },
+            {
+                id: SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM,
+                label: '对应关系核对（item）',
+                systemOutputType: 'item',
+            },
             ...prompts.map((p) => ({ id: p.name, label: p.name, prompt: p })),
         ];
         return items;
@@ -48,9 +76,14 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
 
     getTreeItem(element: PromptTreeItem): vscode.TreeItem {
         const current = this.promptManager.getCurrentPromptName();
-        const isSystemFull = element.id === SYSTEM_FULL_ITEM_ID;
-        const isSystemItem = element.id === SYSTEM_ITEM_ITEM_ID;
-        const isCurrent = isSystemFull ? current === SYSTEM_PROMPT_NAME_FULL : isSystemItem ? current === SYSTEM_PROMPT_NAME_ITEM : current === element.id;
+        const isCurrent =
+            (element.id === SYSTEM_FULL_ITEM_ID && current === SYSTEM_PROMPT_NAME_FULL) ||
+            (element.id === SYSTEM_ITEM_ITEM_ID && current === SYSTEM_PROMPT_NAME_ITEM) ||
+            (element.id === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL && current === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) ||
+            (element.id === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM && current === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) ||
+            (element.id === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM && current === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) ||
+            (element.id === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM && current === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) ||
+            (!!element.prompt && current === element.id);
         const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
         item.id = element.id;
         const systemLabel = element.systemOutputType === 'full' ? '全文' : element.systemOutputType === 'item' ? '条目' : undefined;
@@ -65,7 +98,13 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
             tooltip += `\n输出类型: ${outputTypeLabel}`;
             item.tooltip = tooltip;
         } else if (element.systemOutputType) {
-            item.tooltip = element.systemOutputType === 'full' ? '系统默认提示词（full）' : '系统默认提示词（item）';
+            if (element.id === SYSTEM_FULL_ITEM_ID) {
+                item.tooltip = '系统默认提示词（full）';
+            } else if (element.id === SYSTEM_ITEM_ITEM_ID) {
+                item.tooltip = '系统默认提示词（item）';
+            } else {
+                item.tooltip = element.label;
+            }
         }
         return item;
     }
@@ -97,8 +136,16 @@ export function registerPromptsView(
             let name: string;
             if (id === SYSTEM_FULL_ITEM_ID) name = SYSTEM_PROMPT_NAME_FULL;
             else if (id === SYSTEM_ITEM_ITEM_ID) name = SYSTEM_PROMPT_NAME_ITEM;
+            else if (id === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) name = SYSTEM_PROMPT_NAME_NORMALIZATION_FULL;
+            else if (id === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) name = SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM;
+            else if (id === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) name = SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM;
+            else if (id === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) name = SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM;
             else if (labelText === '系统默认提示词（full）') name = SYSTEM_PROMPT_NAME_FULL;
             else if (labelText === '系统默认提示词（item）') name = SYSTEM_PROMPT_NAME_ITEM;
+            else if (labelText === '表述正常化（full）') name = SYSTEM_PROMPT_NAME_NORMALIZATION_FULL;
+            else if (labelText === '表述正常化（item）') name = SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM;
+            else if (labelText === '硬伤发现（item）') name = SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM;
+            else if (labelText === '对应关系核对（item）') name = SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM;
             else name = id;
             await promptManager.setCurrentPrompt(name);
             provider.refresh();

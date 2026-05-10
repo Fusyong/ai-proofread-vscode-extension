@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.10.2",
+  "version": "1.10.3",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -321,6 +321,16 @@
         "title": "AI Proofreader: show proofread items tree"
       },
       {
+        "command": "ai-proofread.proofreadItems.setSort",
+        "title": "排序…",
+        "icon": "$(list-ordered)"
+      },
+      {
+        "command": "ai-proofread.proofreadItems.setConfidenceFilter",
+        "title": "置信度筛选…",
+        "icon": "$(filter)"
+      },
+      {
         "command": "ai-proofread.opencc",
         "title": "AI Proofreader: OpenCC"
       },
@@ -541,7 +551,7 @@
           ],
           "enumDescriptions": [
             "全文输出",
-            "条目式输出（original/corrected/explanation）"
+            "条目式输出（original/corrected/confidence/explanation）"
           ],
           "default": "full",
           "description": "系统默认提示词时的输出类型"
@@ -578,7 +588,7 @@
                 ],
                 "enumDescriptions": [
                   "全文",
-                  "条目（original+corrected+explanation）",
+                  "条目（original+corrected+confidence+explanation）",
                   "其他"
                 ],
                 "description": "输出类型，默认 full"
@@ -964,14 +974,14 @@
           "when": "aiProofread.showPromptsView"
         },
         {
-          "id": "ai-proofread.dictPrepPrompts",
-          "name": "prompts for dict prep ",
-          "when": "aiProofread.showDictPrepPromptsView"
-        },
-        {
           "id": "ai-proofread.sourceTextCharacteristics",
           "name": "prompts on source text",
           "when": "aiProofread.showSourceTextCharacteristicsView"
+        },
+        {
+          "id": "ai-proofread.dictPrepPrompts",
+          "name": "prompts for dict prep ",
+          "when": "aiProofread.showDictPrepPromptsView"
         },
         {
           "id": "ai-proofread.dictCheckTypes",
@@ -1056,6 +1066,16 @@
           "command": "ai-proofread.numbering.defineSegmentPattern",
           "when": "view == ai-proofread.numberingSegments",
           "group": "navigation"
+        },
+        {
+          "command": "ai-proofread.proofreadItems.setSort",
+          "when": "view == ai-proofread.proofreadItems",
+          "group": "1_sort"
+        },
+        {
+          "command": "ai-proofread.proofreadItems.setConfidenceFilter",
+          "when": "view == ai-proofread.proofreadItems",
+          "group": "2_filter"
         },
         {
           "command": "ai-proofread.prompts.new",

@@ -1,9 +1,16 @@
 /**
- * 在校对流程中选择是否注入「源文本特性提示词」（仅当前为系统默认 full/item 提示词时）
+ * 在校对流程中选择是否注入「源文本特性提示词」（仅当前为内置全文/条目模板提示词时）
  */
 
 import * as vscode from 'vscode';
-import { SYSTEM_PROMPT_NAME_FULL, SYSTEM_PROMPT_NAME_ITEM } from './promptManager';
+import {
+    SYSTEM_PROMPT_NAME_FULL,
+    SYSTEM_PROMPT_NAME_ITEM,
+    SYSTEM_PROMPT_NAME_NORMALIZATION_FULL,
+    SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM,
+    SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM,
+    SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM,
+} from './promptManager';
 import { BUILTIN_SOURCE_TEXT_CHARACTERISTICS } from './sourceTextCharacteristics';
 import type { UserSourceTextCharacteristicPrompt } from './sourceTextCharacteristics';
 import { SourceTextCharacteristicManager } from './sourceTextCharacteristicManager';
@@ -25,7 +32,14 @@ export interface SourceTextCharacteristicsPickResult {
 
 export function isUsingSystemDefaultPrompt(context: vscode.ExtensionContext): boolean {
     const n = context.globalState.get<string>('currentPrompt', SYSTEM_PROMPT_NAME_FULL) ?? SYSTEM_PROMPT_NAME_FULL;
-    return n === SYSTEM_PROMPT_NAME_FULL || n === SYSTEM_PROMPT_NAME_ITEM;
+    return (
+        n === SYSTEM_PROMPT_NAME_FULL ||
+        n === SYSTEM_PROMPT_NAME_ITEM ||
+        n === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL ||
+        n === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM ||
+        n === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM ||
+        n === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM
+    );
 }
 
 function buildQuickPickItems(userPrompts: UserSourceTextCharacteristicPrompt[]): CharacteristicPickItem[] {
@@ -73,7 +87,7 @@ export async function pickSourceTextCharacteristicsInjection(
     const manager = SourceTextCharacteristicManager.getInstance(context);
     const userPrompts = manager.getUserPrompts();
     const picked = await vscode.window.showQuickPick(buildQuickPickItems(userPrompts), {
-        placeHolder: '是否注入源文本特性提示词？（仅作用于系统默认提示词）',
+        placeHolder: '是否注入源文本特性提示词？（仅作用于内置全文/条目模板：系统默认与表述正常化等）',
         ignoreFocusOut: true,
     });
     if (picked === undefined) {

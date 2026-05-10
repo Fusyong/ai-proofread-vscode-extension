@@ -67,7 +67,7 @@ export class ProofreadCommandHandler {
             return;
         }
 
-        // 源文本特性注入仅在使用系统默认 full/item 提示词时询问；先于参数确认，便于在确认框中展示注入选择
+        // 源文本特性注入仅在使用内置全文/条目模板（系统默认、表述正常化等）时询问；先于参数确认，便于在确认框中展示注入选择
         const useSystemDefaultPrompt = !!(context && isUsingSystemDefaultPrompt(context));
         let sourceTextCharacteristics = '';
         let sourceCharacteristicsDisplayTitle: string | undefined;
