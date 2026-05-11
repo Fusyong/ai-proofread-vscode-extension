@@ -13,6 +13,7 @@ import { splitChineseSentencesWithLineNumbers } from '../splitter';
 import { generateHtmlReport } from '../alignmentReportGenerator';
 import { getJiebaWasm } from '../jiebaLoader';
 import { collectWordErrors, formatWordErrors, parseDelimitersFromConfig } from '../wordErrorCollector';
+import { proofreadJsonPathToSegmentsJsonPath, segmentsJsonPathToSplitMarkdownPath } from '../proofreadSplitLayout';
 
 // 接口定义
 /** 配套文档检测结果 */
@@ -705,10 +706,11 @@ export class WebviewManager {
                     break;
                 case 'showProofreadItemsTree': {
                     const proofreadJsonPath = this.getProofreadJsonPath();
-                    const itemPath = proofreadJsonPath?.replace(/\.proofread\.json$/i, '.proofread-item.json');
-                    if (itemPath && fs.existsSync(itemPath)) {
-                        const itemUri = vscode.Uri.file(itemPath);
-                        const doc = await vscode.workspace.openTextDocument(itemUri);
+                    const segJson = proofreadJsonPath ? proofreadJsonPathToSegmentsJsonPath(proofreadJsonPath) : undefined;
+                    const splitMdPath = segJson ? segmentsJsonPathToSplitMarkdownPath(segJson) : undefined;
+                    if (splitMdPath && fs.existsSync(splitMdPath)) {
+                        const mdUri = vscode.Uri.file(splitMdPath);
+                        const doc = await vscode.workspace.openTextDocument(mdUri);
                         await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
                     }
                     await vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', true);

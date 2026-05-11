@@ -8,6 +8,8 @@ export interface ProofreadItem {
     explanation?: string;
     /** 模型给出的置信度，0–1；缺省表示未标注（兼容旧输出） */
     confidence?: number;
+    /** 本条 original 在对应切分段 target 内的 UTF-16 区间（程序写入，供 TreeView 定位 .json.md） */
+    anchor?: { start: number; end: number };
 }
 
 /** 将 JSON 中的 confidence 字段规范为 0–1；无法识别时返回 undefined */
@@ -71,18 +73,37 @@ type RawProofreadItem = {
     corrected?: string;
     explanation?: string;
     confidence?: unknown;
+    anchor?: unknown;
 };
+
+function normalizeItemAnchor(raw: unknown): { start: number; end: number } | undefined {
+    if (raw === null || raw === undefined || typeof raw !== 'object' || Array.isArray(raw)) {
+        return undefined;
+    }
+    const o = raw as Record<string, unknown>;
+    const start = o.start;
+    const end = o.end;
+    if (typeof start !== 'number' || typeof end !== 'number') {
+        return undefined;
+    }
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) {
+        return undefined;
+    }
+    return { start, end };
+}
 
 function mapItemEntries(items: Array<RawProofreadItem | null | undefined>): ProofreadItem[] {
     return items
         .filter((x): x is RawProofreadItem => x != null && typeof x === 'object' && typeof x.original === 'string')
         .map((x) => {
             const confidence = normalizeItemConfidence(x.confidence);
+            const anchor = normalizeItemAnchor(x.anchor);
             return {
                 original: String(x.original),
                 corrected: x.corrected != null ? String(x.corrected) : undefined,
                 explanation: x.explanation != null && x.explanation !== '' ? String(x.explanation) : undefined,
                 ...(confidence !== undefined ? { confidence } : {}),
+                ...(anchor !== undefined ? { anchor } : {}),
             };
         });
 }

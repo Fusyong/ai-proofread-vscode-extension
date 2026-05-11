@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.10.3",
+  "version": "1.10.4",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -329,6 +329,11 @@
         "command": "ai-proofread.proofreadItems.setConfidenceFilter",
         "title": "置信度筛选…",
         "icon": "$(filter)"
+      },
+      {
+        "command": "ai-proofread.proofreadItems.diffItem",
+        "title": "Diff",
+        "icon": "$(diff)"
       },
       {
         "command": "ai-proofread.opencc",
@@ -1099,6 +1104,11 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "ai-proofread.proofreadItems.diffItem",
+          "when": "view == ai-proofread.proofreadItems && viewItem == proofreadItem",
+          "group": "proofreadItems@1"
+        },
         {
           "command": "ai-proofread.prompts.edit",
           "group": "prompts@1",

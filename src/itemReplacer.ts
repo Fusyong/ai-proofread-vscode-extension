@@ -17,6 +17,78 @@ function getSimilarityThreshold(): number {
 }
 
 /**
+ * 在单段 target 内定位 `original` 的 UTF-16 区间（与 applyItemReplacements 单步策略一致，不改变文本）。
+ */
+export function findOriginalSpanInSegment(
+    segmentText: string,
+    original: string,
+    options: ApplyReplacementsOptions = {}
+): { start: number; end: number } | undefined {
+    if (!original) {
+        return undefined;
+    }
+    const threshold = options.similarityThreshold ?? getSimilarityThreshold();
+
+    const exactIndex = segmentText.indexOf(original);
+    if (exactIndex !== -1) {
+        return { start: exactIndex, end: exactIndex + original.length };
+    }
+
+    const normalizedOriginal = normalizeForSimilarity(original, {
+        removeInnerWhitespace: true,
+        removePunctuation: true,
+    });
+    if (!normalizedOriginal) {
+        return undefined;
+    }
+    const len = original.length;
+    const minLen = Math.max(1, Math.floor(len * 0.7));
+    const maxLen = Math.min(segmentText.length, Math.ceil(len * 1.5));
+    for (let L = minLen; L <= maxLen; L++) {
+        for (let start = 0; start <= segmentText.length - L; start++) {
+            const span = segmentText.slice(start, start + L);
+            const normSpan = normalizeForSimilarity(span, {
+                removeInnerWhitespace: true,
+                removePunctuation: true,
+            });
+            if (normSpan === normalizedOriginal) {
+                return { start, end: start + L };
+            }
+        }
+    }
+
+    let bestSim = threshold;
+    let bestStart = -1;
+    let bestLen = 0;
+    for (let L = minLen; L <= maxLen; L++) {
+        for (let start = 0; start <= segmentText.length - L; start++) {
+            const candidate = segmentText.slice(start, start + L);
+            const sim = jaccardSimilarity(original, candidate, { n: 2, granularity: 'char' });
+            if (sim > bestSim) {
+                bestSim = sim;
+                bestStart = start;
+                bestLen = L;
+            }
+        }
+    }
+    if (bestStart >= 0 && bestLen > 0) {
+        return { start: bestStart, end: bestStart + bestLen };
+    }
+    return undefined;
+}
+
+/** 为条目写入 .proofread-item.json 前填充锚点（段落内 UTF-16 偏移） */
+export function attachAnchorsToProofreadItems(items: ProofreadItem[], segmentTarget: string): ProofreadItem[] {
+    return items.map((item) => {
+        const span = findOriginalSpanInSegment(segmentTarget, item.original);
+        if (!span) {
+            return item;
+        }
+        return { ...item, anchor: { start: span.start, end: span.end } };
+    });
+}
+
+/**
  * 在单段文本内按顺序应用每条替换；每处只替换一次，不跨段。
  * 匹配策略：1）全文查找 2）忽略空格、标点后查找 3）相似度最高且≥阈值的片段
  */

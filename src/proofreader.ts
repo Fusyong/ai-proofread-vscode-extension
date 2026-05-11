@@ -14,7 +14,7 @@ import { buildTitleBasedContext, buildParagraphBasedContext } from './splitter';
 import { buildEditorialMemoryXml } from './editorialMemory/service';
 import { ProgressTracker, ProgressUpdateCallback } from './progressTracker';
 import { parseItemOutput, type ProofreadItem } from './itemOutputParser';
-import { applyItemReplacements } from './itemReplacer';
+import { applyItemReplacements, attachAnchorsToProofreadItems } from './itemReplacer';
 import {
     SYSTEM_PROMPT_NAME_FULL,
     SYSTEM_PROMPT_NAME_ITEM,
@@ -50,8 +50,8 @@ const DEFAULT_OUTPUT_FORMAT = `
 2. 即使你确认的确没有任何修改，也应该逐句阅读并输出原文；
 `
 
-// 条目式输出格式（JSON）
-const ITEM_OUTPUT_FORMAT = `
+// 条目式输出格式（JSON）；内置条目模板与自定义 outputType=item 均依赖此说明以便解析与「校对条目」树展示
+export const ITEM_OUTPUT_FORMAT = `
 1. 从目标文本（target）中挑出有问题、需要修改的句子，加以修改，以 JSON 格式输出，且只输出该 JSON，不要其他说明。
 2. JSON 格式为：{"items":[{"original":"有问题、需要修改的句子","corrected":"修改后的句子","confidence":0.85,"explanation":"解释，绝大多数情形下可省略，仅在不解释难以理解时填写"}]}；字段说明：original（必选）、corrected（可选）、confidence（可选，0 到 1 的小数，表示你对本条修改正确性的把握，1 为非常有把握；把握不足时用较低值；难以量化时可省略）、explanation（可选）。
 3. 若无任何修改，输出：{"items":[]}
@@ -295,6 +295,14 @@ export function getOutputType(context?: vscode.ExtensionContext): OutputType {
     return defaultOutputType === 'item' ? 'item' : 'full';
 }
 
+/** 自定义提示词在 outputType=item 时需产出可解析的 JSON，否则「校对条目」树与阶段二替换均失效 */
+function appendItemOutputFormatIfNeeded(content: string, outputType?: string): string {
+    if (outputType !== 'item') {
+        return content;
+    }
+    return `${content.trimEnd()}\n\n---\n\n【条目式输出格式（扩展解析依赖，请勿省略）】\n${ITEM_OUTPUT_FORMAT.trim()}\n`;
+}
+
 // 获取用户配置的提示词；优先使用调用方传入的 context，否则使用激活时持有的 context
 // sourceTextCharacteristics 仅在当前为内置全文/条目模板（系统默认、表述正常化、硬伤发现、对应关系核对等）时生效，自定义提示词忽略
 function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCharacteristics: string = ''): string {
@@ -340,15 +348,16 @@ function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCharacteri
             const selectedPrompt = prompts.find(p => p.name === currentPromptName);
             if (selectedPrompt) {
                 logger.info(`使用自定义提示词: ${selectedPrompt.name}`);
-                return selectedPrompt.content;
+                return appendItemOutputFormatIfNeeded(selectedPrompt.content, selectedPrompt.outputType);
             }
         }
     }
 
     // 无 context 或未找到对应提示词时的回退
     if (prompts.length > 0) {
-        logger.info(`使用自定义提示词: ${prompts[0].name}`);
-        return prompts[0].content;
+        const p0 = prompts[0];
+        logger.info(`使用自定义提示词: ${p0.name}`);
+        return appendItemOutputFormatIfNeeded(p0.content, p0.outputType);
     }
 
     logger.info('使用系统默认提示词（full）');
@@ -1187,7 +1196,15 @@ export async function processJsonFileAsync(
 
             if (processedText) {
                 if (isItemMode) {
-                    outputItemParagraphs[index] = processedText;
+                    const parsedItems = parseItemOutput(processedText);
+                    let cell: string;
+                    if (parsedItems.length === 0) {
+                        const t = processedText.trim();
+                        cell = t.length > 0 ? processedText : '{"items":[]}';
+                    } else {
+                        cell = JSON.stringify({ items: attachAnchorsToProofreadItems(parsedItems, targetText) });
+                    }
+                    outputItemParagraphs[index] = cell;
                     fs.writeFileSync(itemPath, JSON.stringify(outputItemParagraphs, null, 2), 'utf8');
                 } else {
                     outputParagraphs[index] = processedText;

@@ -2,6 +2,7 @@
  * 扩展入口
  */
 
+import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { PromptManager } from './promptManager';
@@ -28,7 +29,12 @@ import { clearEditorialMemory } from './editorialMemory/service';
 import { registerPromptsView, type PromptTreeItem } from './promptsView';
 import { SourceTextCharacteristicManager } from './sourceTextCharacteristicManager';
 import { registerSourceTextCharacteristicsView, type SourceCharacteristicTreeItem } from './sourceTextCharacteristicsView';
-import { registerProofreadItemsView } from './proofreadItemsView';
+import { registerProofreadItemsView, WS_KEY_LAST_ITEM_JSON } from './proofreadItemsView';
+import {
+    proofreadItemPathToSegmentsJsonPath,
+    proofreadJsonPathToSegmentsJsonPath,
+    segmentsJsonPathToSplitMarkdownPath,
+} from './proofreadSplitLayout';
 import { registerWelcomeView } from './ui/welcomeView';
 import { getJiebaWasm } from './jiebaLoader';
 import { setExtensionContext } from './extensionContextHolder';
@@ -625,6 +631,29 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('ai-proofread.showProofreadItemsTree', async () => {
             await vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', true);
+            const ed = vscode.window.activeTextEditor;
+            let segmentsJsonPath: string | undefined;
+            if (ed) {
+                const fp = ed.document.uri.fsPath;
+                if (fp.endsWith('.proofread-item.json') || fp.endsWith('proofread-item.json')) {
+                    segmentsJsonPath = proofreadItemPathToSegmentsJsonPath(fp);
+                } else if (/\.proofread\.json$/i.test(fp)) {
+                    segmentsJsonPath = proofreadJsonPathToSegmentsJsonPath(fp);
+                } else if (/\.json\.md$/i.test(fp) && !/\.proofread\.json\.md$/i.test(fp)) {
+                    segmentsJsonPath = fp.replace(/\.json\.md$/i, '.json');
+                }
+            }
+            if (!segmentsJsonPath) {
+                const lastItem = context.workspaceState.get<string>(WS_KEY_LAST_ITEM_JSON);
+                if (lastItem && fs.existsSync(lastItem)) {
+                    segmentsJsonPath = proofreadItemPathToSegmentsJsonPath(lastItem);
+                }
+            }
+            const splitMdPath = segmentsJsonPath ? segmentsJsonPathToSplitMarkdownPath(segmentsJsonPath) : undefined;
+            if (splitMdPath && fs.existsSync(splitMdPath)) {
+                const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(splitMdPath));
+                await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+            }
             await new Promise((r) => setTimeout(r, 50));
             await vscode.commands.executeCommand('ai-proofread.proofreadItems.focus');
         }),
