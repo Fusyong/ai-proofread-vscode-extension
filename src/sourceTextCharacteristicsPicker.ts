@@ -10,6 +10,8 @@ import {
     SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM,
     SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM,
     SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM,
+    SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL,
+    SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL,
 } from './promptManager';
 import { BUILTIN_SOURCE_TEXT_CHARACTERISTICS } from './sourceTextCharacteristics';
 import type { UserSourceTextCharacteristicPrompt } from './sourceTextCharacteristics';
@@ -38,7 +40,9 @@ export function isUsingSystemDefaultPrompt(context: vscode.ExtensionContext): bo
         n === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL ||
         n === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM ||
         n === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM ||
-        n === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM
+        n === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM ||
+        n === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL ||
+        n === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL
     );
 }
 

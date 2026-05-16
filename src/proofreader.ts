@@ -22,9 +22,17 @@ import {
     SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM,
     SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM,
     SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM,
+    SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL,
+    SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL,
 } from './promptManager';
 import { getExtensionContext } from './extensionContextHolder';
 import { formatSourceCharacteristicsBlock } from './sourceTextCharacteristics';
+import {
+    PINYIN_PROOFREAD_SYSTEM_PROMPT_TEMPLATE,
+    PINYIN_ANNOTATION_SYSTEM_PROMPT_TEMPLATE,
+    PINYIN_PROOFREAD_OUTPUT_FORMAT,
+    PINYIN_ANNOTATION_OUTPUT_FORMAT,
+} from './pinyinPrompt';
 
 // 加载环境变量
 dotenv.config();
@@ -279,7 +287,12 @@ export function getOutputType(context?: vscode.ExtensionContext): OutputType {
         ) {
             return 'item';
         }
-        if (currentPromptName === SYSTEM_PROMPT_NAME_FULL || currentPromptName === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) {
+        if (
+            currentPromptName === SYSTEM_PROMPT_NAME_FULL ||
+            currentPromptName === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL ||
+            currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL ||
+            currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL
+        ) {
             return 'full';
         }
         const config = vscode.workspace.getConfiguration('ai-proofread');
@@ -340,6 +353,22 @@ function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCharacteri
                 ITEM_OUTPUT_FORMAT,
                 sourceTextCharacteristics,
                 CORRESPONDENCE_CHECK_SYSTEM_PROMPT_TEMPLATE
+            );
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL) {
+            logger.info('使用预置提示词：拼音审校（full）');
+            return buildSystemPromptFromTemplate(
+                PINYIN_PROOFREAD_OUTPUT_FORMAT,
+                sourceTextCharacteristics,
+                PINYIN_PROOFREAD_SYSTEM_PROMPT_TEMPLATE
+            );
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL) {
+            logger.info('使用预置提示词：拼音加注（full）');
+            return buildSystemPromptFromTemplate(
+                PINYIN_ANNOTATION_OUTPUT_FORMAT,
+                sourceTextCharacteristics,
+                PINYIN_ANNOTATION_SYSTEM_PROMPT_TEMPLATE
             );
         }
 

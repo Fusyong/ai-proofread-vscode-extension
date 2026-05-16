@@ -12,6 +12,8 @@ import {
     SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM,
     SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM,
     SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM,
+    SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL,
+    SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL,
 } from './promptManager';
 import type { Prompt } from './promptManager';
 
@@ -69,6 +71,16 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
                 label: '对应关系核对（item）',
                 systemOutputType: 'item',
             },
+            {
+                id: SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL,
+                label: '拼音审校（full）',
+                systemOutputType: 'full',
+            },
+            {
+                id: SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL,
+                label: '拼音加注（full）',
+                systemOutputType: 'full',
+            },
             ...prompts.map((p) => ({ id: p.name, label: p.name, prompt: p })),
         ];
         return items;
@@ -83,6 +95,8 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
             (element.id === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM && current === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) ||
             (element.id === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM && current === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) ||
             (element.id === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM && current === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) ||
+            (element.id === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL && current === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL) ||
+            (element.id === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL && current === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL) ||
             (!!element.prompt && current === element.id);
         const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
         item.id = element.id;
@@ -140,12 +154,16 @@ export function registerPromptsView(
             else if (id === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) name = SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM;
             else if (id === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) name = SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM;
             else if (id === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) name = SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM;
+            else if (id === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL) name = SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL;
+            else if (id === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL) name = SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL;
             else if (labelText === '系统默认提示词（full）') name = SYSTEM_PROMPT_NAME_FULL;
             else if (labelText === '系统默认提示词（item）') name = SYSTEM_PROMPT_NAME_ITEM;
             else if (labelText === '表述正常化（full）') name = SYSTEM_PROMPT_NAME_NORMALIZATION_FULL;
             else if (labelText === '表述正常化（item）') name = SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM;
             else if (labelText === '硬伤发现（item）') name = SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM;
             else if (labelText === '对应关系核对（item）') name = SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM;
+            else if (labelText === '拼音审校（full）') name = SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL;
+            else if (labelText === '拼音加注（full）') name = SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL;
             else name = id;
             await promptManager.setCurrentPrompt(name);
             provider.refresh();

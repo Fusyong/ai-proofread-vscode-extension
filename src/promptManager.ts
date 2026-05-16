@@ -18,6 +18,10 @@ export const SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM = '__preset_normalization_ite
 export const SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM = '__preset_hard_issue_item__';
 /** 预置「对应关系核对（item）」在 globalState 中的存值（仅条目输出） */
 export const SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM = '__preset_correspondence_check_item__';
+/** 预置「拼音审校（full）」在 globalState 中的存值 */
+export const SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL = '__preset_pinyin_proofread_full__';
+/** 预置「拼音加注（full）」在 globalState 中的存值 */
+export const SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL = '__preset_pinyin_annotation_full__';
 
 function isReservedPromptStorageName(name: string): boolean {
     return (
@@ -25,7 +29,9 @@ function isReservedPromptStorageName(name: string): boolean {
         name === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL ||
         name === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM ||
         name === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM ||
-        name === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM
+        name === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM ||
+        name === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL ||
+        name === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL
     );
 }
 
@@ -37,6 +43,8 @@ export function getPromptDisplayName(name: string): string {
     if (name === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) return '表述正常化（item）';
     if (name === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) return '硬伤发现（item）';
     if (name === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) return '对应关系核对（item）';
+    if (name === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL) return '拼音审校（full）';
+    if (name === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL) return '拼音加注（full）';
     return name || '系统默认提示词（full）';
 }
 
@@ -80,6 +88,8 @@ export class PromptManager {
         if (name === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) return '表述正常化（item）';
         if (name === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) return '硬伤发现（item）';
         if (name === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) return '对应关系核对（item）';
+        if (name === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL) return '拼音审校（full）';
+        if (name === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL) return '拼音加注（full）';
         return name;
     }
 
