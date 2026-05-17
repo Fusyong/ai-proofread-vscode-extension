@@ -1,16 +1,16 @@
+*QQ群“ai-proofreader 校对插件”：1055031650*
+
+一个用于文档和图书校对、基于大语言模型服务的VS Code扩展，支持选中文本直接校对、长文档切分后批量校对、带记忆地校对选段（实验功能）三种工作流，并集成了一些跟校对相关的辅助功能。[这里是代码库](https://github.com/Fusyong/ai-proofread-vscode-extension)。本扩展的原型基于一个Python校对工具库[Fusyong/ai-proofread](https://github.com/Fusyong/ai-proofread)。
+
+另外，你也可以设置自己的提示词，用于其他文本处理场景，比如翻译、注释、编写练习题等；还可以自定义替换表、检查表，支持批量正则查找替换，或仅作为提示。
+
+A VS Code extension for document and book proofreading based on LLM services, supporting three workflows: proofreading selected text directly, proofreading long documents after segmentation, and proofreading selected text with editorial memory (experimental). It also integrates proofreading-related auxiliary features. [Here is the code repository](https://github.com/Fusyong/ai-proofread-vscode-extension). The prototype of this extension is based on a Python proofreading tool library [Fusyong/ai-proofread](https://github.com/Fusyong/ai-proofread).
+
+Additionally, you can set your own prompts for other text processing scenarios, such as translation, annotation, and creating exercises; you can also customize replacement tables and checklists, run batch regex find-and-replace, or use them as prompts only. 
+
 !!! caution 
     因DeepSeek V3最终版本（0324）以后的校对效果不理想，默认平台已经由DeepSeek改成阿里云百炼。只有DeepSeek账号的用户须手动改回DeepSeek（也可用阿里云百炼平台deepseek-v3作为替代）。
     DeepSeek 平台默认支持 deepseek-v4-flash，如果你改为deepseek-v4-pro，还需要**关注价格变动并测试效果**；旧版 deepseek-chat 在 2026/07/24 前仍可用
-
-*QQ群“ai-proofreader 校对插件”：1055031650*
-
-一个用于文档和图书校对、基于大语言模型服务的VS Code扩展，支持选中文本直接校对和长文档切分后批量校对两种工作流，并集成了一些跟校对相关的辅助功能。[这里是代码库](https://github.com/Fusyong/ai-proofread-vscode-extension)。本扩展的原型基于一个Python校对工具库[Fusyong/ai-proofread](https://github.com/Fusyong/ai-proofread)。
-
-另外，你也可以设置自己的提示词，用于其他文本处理场景，比如翻译、注释、编写练习题等。
-
-A VS Code extension for document and book proofreading based on LLM services, supporting two workflows: proofreading selected text directly and proofreading long documents after segmentation. [Here is the code repository](https://github.com/Fusyong/ai-proofread-vscode-extension). The prototype of this extension is based on a Python proofreading tool library [Fusyong/ai-proofread](https://github.com/Fusyong/ai-proofread).
-
-Additionally, you can also set your own prompts for other text processing scenarios, such as translation, annotation, creating exercises, and more.
 
 ## 1. 安装和必要配置
 
@@ -258,7 +258,22 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 也可以在配置文件中处理提示词，但不适合没有编程知识的用户使用。
 
-#### 3.4.2 提示词原理与撰写示范
+#### 3.4.2 预置提示词说明
+
+除 **系统默认提示词（full）**、**系统默认提示词（item）** 外，扩展在代码中内置了若干预置提示词。在「管理提示词」打开的 prompts 侧栏中可直接点选为当前提示词。
+
+| 名称 | 输出类型 | 适用场景 |
+|------|----------|----------|
+| 系统默认提示词（full） | 全文 | 常规语言文字与知识性校对；**默认项** |
+| 系统默认提示词（item） | 条目 | 同上，仅输出需改句子（JSON），省 token，见 [3.4.4](#344-提示词输出类型) |
+| 表述正常化（full） | 全文 | 凭语感修改违和处，使表述符合常情常理 |
+| 表述正常化（item） | 条目 | 同上，条目式输出 |
+| 硬伤发现（item） | 条目 | 只报必须改的硬伤（字词、语法、事实、逻辑等）；依据不足时标记较低 confidence |
+| 对应关系核对（item） | 条目 | 专查应对应一致的关系：指代、称谓、注释、题答、图表编号、数据单位等 |
+| 拼音审校（full） | 全文 | 按部编版小学语文教材注音规则审校已有拼音（行间拼音、括注拼音等），包括读音、轻声、儿化、「啊/呀/哇/哪」用字 |
+| 拼音加注（full） | 全文 | 以同上标准在行间加注拼音 |
+
+#### 3.4.3 提示词原理与撰写示范
 
 为了写好提示词，你需要了解本扩展的工作原理：
 
@@ -270,6 +285,8 @@ Additionally, you can also set your own prompts for other text processing scenar
 整个过程没有魔法，处理的目的和方法完全由提示词和三种文本及其标签（reference、context、target）来定义。这就是说，**你可以通过自己的提示词，让AI根据三种文本做你期望的任何处理工作，** 比如撰写大意、插图脚本、练习题、注释，绘制图表，注音，翻译，进行专项核查（专名统一性、内容安全、引文、年代、注释等），收集信息（如名词术语）……
 
 需要注意的是，在自定义提示词中，必须对要处理的目标文本（target）、参考资料（reference）、上下文（context）进行说明，如果用不到后两者也可以不说明。并且这种**说明应尽可能与三种标签的字面意义相协调，**比如target可以用作“要处理的目标文本”，也可以用作“要得到的具体目标”（作为系统提示词的补充），但不宜作为参考文本、样例等类。
+
+自定义提示词名称不得使用系统保留名（如 `__system_item__`、`__preset_*__` 等），否则无法保存。
 
 提示词示例：
 
@@ -289,7 +306,7 @@ Additionally, you can also set your own prompts for other text processing scenar
 
 本人有一个[开源提示词库](https://github.com/Fusyong/LLM-prompts-from-a-book-editor)，但不是针对本扩展的，改造（对三种标签进行说明）后才能用于本扩展。
 
-#### 3.4.3 提示词输出类型
+#### 3.4.4 提示词输出类型
 
 本扩展支持三种提示词输出类型：full（全文输出）；item（条目式输出）；other（其他）。
 
@@ -310,13 +327,13 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 请注意，输出形式选item（条目式输出）时，JSON、items、original、corrected、explanation这些词语，对于大模型的理解和输出后的处理都有用，因此不要改变它们的形式。如果你对JSON格式了解不多，我建议直接在这个模版上改写。corrected和explanation两项可以省略。
 
-#### 3.4.4 源文本特性提示词注入
+#### 3.4.5 源文本特性提示词注入
 
-两种系统默认提示词可以注入源文本（如整本书）特性、校对重点等提示词，目的在于说明整本书的独特之处，提醒LLM注意。请注意，系统会在你注入的提示词之前附加“目标文本（target）是一个更大的源文本的一部分。对这个源文本的整体说明如下：”。逻辑上你可以注入内容，但要考虑注入后的整体逻辑。
+系统默认与预置提示词（见 [3.4.2](#342-预置提示词说明)）可注入源文本（如整本书）特性、校对重点等提示词，目的在于说明整本书的独特之处，提醒 LLM 注意；自定义提示词不会自动注入。请注意，系统会在你注入的提示词之前附加“目标文本（target）是一个更大的源文本的一部分。对这个源文本的整体说明如下：”。逻辑上你可以注入内容，但要考虑注入后的整体逻辑。
 
-使用命令 **AI Proofreader: manage prompts** 会同时打开侧栏中的 **prompts** 与 **source characteristics** 视图；在后者中可查看内置条目并增删改自定义源文本特性提示词。
+使用命令 `AI Proofreader: manage prompts` 会同时打开侧栏中的 prompts 与 source characteristics 视图；在后者中可查看内置条目并增删改自定义源文本特性提示词。
 
-#### 3.4.5 提示词重复功能
+#### 3.4.6 提示词重复功能
 
 本扩展支持基于谷歌研究的提示词重复功能，以提高准确度。其原理是：重复用户输入（reference、context、target），让模型在真正处理时已经获得全局信息，从而获得更好的上下文理解。
 
@@ -435,14 +452,15 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 5. TODO
 
-1. 预置更多提示词
+1. 通过treeview配置模型、为不同管线选择模型配置
+2. 本地视觉模型图像校对工作流（专注于图像审查、版式和空间关系）
+3. 尝试用思考模型校对
+4. 预置更多提示词
     1. 习题试做：试做，就地回答，增加必要的格式标记
     2. PDF/OCR文本整理
-3. 预置自定义表
+5. 预置自定义表
     1. 查找数字：分类查找，以便检查一致性
     2. 找到时间：分类查找年代、时间，以便检查一致性
-4. 本地视觉模型图像校对工作流（专注于图像审查、版式和空间关系）
-5. 尝试用思考模型校对
 6. 读秀在线引文核对
 7. 人看的相似度使用编辑距离：fastest-levenshtein，在对齐完成后，快速计算两个相似句子的“修改程度”百分比。它是 JS 环境下编辑距离运算的最快实现
 8.  勘误表改为JSON加web viewer
@@ -451,9 +469,10 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 6. 更新日志
 
-### v1.10.5
+### v1.10.6
 
 - 特性：增加拼音加注、审校提示词
+- 特性：预置轻声词检查表
 
 ### v1.10.4
 
