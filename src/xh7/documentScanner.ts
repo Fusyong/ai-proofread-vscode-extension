@@ -3,6 +3,7 @@
  * 规划见 docs/xh7-word-check-plan.md
  * 文档无分词，采用纯字面匹配；按「先长后短」排序 key，占用区间不重叠。
  * 词表（variant_to_*、non_erhua_to_erhua_single、non_erhua_to_erhua_multi）支持分词后再检查，见 scanDocumentWithSegmentation。
+ * 轻声词（单字）表见 scanDocumentLightToneSingle（分词后仅匹配各词末字）。
  */
 
 import * as vscode from 'vscode';
@@ -165,6 +166,57 @@ export function scanDocumentWithSegmentation(
             existing.ranges.push(rangeObj);
         } else {
             entryMap.set(key, { variant: tok.word, preferred, ranges: [rangeObj] });
+        }
+    }
+    return Array.from(entryMap.values());
+}
+
+/**
+ * 轻声词（单字）表：先分词，仅当分词结果的末字在单字词头表中时命中，高亮末字。
+ */
+export function scanDocumentLightToneSingle(
+    document: vscode.TextDocument,
+    dict: Record<string, string>,
+    jieba: JiebaWasmModule,
+    cancelToken?: vscode.CancellationToken,
+    range?: vscode.Range
+): WordCheckEntry[] {
+    const scanRange = range ?? new vscode.Range(0, 0, document.lineCount, 0);
+    const text = document.getText(scanRange);
+    const rangeStartOffset = document.offsetAt(scanRange.start);
+
+    const tokens = jieba.tokenize(text, 'default', true);
+    const dictSet = new Set(Object.keys(dict));
+    const entryMap = new Map<string, WordCheckEntry>();
+
+    for (const tok of tokens) {
+        if (cancelToken?.isCancellationRequested) break;
+        const chars = [...tok.word];
+        if (chars.length === 0) continue;
+
+        const last = chars[chars.length - 1];
+        if (!dictSet.has(last)) continue;
+
+        const preferred = dict[last];
+        if (!preferred) continue;
+
+        let lastStart = tok.start;
+        for (let i = 0; i < chars.length - 1; i++) {
+            lastStart += chars[i].length;
+        }
+        const startOffset = rangeStartOffset + lastStart;
+        const endOffset = startOffset + last.length;
+        const rangeObj = new vscode.Range(
+            document.positionAt(startOffset),
+            document.positionAt(endOffset)
+        );
+
+        const key = `${last}|${preferred}`;
+        const existing = entryMap.get(key);
+        if (existing) {
+            existing.ranges.push(rangeObj);
+        } else {
+            entryMap.set(key, { variant: last, preferred, ranges: [rangeObj] });
         }
     }
     return Array.from(entryMap.values());

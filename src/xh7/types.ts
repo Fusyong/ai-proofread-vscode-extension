@@ -5,7 +5,7 @@
 
 import type { Range } from 'vscode';
 
-/** 检查类型：dict7 九类 + 通用规范汉字表(tgscc) 七类 */
+/** 检查类型：dict7 十类 + 通用规范汉字表(tgscc) 七类 */
 export type CheckType =
     | 'variant_to_standard'
     | 'variant_to_preferred_single'
@@ -15,7 +15,8 @@ export type CheckType =
     | 'single_char_yiti_other_to_standard'
     | 'non_erhua_to_erhua_single'
     | 'non_erhua_to_erhua_multi'
-    | 'light_tone_headword'
+    | 'light_tone_headword_single'
+    | 'light_tone_headword_multi'
     | 'tgscc_traditional_to_simplified'
     | 'tgscc_variant_to_simplified'
     | 'tgscc_non_standard'
@@ -34,7 +35,8 @@ export const CHECK_TYPE_KEYS: CheckType[] = [
     'single_char_yiti_other_to_standard',
     'non_erhua_to_erhua_single',
     'non_erhua_to_erhua_multi',
-    'light_tone_headword',
+    'light_tone_headword_single',
+    'light_tone_headword_multi',
     'tgscc_traditional_to_simplified',
     'tgscc_variant_to_simplified',
     'tgscc_non_standard',
@@ -44,7 +46,7 @@ export const CHECK_TYPE_KEYS: CheckType[] = [
     'tgscc_table2',
 ];
 
-/** 对照词典检查：dict7 九类 */
+/** 对照词典检查：dict7 十类 */
 export const DICT_CHECK_TYPES: CheckType[] = [
     'variant_to_standard',
     'variant_to_preferred_single',
@@ -54,7 +56,8 @@ export const DICT_CHECK_TYPES: CheckType[] = [
     'single_char_yiti_other_to_standard',
     'non_erhua_to_erhua_single',
     'non_erhua_to_erhua_multi',
-    'light_tone_headword',
+    'light_tone_headword_single',
+    'light_tone_headword_multi',
 ];
 
 /** 对照通用规范汉字表检查：tgscc 七类 */
@@ -81,6 +84,11 @@ export function isDictWordTableType(
     );
 }
 
+/** 轻声词（单字）表：分词后仅匹配各词末字 */
+export function isLightToneHeadwordSingleType(type: CheckType): type is 'light_tone_headword_single' {
+    return type === 'light_tone_headword_single';
+}
+
 /** 用于 QuickPick 多选（复选框样式）的显示标签 */
 export const CHECK_TYPE_LABELS: Record<CheckType, string> = {
     variant_to_standard: '异形词（表内）→标准',
@@ -91,7 +99,8 @@ export const CHECK_TYPE_LABELS: Record<CheckType, string> = {
     single_char_yiti_other_to_standard: '异体字(表外)→标准',
     non_erhua_to_erhua_single: '未儿化词（单字）→儿化词',
     non_erhua_to_erhua_multi: '未儿化词（多字）→儿化词',
-    light_tone_headword: '轻声词→拼音',
+    light_tone_headword_single: '轻声词（单字）→拼音',
+    light_tone_headword_multi: '轻声词（多字）→拼音',
     tgscc_traditional_to_simplified: '繁体字→通用规范字',
     tgscc_variant_to_simplified: '异体字→通用规范字',
     tgscc_non_standard: '非通用规范字',

@@ -42,12 +42,19 @@ import {
     type DictCheckTypesTreeDataProvider,
     type TgsccCheckTypesTreeDataProvider,
 } from '../xh7/checkTypesView';
-import { scanDocument, scanDocumentWithSegmentation } from '../xh7/documentScanner';
+import { scanDocument, scanDocumentWithSegmentation, scanDocumentLightToneSingle } from '../xh7/documentScanner';
 import { scanDocumentTgsccSpecial, isTgsccSpecialType } from '../xh7/documentScannerTgscc';
 import { scanDocumentGjtg } from '../xh7/documentScannerGjtg';
 import { getJiebaWasm } from '../jiebaLoader';
 import { formatFullNotesAsHtml } from '../xh7/notesResolver';
-import { CHECK_TYPE_LABELS, DICT_CHECK_TYPES, TGSCC_CHECK_TYPES, isDictWordTableType, type CheckType } from '../xh7/types';
+import {
+    CHECK_TYPE_LABELS,
+    DICT_CHECK_TYPES,
+    TGSCC_CHECK_TYPES,
+    isDictWordTableType,
+    isLightToneHeadwordSingleType,
+    type CheckType,
+} from '../xh7/types';
 import {
     initCustomTableCache,
     getCustomTables,
@@ -276,10 +283,12 @@ export class WordCheckCommandHandler {
                             const dict = getDict(type);
                             if (Object.keys(dict).length === 0) continue;
                             progress.report({ message: scanRange ? '扫描选中文本…' : '扫描文档…' });
-                            if (isDictWordTableType(type)) {
+                            if (isDictWordTableType(type) || isLightToneHeadwordSingleType(type)) {
                                 const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
                                 const jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
-                                list = scanDocumentWithSegmentation(editor.document, dict, jieba, cancelToken, scanRange);
+                                list = isLightToneHeadwordSingleType(type)
+                                    ? scanDocumentLightToneSingle(editor.document, dict, jieba, cancelToken, scanRange)
+                                    : scanDocumentWithSegmentation(editor.document, dict, jieba, cancelToken, scanRange);
                             } else {
                                 list = scanDocument(editor.document, dict, cancelToken, scanRange);
                             }
