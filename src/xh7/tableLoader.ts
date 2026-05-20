@@ -19,6 +19,7 @@ interface Xh7TablesJson {
     single_char_yiti_other_to_standard?: Record<string, string>;
     non_erhua_to_erhua?: Record<string, string>;
     light_tone_headword?: Record<string, string>;
+    word_to_multi_pinyin?: Record<string, string>;
     raw_notes?: Record<string, string[]>;
     usage_notes?: Record<string, string[]>;
 }
@@ -186,8 +187,8 @@ function filterNonErhuaToErhua(
     return out;
 }
 
-/** 从 light_tone_headword 按键长过滤：单字词头或多字词头 */
-function filterLightToneHeadword(
+/** 按键长过滤 dict7 词表：单字或多字词条 */
+function filterDictByKeyLength(
     dict: Record<string, string> | undefined,
     single: boolean
 ): Record<string, string> {
@@ -211,7 +212,12 @@ export function getDict(type: CheckType): Record<string, string> {
     if (type === 'light_tone_headword_single' || type === 'light_tone_headword_multi') {
         const data = ensureXh7Loaded();
         const base = data.light_tone_headword ?? {};
-        return filterLightToneHeadword(base, type === 'light_tone_headword_single');
+        return filterDictByKeyLength(base, type === 'light_tone_headword_single');
+    }
+    if (type === 'word_to_multi_pinyin_single' || type === 'word_to_multi_pinyin_multi') {
+        const data = ensureXh7Loaded();
+        const base = data.word_to_multi_pinyin ?? {};
+        return filterDictByKeyLength(base, type === 'word_to_multi_pinyin_single');
     }
     if (XH7_KEYS.includes(type as Xh7DictKey)) {
         const data = ensureXh7Loaded();

@@ -5,7 +5,7 @@
 
 import type { Range } from 'vscode';
 
-/** 检查类型：dict7 十类 + 通用规范汉字表(tgscc) 七类 */
+/** 检查类型：dict7 十二类 + 通用规范汉字表(tgscc) 七类 */
 export type CheckType =
     | 'variant_to_standard'
     | 'variant_to_preferred_single'
@@ -17,6 +17,8 @@ export type CheckType =
     | 'non_erhua_to_erhua_multi'
     | 'light_tone_headword_single'
     | 'light_tone_headword_multi'
+    | 'word_to_multi_pinyin_single'
+    | 'word_to_multi_pinyin_multi'
     | 'tgscc_traditional_to_simplified'
     | 'tgscc_variant_to_simplified'
     | 'tgscc_non_standard'
@@ -37,6 +39,8 @@ export const CHECK_TYPE_KEYS: CheckType[] = [
     'non_erhua_to_erhua_multi',
     'light_tone_headword_single',
     'light_tone_headword_multi',
+    'word_to_multi_pinyin_single',
+    'word_to_multi_pinyin_multi',
     'tgscc_traditional_to_simplified',
     'tgscc_variant_to_simplified',
     'tgscc_non_standard',
@@ -46,7 +50,7 @@ export const CHECK_TYPE_KEYS: CheckType[] = [
     'tgscc_table2',
 ];
 
-/** 对照词典检查：dict7 十类 */
+/** 对照词典检查：dict7 十二类 */
 export const DICT_CHECK_TYPES: CheckType[] = [
     'variant_to_standard',
     'variant_to_preferred_single',
@@ -58,6 +62,8 @@ export const DICT_CHECK_TYPES: CheckType[] = [
     'non_erhua_to_erhua_multi',
     'light_tone_headword_single',
     'light_tone_headword_multi',
+    'word_to_multi_pinyin_single',
+    'word_to_multi_pinyin_multi',
 ];
 
 /** 对照通用规范汉字表检查：tgscc 七类 */
@@ -101,6 +107,8 @@ export const CHECK_TYPE_LABELS: Record<CheckType, string> = {
     non_erhua_to_erhua_multi: '未儿化词（多字）→儿化词',
     light_tone_headword_single: '轻声词（单字）→拼音',
     light_tone_headword_multi: '轻声词（多字）→拼音',
+    word_to_multi_pinyin_single: '多音词（单字）→拼音',
+    word_to_multi_pinyin_multi: '多音词（多字）→拼音',
     tgscc_traditional_to_simplified: '繁体字→通用规范字',
     tgscc_variant_to_simplified: '异体字→通用规范字',
     tgscc_non_standard: '非通用规范字',
