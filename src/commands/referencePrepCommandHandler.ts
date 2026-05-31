@@ -58,8 +58,8 @@ export class ReferencePrepCommandHandler {
 
         const actionPick = await vscode.window.showQuickPick(
             [
-                { label: '仅准备参考资料', value: 'prep' as const },
                 { label: '准备参考资料并校对', value: 'prep_and_proofread' as const },
+                { label: '仅准备参考资料', value: 'prep' as const },
             ],
             { title: '下一步', ignoreFocusOut: true }
         );

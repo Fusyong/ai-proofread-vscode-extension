@@ -3,12 +3,34 @@ import { convertOpencc } from '../opencc';
 import type { ResolvedLocalDictConfigItem } from './dictConfig';
 import type { LookupMode } from './mdictClient';
 
+/** 超过此长度视为长选区：不宜整段 exact 查词（与知识核查中 LLM 规划词条一致） */
+export const MAX_DIRECT_DICT_LOOKUP_CHARS = 32;
+
 export function sanitizeLookupTerm(term: string): string {
     const s = String(term ?? '').trim();
     if (!s) return s;
     return s
         .replace(/([\p{Script=Han}])\s+/gu, '$1')
         .replace(/\s+([\p{Script=Han}])/gu, '$1');
+}
+
+/** 短选区直接查；长选区抽取 2–8 字中文词供用户选择 */
+export function extractLookupCandidates(raw: string): string[] {
+    const sanitized = sanitizeLookupTerm(raw);
+    if (!sanitized) return [];
+    if (sanitized.length <= MAX_DIRECT_DICT_LOOKUP_CHARS) {
+        return [sanitized];
+    }
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const re = /\p{Script=Han}{2,8}/gu;
+    for (const m of raw.matchAll(re)) {
+        const w = sanitizeLookupTerm(m[0]);
+        if (!w || w.length < 2 || seen.has(w)) continue;
+        seen.add(w);
+        out.push(w);
+    }
+    return out;
 }
 
 export function buildOpenccAltTerms(term: string): string[] {

@@ -113,7 +113,8 @@
       },
       {
         "command": "ai-proofread.queryLocalDictSelection",
-        "title": "AI Proofreader: query local dictionary for selection"
+        "title": "AI Proofreader: query local dictionary for selection",
+        "description": "Quick lookup for a word/short phrase; long selections offer LLM-planned dict lookup (same as knowledge verify) or open knowledge verify"
       },
       {
         "command": "ai-proofread.proofreadFile",

@@ -375,7 +375,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
     * **在参考文献库中搜索**：`search selection in References`。如果参考文献目录在工作区外，可能受版本限制会没有结果，可将该目录加入工作区后再搜。
     * **连线搜索[中华经典古籍库](https://jingdian.ancientbooks.cn)**：`search selection in Ancientbooks (jingdian)`。
     * **连线搜索[识典古籍](https://www.shidianguji.com/)**：`search selection in Shidianguji`。
-    * 查询本地词典：从右键菜单或命令面板执行 `AI Proofreader: query local dictionary for selection`
+    * **查询本地词典**：`AI Proofreader: query local dictionary for selection`——适合**单个词或短短语**的快速查词（含简繁变体）。**长段落**不会把全文当作词条；会提示选用**智能规划查词**（与知识核查相同的词典规划逻辑），或直接使用 **`AI Proofreader: knowledge verify selection`**（可仅准备参考资料，也可接着校对；还可勾选参考文献 grep 等）。
 5. **字词检查**：命令`check words`。分类三个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的检查与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》、《古籍印刷通用字规范字形表》、规范人名与年号等数据。用户还可以通过`manage custom tables`命令，加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。这是一个非常强大且灵活的功能，值得深入探索。
     ![树视图（提示词管理、字词检查、引文检查）](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/special_checks.png)
 6. **标题树与段内序号检查**：命令`check numbering hierarchy`。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
