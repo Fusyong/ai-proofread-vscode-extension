@@ -1,13 +1,22 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { createHash } from 'crypto';
 import { FilePathUtils, Logger } from '../utils';
 import { ensureDictFilesExist, pickDefaultDictId, resolveLocalDictConfigs, type ResolvedLocalDictConfigItem } from './dictConfig';
 import { MdictClient, type LookupMode } from './mdictClient';
 import { buildDictPrepSystemPrompt, buildDictPrepUserPrompt, parseDictPrepPlan, type DictPrepLookupPoint } from './dictPrepPrompt';
 import { llmGenerateJson } from './dictPrepLlm';
-import { convertOpencc } from '../opencc';
 import { stripHtmlToText } from './htmlToText';
+import {
+    buildDedupKeyLegacy,
+    buildDictTryList,
+    buildLocalDictEntryBeginTag,
+    buildLocalDictEntryEndTag,
+    buildOpenccAltTerms,
+    digestSha1,
+    formatDictReferenceBlock,
+    limitCleanText,
+    sanitizeLookupTerm,
+} from './dictLookupShared';
 
 export interface DictPrepRunStats {
     totalItems: number;
@@ -67,54 +76,6 @@ export interface DictPrepProgressHooks {
     /** 每完成一条的本地查词后调用（0-based 索引） */
     onAfterItemMerged?: (itemIndex: number) => void;
     token?: vscode.CancellationToken;
-}
-
-function sanitizeLookupTerm(term: string): string {
-    // 查词阶段：仅删除“汉字前后”的空白，其它空白保留
-    // 例：`李 白` → `李白`；`Foo 李 白 Bar` → `Foo李白Bar`；`Foo Bar` 保持不变
-    const s = String(term ?? '').trim();
-    if (!s) return s;
-    // 使用 Unicode 属性：Han 脚本（CJK 汉字）；u 标志保证属性转义可用
-    return s
-        .replace(/([\p{Script=Han}])\s+/gu, '$1')
-        .replace(/\s+([\p{Script=Han}])/gu, '$1');
-}
-
-/**
- * 基于 OpenCC 做简⇄繁双向转换，返回“可选变体”（不含原词）。
- * 约定：调用方应先查原词；仅当变体与原词不同且需要时再查变体。
- */
-function buildOpenccAltTerms(term: string): string[] {
-    const base = sanitizeLookupTerm(term);
-    if (!base) return [];
-
-    // 双向都做一遍：输入可能本来就是繁体，或包含可互转的地区词。
-    const t2cn = convertOpencc(base, 't', 'cn');
-    const cn2t = convertOpencc(base, 'cn', 't');
-
-    const out: string[] = [];
-    const push = (x: string) => {
-        const s = sanitizeLookupTerm(x);
-        if (!s) return;
-        if (s === base) return;
-        if (out.includes(s)) return;
-        out.push(s);
-    };
-    push(t2cn);
-    push(cn2t);
-    return out;
-}
-
-function limitCleanText(s: string, maxChars: number): string {
-    const text = String(s ?? '');
-    if (!text) return text;
-    if (!maxChars || maxChars <= 0) return text;
-    if (text.length <= maxChars) return text;
-    return text.slice(0, maxChars) + '\n\n[...已截断...]';
-}
-
-function sha1(text: string): string {
-    return createHash('sha1').update(text).digest('hex').slice(0, 12);
 }
 
 function resolveSystemPrompt(context: vscode.ExtensionContext): string {
@@ -461,7 +422,7 @@ export async function mergeDictPrepReferencesFromPlans(
 
                         for (const h of hits) {
                             const cleaned = limitCleanText(stripHtmlToText(h.definition), maxDefinitionChars);
-                            const digest = sha1(`${h.matchedKey}\n${cleaned}`);
+                            const digest = digestSha1(`${h.matchedKey}\n${cleaned}`);
 
                             const legacyKey = buildDedupKeyLegacy(dict.id, term, mode);
                             const header = `【本地词典】${h.dictName}｜${h.matchedKey}`;
@@ -537,12 +498,9 @@ export async function mergeDictPrepReferencesFromPlans(
                 if (reference.includes(beginTag) || reference.includes(fingerprint) || reference.includes(legacyKey)) {
                     continue;
                 }
-                const block = formatReferenceBlockV2({
+                const block = formatDictReferenceBlock({
                     dictName: one.h.dictName,
-                    dictId: one.h.dictId,
-                    queryTerm: one.h.queryTerm,
                     matchedKey: one.h.matchedKey,
-                    mode: one.h.mode,
                     definition: one.cleaned,
                     digest: one.digest,
                 });
@@ -638,87 +596,3 @@ export async function prepareReferencesFromLocalDicts(
     return mergeDictPrepReferencesFromPlans({ jsonFilePath: params.jsonFilePath, context: params.context, ...hooks });
 }
 
-function buildDedupKey(dictId: string, term: string, mode: LookupMode): string {
-    const t = sanitizeLookupTerm(term);
-    return `<!-- ai-proofread:dictref dictId=${dictId} mode=${mode} term=${escapeAttr(t)} -->`;
-}
-
-function buildLocalDictEntryBeginTag(sha1Digest: string): string {
-    // 仅保留 sha1 作为轻量去重键；不写 dictId/dictName/headword 等元信息
-    return `<!-- ai-proofread:localDictEntry begin sha1=${sha1Digest} -->`;
-}
-
-function buildLocalDictEntryEndTag(): string {
-    return `<!-- ai-proofread:localDictEntry end -->`;
-}
-
-function buildDedupKeyLegacy(dictId: string, term: string, mode: LookupMode): string {
-    // 兼容旧版：曾把连续空白折叠为单空格（而非完全移除）
-    const t = (term ?? '').trim().replace(/\s+/g, ' ');
-    return `<!-- ai-proofread:dictref dictId=${dictId} mode=${mode} term=${escapeAttr(t)} -->`;
-}
-
-function escapeAttr(s: string): string {
-    return s.replace(/-->/g, '--\\>');
-}
-
-function formatReferenceBlock(
-    hit: { dictName: string; dictId: string; queryTerm: string; matchedKey: string; mode: LookupMode; definition: string },
-    dedupKey: string
-): string {
-    const header = `【本地词典】${hit.dictName}（${hit.dictId}） | mode=${hit.mode} | query=${hit.queryTerm} | hit=${hit.matchedKey}`;
-    return [dedupKey, header, '', hit.definition, '<!-- ai-proofread:dictref end -->'].join('\n');
-}
-
-function formatReferenceBlockV2(
-    hit: {
-        dictName: string;
-        dictId: string;
-        queryTerm: string;
-        matchedKey: string;
-        mode: LookupMode;
-        definition: string;
-        digest: string;
-    },
-): string {
-    const begin = buildLocalDictEntryBeginTag(hit.digest);
-    // LLM 友好：仅保留来源与词头，去掉 query/mode 等“对校对无用”的元信息
-    const header = `【本地词典】${hit.dictName}｜${hit.matchedKey}`;
-    return [
-        begin,
-        header,
-        '',
-        hit.definition,
-        buildLocalDictEntryEndTag(),
-    ].join('\n');
-}
-
-function buildDictTryList(
-    dicts: ResolvedLocalDictConfigItem[],
-    preferredDictId: string | null,
-    defaultDictId?: string
-): ResolvedLocalDictConfigItem[] {
-    if (dicts.length === 0) return [];
-    const byPriority = [...dicts].sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100));
-
-    const picked: ResolvedLocalDictConfigItem[] = [];
-    const seen = new Set<string>();
-
-    const pushById = (id?: string | null) => {
-        if (!id) return;
-        const d = dicts.find((x) => x.id === id);
-        if (!d) return;
-        if (seen.has(d.id)) return;
-        picked.push(d);
-        seen.add(d.id);
-    };
-
-    pushById(preferredDictId);
-    pushById(defaultDictId ?? null);
-    for (const d of byPriority) {
-        if (seen.has(d.id)) continue;
-        picked.push(d);
-        seen.add(d.id);
-    }
-    return picked;
-}

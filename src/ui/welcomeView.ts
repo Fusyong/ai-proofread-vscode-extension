@@ -71,6 +71,7 @@ function getHtml(): string {
 </head>
 <body>
     <button class="btn" data-action="openPanel">打开校对面板</button>
+    <button class="btn" data-action="openModelRoutes">模型路由</button>
     <div class="btn-grid">
         <button class="btn" data-action="showExtension">查看说明文档</button>
         <button class="btn" data-action="openCheatsheet">命令速查与业务流程图</button>
@@ -126,6 +127,9 @@ export function registerWelcomeView(context: vscode.ExtensionContext): void {
                 switch (message.action) {
                     case 'openPanel':
                         vscode.commands.executeCommand('ai-proofread.openProofreadingPanel');
+                        break;
+                    case 'openModelRoutes':
+                        vscode.commands.executeCommand('ai-proofread.modelRoutes.openView');
                         break;
                     case 'showExtension':
                         showExtensionInEditor(context);

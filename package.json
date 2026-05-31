@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.10.8",
+  "version": "1.11.0",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -78,8 +78,26 @@
         "title": "AI Proofreader: merge two files"
       },
       {
-        "command": "ai-proofread.prepareLocalDictReferences",
-        "title": "AI Proofreader: prepare references from local dictionaries (JSON)"
+        "command": "ai-proofread.knowledgeVerifySelection",
+        "title": "AI Proofreader: knowledge verify selection (prepare references and proofread)"
+      },
+      {
+        "command": "ai-proofread.prepareReferencesJson",
+        "title": "AI Proofreader: prepare references for JSON file"
+      },
+      {
+        "command": "ai-proofread.modelRoutes.openView",
+        "title": "AI Proofreader: open model routes view",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "ai-proofread.modelRoutes.configure",
+        "title": "配置模型路由"
+      },
+      {
+        "command": "ai-proofread.modelRoutes.refresh",
+        "title": "刷新模型路由",
+        "icon": "$(refresh)"
       },
       {
         "command": "ai-proofread.queryLocalDictSelection",
@@ -484,14 +502,42 @@
           "items": {
             "type": "object",
             "properties": {
-              "id": { "type": "string", "description": "词典ID（稳定标识，用于路由与缓存键）" },
-              "name": { "type": "string", "description": "词典名称（展示用）" },
-              "mdxPath": { "type": "string", "description": "MDX 文件路径（支持绝对路径）" },
-              "tags": { "type": "array", "items": { "type": "string" }, "default": [], "description": "词典标签（如：中文、古汉语、百科等）" },
-              "priority": { "type": "number", "default": 100, "description": "优先级（越小越优先作为回退默认词典）" },
-              "whenToUse": { "type": "string", "default": "", "description": "一句话说明何时使用该词典（供大语言模型参考）" }
+              "id": {
+                "type": "string",
+                "description": "词典ID（稳定标识，用于路由与缓存键）"
+              },
+              "name": {
+                "type": "string",
+                "description": "词典名称（展示用）"
+              },
+              "mdxPath": {
+                "type": "string",
+                "description": "MDX 文件路径（支持绝对路径）"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [],
+                "description": "词典标签（如：中文、古汉语、百科等）"
+              },
+              "priority": {
+                "type": "number",
+                "default": 100,
+                "description": "优先级（越小越优先作为回退默认词典）"
+              },
+              "whenToUse": {
+                "type": "string",
+                "default": "",
+                "description": "一句话说明何时使用该词典（供大语言模型参考）"
+              }
             },
-            "required": ["id", "name", "mdxPath"]
+            "required": [
+              "id",
+              "name",
+              "mdxPath"
+            ]
           },
           "description": "本地 MDict 词典配置（MDX）。用于“本地词典参考准备”流程的词典路由与查询。"
         },
@@ -540,12 +586,75 @@
           "items": {
             "type": "object",
             "properties": {
-              "name": { "type": "string", "description": "词典查询提示词名称" },
-              "content": { "type": "string", "description": "提示词内容（必须要求模型只输出 JSON，并遵循 lookups 结构）" }
+              "name": {
+                "type": "string",
+                "description": "词典查询提示词名称"
+              },
+              "content": {
+                "type": "string",
+                "description": "提示词内容（必须要求模型只输出 JSON，并遵循 lookups 结构）"
+              }
             },
-            "required": ["name", "content"]
+            "required": [
+              "name",
+              "content"
+            ]
           },
-          "description": "词典查询提示词列表（用于“本地词典参考准备”流程）。"
+          "description": "参考资料规划提示词列表（referencePrep 与 dict prep prompts 视图共用）。"
+        },
+        "ai-proofread.referencePrep.enabledSources": {
+          "order": 36,
+          "type": "array",
+          "default": ["dict", "grep_md"],
+          "items": {
+            "type": "string",
+            "enum": ["dict", "grep_md", "citation", "web"]
+          },
+          "description": "默认启用的参考资料来源。"
+        },
+        "ai-proofread.referencePrep.maxRounds": {
+          "order": 37,
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "参考资料准备最大轮次。"
+        },
+        "ai-proofread.referencePrep.useEditorialMemory": {
+          "order": 37.5,
+          "type": "boolean",
+          "default": false,
+          "description": "知识核查选段在「准备并校对」时是否注入编辑记忆。"
+        },
+        "ai-proofread.referencePrep.grep.maxHitsPerRound": {
+          "order": 37.6,
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "每轮 grep 最多保留的合并命中块数。"
+        },
+        "ai-proofread.referencePrep.grep.maxSnippetChars": {
+          "order": 37.7,
+          "type": "number",
+          "default": 12000,
+          "minimum": 1000,
+          "maximum": 100000,
+          "description": "每轮 grep 结果总字符预算。"
+        },
+        "ai-proofread.modelRoutes": {
+          "order": 9.5,
+          "type": "object",
+          "default": {},
+          "description": "各功能 LLM 路由覆盖。键为 referencePrep | editorialMemory；inherit 为 true 时跟随校对。",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "inherit": { "type": "boolean" },
+              "platform": { "type": "string", "enum": ["aliyun", "deepseek", "google", "ollama"] },
+              "model": { "type": "string" }
+            }
+          }
         },
         "ai-proofread.proofread.defaultOutputType": {
           "order": 27.5,
@@ -974,6 +1083,10 @@
           "type": "webview"
         },
         {
+          "id": "ai-proofread.modelRoutes",
+          "name": "model routes"
+        },
+        {
           "id": "ai-proofread.prompts",
           "name": "prompts",
           "when": "aiProofread.showPromptsView"
@@ -1037,6 +1150,16 @@
     },
     "menus": {
       "view/title": [
+        {
+          "command": "ai-proofread.modelRoutes.openView",
+          "when": "view == ai-proofread.welcome",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ai-proofread.modelRoutes.refresh",
+          "when": "view == ai-proofread.modelRoutes",
+          "group": "navigation@1"
+        },
         {
           "command": "ai-proofread.wordCheck.sortAndFilter",
           "when": "view == ai-proofread.wordCheck",
@@ -1324,9 +1447,14 @@
           "when": "resourceLangId == markdown"
         },
         {
-          "command": "ai-proofread.prepareLocalDictReferences",
+          "command": "ai-proofread.prepareReferencesJson",
           "group": "ai-proofread@30.5",
           "when": "resourceLangId == json"
+        },
+        {
+          "command": "ai-proofread.knowledgeVerifySelection",
+          "group": "ai-proofread@30.4",
+          "when": "editorHasSelection"
         },
         {
           "command": "ai-proofread.proofreadFile",
@@ -1366,6 +1494,7 @@
   },
   "dependencies": {
     "@google/genai": "^0.7.0",
+    "@vscode/ripgrep": "^1.18.0",
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
     "jieba-wasm": "^2.4.0",

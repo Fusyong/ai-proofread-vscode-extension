@@ -1385,7 +1385,8 @@ export async function proofreadSelection(
     sourceCharacteristicsDisplayTitle?: string,
     onItemItems?: (items: ProofreadItem[]) => void,
     onRawItemOutput?: (raw: string) => void,
-    editorialMemoryForceEnabled?: boolean
+    editorialMemoryForceEnabled?: boolean,
+    inlineReferenceText?: string
 ): Promise<string | null> {
     // 获取选中的文本
     const selectedText = editor.document.getText(selection);
@@ -1436,6 +1437,11 @@ export async function proofreadSelection(
     // 如果选择了参考文件，读取参考文件内容
     if (referenceFile && referenceFile[0]) {
         referenceText = fs.readFileSync(referenceFile[0].fsPath, 'utf8');
+    }
+    if (inlineReferenceText?.trim()) {
+        referenceText = referenceText
+            ? `${referenceText}\n\n${inlineReferenceText.trim()}`
+            : inlineReferenceText.trim();
     }
 
     // 构建提示文本

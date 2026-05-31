@@ -15,7 +15,7 @@ import { SplitIntoSentencesCommandHandler } from './commands/splitIntoSentencesC
 import { DocumentConvertCommandHandler } from './commands/documentConvertCommandHandler';
 import { UtilityCommandHandler } from './commands/utilityCommandHandler';
 import { CitationCommandHandler } from './commands/citationCommandHandler';
-import { DictPrepCommandHandler } from './commands/dictPrepCommandHandler';
+import { ReferencePrepCommandHandler } from './commands/referencePrepCommandHandler';
 import { registerCitationView } from './citation/citationView';
 import { registerDuplicateView } from './duplicate/duplicateView';
 import { DuplicateCommandHandler } from './commands/duplicateCommandHandler';
@@ -42,6 +42,8 @@ import { convertOpencc, type OpenccLocale } from './opencc';
 import { DictPrepPromptManager } from './localDict/dictPrepPromptManager';
 import { registerDictPrepPromptsView, type DictPrepPromptTreeItem } from './localDict/dictPrepPromptsView';
 import { LocalDictQueryCommandHandler } from './commands/localDictQueryCommandHandler';
+import { registerModelRoutesView } from './modelRoutes/modelRoutesView';
+import { ModelRoutesCommandHandler } from './modelRoutes/modelRoutesCommandHandler';
 
 const OPENCC_LOCALES: Array<{ id: OpenccLocale; label: string; description: string }> = [
     { id: 'cn', label: 'cn', description: 'Simplified Chinese (Mainland China)' },
@@ -72,6 +74,8 @@ export function activate(context: vscode.ExtensionContext) {
     setExtensionContext(context);
     // 最先注册欢迎视图，避免点击 Activity Bar 图标时出现 "no data provider registered"
     registerWelcomeView(context);
+    const { provider: modelRoutesProvider } = registerModelRoutesView(context);
+    const modelRoutesHandler = new ModelRoutesCommandHandler(modelRoutesProvider);
 
     const logger = Logger.getInstance();
     const configManager = ConfigManager.getInstance();
@@ -88,7 +92,7 @@ export function activate(context: vscode.ExtensionContext) {
     const splitIntoSentencesHandler = new SplitIntoSentencesCommandHandler();
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
-    const dictPrepHandler = new DictPrepCommandHandler(webviewManager);
+    const referencePrepHandler = new ReferencePrepCommandHandler(webviewManager, proofreadHandler);
     const localDictQueryHandler = new LocalDictQueryCommandHandler();
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
     const citationHandler = new CitationCommandHandler(context, citationTreeProvider, citationTreeView);
@@ -140,15 +144,20 @@ export function activate(context: vscode.ExtensionContext) {
     webviewManager.setMergeCallback((jsonFilePath: string) => {
         return utilityHandler.handleMergeTwoFilesByPath(jsonFilePath);
     });
-    webviewManager.setDictPrepLlmPlanCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
-        return dictPrepHandler.handleDictPrepLlmPlan(jsonFilePath, ctx);
-    });
-    webviewManager.setDictPrepLocalMergeCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
-        return dictPrepHandler.handleDictPrepLocalMerge(jsonFilePath, ctx);
+    webviewManager.setReferencePrepJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
+        return referencePrepHandler.handlePrepareReferencesJson(jsonFilePath, ctx);
     });
 
     // 注册所有命令
     let disposables = [
+        vscode.commands.registerCommand('ai-proofread.modelRoutes.openView', () =>
+            modelRoutesHandler.openView()
+        ),
+        vscode.commands.registerCommand('ai-proofread.modelRoutes.configure', (item?: { routeId: string }) =>
+            modelRoutesHandler.configureRoute(item as { routeId: import('./modelRoutes/modelRouteRegistry').ModelRouteId })
+        ),
+        vscode.commands.registerCommand('ai-proofread.modelRoutes.refresh', () => modelRoutesProvider.refresh()),
+
         vscode.commands.registerCommand('ai-proofread.splitFile', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
@@ -323,13 +332,22 @@ export function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleMergeTwoFilesCommand(editor);
         }),
 
-        vscode.commands.registerCommand('ai-proofread.prepareLocalDictReferences', async () => {
+        vscode.commands.registerCommand('ai-proofread.knowledgeVerifySelection', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showInformationMessage('No active editor!');
                 return;
             }
-            await dictPrepHandler.handlePrepareLocalDictReferencesCommand(editor, context);
+            await referencePrepHandler.handleKnowledgeVerifySelection(editor, context);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.prepareReferencesJson', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await referencePrepHandler.handlePrepareReferencesFromEditor(editor, context);
         }),
 
         vscode.commands.registerCommand('ai-proofread.queryLocalDictSelection', async () => {

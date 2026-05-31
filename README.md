@@ -181,21 +181,20 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 将上述键值对并入 `settings.json` 里 `ai-proofread` 对应配置即可（若已有 `localDicts`，可整段替换或手工合并）。若希望随仓库携带相对路径，可把 `mdxPath` 写成 `"${workspaceFolder}/…/词典.mdx"`。
 
-**LLM 自动确定查询点，本地查询后写入 JSON 的 reference**：
+**统一参考资料准备（知识核查）**：
 
-在批量校对前，让 LLM 阅读每个 `target` 片段，先提出“需要查词典的点”；再自动查询本地词典，把结果写进每条的 `reference`，作为校对准备过程。
+在批量校对或选段校对前，可多轮检索**本地词典**与**参考文献目录**（`ai-proofread.citation.referencesPath` 下的 md/txt），将结果写入 `reference`，再调用既有校对流程。
 
-输出文件：
+- 选段命令：`AI Proofreader: knowledge verify selection`（可选「仅准备」或「准备并校对」）
+- JSON：校对面板 **准备参考资料**，或命令 `prepare references for JSON file`
+- 过程文件：`文档.referenceprep.json`、`文档.referenceprep.log`（详见 `docs/knowledge-verify-plan.md`）
+- 运行前可勾选资料来源（词典 / 参考文献 grep）；强度（轻量 / 标准 / 深入）控制轮次与查询上限
 
-- `文档.dictprep.json`：记录每条的查询计划（planned points）、命中结果与错误信息，便于复查与复跑
-- `文档.dictprep.log`：运行日志
+**参考资料规划提示词**（侧栏 `dict prep prompts`）：可自定义；须要求模型只输出 JSON（`sufficient` / `queries` / `prune`）。未选择时使用内置规划提示词。
 
-**词典查询提示词**：
+**模型路由**（侧栏 `model routes`，overview 顶栏齿轮按钮可打开）：
 
-扩展提供了独立的“词典查询提示词”管理视图（侧栏 `dict prep prompts`），可新建/编辑/删除，并选择一条作为当前提示词。
-
-- 若未选择自定义提示词，则使用系统内置提示词。
-- 注意：词典查询提示词必须要求模型**只输出 JSON**，且输出结构为 `{\"lookups\":[...]}`（详见源码`dictPrepPrompt.ts`）。
+为不同 LLM 管线分别指定平台与模型名称；**参考资料准备**、**编辑记忆合并** 默认**跟随校对**（与 `proofread.platform` / `proofread.models.*` 一致），也可改为独立配置。点击树中某一项即可选择平台、填写模型或切换「跟随校对」。高级用户仍可在设置中编辑 `ai-proofread.modelRoutes`。
 
 
 ### 3.2. 校对
@@ -452,15 +451,10 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 5. TODO
 
-1. 一个知识核查用grep智能体：加入增补查询和效果评估环节，形成一个自动循环的知识核查智能体；
-    1. 增强词典查询功能
-    2. 加入在线查询
-    3. 加入本地参考文献库查询
-2. 一个memo管理智能体
+1. 一个memo管理智能体
     1. 三段式：原文；改后；说明
     2. 分类、加标签存储（字词层为穷尽举例式、句段层为举例加格式说明）
     3. 存档、压缩工作流……
-3. 通过treeview配置模型、为不同管线选择模型配置
 4. 本地视觉模型图像校对工作流（专注于图像审查、版式和空间关系）
 5. 尝试用思考模型校对
 6. 预置更多提示词
@@ -476,6 +470,11 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 12. 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
 
 ## 6. 更新日志
+
+### v1.11.0
+
+- 特性：知识核查智能体工作流，复用了原来的词典查询功能，增加本地参考文献库grep和互联网查询
+- 特性：增加模型配置treeview
 
 ### v1.10.8
 
