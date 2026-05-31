@@ -91,6 +91,18 @@
         "icon": "$(settings-gear)"
       },
       {
+        "command": "ai-proofread.modelRoutes.toggleView",
+        "title": "AI Proofreader: toggle model routes view"
+      },
+      {
+        "command": "ai-proofread.prompts.toggleViews",
+        "title": "AI Proofreader: toggle prompts views"
+      },
+      {
+        "command": "ai-proofread.wordCheck.toggleViews",
+        "title": "AI Proofreader: toggle word check views"
+      },
+      {
         "command": "ai-proofread.modelRoutes.configure",
         "title": "配置模型路由"
       },
@@ -210,6 +222,10 @@
       {
         "command": "ai-proofread.duplicate.scanSelection",
         "title": "AI Proofreader: scan duplicate sentences in selection"
+      },
+      {
+        "command": "ai-proofread.wordCheck.openViews",
+        "title": "AI Proofreader: open word check views"
       },
       {
         "command": "ai-proofread.checkWords",
@@ -1084,7 +1100,8 @@
         },
         {
           "id": "ai-proofread.modelRoutes",
-          "name": "model routes"
+          "name": "model routes",
+          "when": "aiProofread.showModelRoutesView"
         },
         {
           "id": "ai-proofread.prompts",
@@ -1524,7 +1541,8 @@
       "includeNodeModules": {
         "vscode": false,
         "sql.js": false,
-        "jieba-wasm": false
+        "jieba-wasm": false,
+        "@vscode/ripgrep": false
       },
       "sourceMap": false,
       "outputFormat": "commonjs",

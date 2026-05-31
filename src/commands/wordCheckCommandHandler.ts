@@ -14,6 +14,7 @@ import {
     getCurrentOccurrenceIndex,
     setCurrentOccurrenceIndex,
 } from '../xh7/wordCheckView';
+import { setWordCheckViewsVisible, toggleWordCheckViewsVisible } from '../ui/sidebarViewVisibility';
 import {
     initTableLoader,
     getDict,
@@ -116,6 +117,16 @@ export class WordCheckCommandHandler {
         this.dictCheckTypesProvider = dictReg.provider as DictCheckTypesTreeDataProvider;
         const tgsccReg = registerTgsccCheckTypesView(this.context);
         this.tgsccCheckTypesProvider = tgsccReg.provider as TgsccCheckTypesTreeDataProvider;
+    }
+
+    /** 显示字词检查相关侧栏视图（不自动执行扫描） */
+    async openWordCheckViews(): Promise<void> {
+        await setWordCheckViewsVisible(true);
+    }
+
+    /** 切换字词检查相关侧栏视图的显示/隐藏 */
+    async toggleWordCheckViews(): Promise<void> {
+        await toggleWordCheckViewsVisible();
     }
 
     /** 获取当前参与检查的表 id 列表（按 tableOrder 顺序；order 与树视图一致，含新载入的表） */

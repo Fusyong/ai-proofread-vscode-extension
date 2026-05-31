@@ -20,6 +20,12 @@ import { registerCitationView } from './citation/citationView';
 import { registerDuplicateView } from './duplicate/duplicateView';
 import { DuplicateCommandHandler } from './commands/duplicateCommandHandler';
 import { WordCheckCommandHandler } from './commands/wordCheckCommandHandler';
+import {
+    hideAllOnDemandSidebarViews,
+    setPromptsViewsVisible,
+    setWordCheckViewsVisible,
+    togglePromptsViewsVisible,
+} from './ui/sidebarViewVisibility';
 import { NumberingTreeDataProvider } from './numbering/numberingTreeProvider';
 import { registerNumberingView } from './numbering/numberingView';
 import { SegmentTreeDataProvider } from './numbering/segmentTreeProvider';
@@ -121,18 +127,12 @@ export function activate(context: vscode.ExtensionContext) {
     registerProofreadItemsView(context);
 
     // 按需显示 TreeView：默认全部隐藏，由命令显式打开
-    vscode.commands.executeCommand('setContext', 'aiProofread.showPromptsView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showDictPrepPromptsView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showDictCheckTypesView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showTgsccCheckTypesView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', false);
+    void hideAllOnDemandSidebarViews();
     vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showSourceTextCharacteristicsView', false);
 
     // 设置校对、切分、合并的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
@@ -152,6 +152,9 @@ export function activate(context: vscode.ExtensionContext) {
     let disposables = [
         vscode.commands.registerCommand('ai-proofread.modelRoutes.openView', () =>
             modelRoutesHandler.openView()
+        ),
+        vscode.commands.registerCommand('ai-proofread.modelRoutes.toggleView', () =>
+            modelRoutesHandler.toggleView()
         ),
         vscode.commands.registerCommand('ai-proofread.modelRoutes.configure', (item?: { routeId: string }) =>
             modelRoutesHandler.configureRoute(item as { routeId: import('./modelRoutes/modelRouteRegistry').ModelRouteId })
@@ -265,11 +268,9 @@ export function activate(context: vscode.ExtensionContext) {
 
         // 注册提示词管理命令（同时显示 prompts 与源文本特性两个 TreeView，并聚焦 prompts）
         vscode.commands.registerCommand('ai-proofread.managePrompts', async () => {
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showPromptsView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showDictPrepPromptsView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showSourceTextCharacteristicsView', true);
-            PromptManager.getInstance(context).managePrompts();
+            await setPromptsViewsVisible(true);
         }),
+        vscode.commands.registerCommand('ai-proofread.prompts.toggleViews', () => togglePromptsViewsVisible()),
 
         vscode.commands.registerCommand('ai-proofread.prompts.new', async () => {
             await promptManager.addPrompt();
@@ -559,12 +560,14 @@ export function activate(context: vscode.ExtensionContext) {
             await vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', true);
             await duplicateHandler.handleScanSelection();
         }),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.openViews', async () => {
+            await wordCheckHandler.openWordCheckViews();
+        }),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.toggleViews', async () => {
+            await wordCheckHandler.toggleWordCheckViews();
+        }),
         vscode.commands.registerCommand('ai-proofread.checkWords', async () => {
-            // 按需显示与字词检查相关的视图
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showDictCheckTypesView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showTgsccCheckTypesView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', true);
+            await wordCheckHandler.openWordCheckViews();
             await wordCheckHandler.handleCheckWordsCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.wordCheck.prevOccurrence', () => wordCheckHandler.handlePrevOccurrenceCommand()),
@@ -581,11 +584,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.wordCheck.applyInsertVisible', () => wordCheckHandler.handleApplyInsertVisibleCommand()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.sortAndFilter', () => wordCheckHandler.handleWordCheckSortAndFilterCommand()),
         vscode.commands.registerCommand('ai-proofread.manageCustomTables', async () => {
-            // 按需显示自定义替换表及相关视图
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showDictCheckTypesView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showTgsccCheckTypesView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', true);
+            await setWordCheckViewsVisible(true);
             await wordCheckHandler.handleManageCustomTablesCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.customTables.delete', (el: import('./xh7/customTablesView').CustomTableTreeItem) => wordCheckHandler.handleCustomTableDelete(el)),

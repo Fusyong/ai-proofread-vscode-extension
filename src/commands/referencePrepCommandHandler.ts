@@ -1,5 +1,4 @@
 import * as fs from 'fs';
-import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { ConfigManager, ErrorUtils, FilePathUtils } from '../utils';
@@ -90,14 +89,14 @@ export class ReferencePrepCommandHandler {
         const anchorPath = editor.document.uri.fsPath;
 
         try {
-            await vscode.window.withProgress(
+            const { mergedReference } = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
                     title: '参考资料准备',
                     cancellable: true,
                 },
-                async (_p, token) => {
-                    const { mergedReference } = await runReferencePrepForTarget({
+                async (_p, token) =>
+                    runReferencePrepForTarget({
                         target: selectedText,
                         anchorPath,
                         context,
@@ -106,28 +105,27 @@ export class ReferencePrepCommandHandler {
                         freshProcess: true,
                         onProgress: (m) => _p.report({ message: m }),
                         token,
-                    });
-
-                    if (!opts.runProofread) {
-                        if (mergedReference) {
-                            const doc = await vscode.workspace.openTextDocument({
-                                content: mergedReference,
-                                language: 'markdown',
-                            });
-                            await vscode.window.showTextDocument(doc, { preview: true });
-                        }
-                        vscode.window.showInformationMessage(
-                            mergedReference
-                                ? '参考资料已准备完成（已打开预览）。'
-                                : '参考资料准备完成，未检索到命中。'
-                        );
-                        return;
-                    }
-
-                    _p.report({ message: '正在校对…' });
-                    await this.runProofreadSelectionWithInlineReference(editor, context, mergedReference, token);
-                }
+                    })
             );
+
+            if (!opts.runProofread) {
+                if (mergedReference) {
+                    const doc = await vscode.workspace.openTextDocument({
+                        content: mergedReference,
+                        language: 'markdown',
+                    });
+                    await vscode.window.showTextDocument(doc, { preview: true });
+                }
+                vscode.window.showInformationMessage(
+                    mergedReference
+                        ? '参考资料已准备完成（已打开预览）。'
+                        : '参考资料准备完成，未检索到命中。'
+                );
+                return;
+            }
+
+            // 校对进度由 proofreadSelection 内 Window 进度负责；不在此通知中等待用户核对 diff
+            await this.runProofreadSelectionWithInlineReference(editor, context, mergedReference);
         } catch (e) {
             ErrorUtils.showError(e, '知识核查失败：');
         }
@@ -136,11 +134,8 @@ export class ReferencePrepCommandHandler {
     private async runProofreadSelectionWithInlineReference(
         editor: vscode.TextEditor,
         context: vscode.ExtensionContext,
-        inlineReference: string,
-        token?: vscode.CancellationToken
+        inlineReference: string
     ): Promise<void> {
-        if (token?.isCancellationRequested) return;
-
         const useMemory = vscode.workspace
             .getConfiguration('ai-proofread')
             .get<boolean>('referencePrep.useEditorialMemory', false);
@@ -235,14 +230,14 @@ export class ReferencePrepCommandHandler {
                 throw new Error('JSON 格式不正确');
             }
 
-            await vscode.window.withProgress(
+            const stats = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
                     title: '批量准备参考资料',
                     cancellable: true,
                 },
-                async (_p, token) => {
-                    const stats = await runReferencePrepForJsonFile({
+                async (_p, token) =>
+                    runReferencePrepForJsonFile({
                         jsonFilePath,
                         context,
                         enabledSources: opts.enabledSources,
@@ -250,17 +245,15 @@ export class ReferencePrepCommandHandler {
                         onProgress: (m) => _p.report({ message: m }),
                         token,
                         onAfterJsonItem: () => {},
-                    });
-                    vscode.window.showInformationMessage(
-                        `参考资料准备完成：${stats.processed}/${stats.total} 条`
-                    );
-
-                    if (opts.runProofread) {
-                        _p.report({ message: '开始批量校对…' });
-                        await this.runProofreadJson(jsonFilePath, context, token);
-                    }
-                }
+                    })
             );
+            vscode.window.showInformationMessage(
+                `参考资料准备完成：${stats.processed}/${stats.total} 条`
+            );
+
+            if (opts.runProofread) {
+                await this.runProofreadJson(jsonFilePath, context);
+            }
         } catch (e) {
             ErrorUtils.showError(e, '准备参考资料失败：');
         }

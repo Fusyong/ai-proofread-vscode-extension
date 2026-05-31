@@ -192,7 +192,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 **参考资料规划提示词**（侧栏 `dict prep prompts`）：可自定义；须要求模型只输出 JSON（`sufficient` / `queries` / `prune`）。未选择时使用内置规划提示词。
 
-**模型路由**（侧栏 `model routes`，overview 顶栏齿轮按钮可打开）：
+**模型路由**（默认隐藏；overview 按钮「模型路由」或顶栏齿轮、命令 `open model routes view` 打开侧栏 `model routes`）：
 
 为不同 LLM 管线分别指定平台与模型名称；**参考资料准备**、**编辑记忆合并** 默认**跟随校对**（与 `proofread.platform` / `proofread.models.*` 一致），也可改为独立配置。点击树中某一项即可选择平台、填写模型或切换「跟随校对」。高级用户仍可在设置中编辑 `ai-proofread.modelRoutes`。
 

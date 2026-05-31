@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ConfigManager } from '../utils';
 import { LLM_PLATFORMS, type LlmPlatformId, type ModelRouteId } from './modelRouteRegistry';
 import type { ModelRoutesTreeDataProvider } from './modelRoutesView';
+import { setModelRoutesVisible, toggleModelRoutesVisible } from '../ui/sidebarViewVisibility';
 import {
     isRouteInherited,
     resolveModelRoute,
@@ -15,7 +16,11 @@ export class ModelRoutesCommandHandler {
     constructor(private treeProvider: ModelRoutesTreeDataProvider) {}
 
     async openView(): Promise<void> {
-        await vscode.commands.executeCommand('ai-proofread.modelRoutes.focus');
+        await setModelRoutesVisible(true);
+    }
+
+    async toggleView(): Promise<void> {
+        await toggleModelRoutesVisible();
     }
 
     async configureRoute(item?: { routeId: ModelRouteId }): Promise<void> {

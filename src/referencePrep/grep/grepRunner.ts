@@ -1,11 +1,32 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { createRequire } from 'module';
 import { spawnSync } from 'child_process';
-import * as rg from '@vscode/ripgrep';
 import type { RawGrepLineHit } from './hitMerger';
 
+let cachedRgPath: string | undefined;
+
+/**
+ * 从扩展根目录 require @vscode/ripgrep（不可被 Parcel 打包，见 .parcelrc）。
+ */
 function getRgPath(): string {
-    return rg.rgPath;
+    if (cachedRgPath) {
+        return cachedRgPath;
+    }
+    const extRoot = path.resolve(__dirname, '..');
+    try {
+        const req = createRequire(path.join(extRoot, 'package.json'));
+        const rg = req('@vscode/ripgrep') as { rgPath?: string };
+        const p = rg?.rgPath;
+        if (p && fs.existsSync(p)) {
+            cachedRgPath = p;
+            return cachedRgPath;
+        }
+    } catch {
+        /* 开发环境未安装或 vsix 未包含 optional 平台包时回退 */
+    }
+    cachedRgPath = process.platform === 'win32' ? 'rg.exe' : 'rg';
+    return cachedRgPath;
 }
 
 function listMdFiles(root: string): string[] {
