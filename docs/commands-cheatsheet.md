@@ -43,7 +43,7 @@
 | 步骤 | 操作（优先用 UI） |
 |------|-------------------|
 | 1. 打开校对面板 | 通过左侧活动栏图标的指引打开 **校对面板**；或在命令面板输入「open proofreading panel」→ 打开 **校对面板** |
-| 2. 文件转换（可选） | 面板顶部点 **「docx → Markdown」** 或 **「PDF → Markdown」**（需先安装 Pandoc / pdftotext） |
+| 2. 文件转换（可选） | 面板顶部点 **「docx → Markdown」** 或 **「PDF → Markdown」**（docx 需 Pandoc；PDF 在 Windows 已内置 pdftotext） |
 | 3. 整理（可选） | 面板内点 **「整理段落」**、**「根据目录标记标题」** |
 | 4. 选主文件 | 面板内点 **「选择主文件」** 或 **「从工作区选择」** |
 | 5. 切分 | 面板内点 **「切分文档」**，选择切分模式（见 [3.3](#33-切分模式选择决策简图)） |
@@ -227,7 +227,7 @@ flowchart LR
 |------|----------|
 | **文档转换** | |
 | AI Proofreader: convert docx to markdown | 将 Word(docx) 转为 Markdown，需安装 Pandoc |
-| AI Proofreader: convert PDF to markdown | 将活文字 PDF 转为 Markdown，需安装 pdftotext |
+| AI Proofreader: convert PDF to markdown | 将活文字 PDF 转为 Markdown（Windows 内置 pdftotext；其他系统需自行安装） |
 | AI Proofreader: convert markdown to docx | 将 Markdown 转为 Word(docx) |
 | **文档整理** | |
 | AI Proofreader: format paragraphs | 整理段落：段末加空行 / 删除段内分行 |

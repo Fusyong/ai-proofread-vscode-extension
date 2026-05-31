@@ -11,7 +11,7 @@
 
 | 命令 | 说明 |
 |------|------|
-| `AI Proofreader: knowledge verify selection` | 选段：准备参考资料，可选接着校对 |
+| `AI Proofreader: knowledge verify selection` | 选段：准备参考资料，可选接着校对；workspace 记住上次来源与强度；准备并校对时选择校对提示词 |
 | `AI Proofreader: prepare references for JSON file` | 对当前 JSON 切分文件批量准备 `reference` |
 | 校对面板 **准备参考资料** | 与上者相同（JSON） |
 
@@ -29,6 +29,15 @@
 - `ai-proofread.referencePrep.enabledSources` — 默认 `["dict","grep_md"]`
 - `ai-proofread.referencePrep.maxRounds` — 默认 3
 - `ai-proofread.referencePrep.useEditorialMemory` — 选段「准备并校对」时是否注入编辑记忆
+- workspaceState `ai-proofread.referencePrep.lastRun` — 上次勾选的来源与强度
+- workspaceState `ai-proofread.referencePrep.lastProofreadPrompt` — 上次选段校对提示词（存值如 `__preset_knowledge_verify_item__`）
+
+## 预置校对提示词（阶段 B）
+
+| 名称 | 输出 | 说明 |
+|------|------|------|
+| 知识核查（item） | item | 默认推荐；强调依据 reference、按来源权衡可信度 |
+| 知识核查（full） | full | 同上，全文输出 |
 - `ai-proofread.referencePrep.grep.*` — grep 截断
 - `ai-proofread.dictPrep.*` — 仍用于词典查询上限、缓存（`referencePrep.dict.*` 可覆盖）
 

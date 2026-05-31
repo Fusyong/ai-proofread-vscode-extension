@@ -939,7 +939,7 @@ export class WebviewManager {
                 ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('diffItWithAnotherFile')" title="AI Proofreader: diff it with another file">diff 与另一文件</button>
                 ${sep}
-                <button type="button" class="link-button" onclick="handleAction('queryLocalDictSelection')" title="AI Proofreader: query local dictionary for selection">在词典中查询选中</button>
+                <button type="button" class="link-button" onclick="handleAction('queryLocalDictSelection')" title="AI Proofreader: exact local dictionary lookup for selection (whole selection as headword)">按选文作词条查词典</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('searchSelectionInPDF')" title="AI Proofreader: search selection in PDF">在 PDF 中搜索选中文本</button>
                 ${sep}

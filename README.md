@@ -67,7 +67,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 * **文本文件**只需要把后缀（比如纯文本的`.txt`）改成`.md`即可
 * **docx文档**（Word、WPS的通常格式），可以通过命令面板（Ctrl+Shift+P），使用convert docx to Markdown命令转换后进行校。本功能依赖[多功能文档格式转换工具Pandoc](https://pandoc.org/installing.html)，需要预先正确安装。安装后可能需要重启才能生效。
-* **活文字PDF文档**，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。本功能依赖[Xpdf command line tools](https://www.xpdfreader.com/download.html)中的`pdftotext.exe`程序，需手动安装（在“系统变量”的Path中添加其所在路径），交流群备用bat辅助安装程序。安装后可能需要重启才能生效。pdftotext可忽略四周无用文字，如页码、页眉，尺寸单位是磅（pt），五号字是 10.5 pt，x mm = x/25.4*72 pt 。
+* **活文字PDF文档**，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。**Windows 用户无需另行安装**：扩展已内置 [Xpdf](https://www.xpdfreader.com/download.html) 4.06 的 `pdftotext.exe`（GPL，见扩展内 `vendor/xpdf/COPYING`）。macOS/Linux 仍需自行安装 Xpdf 命令行工具并加入 PATH。pdftotext 可忽略四周无用文字，如页码、页眉，尺寸单位是磅（pt），五号字是 10.5 pt，x mm = x/25.4*72 pt 。
 * **死文字PDF**，需要通过OCR处理成活文字PDF、docx、text、Markdown等后进一步处理。QQ交流群中上传了一个OCR命令行工具rapiddoc.exe。加密码限制提取文字的活文字PDF，也如此处理，或尝试用[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)打开后复制文字。
 * **方正书版大样文档**，如果有方正智能审校工具，用它处理后即为活文字PDF（没有图），再进一步处理。另外，方正书版本身有一些间接导出活文字PDF的办法，但有各种问题，常常比不上用OCR工具处理。
 
@@ -185,7 +185,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 在批量校对或选段校对前，可多轮检索**本地词典**与**参考文献目录**（`ai-proofread.citation.referencesPath` 下的 md/txt），将结果写入 `reference`，再调用既有校对流程。
 
-- 选段命令：`AI Proofreader: knowledge verify selection`（可选「仅准备」或「准备并校对」）
+- 选段命令：`AI Proofreader: knowledge verify selection`（可选「仅准备」或「准备并校对」；**记住上次**资料来源与核查强度；「准备并校对」时**另选校对提示词**，默认「知识核查（item）」）
 - JSON：校对面板 **准备参考资料**，或命令 `prepare references for JSON file`
 - 过程文件：`文档.referenceprep.json`、`文档.referenceprep.log`（详见 `docs/knowledge-verify-plan.md`）
 - 运行前可勾选资料来源（词典 / 参考文献 grep）；强度（轻量 / 标准 / 深入）控制轮次与查询上限
@@ -239,6 +239,10 @@ Additionally, you can set your own prompts for other text processing scenarios, 
    - `sourceTextHint`（字符串，可选）：省略或 `""` 或 `"none"` — 不注入源文本特性。否则须为源文本特性提示词的内置 id或名称。可通过「管理提示词」维护提示词后再写进 JSON
 3. 编辑记忆文件路径：`<工作区根>/.proofread/editorial-memory.json`（活跃）、`editorial-memory-archive.json`（存档）。
 
+####  3.2.4. 知识核查智能体（实验功能）
+
+命令： `knowledge verify selection (prepare references and proofread)`。通过本地词典、本地参考文献库、web搜索检索文中相关知识，然后校对。 **会消耗较多token！**
+
 ### 3.3. 比较（diff）校对前后的文件差异
 
 在当前markdown或json界面，使用右键菜单`diff it with another file`，如果当前是markdown则有三种模式：
@@ -269,6 +273,8 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 | 表述正常化（item） | 条目 | 同上，条目式输出 |
 | 硬伤发现（item） | 条目 | 只报必须改的硬伤（字词、语法、事实、逻辑等）；依据不足时标记较低 confidence |
 | 对应关系核对（item） | 条目 | 专查应对应一致的关系：指代、称谓、注释、题答、图表编号、数据单位等 |
+| 知识核查（item） | 条目 | **推荐**用于 knowledge verify：依据阶段 A 的 reference 核查，区分词典与文献摘录可信度，不臆造 |
+| 知识核查（full） | 全文 | 同上，全文输出 |
 | 拼音审校（full） | 全文 | 按部编版小学语文教材注音规则审校已有拼音（行间拼音、括注拼音等），包括读音、轻声、儿化、「啊/呀/哇/哪」用字 |
 | 拼音加注（full） | 全文 | 以同上标准在行间加注拼音 |
 
@@ -375,7 +381,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
     * **在参考文献库中搜索**：`search selection in References`。如果参考文献目录在工作区外，可能受版本限制会没有结果，可将该目录加入工作区后再搜。
     * **连线搜索[中华经典古籍库](https://jingdian.ancientbooks.cn)**：`search selection in Ancientbooks (jingdian)`。
     * **连线搜索[识典古籍](https://www.shidianguji.com/)**：`search selection in Shidianguji`。
-    * **查询本地词典**：`AI Proofreader: query local dictionary for selection`——适合**单个词或短短语**的快速查词（含简繁变体）。**长段落**不会把全文当作词条；会提示选用**智能规划查词**（与知识核查相同的词典规划逻辑），或直接使用 **`AI Proofreader: knowledge verify selection`**（可仅准备参考资料，也可接着校对；还可勾选参考文献 grep 等）。
+    * **按选文作词条查本地词典**：`AI Proofreader: exact local dictionary lookup for selection (whole selection as headword)`——将**整段选中文本**视为一个词条，在已配置的 MDict 中做**精确匹配**查询（不做分词或智能规划）。查段落、多词请用 **`knowledge verify selection`**。
 5. **字词检查**：命令`check words`。分类三个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的检查与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》、《古籍印刷通用字规范字形表》、规范人名与年号等数据。用户还可以通过`manage custom tables`命令，加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。这是一个非常强大且灵活的功能，值得深入探索。
     ![树视图（提示词管理、字词检查、引文检查）](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/special_checks.png)
 6. **标题树与段内序号检查**：命令`check numbering hierarchy`。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
@@ -473,8 +479,9 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ### v1.11.0
 
-- 特性：知识核查智能体工作流，复用了原来的词典查询功能，增加本地参考文献库grep和互联网查询
-- 特性：增加模型配置treeview
+- 特性：增加知识核查智能体工作流，复用了原来的词典查询功能，增加本地参考文献库grep（暂时没有集成互联网查询服务）
+- 特性：增加模型配置treeview；优化treeview UI
+- 特性：集成pdftotext.exe，Windows用户不需要额外安装
 
 ### v1.10.8
 
