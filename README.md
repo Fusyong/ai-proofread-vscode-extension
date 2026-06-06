@@ -134,7 +134,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 组织校对语境是一个看起来有些麻烦，但非常有效的工作。比如校对练习册，有必要把练习和答案拼成语境（拼在一个target中更能节省费用）。而对一首古诗的解释如果不可靠，可以用一篇可靠的作为reference。包含人物的内容，则可以用词典中的任务条目作为reference。
 
-本扩展会逐步增加语境组织功能。
+命令`prepare references for JSON file`，或“准备参考资料”按钮，可以通过本地的甸子词典、参考文献为JSON文本篇段准备参考文本。详见下文对知识核查智能体的介绍。
 
 #### 3.1.5 检索本地词典，组织参考资料（实验功能）
 
@@ -199,7 +199,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ### 3.2. 校对
 
-#### 3.2.1. 校对Markdown文档中选中的片段
+#### 3.2.1. 对文档选段进行校对
 
 1. 打开Markdown文档（其他纯文本文档可改为.md后缀，即为Markdown文档）
 2. 选中要校对的段落，不宜过长
@@ -208,7 +208,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 5. 校对结束后会打开 diff；**关闭右侧校对结果文档时**可选择是否将结果**写回选区**。**普通 Proofread Selection** 不会读写编辑记忆 JSON。**Proofread Selection with Memory** 会在接受写回后更新 **`.proofread/editorial-memory.json`**：**全局**为结构化条目（`original` / `changedTo` / **`weight`**；可选 **`note`** 修改说明；超员时**低 weight**先入存档）；**最近 d 次（默认 3）**校对的**扁平合并稿**栈 `currentRounds`（轮次间归一化完全相同则去重，单轮内不限条数）。注入：`<editorial_memory_global>`、`<editorial_memory_current_rounds>`、`<editorial_proofread_context>`。写回时 LLM 产出 `global_ops` + `current_round_flat`（或由程序摘要压栈），详见 `mergeAfterAccept` 等 `ai-proofread.editorialMemory.*` 设置。
 
 
-#### 3.2.2. 校对切分好的JSON文档
+#### 3.2.2. 对切分好的JSON文档进行校对（批处理）
 
 1. 打开已切分的 JSON 文件
 2. 通过右键菜单或命令面板选择Proofread File
@@ -217,7 +217,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 5. 最后会提示你查看结果：JSON结果、前后差异、日志文件，以及生成差异文件（类似带修改标记的Word文档）。
 6. 如有未完成的条目，可重新校对，重新校对时只处理未完成的条目
 
-#### 3.2.3. 带记忆地校对选段，并自动维护项目级编辑记忆（实验功能）
+#### 3.2.3. 对文档选段进行带记忆的校对，并自动维护项目级编辑记忆（实验功能）
+
+本功能是在`Proofread Selection`基础上增加收集、处理、使用校对记忆的工作流。
 
 !!! caution 费用警告
     本工作模式比起Proofread Selection来，每次都要提交编辑记忆给大模型参考，并合并新的编辑记忆，因此会消耗多得多的token。
@@ -239,9 +241,11 @@ Additionally, you can set your own prompts for other text processing scenarios, 
    - `sourceTextHint`（字符串，可选）：省略或 `""` 或 `"none"` — 不注入源文本特性。否则须为源文本特性提示词的内置 id或名称。可通过「管理提示词」维护提示词后再写进 JSON
 3. 编辑记忆文件路径：`<工作区根>/.proofread/editorial-memory.json`（活跃）、`editorial-memory-archive.json`（存档）。
 
-####  3.2.4. 知识核查智能体（实验功能）
+####  3.2.4. 对文档选段进行知识核查（实验功能）
 
-命令： `knowledge verify selection (prepare references and proofread)`。通过本地词典、本地参考文献库、web搜索检索文中相关知识，然后校对。 **会消耗较多token！**
+命令： `knowledge verify selection (prepare references and proofread)`。流程基于“带记忆地校对选段”，先通过本地词典、本地参考文献库检索文中相关知识（暂未集成web搜索）作为reference，然后使用提示词“知识核查（full）”进行校对；可以选择是否使用编辑记忆。 **会消耗比一般校对多得多的token！**
+
+如果要对JSON进行批处理，可以先通过命令`prepare references for JSON file`，或“准备参考资料”按钮，JSON中的所有文本片段准备好参考文本，然后使用提示词“知识核查（full）”进行校对。
 
 ### 3.3. 比较（diff）校对前后的文件差异
 
@@ -457,7 +461,8 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 5. TODO
 
-1. 一个memo管理智能体
+1. 在知识核查中集成web搜索服务
+2. 一个memo管理智能体
     1. 三段式：原文；改后；说明
     2. 分类、加标签存储（字词层为穷尽举例式、句段层为举例加格式说明）
     3. 存档、压缩工作流……
