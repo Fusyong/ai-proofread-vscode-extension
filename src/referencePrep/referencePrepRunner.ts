@@ -6,6 +6,7 @@ import {
     buildReferencePrepSystemPrompt,
     buildReferencePrepUserPrompt,
     parseReferencePrepPlan,
+    type ReferencePrepTargetKind,
 } from './referencePrepPrompt';
 import { generateReferencePrepPlanJson } from './referencePrepLlm';
 import {
@@ -50,14 +51,29 @@ export interface ReferencePrepRunParams {
     sourceJsonPath?: string;
     /** JSON 批量时每条独立 corpus */
     freshProcess?: boolean;
+    /** 默认 manuscript；search_intent 用于 LLM 增强参考文献检索命令 */
+    targetKind?: ReferencePrepTargetKind;
 }
 
-function resolvePlanSystemPrompt(context: vscode.ExtensionContext, enabled: ReferenceSourceId[], disabled: ReferenceSourceId[], maxQueries: number, intents: ReferencePrepIntent[]): string {
+function resolvePlanSystemPrompt(
+    context: vscode.ExtensionContext,
+    enabled: ReferenceSourceId[],
+    disabled: ReferenceSourceId[],
+    maxQueries: number,
+    intents: ReferencePrepIntent[],
+    targetKind?: ReferencePrepTargetKind
+): string {
     const custom = resolveDictPrepStylePrompt(context);
     if (custom) {
         return custom;
     }
-    return buildReferencePrepSystemPrompt({ enabledSources: enabled, disabledSources: disabled, maxQueries, intents });
+    return buildReferencePrepSystemPrompt({
+        enabledSources: enabled,
+        disabledSources: disabled,
+        maxQueries,
+        intents,
+        targetKind,
+    });
 }
 
 function resolveDictPrepStylePrompt(context: vscode.ExtensionContext): string | null {
@@ -121,7 +137,8 @@ export async function runReferencePrepForTarget(
             params.enabledSources,
             disabled,
             preset.maxQueriesPerRound,
-            intents
+            intents,
+            params.targetKind
         );
         const userPrompt = buildReferencePrepUserPrompt({
             target: params.target,
@@ -129,6 +146,7 @@ export async function runReferencePrepForTarget(
             corpusSummary,
             roundIndex: round,
             maxRounds,
+            targetKind: params.targetKind,
         });
 
         params.onProgress?.(`参考资料准备：第 ${round + 1}/${maxRounds} 轮规划…`);

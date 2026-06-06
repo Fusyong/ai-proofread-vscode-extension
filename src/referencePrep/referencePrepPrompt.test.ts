@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseReferencePrepPlan, extractFallbackGrepPatterns } from './referencePrepPrompt';
+import {
+    parseReferencePrepPlan,
+    extractFallbackGrepPatterns,
+    buildReferencePrepUserPrompt,
+} from './referencePrepPrompt';
 
 describe('parseReferencePrepPlan', () => {
     const intents = ['entity_name', 'general_fact'] as const;
@@ -31,6 +35,21 @@ describe('parseReferencePrepPlan', () => {
         });
         const plan = parseReferencePrepPlan(raw, [...intents]);
         expect(plan.queries).toHaveLength(0);
+    });
+});
+
+describe('buildReferencePrepUserPrompt', () => {
+    it('wraps search intent in dedicated tags', () => {
+        const prompt = buildReferencePrepUserPrompt({
+            target: '查找李白籍贯',
+            dicts: [],
+            corpusSummary: '',
+            roundIndex: 0,
+            maxRounds: 3,
+            targetKind: 'search_intent',
+        });
+        expect(prompt).toContain('<search_intent>');
+        expect(prompt).not.toContain('<target>');
     });
 });
 

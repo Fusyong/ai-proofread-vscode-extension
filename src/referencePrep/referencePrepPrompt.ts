@@ -7,12 +7,18 @@ export function buildReferencePrepSystemPrompt(params: {
     disabledSources: ReferenceSourceId[];
     maxQueries: number;
     intents: ReferencePrepIntent[];
+    targetKind?: ReferencePrepTargetKind;
 }): string {
     const srcLines = params.enabledSources.map((s) => '- enabled: ' + s).join('\n');
     const disLines = params.disabledSources.map((s) => '- disabled: ' + s).join('\n');
     const intentList = params.intents.join(', ');
+    const targetKind = params.targetKind ?? 'manuscript';
+    const targetIntro =
+        targetKind === 'search_intent'
+            ? '用户给出检索意图描述（说明希望在参考文献中查找什么内容）、已检索到的 corpus 摘要，以及可用/禁用的资料来源。'
+            : '用户给出 target 文本、已检索到的 corpus 摘要，以及可用/禁用的资料来源。';
     return [
-        '你是一位资深的文字编辑，负责为书稿核查准备参考资料。用户给出 target 文本、已检索到的 corpus 摘要，以及可用/禁用的资料来源。',
+        '你是一位资深的文字编辑，负责为书稿核查准备参考资料。' + targetIntro,
         '',
         '输出要求（严格遵守）：',
         '1) 只输出 JSON，无 markdown、无解释。',
@@ -32,12 +38,15 @@ export function buildReferencePrepSystemPrompt(params: {
     ].join('\n');
 }
 
+export type ReferencePrepTargetKind = 'manuscript' | 'search_intent';
+
 export function buildReferencePrepUserPrompt(params: {
     target: string;
     dicts: ResolvedLocalDictConfigItem[];
     corpusSummary: string;
     roundIndex: number;
     maxRounds: number;
+    targetKind?: ReferencePrepTargetKind;
 }): string {
     const dictLines = params.dicts
         .map((d) => {
@@ -46,6 +55,12 @@ export function buildReferencePrepUserPrompt(params: {
             return '- id=' + d.id + '; name=' + d.name + '; tags=[' + tags + ']; whenToUse=' + whenToUse;
         })
         .join('\n');
+
+    const targetKind = params.targetKind ?? 'manuscript';
+    const targetBlock =
+        targetKind === 'search_intent'
+            ? ['<search_intent>', params.target, '</search_intent>']
+            : ['<target>', params.target, '</target>'];
 
     return [
         'round=' + (params.roundIndex + 1) + '/' + params.maxRounds,
@@ -56,9 +71,7 @@ export function buildReferencePrepUserPrompt(params: {
         'corpus_summary:',
         params.corpusSummary || '(尚无)',
         '',
-        '<target>',
-        params.target,
-        '</target>',
+        ...targetBlock,
     ].join('\n');
 }
 

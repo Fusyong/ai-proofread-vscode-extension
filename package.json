@@ -117,6 +117,11 @@
         "description": "把选中当作一个词条查本地词典"
       },
       {
+        "command": "ai-proofread.llmGrepSearchReferences",
+        "title": "AI Proofreader: LLM-enhanced grep search",
+        "description": "用自然语言描述检索意图，LLM 规划后在本地词典中检索，在参考文献目录中grep，可以多轮次处理"
+      },
+      {
         "command": "ai-proofread.proofreadFile",
         "title": "AI Proofreader: proofread file"
       },

@@ -48,6 +48,7 @@ import { convertOpencc, type OpenccLocale } from './opencc';
 import { DictPrepPromptManager } from './localDict/dictPrepPromptManager';
 import { registerDictPrepPromptsView, type DictPrepPromptTreeItem } from './localDict/dictPrepPromptsView';
 import { LocalDictQueryCommandHandler } from './commands/localDictQueryCommandHandler';
+import { GrepSearchCommandHandler } from './commands/grepSearchCommandHandler';
 import { registerModelRoutesView } from './modelRoutes/modelRoutesView';
 import { ModelRoutesCommandHandler } from './modelRoutes/modelRoutesCommandHandler';
 
@@ -100,6 +101,7 @@ export function activate(context: vscode.ExtensionContext) {
     const utilityHandler = new UtilityCommandHandler();
     const referencePrepHandler = new ReferencePrepCommandHandler(webviewManager, proofreadHandler);
     const localDictQueryHandler = new LocalDictQueryCommandHandler();
+    const grepSearchHandler = new GrepSearchCommandHandler();
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
     const citationHandler = new CitationCommandHandler(context, citationTreeProvider, citationTreeView);
     const { provider: duplicateTreeProvider, treeView: duplicateTreeView } = registerDuplicateView(context);
@@ -358,6 +360,10 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await localDictQueryHandler.handleQuerySelectionCommand(editor, context);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.llmGrepSearchReferences', async () => {
+            await grepSearchHandler.handleLlmGrepSearchCommand(vscode.window.activeTextEditor, context);
         }),
 
         // 注册在PDF中搜索选中文本命令
