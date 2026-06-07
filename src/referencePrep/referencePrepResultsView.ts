@@ -4,9 +4,11 @@ import type { CorpusHit, ReferencePrepProcessFileV020, ReferencePrepRound } from
 import { loadProcessFile, saveProcessFile } from './processFile';
 import { buildMergedReference } from './retrieval/executor';
 import {
+    canOpenHitInEditor,
     getHitsForRoundQuery,
     getQueryIdsWithHits,
     getRoundHitCount,
+    referencePrepHitContextValue,
     roundHasVisibleHits,
 } from './referencePrepResultsTree';
 
@@ -97,16 +99,20 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
             h.pruneReason ? `prune: ${h.pruneReason}` : '',
         ].filter(Boolean);
         item.tooltip = tips.join('\n');
-        item.contextValue = h.status === 'active' ? 'referencePrepHitActive' : 'referencePrepHitPruned';
+        item.contextValue = referencePrepHitContextValue(h);
         item.iconPath =
             h.status === 'pruned'
                 ? new vscode.ThemeIcon('circle-slash')
-                : new vscode.ThemeIcon('book');
-        item.command = {
-            command: 'ai-proofread.referencePrep.openHit',
-            title: '打开命中位置',
-            arguments: [h],
-        };
+                : h.source === 'dict'
+                  ? new vscode.ThemeIcon('book')
+                  : new vscode.ThemeIcon('file');
+        if (canOpenHitInEditor(h)) {
+            item.command = {
+                command: 'ai-proofread.referencePrep.openHit',
+                title: '打开命中位置',
+                arguments: [h],
+            };
+        }
         return item;
     }
 

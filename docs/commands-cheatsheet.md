@@ -70,8 +70,8 @@
 | 步骤 | 操作（优先用 UI） |
 |------|-------------------|
 | 1. 建索引 | 设置 `citation.referencesPath`（齿轮 ⚙️ → 扩展设置）→ **校对面板** 点 **「建立引文索引」** |
-| 2. 核对 | **校对面板** 点 **「核对全文引文」**；或选中引文后 **右键** → verify selected citation |
-| 3. 反查 | 打开 **侧栏「citations」视图**，对某条引文 **右键** → **search citation in PDF** |
+| 2. 核对选中 | 选中引文 → **verify selected citation**（LLM 参考资料准备 → **参考资料命中** 树） |
+| 3. 核对全文 | **校对面板** **「核对全文引文」** → **citations** 树（相似度匹配，可 diff / PDF） |
 
 ### 1.5 专项检查（错别字、异形词、序号）
 
@@ -99,7 +99,7 @@
 |--------|----------|
 | 校稿、审稿、改错 | proofread selection / proofread file |
 | 出勘误表、审校记录 | diff it with another file → 逐句对齐 |
-| 核对引文、查出处 | verify citations + search citation in PDF |
+| 核对引文、查出处 | verify selected citation（参考资料命中）/ verify citations（Citation 树）+ search citation in PDF |
 | 转 Word、转 Markdown | convert docx/markdown |
 | 查错别字、异形词 | check words |
 | 检查序号、标题层级 | check numbering hierarchy |
@@ -263,8 +263,9 @@ flowchart LR
 | **PDF 与引文** | |
 | AI Proofreader: build citation reference index | 建立本地文献库索引（引文核对前需先执行） |
 | AI Proofreader: verify citations | 打开引文核对视图，批量核对全文引文 |
-| AI Proofreader: verify selected citation | 核对当前选中的引文 |
-| diff citations vs references | 对比引文与文献差异（**侧栏 citations 视图** 中 **右键** 某条使用） |
+| AI Proofreader: verify selected citation | 核对选中引文（LLM 参考资料准备 → **参考资料命中** 树，与 LLM grep 同流程） |
+| AI Proofreader: LLM-enhanced grep search | 自然语言检索词典与文献（同上流程，`search_intent` 提示词） |
+| diff citations vs references | 对比引文与文献差异（**侧栏 citations 视图** 中 **右键** 某条使用；仅 **verify citations** 全文核对） |
 | search citation in PDF | 在文献 PDF 中搜索该条引文（**侧栏 citations 视图** 中 **右键** 某条使用） |
 
 ---

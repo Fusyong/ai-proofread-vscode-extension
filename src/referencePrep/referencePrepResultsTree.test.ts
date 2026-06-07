@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+    canOpenHitInEditor,
     getHitsForRoundQuery,
     getQueryIdsWithHits,
+    referencePrepHitContextValue,
     roundHasVisibleHits,
 } from './referencePrepResultsTree';
 import type { ReferencePrepProcessFileV020 } from './schema';
@@ -16,6 +18,38 @@ function proc(partial: Partial<ReferencePrepProcessFileV020>): ReferencePrepProc
 }
 
 describe('referencePrepResultsTree', () => {
+    it('dict hits are not openable in editor', () => {
+        const hit = {
+            hitId: 'h-dict-1',
+            source: 'dict' as const,
+            queryId: 'q1',
+            baseValue: 1,
+            aggregatedValue: 1,
+            snippet: 'test',
+            digest: 'd',
+            referenceBlock: 'block',
+            status: 'active' as const,
+        };
+        expect(canOpenHitInEditor(hit)).toBe(false);
+        expect(referencePrepHitContextValue(hit)).toBe('referencePrepHitActiveDict');
+    });
+
+    it('grep hits with relPath are openable', () => {
+        const hit = {
+            hitId: 'h-grep-1',
+            source: 'grep_md' as const,
+            queryId: 'q1',
+            baseValue: 1,
+            aggregatedValue: 1,
+            snippet: 'test',
+            digest: 'd',
+            referenceBlock: 'block',
+            status: 'active' as const,
+            relPath: 'foo.md',
+        };
+        expect(canOpenHitInEditor(hit)).toBe(true);
+        expect(referencePrepHitContextValue(hit)).toBe('referencePrepHitActive');
+    });
     it('only attributes orphan hits to first round with same queryId', () => {
         const p = proc({
             rounds: [

@@ -1390,17 +1390,17 @@
         },
         {
           "command": "ai-proofread.referencePrep.copyBlock",
-          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitActive || viewItem == referencePrepHitPruned)",
+          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitActive || viewItem == referencePrepHitActiveDict || viewItem == referencePrepHitPruned || viewItem == referencePrepHitPrunedDict)",
           "group": "referencePrep@1"
         },
         {
           "command": "ai-proofread.referencePrep.pruneHit",
-          "when": "view == ai-proofread.referencePrepResults && viewItem == referencePrepHitActive",
+          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitActive || viewItem == referencePrepHitActiveDict)",
           "group": "referencePrep@2"
         },
         {
           "command": "ai-proofread.referencePrep.restoreHit",
-          "when": "view == ai-proofread.referencePrepResults && viewItem == referencePrepHitPruned",
+          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitPruned || viewItem == referencePrepHitPrunedDict)",
           "group": "referencePrep@2"
         },
         {

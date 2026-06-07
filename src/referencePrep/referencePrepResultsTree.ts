@@ -1,5 +1,20 @@
 import type { CorpusHit, ReferencePrepProcessFileV020, ReferencePrepRound } from './schema';
 
+/** 词典命中无文献路径，不宜「打开命中位置」 */
+export function canOpenHitInEditor(hit: CorpusHit): boolean {
+    if (hit.source === 'dict') return false;
+    const rel = (hit.relPath ?? hit.file)?.trim();
+    return Boolean(rel);
+}
+
+export function referencePrepHitContextValue(hit: CorpusHit): string {
+    const openable = canOpenHitInEditor(hit);
+    if (hit.status === 'pruned') {
+        return openable ? 'referencePrepHitPruned' : 'referencePrepHitPrunedDict';
+    }
+    return openable ? 'referencePrepHitActive' : 'referencePrepHitActiveDict';
+}
+
 /** 某轮某 query 在 corpus 中的命中（严格按 roundId，兼容无 roundId 的旧数据） */
 export function getHitsForRoundQuery(
     process: ReferencePrepProcessFileV020,

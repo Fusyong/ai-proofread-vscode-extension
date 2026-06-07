@@ -56,6 +56,7 @@ import {
     openCorpusHitInEditor,
     type ReferencePrepTreeNode,
 } from './referencePrep/referencePrepResultsView';
+import { canOpenHitInEditor } from './referencePrep/referencePrepResultsTree';
 import { resolveReferencesPath } from './citation/referenceStore';
 import type { CorpusHit } from './referencePrep/schema';
 
@@ -115,7 +116,12 @@ export function activate(context: vscode.ExtensionContext) {
     const localDictQueryHandler = new LocalDictQueryCommandHandler();
     const grepSearchHandler = new GrepSearchCommandHandler(referencePrepResultsProvider);
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
-    const citationHandler = new CitationCommandHandler(context, citationTreeProvider, citationTreeView);
+    const citationHandler = new CitationCommandHandler(
+        context,
+        citationTreeProvider,
+        citationTreeView,
+        referencePrepResultsProvider
+    );
     const { provider: duplicateTreeProvider, treeView: duplicateTreeView } = registerDuplicateView(context);
     const duplicateHandler = new DuplicateCommandHandler(context, duplicateTreeProvider, duplicateTreeView);
     const wordCheckHandler = new WordCheckCommandHandler(context);
@@ -387,6 +393,7 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('ai-proofread.referencePrep.openHit', async (hit?: CorpusHit) => {
             if (!hit) return;
+            if (!canOpenHitInEditor(hit)) return;
             const config = vscode.workspace.getConfiguration('ai-proofread');
             const refRoot = resolveReferencesPath(config.get<string>('citation.referencesPath', '${workspaceFolder}/references'));
             await openCorpusHitInEditor(hit, refRoot);
@@ -577,8 +584,7 @@ export function activate(context: vscode.ExtensionContext) {
             await citationHandler.handleRebuildIndexCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.citation.verifySelection', async () => {
-            // 使用“核对选中引文”命令时，也自动显示引文视图
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', true);
+            await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
             await citationHandler.handleVerifySelectionCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.citation.showDiff', (nodeOrItem?: unknown) => {

@@ -11,13 +11,17 @@
 
 ## 命令
 
-| 命令 | 说明 |
-|------|------|
-| `AI Proofreader: knowledge verify selection` | 选段：准备参考资料，可选接着校对 |
-| `AI Proofreader: prepare references for JSON file` | JSON 批量准备 `reference` |
-| `AI Proofreader: LLM-enhanced grep search` | 仅文献检索（grep + BM25 + vector） |
-| `AI Proofreader: open reference prep results` | 打开「参考资料命中」TreeView |
-| 校对面板 **准备参考资料** | 与 JSON 命令相同 |
+| 命令 | 共用流程 | 规划提示词（targetKind） | 是否校对 |
+|------|----------|--------------------------|----------|
+| `knowledge verify selection`（仅准备 / 准备并验证） | 预筛 → 规划 → 检索 → 精排 → **参考资料命中** TreeView | `manuscript`（默认） | 可选 |
+| `LLM-enhanced grep search` | 同上 | `search_intent` | 否 |
+| `verify selected citation` | 同上 | `citation_selection` | 否 |
+| `prepare references for JSON file` / 校对面板 **准备参考资料** | 同上（批量） | `manuscript` | 可选 |
+| `open reference prep results` | 打开 TreeView | — | — |
+
+**全文引文核对**（`verify citations`）仍走引文索引 + 相似度匹配 + **Citation** 树，与上表三条不同。
+
+三条「参考资料准备」命令默认资料来源均为：**词典 + grep + BM25 + 向量**（需引文索引与词典配置）；差异仅在输入语义（提示词）与是否进入阶段 B 校对。
 
 ## 过程文件
 

@@ -51,6 +51,19 @@ describe('buildReferencePrepUserPrompt', () => {
         expect(prompt).toContain('<search_intent>');
         expect(prompt).not.toContain('<target>');
     });
+
+    it('wraps citation selection in dedicated tags', () => {
+        const prompt = buildReferencePrepUserPrompt({
+            target: '李白，字太白，号青莲居士。',
+            dicts: [],
+            corpusSummary: '',
+            roundIndex: 0,
+            maxRounds: 3,
+            targetKind: 'citation_selection',
+        });
+        expect(prompt).toContain('<citation_selection>');
+        expect(prompt).not.toContain('<target>');
+    });
 });
 
 describe('extractFallbackGrepPatterns', () => {

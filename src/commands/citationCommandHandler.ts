@@ -14,7 +14,15 @@ import type { CitationTreeDataProvider } from '../citation/citationTreeProvider'
 import type { CitationTreeNode } from '../citation/citationTreeProvider';
 import { showDiff } from '../differ';
 import { searchTextInPDF } from '../pdfSearcher';
-import { normalizeLineEndings } from '../utils';
+import { normalizeLineEndings, ErrorUtils } from '../utils';
+import { pickReferencePrepContinuation } from '../referencePrep/continuation';
+import {
+    pickReferencePrepStrength,
+    presentReferencePrepSessionResult,
+    runReferencePrepSession,
+    summarizeSessionPatterns,
+} from '../referencePrep/referencePrepSession';
+import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
 
 const CITATION_VIEW_BASE_TITLE = 'Citation';
 
@@ -49,7 +57,8 @@ export class CitationCommandHandler {
     constructor(
         private context: vscode.ExtensionContext,
         private citationTreeProvider: CitationTreeDataProvider | null = null,
-        private citationTreeView: vscode.TreeView<CitationTreeNode> | null = null
+        private citationTreeView: vscode.TreeView<CitationTreeNode> | null = null,
+        private referencePrepResultsProvider?: ReferencePrepResultsProvider
     ) {}
 
     /** 更新引文 TreeView 标题栏显示的条目数量 */
@@ -249,107 +258,84 @@ export class CitationCommandHandler {
         }
     }
 
-    /** 核对选中引文：用当前选中的文本作为一条引文，走现有匹配逻辑，结果展示在 Citation 树中 */
+    /**
+     * 核对选中引文：与 LLM 增强检索共用 referencePrep（预筛 / 规划 / 精排），
+     * 规划提示词为 citation_selection；结果展示在「参考资料命中」TreeView，不进入校对。
+     */
     async handleVerifySelectionCommand(): Promise<void> {
         const editor = vscode.window.activeTextEditor;
         const doc = editor?.document;
-        if (!doc || !editor.selection || editor.selection.isEmpty) {
+        if (!doc || !editor?.selection || editor.selection.isEmpty) {
             vscode.window.showWarningMessage('请先选中要核对的引文文本。');
             return;
         }
-        const refStore = ReferenceStore.getInstance(this.context);
-        const root = refStore.getReferencesRoot();
-        if (!root || !fs.existsSync(root)) {
-            vscode.window.showWarningMessage('请先在设置中配置并确保「引文核对：参考文献根路径」存在，然后执行「重建引文索引」。');
-            if (this.citationTreeProvider) {
-                this.citationTreeProvider.refresh([], null);
-                this.updateCitationViewTitle(0);
-                await focusCitationView();
-            }
-            return;
-        }
-        const range = editor.selection;
-        let text = normalizeLineEndings(doc.getText(range));
-        text = text.split('\n').map((line) => line.replace(/^[\s>]+/, '')).join('\n').replace(/^\s+/, '');
+        let text = normalizeLineEndings(doc.getText(editor.selection));
+        text = text
+            .split('\n')
+            .map((line) => line.replace(/^[\s>]+/, ''))
+            .join('\n')
+            .replace(/^\s+/, '');
         if (!text.trim()) {
             vscode.window.showWarningMessage('选中的内容为空。');
             return;
         }
-        const startLine = range.start.line + 1;
-        const endLine = range.end.line + 1;
-        /** 去除左侧空格和 > 后的文本作为原始引文，后续与全文引文一致：分句、归一化、匹配 */
-        const entry: CitationEntry = {
-            uri: doc.uri,
-            text,
-            startLine,
-            endLine,
-            range,
-            type: 'quote',
-            confidence: 'citation'
-        };
+
+        const strength = await pickReferencePrepStrength('核对选中引文');
+        if (!strength) return;
+
+        const anchorPath = doc.uri.scheme !== 'untitled' && doc.uri.fsPath ? doc.uri.fsPath : undefined;
+        if (!anchorPath) {
+            vscode.window.showWarningMessage('请先保存当前文档，以便写入参考资料过程文件。');
+            return;
+        }
+
         try {
-            const opts = getCitationNormalizeOptions();
-            const blocks = splitCitationBlocksIntoSentences([entry], opts);
-            if (blocks.length === 0) {
-                vscode.window.showInformationMessage('选中文本分句后无有效句子，无法匹配。');
-                if (this.citationTreeProvider) {
-                    this.citationTreeProvider.refresh([], doc.uri);
-                    this.updateCitationViewTitle(0);
-                    await focusCitationView();
-                }
-                return;
-            }
-            const config = vscode.workspace.getConfiguration('ai-proofread.citation');
-            const lenDeltaRatio = config.get<number>('lenDeltaRatio', 0.2);
-            const matchesPerCitation = config.get<number>('matchesPerCitation', 2);
-            const alignmentConfig = vscode.workspace.getConfiguration('ai-proofread.alignment');
-            const similarityThreshold = alignmentConfig.get<number>('similarityThreshold', 0.4);
-            const ngramSize = alignmentConfig.get<number>('ngramSize', 1);
-            const ngramGranularity = alignmentConfig.get<'word' | 'char'>('ngramGranularity', 'word');
-            let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
-            if (ngramGranularity === 'word') {
-                try {
-                    const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
-                    jieba = getJiebaWasm(path.join(this.context.extensionPath, 'dist'), customDictPath || undefined);
-                } catch (e) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    vscode.window.showErrorMessage(`jieba 加载失败，核对选中引文已中止（当前配置为词级相似度，需要 jieba）：${msg}`);
-                    return;
-                }
-            }
-            const blockResults = await vscode.window.withProgress(
+            const cont = await pickReferencePrepContinuation({
+                context: this.context,
+                anchorPath,
+                target: text.trim(),
+                title: '核对选中引文 · 参考资料准备',
+            });
+            if (!cont) return;
+
+            const runTarget = cont.targetOverride ?? text.trim();
+            const runAnchor = cont.anchorPath;
+
+            const { mergedReference, hits, process } = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
-                    title: '核对选中引文',
-                    cancellable: true
+                    title: cont.continuation ? '参考资料准备（续跑）' : '参考资料准备',
+                    cancellable: true,
                 },
-                async (progress, cancelToken) => {
-                    const cutMode = vscode.workspace.getConfiguration('ai-proofread.jieba').get<'default' | 'search'>('cutMode', 'default');
-                    return matchCitationsToReferences(blocks, refStore, {
-                        lenDeltaRatio,
-                        similarityThreshold,
-                        matchesPerCitation,
-                        ngramSize,
-                        ngramGranularity: jieba ? 'word' : 'char',
-                        cutMode,
-                        jieba,
-                        cancelToken,
-                        progress: (msg) => progress.report({ message: msg })
-                    });
-                }
+                async (progress, token) =>
+                    runReferencePrepSession({
+                        target: runTarget,
+                        targetKind: 'citation_selection',
+                        strength,
+                        context: this.context,
+                        anchorPath: runAnchor,
+                        intents: ['citation', 'entity_name', 'general_fact', 'term_norm'],
+                        freshProcess: cont.freshProcess,
+                        continuation: cont.continuation,
+                        maxRoundsOverride: cont.maxRoundsOverride,
+                        onProgress: (m) => progress.report({ message: m }),
+                        token,
+                    })
             );
-            if (this.citationTreeProvider) {
-                this.citationTreeProvider.refresh(blockResults, doc.uri);
-                this.updateCitationViewTitle(blockResults.length);
-                await focusCitationView();
-            }
+
+            const patternSummary = summarizeSessionPatterns(process);
+            await presentReferencePrepSessionResult({
+                resultsProvider: this.referencePrepResultsProvider,
+                anchorPath: runAnchor,
+                process,
+                mergedReference,
+                openMergedBeside: true,
+                informationMessage: mergedReference
+                    ? `引文核对完成：${hits.length} 条命中，${process.rounds.length} 轮（关键词：${patternSummary}）`
+                    : `引文核对完成，未命中（${process.rounds.length} 轮；关键词：${patternSummary}）`,
+            });
         } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
-            vscode.window.showErrorMessage(`核对选中引文失败: ${msg}`);
-            if (this.citationTreeProvider) {
-                this.citationTreeProvider.refresh([], null);
-                this.updateCitationViewTitle(0);
-            }
+            ErrorUtils.showError(e, '核对选中引文失败：');
         }
     }
 
