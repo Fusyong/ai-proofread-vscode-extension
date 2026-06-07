@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
+import { FALLBACK_MODEL, resolveProofreadModel } from './modelRoutes/modelRouteResolver';
 
 /**
  * 将任意换行符统一为 LF（\n）。
@@ -262,24 +263,20 @@ export class ConfigManager {
      * @returns 平台名称
      */
     public getPlatform(): string {
-        return this.config.get<string>('proofread.platform', 'deepseek');
+        return resolveProofreadModel().platform;
     }
 
     /**
-     * 获取模型配置
+     * 获取模型配置（与模型路由「校对」解析一致）
      * @param platform 平台名称
      * @returns 模型名称
      */
     public getModel(platform: string): string {
-        const fallbackByPlatform: Record<string, string> = {
-            aliyun: 'qwen3.6-max-preview',
-            deepseek: 'deepseek-v4-pro',
-            google: 'gemini-2.5-pro-exp-03-25',
-            ollama: 'gemma3:1b',
-        };
+        const resolved = resolveProofreadModel();
+        if (platform === resolved.platform) return resolved.model;
         return this.config.get<string>(
             `proofread.models.${platform}`,
-            fallbackByPlatform[platform] ?? 'deepseek-v4-pro'
+            FALLBACK_MODEL[platform] ?? 'deepseek-v4-flash'
         );
     }
 

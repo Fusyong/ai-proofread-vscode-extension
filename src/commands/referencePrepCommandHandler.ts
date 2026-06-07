@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { ConfigManager, ErrorUtils, FilePathUtils } from '../utils';
+import { resolveModelRoute } from '../modelRoutes/modelRouteResolver';
 import { proofreadSelection } from '../proofreader';
 import { getPromptDisplayName } from '../promptManager';
 import { showSelectionProofreadDiffWithApply } from '../differ';
@@ -221,8 +222,7 @@ export class ReferencePrepCommandHandler {
             .getConfiguration('ai-proofread')
             .get<boolean>('referencePrep.useEditorialMemory', false);
 
-        const platform = this.configManager.getPlatform();
-        const model = this.configManager.getModel(platform);
+        const { platform, model } = resolveModelRoute('proofread');
         const userTemperature = this.configManager.getTemperature();
 
         const range = new vscode.Range(editor.selection.start, editor.selection.end);

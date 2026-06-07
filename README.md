@@ -198,7 +198,24 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 **模型路由**（默认隐藏；overview 按钮「模型路由」或顶栏齿轮、命令 `open model routes view` 打开侧栏 `model routes`）：
 
-为不同 LLM 管线分别指定平台与模型名称；**参考资料准备**、**参考资料精排**、**编辑记忆合并** 默认**跟随校对**（与 `proofread.platform` / `proofread.models.*` 一致），也可改为独立配置。点击树中某一项即可选择平台、填写模型或切换「跟随校对」。高级用户仍可在设置中编辑 `ai-proofread.modelRoutes`。
+为不同 LLM 管线分别指定平台与模型名称。默认继承关系：
+
+| 管线 | 默认跟随 | 说明 |
+|------|----------|------|
+| 校对 | — | `proofread.platform` / `proofread.models.*` |
+| 参考资料准备 | 校对 | 多轮规划 |
+| 参考资料预筛 | 参考资料准备 | 大目录时筛选词典与文献 |
+| 参考资料精排 | 参考资料准备 | 每轮检索后打分去重 |
+| 编辑记忆合并 | 校对 | 带记忆校对写回后整理 |
+
+精排与预筛可在配置中选择跟随「校对」或「参考资料准备」。点击树中某一项即可选择平台、填写模型或切换跟随对象。高级用户可编辑 `ai-proofread.modelRoutes`（支持 `inheritFrom`: `proofread` | `referencePrep`）。
+
+**推荐模型组合**（DeepSeek 示例，可按平台替换）：
+
+- **校对**：`deepseek-v4-pro`（质量优先）
+- **参考资料准备**：`deepseek-v4-flash` 或 `qwen3-max`（多轮 JSON 规划，成本适中）
+- **预筛 / 精排**：跟随参考资料准备，或单独指定 flash 模型以进一步降本
+- **编辑记忆合并**：跟随校对，或单独指定较小模型（结构化 patch，对推理要求较低）
 
 
 ### 3.2. 校对

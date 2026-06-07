@@ -31,7 +31,6 @@ function readConfig() {
     const c = vscode.workspace.getConfiguration('ai-proofread');
     return {
         mergeAfterAccept: c.get<boolean>('editorialMemory.mergeAfterAccept', true),
-        mergeModelOverride: c.get<string>('editorialMemory.mergeModelOverride', ''),
         globalActiveMax: c.get<number>('editorialMemory.globalActiveMax', 30),
         currentProofreadRoundsMax: c.get<number>('editorialMemory.currentProofreadRoundsMax', 3),
     };
@@ -114,11 +113,7 @@ export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Prom
             currentRoundsPromptMaxChars: PATCH_PROMPT_CURRENT_ROUNDS_MAX_CHARS,
         });
         const memRoute = resolveModelRoute('editorialMemory');
-        const mergePlatform = memRoute.inherited ? args.platform : memRoute.platform;
-        const mergeModel =
-            (memRoute.inherited ? cfg.mergeModelOverride.trim() || args.model : memRoute.model) ||
-            args.model;
-        const patch = await runMemoryPatchLlm(mergePlatform, mergeModel, user);
+        const patch = await runMemoryPatchLlm(memRoute.platform, memRoute.model, user);
         const applied =
             patch != null
                 ? applyGlobalOpsAndPushCurrentRound({

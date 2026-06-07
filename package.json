@@ -660,7 +660,7 @@
           "default": 3,
           "minimum": 1,
           "maximum": 10,
-          "description": "参考资料准备最大轮次。"
+          "description": "（已弃用）最大轮次由命令中选择的核查强度（轻量/标准/深入）决定。"
         },
         "ai-proofread.referencePrep.continuation.maxRounds": {
           "order": 37.05,
@@ -682,7 +682,7 @@
           "default": 30,
           "minimum": 1,
           "maximum": 200,
-          "description": "每轮 grep 最多保留的合并命中块数。"
+          "description": "（已弃用）每轮 grep 命中上限由核查强度决定：轻量 12 / 标准 30 / 深入 50。"
         },
         "ai-proofread.referencePrep.grep.maxSnippetChars": {
           "order": 37.7,
@@ -690,7 +690,7 @@
           "default": 12000,
           "minimum": 1000,
           "maximum": 100000,
-          "description": "每轮 grep 结果总字符预算。"
+          "description": "（已弃用）grep 字符预算由核查强度决定：轻量 6000 / 标准 12000 / 深入 20000。"
         },
         "ai-proofread.referencePrep.grep.maxFiles": {
           "order": 37.75,
@@ -788,11 +788,13 @@
           "order": 9.5,
           "type": "object",
           "default": {},
-          "description": "各功能 LLM 路由覆盖。键为 referencePrep | referencePrepRerank | editorialMemory；inherit 为 true 时跟随校对。",
+          "description": "各功能 LLM 路由覆盖。键为 referencePrep | referencePrepScope | referencePrepRerank | editorialMemory。inherit 为 true 时跟随上级（见 inheritFrom）。",
+          "markdownDescription": "各功能 LLM 路由覆盖。\n\n- **referencePrep**：默认跟随校对\n- **referencePrepScope**（资源预筛）、**referencePrepRerank**（精排）：默认跟随 **referencePrep**；`inheritFrom` 可选 `proofread` 或 `referencePrep`\n- **editorialMemory**：默认跟随校对\n\n示例：`{ \"referencePrepRerank\": { \"inherit\": true, \"inheritFrom\": \"referencePrep\" } }`",
           "additionalProperties": {
             "type": "object",
             "properties": {
               "inherit": { "type": "boolean" },
+              "inheritFrom": { "type": "string", "enum": ["proofread", "referencePrep"] },
               "platform": { "type": "string", "enum": ["aliyun", "deepseek", "google", "ollama"] },
               "model": { "type": "string" }
             }
@@ -1196,15 +1198,16 @@
           "order": 105,
           "type": "string",
           "default": "",
-          "description": "记忆 patch 专用模型名（留空则用当前校对所用 platform 的模型）。",
-          "markdownDescription": "编辑记忆合并（patch）专用模型名；留空则使用当前校对所选 **platform** 的模型。"
+          "deprecationMessage": "已弃用：请使用侧栏「模型路由」中的「编辑记忆合并」，或设置 ai-proofread.modelRoutes.editorialMemory。",
+          "description": "（已弃用）记忆 patch 专用模型名。请改用 modelRoutes.editorialMemory。",
+          "markdownDescription": "**已弃用**。请使用侧栏 **模型路由 → 编辑记忆合并**，或 `ai-proofread.modelRoutes.editorialMemory`。"
         },
         "ai-proofread.debug.enableConsoleLog": {
           "order": 114,
           "type": "boolean",
           "default": false,
           "description": "在开发者工具控制台输出与大模型交互的完整请求与响应。",
-          "markdownDescription": "开启后，在 **开发者工具 → 控制台**（*Help → Toggle Developer Tools*）中输出每次 LLM 调用的 **请求与响应**（OpenAI 兼容接口为 HTTP 返回 JSON；Google 为可序列化的 SDK 结果摘要）。涵盖：**校对**（DeepSeek / 阿里云 / Google / Ollama）、**编辑记忆合并**（`editorialMemoryChat`）、**词典准备**（`dictPrepLlm`）。失败时额外输出 axios 错误响应体（若有）。长文本会完整打印，可能影响性能。"
+          "markdownDescription": "开启后，在 **开发者工具 → 控制台**（*Help → Toggle Developer Tools*）中输出每次 LLM 调用的 **请求与响应**（OpenAI 兼容接口为 HTTP 返回 JSON；Google 为可序列化的 SDK 结果摘要）。涵盖：**校对**、**参考资料准备 / 预筛 / 精排**、**编辑记忆合并**（统一经 `llmClient`）。失败时额外输出 axios 错误响应体（若有）。长文本会完整打印，可能影响性能。"
         }
       }
     },

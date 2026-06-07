@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
-import type { LlmPlatformId, ModelRouteId } from './modelRouteRegistry';
+import type { LlmPlatformId, ModelRouteId, ModelRouteInheritFrom } from './modelRouteRegistry';
+import { getDefaultInheritFrom } from './modelRouteRegistry';
 
 export interface ModelRouteOverride {
     inherit?: boolean;
+    inheritFrom?: ModelRouteInheritFrom;
     platform?: string;
     model?: string;
 }
@@ -11,10 +13,11 @@ export interface ResolvedModelRoute {
     platform: string;
     model: string;
     inherited: boolean;
-    inheritedFrom?: 'proofread';
+    inheritedFrom?: ModelRouteInheritFrom;
 }
 
-const FALLBACK_MODEL: Record<string, string> = {
+/** 各平台未显式配置 proofread.models.* 时的默认模型（校对与各路由解析统一使用） */
+export const FALLBACK_MODEL: Record<string, string> = {
     aliyun: 'qwen3-max',
     deepseek: 'deepseek-v4-flash',
     google: 'gemini-2.5-pro-exp-03-25',
@@ -40,6 +43,11 @@ function readRouteOverride(routeId: ModelRouteId): ModelRouteOverride | undefine
     return routes?.[routeId];
 }
 
+export function getEffectiveInheritFrom(routeId: ModelRouteId): ModelRouteInheritFrom {
+    const o = readRouteOverride(routeId);
+    return o?.inheritFrom ?? getDefaultInheritFrom(routeId);
+}
+
 export function isRouteInherited(routeId: ModelRouteId): boolean {
     if (routeId === 'proofread') return false;
     const o = readRouteOverride(routeId);
@@ -54,25 +62,12 @@ export function getRouteOverride(routeId: ModelRouteId): ModelRouteOverride {
     }
     const o = readRouteOverride(routeId);
     if (isRouteInherited(routeId)) {
-        return { inherit: true };
-    }
-    const config = cfg();
-    let platform = o?.platform?.trim();
-    let model = o?.model?.trim();
-    if (routeId === 'referencePrep' || routeId === 'referencePrepRerank') {
-        platform = platform || config.get<string>('referencePrep.platform')?.trim();
-        if (platform && !model) {
-            model = config.get<string>('referencePrep.models.' + platform)?.trim();
-        }
-    }
-    if (routeId === 'editorialMemory') {
-        const legacyModel = config.get<string>('editorialMemory.mergeModelOverride', '').trim();
-        if (!model && legacyModel) model = legacyModel;
+        return { inherit: true, inheritFrom: getEffectiveInheritFrom(routeId) };
     }
     return {
         inherit: false,
-        platform: platform || undefined,
-        model: model || undefined,
+        platform: o?.platform?.trim() || undefined,
+        model: o?.model?.trim() || undefined,
     };
 }
 
@@ -82,16 +77,6 @@ export async function setRouteOverride(routeId: ModelRouteId, patch: ModelRouteO
     const prev = routes[routeId] ?? {};
     routes[routeId] = { ...prev, ...patch };
     await config.update('modelRoutes', routes, vscode.ConfigurationTarget.Global);
-
-    if (routeId === 'referencePrep' && patch.inherit === false && patch.platform) {
-        await config.update('referencePrep.platform', patch.platform, vscode.ConfigurationTarget.Global);
-        if (patch.model) {
-            await config.update('referencePrep.models.' + patch.platform, patch.model, vscode.ConfigurationTarget.Global);
-        }
-    }
-    if (routeId === 'editorialMemory' && patch.model) {
-        await config.update('editorialMemory.mergeModelOverride', patch.model, vscode.ConfigurationTarget.Global);
-    }
 }
 
 export async function setProofreadPlatform(platform: LlmPlatformId): Promise<void> {
@@ -102,21 +87,32 @@ export async function setProofreadModel(platform: string, model: string): Promis
     await cfg().update('proofread.models.' + platform, model, vscode.ConfigurationTarget.Global);
 }
 
+function modelForPlatform(platform: string, fallbackModel: string): string {
+    return cfg().get<string>('proofread.models.' + platform, FALLBACK_MODEL[platform] ?? fallbackModel);
+}
+
 export function resolveModelRoute(routeId: ModelRouteId): ResolvedModelRoute {
     if (routeId === 'proofread') {
         return resolveProofreadModel();
     }
 
-    const base = resolveProofreadModel();
     if (isRouteInherited(routeId)) {
-        return { platform: base.platform, model: base.model, inherited: true, inheritedFrom: 'proofread' };
+        const inheritedFrom = getEffectiveInheritFrom(routeId);
+        const parent =
+            inheritedFrom === 'referencePrep'
+                ? resolveModelRoute('referencePrep')
+                : resolveProofreadModel();
+        return {
+            platform: parent.platform,
+            model: parent.model,
+            inherited: true,
+            inheritedFrom,
+        };
     }
 
     const o = getRouteOverride(routeId);
+    const base = resolveProofreadModel();
     const platform = o.platform?.trim() || base.platform;
-    let model = o.model?.trim();
-    if (!model) {
-        model = cfg().get<string>('proofread.models.' + platform, FALLBACK_MODEL[platform] ?? base.model);
-    }
+    const model = o.model?.trim() || modelForPlatform(platform, base.model);
     return { platform, model, inherited: false };
 }

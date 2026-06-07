@@ -1,9 +1,18 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../utils';
-import { LLM_PLATFORMS, type LlmPlatformId, type ModelRouteId } from './modelRouteRegistry';
+import {
+    getDefaultInheritFrom,
+    inheritFromLabel,
+    LLM_PLATFORMS,
+    routeSupportsInheritFromChoice,
+    type LlmPlatformId,
+    type ModelRouteId,
+    type ModelRouteInheritFrom,
+} from './modelRouteRegistry';
 import type { ModelRoutesTreeDataProvider } from './modelRoutesView';
 import { setModelRoutesVisible, toggleModelRoutesVisible } from '../ui/sidebarViewVisibility';
 import {
+    getEffectiveInheritFrom,
     isRouteInherited,
     resolveModelRoute,
     resolveProofreadModel,
@@ -32,12 +41,17 @@ export class ModelRoutesCommandHandler {
             { label: '$(edit) 填写模型名称', id: 'model' },
         ];
         if (routeId !== 'proofread') {
+            const inherited = isRouteInherited(routeId);
+            const fromLabel = inheritFromLabel(getEffectiveInheritFrom(routeId));
             actions.push({
-                label: isRouteInherited(routeId)
-                    ? '$(link) 已跟随校对（点击可改为独立配置）'
-                    : '$(link) 改为跟随校对',
+                label: inherited
+                    ? `$(link) 已跟随${fromLabel}（点击可改为独立配置）`
+                    : `$(link) 改为跟随${fromLabel}`,
                 id: 'inherit',
             });
+            if (routeSupportsInheritFromChoice(routeId)) {
+                actions.push({ label: '$(git-merge) 选择跟随对象', id: 'inheritFrom' });
+            }
         }
         actions.push({ label: '$(key) 打开 API 密钥设置', id: 'apikeys' });
 
@@ -56,6 +70,9 @@ export class ModelRoutesCommandHandler {
                 break;
             case 'inherit':
                 await this.toggleInherit(routeId);
+                break;
+            case 'inheritFrom':
+                await this.pickInheritFrom(routeId);
                 break;
             case 'apikeys':
                 await vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread.apiKeys');
@@ -121,14 +138,42 @@ export class ModelRoutesCommandHandler {
     private async toggleInherit(routeId: ModelRouteId): Promise<void> {
         if (routeId === 'proofread') return;
         if (isRouteInherited(routeId)) {
-            const base = resolveProofreadModel();
+            const resolved = resolveModelRoute(routeId);
             await setRouteOverride(routeId, {
                 inherit: false,
-                platform: base.platform,
-                model: base.model,
+                platform: resolved.platform,
+                model: resolved.model,
             });
         } else {
-            await setRouteOverride(routeId, { inherit: true, platform: undefined, model: undefined });
+            await setRouteOverride(routeId, {
+                inherit: true,
+                platform: undefined,
+                model: undefined,
+                inheritFrom: getDefaultInheritFrom(routeId),
+            });
         }
+    }
+
+    private async pickInheritFrom(routeId: ModelRouteId): Promise<void> {
+        if (!routeSupportsInheritFromChoice(routeId)) return;
+        const current = getEffectiveInheritFrom(routeId);
+        const picked = await vscode.window.showQuickPick(
+            (['proofread', 'referencePrep'] as ModelRouteInheritFrom[]).map((id) => ({
+                label: inheritFromLabel(id),
+                id,
+                picked: id === current,
+            })),
+            {
+                title: '选择跟随对象',
+                ignoreFocusOut: true,
+            }
+        );
+        if (!picked) return;
+        await setRouteOverride(routeId, {
+            inherit: true,
+            inheritFrom: picked.id as ModelRouteInheritFrom,
+            platform: undefined,
+            model: undefined,
+        });
     }
 }

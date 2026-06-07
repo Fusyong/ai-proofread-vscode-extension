@@ -122,11 +122,10 @@ export async function runReferencePrepForTarget(
 
     const preset = getStrengthPreset(params.strength);
     const scopeCfg = getScopeConfig();
-    const configMaxRounds = vscode.workspace.getConfiguration('ai-proofread').get<number>('referencePrep.maxRounds', preset.maxRounds);
     const maxRounds = params.continuation
         ? (params.maxRoundsOverride ??
           vscode.workspace.getConfiguration('ai-proofread').get<number>('referencePrep.continuation.maxRounds', 1))
-        : configMaxRounds;
+        : preset.maxRounds;
     const intents = params.intents?.length ? params.intents : ALL_INTENTS;
     const { platform, model } = getReferencePrepLlmConfig();
     const disabled = ALL_SOURCES.filter((s) => !params.enabledSources.includes(s));

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import {
+    inheritFromLabel,
     MODEL_ROUTE_METAS,
     MODEL_ROUTES_VIEW_ID,
     type ModelRouteId,
@@ -36,7 +37,7 @@ export class ModelRoutesTreeDataProvider implements vscode.TreeDataProvider<Mode
         const platformLabel = resolved.platform;
         const modelLabel = resolved.model;
         const summary = inherited
-            ? '跟随校对 · ' + platformLabel + ' / ' + modelLabel
+            ? '跟随' + inheritFromLabel(resolved.inheritedFrom ?? 'proofread') + ' · ' + platformLabel + ' / ' + modelLabel
             : platformLabel + ' / ' + modelLabel;
 
         const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
@@ -71,10 +72,7 @@ export function registerModelRoutesView(
             if (
                 e.affectsConfiguration('ai-proofread.proofread.platform') ||
                 e.affectsConfiguration('ai-proofread.proofread.models') ||
-                e.affectsConfiguration('ai-proofread.modelRoutes') ||
-                e.affectsConfiguration('ai-proofread.referencePrep.platform') ||
-                e.affectsConfiguration('ai-proofread.referencePrep.models') ||
-                e.affectsConfiguration('ai-proofread.editorialMemory.mergeModelOverride')
+                e.affectsConfiguration('ai-proofread.modelRoutes')
             ) {
                 refresh();
             }

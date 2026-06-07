@@ -8,7 +8,7 @@ import {
 } from '../catalog/headingIndex';
 import { getScopeConfig } from '../config';
 import { generateReferencePrepPlanJson } from '../referencePrepLlm';
-import { getReferencePrepLlmConfig } from '../config';
+import { getReferencePrepScopeLlmConfig } from '../config';
 import type { ResourceScope } from '../schema';
 
 export interface ResolveResourceScopeParams {
@@ -47,7 +47,7 @@ async function llmFilterScope(params: {
     catalog: ReferenceCatalog;
     headings: HeadingEntry[];
 }): Promise<Partial<ResourceScope> & { filterReason?: string }> {
-    const { platform, model } = getReferencePrepLlmConfig();
+    const { platform, model } = getReferencePrepScopeLlmConfig();
     const dictLines = params.dicts
         .map((d) => `- id=${d.id}; name=${d.name}; tags=[${(d.tags ?? []).slice(0, 4).join(', ')}]`)
         .join('\n');

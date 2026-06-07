@@ -1,16 +1,9 @@
 import * as vscode from 'vscode';
 import { resolveModelRoute } from '../modelRoutes/modelRouteResolver';
 import type { ReferencePrepStrength, ReferenceSourceId } from './schema';
+import { getStrengthPresetValues, type StrengthPreset } from './strengthPresets';
 
-export interface StrengthPreset {
-    maxRounds: number;
-    maxQueriesPerRound: number;
-    maxTotalLookups: number;
-    grepMaxHitsPerRound: number;
-    grepMaxSnippetChars: number;
-    valuePruneThreshold: number;
-    maxPointsPerItem: number;
-}
+export type { StrengthPreset } from './strengthPresets';
 
 export interface ScopeConfig {
     dictCountThreshold: number;
@@ -41,54 +34,13 @@ export interface VectorConfig {
     minScore: number;
 }
 
-const STRENGTH_PRESETS: Record<ReferencePrepStrength, StrengthPreset> = {
-    light: {
-        maxRounds: 1,
-        maxQueriesPerRound: 4,
-        maxTotalLookups: 40,
-        grepMaxHitsPerRound: 12,
-        grepMaxSnippetChars: 6000,
-        valuePruneThreshold: 0.3,
-        maxPointsPerItem: 4,
-    },
-    standard: {
-        maxRounds: 3,
-        maxQueriesPerRound: 6,
-        maxTotalLookups: 100,
-        grepMaxHitsPerRound: 30,
-        grepMaxSnippetChars: 12000,
-        valuePruneThreshold: 0.25,
-        maxPointsPerItem: 6,
-    },
-    thorough: {
-        maxRounds: 5,
-        maxQueriesPerRound: 10,
-        maxTotalLookups: 200,
-        grepMaxHitsPerRound: 50,
-        grepMaxSnippetChars: 20000,
-        valuePruneThreshold: 0.2,
-        maxPointsPerItem: 10,
-    },
-};
-
 function cfg() {
     return vscode.workspace.getConfiguration('ai-proofread');
 }
 
+/** 核查强度预设；轮次、查询数、grep 预算等均以 strength 为准（非全局设置覆盖）。 */
 export function getStrengthPreset(strength: ReferencePrepStrength): StrengthPreset {
-    const preset = STRENGTH_PRESETS[strength] ?? STRENGTH_PRESETS.standard;
-    const config = cfg();
-    return {
-        ...preset,
-        grepMaxHitsPerRound: config.get<number>(
-            'referencePrep.grep.maxHitsPerRound',
-            preset.grepMaxHitsPerRound
-        ),
-        grepMaxSnippetChars: config.get<number>(
-            'referencePrep.grep.maxSnippetChars',
-            preset.grepMaxSnippetChars
-        ),
-    };
+    return getStrengthPresetValues(strength);
 }
 
 export function getDefaultEnabledSources(): ReferenceSourceId[] {
@@ -99,20 +51,24 @@ export function getDefaultEnabledSources(): ReferenceSourceId[] {
     return out.length > 0 ? out : ['dict', 'grep_md'];
 }
 
-export function getReferencePrepLlmConfig(): { platform: string; model: string } {
-    const { platform, model } = resolveModelRoute('referencePrep');
+function requireModel(routeId: Parameters<typeof resolveModelRoute>[0]): { platform: string; model: string } {
+    const { platform, model } = resolveModelRoute(routeId);
     if (!model) {
         throw new Error('未配置模型：ai-proofread.proofread.models.' + platform);
     }
     return { platform, model };
 }
 
+export function getReferencePrepLlmConfig(): { platform: string; model: string } {
+    return requireModel('referencePrep');
+}
+
+export function getReferencePrepScopeLlmConfig(): { platform: string; model: string } {
+    return requireModel('referencePrepScope');
+}
+
 export function getReferencePrepRerankLlmConfig(): { platform: string; model: string } {
-    const { platform, model } = resolveModelRoute('referencePrepRerank');
-    if (!model) {
-        return getReferencePrepLlmConfig();
-    }
-    return { platform, model };
+    return requireModel('referencePrepRerank');
 }
 
 export function getDictPrepConfigKeys() {

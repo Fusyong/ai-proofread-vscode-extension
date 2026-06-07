@@ -9,6 +9,7 @@ export async function generateReferencePrepPlanJson(params: {
     userPrompt: string;
 }): Promise<string> {
     return llmGenerateJson({
+        logTag: 'referencePrepLlm',
         platform: params.platform,
         model: params.model,
         systemPrompt: params.systemPrompt,
