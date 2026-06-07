@@ -9,6 +9,7 @@ export function buildReferencePrepSystemPrompt(params: {
     maxQueries: number;
     intents: ReferencePrepIntent[];
     targetKind?: ReferencePrepTargetKind;
+    continuation?: boolean;
 }): string {
     const disLines = params.disabledSources.map((s) => '- disabled: ' + s).join('\n');
     const intentList = params.intents.join(', ');
@@ -38,6 +39,14 @@ export function buildReferencePrepSystemPrompt(params: {
         '- disabled 来源禁止为其生成 query。',
         '- enabled 含 dict 时可为专名/术语填 dict；含 grep_md/bm25/vector 时可填文献检索。',
         '- 词条不要带书名号；patterns 宜短、可命中参考文献。',
+        params.continuation
+            ? [
+                  '',
+                  '续跑模式（重要）：',
+                  '- corpus 中已有用户认可的资料；本轮须追加 queries 以补充缺口，勿因 sufficient 而返回空 queries。',
+                  '- 可 prune 无关 hitId；优先检索尚未覆盖的疑点。',
+              ].join('\n')
+            : '',
         disLines ? '\n' + disLines : '',
     ].join('\n');
 }
@@ -54,6 +63,7 @@ export function buildReferencePrepUserPrompt(params: {
     catalogSummary?: string;
     scope?: ResourceScope;
     navigationHints?: string;
+    continuation?: boolean;
 }): string {
     const dictLines = params.dicts
         .map((d) => {
@@ -81,6 +91,7 @@ export function buildReferencePrepUserPrompt(params: {
 
     return [
         'round=' + (params.roundIndex + 1) + '/' + params.maxRounds,
+        params.continuation ? 'mode=continuation' : '',
         '',
         'dicts:',
         dictLines || '(空)',

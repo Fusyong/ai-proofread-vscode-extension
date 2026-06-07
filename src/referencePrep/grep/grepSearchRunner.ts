@@ -11,6 +11,9 @@ export interface GrepSearchRunParams {
     anchorPath: string;
     onProgress?: (msg: string) => void;
     token?: vscode.CancellationToken;
+    freshProcess?: boolean;
+    continuation?: boolean;
+    maxRoundsOverride?: number;
 }
 
 export interface GrepSearchRunResult {
@@ -31,7 +34,9 @@ export async function runLlmGrepSearch(params: GrepSearchRunParams): Promise<Gre
         enabledSources: ['grep_md', 'bm25', 'vector'],
         strength: params.strength,
         targetKind: 'search_intent',
-        freshProcess: true,
+        freshProcess: params.freshProcess ?? true,
+        continuation: params.continuation,
+        maxRoundsOverride: params.maxRoundsOverride,
         onProgress: params.onProgress,
         token: params.token,
     });

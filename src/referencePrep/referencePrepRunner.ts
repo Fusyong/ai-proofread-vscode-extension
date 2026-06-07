@@ -38,6 +38,7 @@ import {
     widenResourceScope,
 } from './scope/resourceScope';
 import { runLlmRerank } from './rerank/rerankRunner';
+import { recordRecentSession } from './continuation';
 
 const ALL_INTENTS: ReferencePrepIntent[] = [
     'entity_name',
@@ -64,6 +65,10 @@ export interface ReferencePrepRunParams {
     sourceJsonPath?: string;
     freshProcess?: boolean;
     targetKind?: ReferencePrepTargetKind;
+    /** 续跑：追加规划轮，保留 corpus */
+    continuation?: boolean;
+    /** 续跑时覆盖 maxRounds（默认 1） */
+    maxRoundsOverride?: number;
 }
 
 function resolvePlanSystemPrompt(
@@ -72,7 +77,8 @@ function resolvePlanSystemPrompt(
     disabled: ReferenceSourceId[],
     maxQueries: number,
     intents: ReferencePrepIntent[],
-    targetKind?: ReferencePrepTargetKind
+    targetKind?: ReferencePrepTargetKind,
+    continuation?: boolean
 ): string {
     const custom = resolveDictPrepStylePrompt(context);
     if (custom) {
@@ -84,6 +90,7 @@ function resolvePlanSystemPrompt(
         maxQueries,
         intents,
         targetKind,
+        continuation,
     });
 }
 
@@ -115,7 +122,11 @@ export async function runReferencePrepForTarget(
 
     const preset = getStrengthPreset(params.strength);
     const scopeCfg = getScopeConfig();
-    const maxRounds = vscode.workspace.getConfiguration('ai-proofread').get<number>('referencePrep.maxRounds', preset.maxRounds);
+    const configMaxRounds = vscode.workspace.getConfiguration('ai-proofread').get<number>('referencePrep.maxRounds', preset.maxRounds);
+    const maxRounds = params.continuation
+        ? (params.maxRoundsOverride ??
+          vscode.workspace.getConfiguration('ai-proofread').get<number>('referencePrep.continuation.maxRounds', 1))
+        : configMaxRounds;
     const intents = params.intents?.length ? params.intents : ALL_INTENTS;
     const { platform, model } = getReferencePrepLlmConfig();
     const disabled = ALL_SOURCES.filter((s) => !params.enabledSources.includes(s));
@@ -141,13 +152,24 @@ export async function runReferencePrepForTarget(
     const refRoot = resolveReferencesPath(refPathRaw);
     const catalog = refRoot ? getOrBuildCatalog(refRoot) : null;
 
+    if (params.continuation) {
+        appendProcessLog(
+            params.anchorPath,
+            `Continuation: prior rounds=${proc.rounds.length} active_hits=${proc.corpus.filter((h) => h.status === 'active').length}`
+        );
+        params.onProgress?.('参考资料准备：续跑（保留已有 corpus）…');
+    }
+
     params.onProgress?.('参考资料准备：解析资源范围…');
-    let resourceScope = await resolveResourceScope({
-        target: params.target,
-        dicts,
-        catalog,
-        referencesRoot: refRoot,
-    });
+    let resourceScope =
+        params.continuation && proc.resourceScope
+            ? proc.resourceScope
+            : await resolveResourceScope({
+                  target: params.target,
+                  dicts,
+                  catalog,
+                  referencesRoot: refRoot,
+              });
     proc.resourceScope = resourceScope;
     proc.catalogSnapshotId = catalog?.snapshotId;
     appendProcessLog(params.anchorPath, `Phase0 scope: dicts=${resourceScope.dictIds.length} files=${resourceScope.filePaths.length} filtered=${resourceScope.llmFiltered}`);
@@ -170,7 +192,8 @@ export async function runReferencePrepForTarget(
             disabled,
             preset.maxQueriesPerRound,
             intents,
-            params.targetKind
+            params.targetKind,
+            params.continuation
         );
         const userPrompt = buildReferencePrepUserPrompt({
             target: params.target,
@@ -182,6 +205,7 @@ export async function runReferencePrepForTarget(
             catalogSummary,
             scope: resourceScope,
             navigationHints,
+            continuation: params.continuation,
         });
 
         params.onProgress?.(`参考资料准备：第 ${round + 1}/${maxRounds} 轮规划…`);
@@ -199,10 +223,16 @@ export async function runReferencePrepForTarget(
             queryCount: plan.queries.length,
         };
 
-        if (plan.sufficient && plan.queries.length === 0) {
+        if (plan.sufficient && plan.queries.length === 0 && !params.continuation) {
             roundEntry.finishedAt = new Date().toISOString();
             proc.rounds.push(roundEntry);
             applyPruneToCorpus(proc.corpus, plan, preset.valuePruneThreshold);
+            break;
+        }
+        if (plan.sufficient && plan.queries.length === 0 && params.continuation) {
+            appendProcessLog(params.anchorPath, 'Continuation: plan returned sufficient with no queries, stopping');
+            roundEntry.finishedAt = new Date().toISOString();
+            proc.rounds.push(roundEntry);
             break;
         }
 
@@ -255,6 +285,7 @@ export async function runReferencePrepForTarget(
         citationDb: refRoot ? 'citation-refs.db' : undefined,
     };
     saveProcessFile(params.anchorPath, proc);
+    await recordRecentSession(params.context, params.anchorPath, proc);
     params.onProcessUpdated?.(proc);
     return { mergedReference, process: proc };
 }

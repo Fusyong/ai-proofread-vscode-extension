@@ -7,6 +7,7 @@ import {
     summarizeGrepPatterns,
 } from '../referencePrep/grep/grepSearchRunner';
 import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
+import { pickReferencePrepContinuation } from '../referencePrep/continuation';
 
 const STRENGTH_OPTIONS: Array<{ label: string; description: string; value: ReferencePrepStrength }> = [
     { label: '轻量', description: '1 轮，较少命中', value: 'light' },
@@ -47,18 +48,32 @@ export class GrepSearchCommandHandler {
 
         try {
             const anchorPath = resolveGrepSearchAnchorPath(editor);
+            const cont = await pickReferencePrepContinuation({
+                context,
+                anchorPath,
+                target: description.trim(),
+                title: 'LLM 增强参考文献检索',
+            });
+            if (!cont) return;
+
+            const runDescription = cont.targetOverride ?? description.trim();
+            const runAnchor = cont.anchorPath;
+
             const { mergedReference, hits, process } = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
-                    title: '参考文献 LLM 检索',
+                    title: cont.continuation ? '参考文献 LLM 检索（续跑）' : '参考文献 LLM 检索',
                     cancellable: true,
                 },
                 async (progress, token) =>
                     runLlmGrepSearch({
-                        description: description.trim(),
+                        description: runDescription,
                         strength: strengthPick.value,
                         context,
-                        anchorPath,
+                        anchorPath: runAnchor,
+                        freshProcess: cont.freshProcess,
+                        continuation: cont.continuation,
+                        maxRoundsOverride: cont.maxRoundsOverride,
                         onProgress: (m) => progress.report({ message: m }),
                         token,
                     })
@@ -66,7 +81,7 @@ export class GrepSearchCommandHandler {
 
             if (this.resultsProvider) {
                 await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
-                this.resultsProvider.refresh(process, anchorPath);
+                this.resultsProvider.refresh(process, runAnchor);
             }
 
             if (mergedReference) {

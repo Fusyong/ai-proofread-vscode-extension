@@ -14,6 +14,7 @@ import type { ReferencePrepStrength, ReferenceSourceId } from '../referencePrep/
 import { getDefaultEnabledSources, runReferencePrepForJsonFile, runReferencePrepForTarget } from '../referencePrep/referencePrepRunner';
 import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
 import { loadReferencePrepLastRun, saveReferencePrepLastRun } from '../referencePrep/runPreferences';
+import { pickReferencePrepContinuation } from '../referencePrep/continuation';
 import { WebviewManager } from '../ui/webviewManager';
 import type { ProofreadCommandHandler } from './proofreadCommandHandler';
 
@@ -133,27 +134,52 @@ export class ReferencePrepCommandHandler {
 
         const anchorPath = editor.document.uri.fsPath;
 
+        let runTarget = selectedText;
+        let runAnchor = anchorPath;
+        let freshProcess = true;
+        let continuation = false;
+        let maxRoundsOverride: number | undefined;
+
+        if (!opts.runProofread) {
+            const cont = await pickReferencePrepContinuation({
+                context,
+                anchorPath,
+                target: selectedText,
+                title: '知识核查 · 参考资料准备',
+            });
+            if (!cont) return;
+            runAnchor = cont.anchorPath;
+            freshProcess = cont.freshProcess;
+            continuation = cont.continuation;
+            maxRoundsOverride = cont.maxRoundsOverride;
+            if (cont.targetOverride) {
+                runTarget = cont.targetOverride;
+            }
+        }
+
         try {
             const { mergedReference, process } = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
-                    title: '参考资料准备',
+                    title: continuation ? '参考资料准备（续跑）' : '参考资料准备',
                     cancellable: true,
                 },
                 async (_p, token) =>
                     runReferencePrepForTarget({
-                        target: selectedText,
-                        anchorPath,
+                        target: runTarget,
+                        anchorPath: runAnchor,
                         context,
                         enabledSources: opts.enabledSources,
                         strength: opts.strength,
-                        freshProcess: true,
+                        freshProcess,
+                        continuation,
+                        maxRoundsOverride,
                         onProgress: (m) => _p.report({ message: m }),
                         token,
-                        onProcessUpdated: (proc) => this.resultsProvider?.refresh(proc, anchorPath),
+                        onProcessUpdated: (proc) => this.resultsProvider?.refresh(proc, runAnchor),
                     })
             );
-            await this.showResultsTree(anchorPath, process);
+            await this.showResultsTree(runAnchor, process);
 
             if (!opts.runProofread) {
                 if (mergedReference) {

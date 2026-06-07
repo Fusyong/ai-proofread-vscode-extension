@@ -662,6 +662,14 @@
           "maximum": 10,
           "description": "参考资料准备最大轮次。"
         },
+        "ai-proofread.referencePrep.continuation.maxRounds": {
+          "order": 37.05,
+          "type": "number",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 5,
+          "description": "续跑时在已有 corpus 上追加的规划轮次。"
+        },
         "ai-proofread.referencePrep.useEditorialMemory": {
           "order": 37.5,
           "type": "boolean",

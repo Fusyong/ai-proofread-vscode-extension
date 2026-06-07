@@ -189,6 +189,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 - 文献检索：`AI Proofreader: LLM-enhanced grep search`（自然语言意图；默认 grep + BM25 + vector）
 - JSON：校对面板 **准备参考资料**，或命令 `prepare references for JSON file`
 - 结果查看：侧栏 **参考资料命中** TreeView（命令 `open reference prep results`）；可打开文件跳转、复制块、手动 prune
+- **续跑**：「仅准备」与 LLM grep 若已有过程文件，可选择继续上次（追加 1 轮）或重新开始；「准备并校对」始终全新开始
 - 过程文件：`文档.referenceprep.json`（v0.2 结构化 corpus）、`文档.referenceprep.log`（详见 `docs/knowledge-verify-plan.md`）
 - 运行前可勾选资料来源（词典 / grep / BM25 / 向量）；强度（轻量 / 标准 / 深入）控制轮次与查询上限
 - BM25 需先 **建立引文索引**；向量索引首次使用时懒构建

@@ -77,6 +77,13 @@
 
 侧栏 **参考资料命中**：`轮次 → 查询 → 命中项`。支持打开文件跳转、复制 reference 块、手动 prune/restore。
 
+## 续跑（仅准备 / LLM grep）
+
+- 若当前锚点（或工作区最近会话）存在 `.referenceprep.json`，启动时可选择 **继续上次**（默认追加 1 规划轮，保留 corpus）或 **重新开始**
+- **准备并校对** 始终全新开始，不提示续跑
+- 选区/检索描述与 `userInput` 不一致时会二次确认；续跑其它文档时使用该过程文件中的 target
+- 最近会话列表保存在 workspaceState（最多 10 条）；配置 `referencePrep.continuation.maxRounds` 可调续跑轮次
+
 ## 索引依赖
 
 - **BM25**：需先执行「建立引文索引」（`citation-refs.db` + FTS5）
