@@ -9,10 +9,10 @@ import type {
 } from '../schema';
 import type { ResourceScope } from '../schema';
 import { resolveSourcesForQuery } from './intentMap';
-import { executeDictQuery, resetDictHitCounter } from './dictAdapter';
-import { executeGrepQuery, resetGrepHitCounter } from './grepAdapter';
-import { executeBm25Query, resetBm25HitCounter } from './bm25Adapter';
-import { executeVectorQuery, resetVectorHitCounter } from './vectorAdapter';
+import { executeDictQuery } from './dictAdapter';
+import { executeGrepQuery } from './grepAdapter';
+import { executeBm25Query } from './bm25Adapter';
+import { executeVectorQuery } from './vectorAdapter';
 import { extractFallbackGrepPatterns } from '../referencePrepPrompt';
 import { fuseChannelHits } from './fusion';
 import { filterDictsByScope } from '../scope/resourceScope';
@@ -29,11 +29,6 @@ export async function executeReferencePrepPlan(params: {
     scope?: ResourceScope;
     roundId?: string;
 }): Promise<CorpusHit[]> {
-    resetDictHitCounter();
-    resetGrepHitCounter();
-    resetBm25HitCounter();
-    resetVectorHitCounter();
-
     const config = vscode.workspace.getConfiguration('ai-proofread');
     const refPathRaw = config.get<string>('citation.referencesPath', '${workspaceFolder}/references');
     const refRoot = resolveReferencesPath(refPathRaw);

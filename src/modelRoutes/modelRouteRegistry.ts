@@ -28,10 +28,11 @@ export interface ModelRouteMeta {
     canInherit: boolean;
     /** 默认继承来源（canInherit 为 true 时有效） */
     defaultInheritFrom?: ModelRouteInheritFrom;
-    /** 是否可在「校对 / 参考资料准备」间切换继承来源 */
+    /** 是否可在「校对 / 参考资料规划」间切换继承来源 */
     canChooseInheritFrom?: boolean;
 }
 
+/** 侧栏展示顺序与管线执行先后一致：预筛 → 规划 → 精排 */
 export const MODEL_ROUTE_METAS: ModelRouteMeta[] = [
     {
         id: 'proofread',
@@ -40,24 +41,24 @@ export const MODEL_ROUTE_METAS: ModelRouteMeta[] = [
         canInherit: false,
     },
     {
-        id: 'referencePrep',
-        label: '参考资料准备',
-        description: '知识核查 / 多轮检索词典与文献',
-        canInherit: true,
-        defaultInheritFrom: 'proofread',
-    },
-    {
         id: 'referencePrepScope',
         label: '参考资料预筛',
-        description: '大目录时 LLM 筛选词典与文献范围',
+        description: '大目录时 LLM 筛选词典与文献范围（规划前，条件触发）',
         canInherit: true,
         defaultInheritFrom: 'referencePrep',
         canChooseInheritFrom: true,
     },
     {
+        id: 'referencePrep',
+        label: '参考资料规划',
+        description: '多轮生成检索计划（sufficient / queries / prune JSON）',
+        canInherit: true,
+        defaultInheritFrom: 'proofread',
+    },
+    {
         id: 'referencePrepRerank',
         label: '参考资料精排',
-        description: '检索结果相关性打分、去重与裁剪',
+        description: '每轮检索后相关性打分、去重与裁剪',
         canInherit: true,
         defaultInheritFrom: 'referencePrep',
         canChooseInheritFrom: true,
@@ -88,5 +89,5 @@ export function routeSupportsInheritFromChoice(routeId: ModelRouteId): boolean {
 }
 
 export function inheritFromLabel(from: ModelRouteInheritFrom): string {
-    return from === 'referencePrep' ? '参考资料准备' : '校对';
+    return from === 'referencePrep' ? '参考资料规划' : '校对';
 }

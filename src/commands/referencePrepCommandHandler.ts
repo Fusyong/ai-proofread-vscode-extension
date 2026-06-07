@@ -15,7 +15,10 @@ import type { ReferencePrepStrength, ReferenceSourceId } from '../referencePrep/
 import { getDefaultEnabledSources, runReferencePrepForJsonFile, runReferencePrepForTarget } from '../referencePrep/referencePrepRunner';
 import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
 import { loadReferencePrepLastRun, saveReferencePrepLastRun } from '../referencePrep/runPreferences';
-import { pickReferencePrepContinuation } from '../referencePrep/continuation';
+import {
+    pickExistingReferenceForProofread,
+    pickReferencePrepContinuation,
+} from '../referencePrep/continuation';
 import { WebviewManager } from '../ui/webviewManager';
 import type { ProofreadCommandHandler } from './proofreadCommandHandler';
 
@@ -30,6 +33,30 @@ const STRENGTH_OPTIONS: Array<{ label: string; description: string; value: Refer
     { label: '轻量', description: '1 轮，较少查询', value: 'light' },
     { label: '标准', description: '3 轮', value: 'standard' },
     { label: '深入', description: '5 轮，更多查询', value: 'thorough' },
+];
+
+type KnowledgeVerifyMode = 'prep_and_proofread' | 'prep_only' | 'proofread_existing';
+
+const KNOWLEDGE_VERIFY_MODE_OPTIONS: Array<{
+    label: string;
+    description: string;
+    value: KnowledgeVerifyMode;
+}> = [
+    {
+        label: '准备参考资料并验证',
+        description: '检索词典与文献后，用知识核查提示词校对选段',
+        value: 'prep_and_proofread',
+    },
+    {
+        label: '仅准备参考资料',
+        description: '只运行 referencePrep，生成 mergedReference，不校对',
+        value: 'prep_only',
+    },
+    {
+        label: '用已有参考资料验证',
+        description: '使用当前文档或最近会话中已准备的 reference 直接校对',
+        value: 'proofread_existing',
+    },
 ];
 
 export class ReferencePrepCommandHandler {
@@ -47,12 +74,26 @@ export class ReferencePrepCommandHandler {
         this.resultsProvider.refresh(process, anchorPath);
     }
 
-    async pickRunOptions(context: vscode.ExtensionContext): Promise<
+    private async pickKnowledgeVerifyMode(): Promise<KnowledgeVerifyMode | undefined> {
+        const picked = await vscode.window.showQuickPick(
+            KNOWLEDGE_VERIFY_MODE_OPTIONS.map((o) => ({
+                label: o.label,
+                description: o.description,
+                value: o.value,
+            })),
+            {
+                title: '知识核查',
+                placeHolder: '选择要执行的操作',
+                ignoreFocusOut: true,
+            }
+        );
+        return picked?.value;
+    }
+
+    private async pickPrepSourcesAndStrength(context: vscode.ExtensionContext): Promise<
         | {
               enabledSources: ReferenceSourceId[];
               strength: ReferencePrepStrength;
-              runProofread: boolean;
-              proofreadPromptName?: string;
           }
         | undefined
     > {
@@ -90,6 +131,27 @@ export class ReferencePrepCommandHandler {
         );
         if (!strengthPick) return undefined;
 
+        await saveReferencePrepLastRun(context, {
+            enabledSources,
+            strength: strengthPick.value,
+        });
+
+        return { enabledSources, strength: strengthPick.value };
+    }
+
+    /** JSON 批量准备等：资料来源 + 强度 + 是否接着校对 */
+    async pickRunOptions(context: vscode.ExtensionContext): Promise<
+        | {
+              enabledSources: ReferenceSourceId[];
+              strength: ReferencePrepStrength;
+              runProofread: boolean;
+              proofreadPromptName?: string;
+          }
+        | undefined
+    > {
+        const prep = await this.pickPrepSourcesAndStrength(context);
+        if (!prep) return undefined;
+
         const actionPick = await vscode.window.showQuickPick(
             [
                 { label: '准备参考资料并校对', value: 'prep_and_proofread' as const },
@@ -106,34 +168,67 @@ export class ReferencePrepCommandHandler {
             if (!proofreadPromptName) return undefined;
         }
 
-        await saveReferencePrepLastRun(context, {
-            enabledSources,
-            strength: strengthPick.value,
-        });
-
         return {
-            enabledSources,
-            strength: strengthPick.value,
+            enabledSources: prep.enabledSources,
+            strength: prep.strength,
             runProofread,
             proofreadPromptName,
         };
     }
 
-    /** 选段：准备参考资料，可选接着校对 */
+    /** 选段：知识核查（准备 / 仅准备 / 用已有资料验证） */
     async handleKnowledgeVerifySelection(
         editor: vscode.TextEditor,
         context: vscode.ExtensionContext
     ): Promise<void> {
-        const opts = await this.pickRunOptions(context);
-        if (!opts) return;
-
         const selectedText = editor.document.getText(editor.selection);
         if (!selectedText.trim()) {
             vscode.window.showErrorMessage('请先选择要核查的文本。');
             return;
         }
 
+        const mode = await this.pickKnowledgeVerifyMode();
+        if (!mode) return;
+
         const anchorPath = editor.document.uri.fsPath;
+
+        if (mode === 'proofread_existing') {
+            try {
+                const existing = await pickExistingReferenceForProofread({
+                    context,
+                    anchorPath,
+                    selectedText,
+                });
+                if (!existing) return;
+
+                const promptStorageName = await pickProofreadPromptForKnowledgeVerify(context);
+                if (!promptStorageName) return;
+
+                await this.showResultsTree(existing.anchorPath, existing.process);
+
+                await withTemporaryProofreadPrompt(context, promptStorageName, () =>
+                    this.runProofreadSelectionWithInlineReference(
+                        editor,
+                        context,
+                        existing.mergedReference,
+                        getPromptDisplayName(promptStorageName)
+                    )
+                );
+            } catch (e) {
+                ErrorUtils.showError(e, '知识核查失败：');
+            }
+            return;
+        }
+
+        const prep = await this.pickPrepSourcesAndStrength(context);
+        if (!prep) return;
+
+        const runProofread = mode === 'prep_and_proofread';
+        let proofreadPromptName: string | undefined;
+        if (runProofread) {
+            proofreadPromptName = await pickProofreadPromptForKnowledgeVerify(context);
+            if (!proofreadPromptName) return;
+        }
 
         let runTarget = selectedText;
         let runAnchor = anchorPath;
@@ -141,12 +236,12 @@ export class ReferencePrepCommandHandler {
         let continuation = false;
         let maxRoundsOverride: number | undefined;
 
-        if (!opts.runProofread) {
+        if (!runProofread) {
             const cont = await pickReferencePrepContinuation({
                 context,
                 anchorPath,
                 target: selectedText,
-                title: '知识核查 · 参考资料准备',
+                title: '知识核查 · 仅准备参考资料',
             });
             if (!cont) return;
             runAnchor = cont.anchorPath;
@@ -170,8 +265,8 @@ export class ReferencePrepCommandHandler {
                         target: runTarget,
                         anchorPath: runAnchor,
                         context,
-                        enabledSources: opts.enabledSources,
-                        strength: opts.strength,
+                        enabledSources: prep.enabledSources,
+                        strength: prep.strength,
                         freshProcess,
                         continuation,
                         maxRoundsOverride,
@@ -182,7 +277,7 @@ export class ReferencePrepCommandHandler {
             );
             await this.showResultsTree(runAnchor, process);
 
-            if (!opts.runProofread) {
+            if (!runProofread) {
                 if (mergedReference) {
                     const doc = await vscode.workspace.openTextDocument({
                         content: mergedReference,
@@ -198,7 +293,7 @@ export class ReferencePrepCommandHandler {
                 return;
             }
 
-            const promptStorageName = opts.proofreadPromptName!;
+            const promptStorageName = proofreadPromptName!;
             await withTemporaryProofreadPrompt(context, promptStorageName, () =>
                 this.runProofreadSelectionWithInlineReference(
                     editor,

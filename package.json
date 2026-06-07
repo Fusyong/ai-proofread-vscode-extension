@@ -79,7 +79,7 @@
       },
       {
         "command": "ai-proofread.knowledgeVerifySelection",
-        "title": "AI Proofreader: knowledge verify selection (prepare references and proofread)"
+        "title": "AI Proofreader: knowledge verify selection"
       },
       {
         "command": "ai-proofread.prepareReferencesJson",
@@ -789,7 +789,7 @@
           "type": "object",
           "default": {},
           "description": "各功能 LLM 路由覆盖。键为 referencePrep | referencePrepScope | referencePrepRerank | editorialMemory。inherit 为 true 时跟随上级（见 inheritFrom）。",
-          "markdownDescription": "各功能 LLM 路由覆盖。\n\n- **referencePrep**：默认跟随校对\n- **referencePrepScope**（资源预筛）、**referencePrepRerank**（精排）：默认跟随 **referencePrep**；`inheritFrom` 可选 `proofread` 或 `referencePrep`\n- **editorialMemory**：默认跟随校对\n\n示例：`{ \"referencePrepRerank\": { \"inherit\": true, \"inheritFrom\": \"referencePrep\" } }`",
+          "markdownDescription": "各功能 LLM 路由覆盖（侧栏顺序：预筛 → 规划 → 精排）。\n\n- **referencePrep**（参考资料规划）：默认跟随校对\n- **referencePrepScope**（预筛）、**referencePrepRerank**（精排）：默认跟随 **referencePrep**；`inheritFrom` 可选 `proofread` 或 `referencePrep`\n- **editorialMemory**：默认跟随校对\n\n示例：`{ \"referencePrepRerank\": { \"inherit\": true, \"inheritFrom\": \"referencePrep\" } }`",
           "additionalProperties": {
             "type": "object",
             "properties": {
@@ -1207,7 +1207,7 @@
           "type": "boolean",
           "default": false,
           "description": "在开发者工具控制台输出与大模型交互的完整请求与响应。",
-          "markdownDescription": "开启后，在 **开发者工具 → 控制台**（*Help → Toggle Developer Tools*）中输出每次 LLM 调用的 **请求与响应**（OpenAI 兼容接口为 HTTP 返回 JSON；Google 为可序列化的 SDK 结果摘要）。涵盖：**校对**、**参考资料准备 / 预筛 / 精排**、**编辑记忆合并**（统一经 `llmClient`）。失败时额外输出 axios 错误响应体（若有）。长文本会完整打印，可能影响性能。"
+          "markdownDescription": "开启后，在 **开发者工具 → 控制台**（*Help → Toggle Developer Tools*）中输出每次 LLM 调用的 **请求与响应**（OpenAI 兼容接口为 HTTP 返回 JSON；Google 为可序列化的 SDK 结果摘要）。涵盖：**校对**、**参考资料预筛 / 规划 / 精排**、**编辑记忆合并**（统一经 `llmClient`）。失败时额外输出 axios 错误响应体（若有）。长文本会完整打印，可能影响性能。"
         }
       }
     },
@@ -1294,7 +1294,7 @@
         },
         {
           "id": "ai-proofread.referencePrepResults",
-          "name": "参考资料命中",
+          "name": "reference hit",
           "when": "aiProofread.showReferencePrepResultsView"
         }
       ]
@@ -1661,7 +1661,8 @@
     "lint": "eslint src --ext ts",
     "package-vsix": "npx vsce package",
     "publish": "npx vsce publish",
-    "mdict:debug": "node scripts/mdict-debug.js"
+    "mdict:debug": "node scripts/mdict-debug.js",
+    "postinstall": "node scripts/patch-mdict-js.js"
   },
   "dependencies": {
     "@google/genai": "^0.7.0",

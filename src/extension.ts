@@ -392,10 +392,10 @@ export function activate(context: vscode.ExtensionContext) {
             await openCorpusHitInEditor(hit, refRoot);
         }),
         vscode.commands.registerCommand('ai-proofread.referencePrep.pruneHit', async (node?: ReferencePrepTreeNode) => {
-            if (node?.kind === 'hit') referencePrepResultsProvider.pruneHit(node.hit.hitId);
+            if (node?.kind === 'hit') referencePrepResultsProvider.pruneHit(node.hit);
         }),
         vscode.commands.registerCommand('ai-proofread.referencePrep.restoreHit', async (node?: ReferencePrepTreeNode) => {
-            if (node?.kind === 'hit') referencePrepResultsProvider.restoreHit(node.hit.hitId);
+            if (node?.kind === 'hit') referencePrepResultsProvider.restoreHit(node.hit);
         }),
         vscode.commands.registerCommand('ai-proofread.referencePrep.copyBlock', async (node?: ReferencePrepTreeNode) => {
             if (node?.kind === 'hit' && node.hit.referenceBlock) {

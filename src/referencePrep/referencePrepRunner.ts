@@ -156,10 +156,10 @@ export async function runReferencePrepForTarget(
             params.anchorPath,
             `Continuation: prior rounds=${proc.rounds.length} active_hits=${proc.corpus.filter((h) => h.status === 'active').length}`
         );
-        params.onProgress?.('参考资料准备：续跑（保留已有 corpus）…');
+        params.onProgress?.('续跑（保留已有 corpus）…');
     }
 
-    params.onProgress?.('参考资料准备：解析资源范围…');
+    params.onProgress?.('解析资源范围…');
     let resourceScope =
         params.continuation && proc.resourceScope
             ? proc.resourceScope
@@ -207,7 +207,7 @@ export async function runReferencePrepForTarget(
             continuation: params.continuation,
         });
 
-        params.onProgress?.(`参考资料准备：第 ${round + 1}/${maxRounds} 轮规划…`);
+        params.onProgress?.(`第 ${round + 1}/${maxRounds} 轮规划…`);
         appendProcessLog(params.anchorPath, `Round ${round + 1} plan LLM`);
 
         const raw = await generateReferencePrepPlanJson({ platform, model, systemPrompt, userPrompt });
@@ -235,7 +235,7 @@ export async function runReferencePrepForTarget(
             break;
         }
 
-        params.onProgress?.(`参考资料准备：执行 ${plan.queries.length} 个查询…`);
+        params.onProgress?.(`执行 ${plan.queries.length} 个查询…`);
         const incoming = await executeReferencePrepPlan({
             plan,
             target: params.target,
@@ -249,7 +249,7 @@ export async function runReferencePrepForTarget(
         });
         roundIncomingTotal += incoming.length;
 
-        params.onProgress?.(`参考资料准备：精排 ${incoming.length} 条候选…`);
+        params.onProgress?.(`精排 ${incoming.length} 条候选…`);
         const reranked = await runLlmRerank({ target: params.target, hits: incoming });
 
         mergeCorpusDedupe(proc.corpus, reranked);

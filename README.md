@@ -185,7 +185,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 在批量校对或选段校对前，经**资源范围解析**（大库时 LLM 预筛词典/目录/标题）与**多轮 LLM 规划**，从**本地词典**、**grep**、**BM25/FTS**、**轻量向量**（字符 n-gram）检索参考文献（`ai-proofread.citation.referencesPath`），经**混合打分**与**LLM 精排**后写入 `reference`，再调用既有校对流程。
 
-- 选段命令：`AI Proofreader: knowledge verify selection`（可选「仅准备」或「准备并校对」；**记住上次**资料来源与核查强度；「准备并校对」时**另选校对提示词**，默认「知识核查（item）」）
+- 选段命令：`AI Proofreader: knowledge verify selection`（**第一步**选：准备并验证 / 仅准备 / 用已有资料验证；后两种再选资料来源与强度，**记住上次**；准备并验证或「用已有资料」时**另选校对提示词**，默认「知识核查（item）」）
 - 文献检索：`AI Proofreader: LLM-enhanced grep search`（自然语言意图；默认 grep + BM25 + vector）
 - JSON：校对面板 **准备参考资料**，或命令 `prepare references for JSON file`
 - 结果查看：侧栏 **参考资料命中** TreeView（命令 `open reference prep results`）；可打开文件跳转、复制块、手动 prune
@@ -200,21 +200,21 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 为不同 LLM 管线分别指定平台与模型名称。默认继承关系：
 
-| 管线 | 默认跟随 | 说明 |
-|------|----------|------|
+| 管线（侧栏顺序） | 默认跟随 | 说明 |
+|------------------|----------|------|
 | 校对 | — | `proofread.platform` / `proofread.models.*` |
-| 参考资料准备 | 校对 | 多轮规划 |
-| 参考资料预筛 | 参考资料准备 | 大目录时筛选词典与文献 |
-| 参考资料精排 | 参考资料准备 | 每轮检索后打分去重 |
+| 参考资料预筛 | 参考资料规划 | 大目录时筛选词典与文献（规划前，条件触发） |
+| 参考资料规划 | 校对 | 多轮生成检索计划 JSON |
+| 参考资料精排 | 参考资料规划 | 每轮检索后打分去重 |
 | 编辑记忆合并 | 校对 | 带记忆校对写回后整理 |
 
-精排与预筛可在配置中选择跟随「校对」或「参考资料准备」。点击树中某一项即可选择平台、填写模型或切换跟随对象。高级用户可编辑 `ai-proofread.modelRoutes`（支持 `inheritFrom`: `proofread` | `referencePrep`）。
+精排与预筛可在配置中选择跟随「校对」或「参考资料规划」。点击树中某一项即可选择平台、填写模型或切换跟随对象。高级用户可编辑 `ai-proofread.modelRoutes`（支持 `inheritFrom`: `proofread` | `referencePrep`）。
 
 **推荐模型组合**（DeepSeek 示例，可按平台替换）：
 
 - **校对**：`deepseek-v4-pro`（质量优先）
-- **参考资料准备**：`deepseek-v4-flash` 或 `qwen3-max`（多轮 JSON 规划，成本适中）
-- **预筛 / 精排**：跟随参考资料准备，或单独指定 flash 模型以进一步降本
+- **参考资料规划**：`deepseek-v4-flash` 或 `qwen3-max`（多轮 JSON 规划，成本适中）
+- **预筛 / 精排**：跟随参考资料规划，或单独指定 flash 模型以进一步降本
 - **编辑记忆合并**：跟随校对，或单独指定较小模型（结构化 patch，对推理要求较低）
 
 

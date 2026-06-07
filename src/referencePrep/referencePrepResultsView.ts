@@ -3,6 +3,12 @@ import * as path from 'path';
 import type { CorpusHit, ReferencePrepProcessFileV020, ReferencePrepRound } from './schema';
 import { loadProcessFile, saveProcessFile } from './processFile';
 import { buildMergedReference } from './retrieval/executor';
+import {
+    getHitsForRoundQuery,
+    getQueryIdsWithHits,
+    getRoundHitCount,
+    roundHasVisibleHits,
+} from './referencePrepResultsTree';
 
 export type ReferencePrepRoundNode = { kind: 'round'; round: ReferencePrepRound; roundIndex: number };
 export type ReferencePrepQueryNode = {
@@ -44,28 +50,39 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
     getTreeItem(element: ReferencePrepTreeNode): vscode.TreeItem {
         if (element.kind === 'round') {
             const r = element.round;
+            const hitCount = this.process ? getRoundHitCount(this.process, element.roundIndex) : 0;
             const item = new vscode.TreeItem(
                 `轮次 ${element.roundIndex + 1}`,
-                vscode.TreeItemCollapsibleState.Expanded
+                hitCount > 0
+                    ? vscode.TreeItemCollapsibleState.Expanded
+                    : vscode.TreeItemCollapsibleState.None
             );
             item.id = `rp-round:${element.roundIndex}`;
-            item.description = `${r.queryCount} 查询`;
-            item.tooltip = r.startedAt + (r.finishedAt ? ` → ${r.finishedAt}` : '');
+            item.description = `${hitCount} 命中`;
+            item.tooltip = [
+                r.startedAt + (r.finishedAt ? ` → ${r.finishedAt}` : ''),
+                `规划 ${r.queryCount} 个查询，corpus ${hitCount} 条`,
+            ].join('\n');
             return item;
         }
         if (element.kind === 'query') {
+            const hits = this.process
+                ? getHitsForRoundQuery(this.process, element.roundIndex, element.queryId)
+                : [];
             const item = new vscode.TreeItem(
                 element.queryId,
-                vscode.TreeItemCollapsibleState.Collapsed
+                hits.length > 0
+                    ? vscode.TreeItemCollapsibleState.Collapsed
+                    : vscode.TreeItemCollapsibleState.None
             );
             item.id = `rp-query:${element.roundIndex}:${element.queryId}`;
-            item.description = element.intent;
+            item.description = `${element.intent} · ${hits.length} 条`;
             return item;
         }
         const h = element.hit;
         const label = h.snippet.slice(0, 40).replace(/\s+/g, ' ') + (h.snippet.length > 40 ? '…' : '');
         const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-        item.id = `rp-hit:${h.hitId}`;
+        item.id = `rp-hit:${element.roundIndex}:${h.queryId}:${h.hitId}`;
         const score = (h.rerankScore ?? h.finalScore ?? h.aggregatedValue).toFixed(2);
         item.description = `${h.source} · ${score} · ${h.status}`;
         const tips = [
@@ -96,16 +113,13 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
     getChildren(element?: ReferencePrepTreeNode): ReferencePrepTreeNode[] {
         if (!this.process) return [];
         if (!element) {
-            return this.process.rounds.map((round, roundIndex) => ({
-                kind: 'round' as const,
-                round,
-                roundIndex,
-            }));
+            return this.process.rounds
+                .map((round, roundIndex) => ({ kind: 'round' as const, round, roundIndex }))
+                .filter(({ roundIndex }) => roundHasVisibleHits(this.process!, roundIndex));
         }
         if (element.kind === 'round') {
-            const qIds = element.round.plan.queries.map((q) => q.queryId);
-            const unique = [...new Set(qIds)];
-            return unique.map((queryId) => {
+            const queryIds = getQueryIdsWithHits(this.process, element.round, element.roundIndex);
+            return queryIds.map((queryId) => {
                 const q = element.round.plan.queries.find((x) => x.queryId === queryId)!;
                 return {
                     kind: 'query' as const,
@@ -116,21 +130,18 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
             });
         }
         if (element.kind === 'query') {
-            const roundId = this.process!.rounds[element.roundIndex]?.roundId;
-            return this.process!.corpus
-                .filter((h) => h.queryId === element.queryId && (!roundId || h.roundId === roundId || !h.roundId))
-                .map((hit) => ({
-                    kind: 'hit' as const,
-                    hit,
-                    roundIndex: element.roundIndex,
-                }));
+            return getHitsForRoundQuery(this.process, element.roundIndex, element.queryId).map((hit) => ({
+                kind: 'hit' as const,
+                hit,
+                roundIndex: element.roundIndex,
+            }));
         }
         return [];
     }
 
-    pruneHit(hitId: string): void {
+    pruneHit(hit: CorpusHit): void {
         if (!this.process || !this.anchorPath) return;
-        const h = this.process.corpus.find((x) => x.hitId === hitId);
+        const h = this.process.corpus.find((x) => x.digest === hit.digest);
         if (!h) return;
         h.status = 'pruned';
         h.pruneReason = '手动 prune';
@@ -139,9 +150,9 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
         this._onDidChangeTreeData.fire();
     }
 
-    restoreHit(hitId: string): void {
+    restoreHit(hit: CorpusHit): void {
         if (!this.process || !this.anchorPath) return;
-        const h = this.process.corpus.find((x) => x.hitId === hitId);
+        const h = this.process.corpus.find((x) => x.digest === hit.digest);
         if (!h) return;
         h.status = 'active';
         h.pruneReason = undefined;
