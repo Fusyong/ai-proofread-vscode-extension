@@ -51,6 +51,13 @@ import { LocalDictQueryCommandHandler } from './commands/localDictQueryCommandHa
 import { GrepSearchCommandHandler } from './commands/grepSearchCommandHandler';
 import { registerModelRoutesView } from './modelRoutes/modelRoutesView';
 import { ModelRoutesCommandHandler } from './modelRoutes/modelRoutesCommandHandler';
+import {
+    registerReferencePrepResultsView,
+    openCorpusHitInEditor,
+    type ReferencePrepTreeNode,
+} from './referencePrep/referencePrepResultsView';
+import { resolveReferencesPath } from './citation/referenceStore';
+import type { CorpusHit } from './referencePrep/schema';
 
 const OPENCC_LOCALES: Array<{ id: OpenccLocale; label: string; description: string }> = [
     { id: 'cn', label: 'cn', description: 'Simplified Chinese (Mainland China)' },
@@ -99,9 +106,14 @@ export function activate(context: vscode.ExtensionContext) {
     const splitIntoSentencesHandler = new SplitIntoSentencesCommandHandler();
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
-    const referencePrepHandler = new ReferencePrepCommandHandler(webviewManager, proofreadHandler);
+    const { provider: referencePrepResultsProvider } = registerReferencePrepResultsView(context);
+    const referencePrepHandler = new ReferencePrepCommandHandler(
+        webviewManager,
+        proofreadHandler,
+        referencePrepResultsProvider
+    );
     const localDictQueryHandler = new LocalDictQueryCommandHandler();
-    const grepSearchHandler = new GrepSearchCommandHandler();
+    const grepSearchHandler = new GrepSearchCommandHandler(referencePrepResultsProvider);
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
     const citationHandler = new CitationCommandHandler(context, citationTreeProvider, citationTreeView);
     const { provider: duplicateTreeProvider, treeView: duplicateTreeView } = registerDuplicateView(context);
@@ -364,6 +376,31 @@ export function activate(context: vscode.ExtensionContext) {
 
         vscode.commands.registerCommand('ai-proofread.llmGrepSearchReferences', async () => {
             await grepSearchHandler.handleLlmGrepSearchCommand(vscode.window.activeTextEditor, context);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.referencePrep.openView', async () => {
+            await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
+            const editor = vscode.window.activeTextEditor;
+            if (editor?.document.uri.fsPath) {
+                referencePrepResultsProvider.loadFromAnchor(editor.document.uri.fsPath);
+            }
+        }),
+        vscode.commands.registerCommand('ai-proofread.referencePrep.openHit', async (hit?: CorpusHit) => {
+            if (!hit) return;
+            const config = vscode.workspace.getConfiguration('ai-proofread');
+            const refRoot = resolveReferencesPath(config.get<string>('citation.referencesPath', '${workspaceFolder}/references'));
+            await openCorpusHitInEditor(hit, refRoot);
+        }),
+        vscode.commands.registerCommand('ai-proofread.referencePrep.pruneHit', async (node?: ReferencePrepTreeNode) => {
+            if (node?.kind === 'hit') referencePrepResultsProvider.pruneHit(node.hit.hitId);
+        }),
+        vscode.commands.registerCommand('ai-proofread.referencePrep.restoreHit', async (node?: ReferencePrepTreeNode) => {
+            if (node?.kind === 'hit') referencePrepResultsProvider.restoreHit(node.hit.hitId);
+        }),
+        vscode.commands.registerCommand('ai-proofread.referencePrep.copyBlock', async (node?: ReferencePrepTreeNode) => {
+            if (node?.kind === 'hit' && node.hit.referenceBlock) {
+                await vscode.env.clipboard.writeText(node.hit.referenceBlock);
+            }
         }),
 
         // 注册在PDF中搜索选中文本命令

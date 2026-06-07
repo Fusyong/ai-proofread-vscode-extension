@@ -3,12 +3,10 @@ import * as path from 'path';
 import { createRequire } from 'module';
 import { spawnSync } from 'child_process';
 import type { RawGrepLineHit } from './hitMerger';
+import { getGrepMaxFiles } from '../config';
 
 let cachedRgPath: string | undefined;
 
-/**
- * 从扩展根目录 require @vscode/ripgrep（不可被 Parcel 打包，见 .parcelrc）。
- */
 function getRgPath(): string {
     if (cachedRgPath) {
         return cachedRgPath;
@@ -23,13 +21,13 @@ function getRgPath(): string {
             return cachedRgPath;
         }
     } catch {
-        /* 开发环境未安装或 vsix 未包含 optional 平台包时回退 */
+        /* fallback */
     }
     cachedRgPath = process.platform === 'win32' ? 'rg.exe' : 'rg';
     return cachedRgPath;
 }
 
-function listMdFiles(root: string): string[] {
+function listMdFiles(root: string, scopePaths?: string[]): string[] {
     const out: string[] = [];
     const exts = new Set(['.md', '.markdown', '.txt']);
     const walk = (dir: string) => {
@@ -50,6 +48,14 @@ function listMdFiles(root: string): string[] {
         }
     };
     walk(root);
+
+    if (scopePaths?.length) {
+        const normalized = scopePaths.map((p) => p.replace(/\\/g, '/'));
+        return out.filter((full) => {
+            const rel = path.relative(root, full).replace(/\\/g, '/');
+            return normalized.some((sp) => rel === sp || rel.startsWith(sp + '/'));
+        });
+    }
     return out;
 }
 
@@ -67,50 +73,62 @@ function grepFile(filePath: string, pattern: string, caseInsensitive: boolean): 
     return lines;
 }
 
-/**
- * 在参考文献根目录下检索 md/txt（首期：逐文件 rg，避免复杂 glob）。
- */
+export function buildRgCommand(filePath: string, pattern: string, caseInsensitive: boolean): string {
+    const args = ['--line-number', '--no-heading', '--max-count', '80'];
+    if (caseInsensitive) args.push('-i');
+    args.push(JSON.stringify(pattern), JSON.stringify(filePath));
+    return `rg ${args.join(' ')}`;
+}
+
 export function runGrepInReferences(params: {
     referencesRoot: string;
     patterns: string[];
     patternValue: number;
     contextLines: number;
     maxFiles?: number;
+    scopePaths?: string[];
 }): RawGrepLineHit[] {
     const root = path.normalize(params.referencesRoot);
     if (!fs.existsSync(root)) return [];
 
-    const files = listMdFiles(root).slice(0, params.maxFiles ?? 200);
+    const maxFiles = params.maxFiles ?? getGrepMaxFiles();
+    const files = listMdFiles(root, params.scopePaths).slice(0, maxFiles);
     const hits: RawGrepLineHit[] = [];
     const ctx = Math.max(0, params.contextLines ?? 2);
 
     for (const file of files) {
-        let content: string;
-        try {
-            content = fs.readFileSync(file, 'utf8');
-        } catch {
-            continue;
-        }
-        const fileLines = content.split(/\r?\n/);
-
+        const relFile = path.relative(root, file).replace(/\\/g, '/') || file;
         for (const pattern of params.patterns) {
             if (!pattern.trim()) continue;
             const matchedLines = grepFile(file, pattern, true);
             for (const lineNo of matchedLines) {
-                const idx = lineNo - 1;
-                if (idx < 0 || idx >= fileLines.length) continue;
-                const start = Math.max(0, idx - ctx);
-                const end = Math.min(fileLines.length - 1, idx + ctx);
-                const snippet = fileLines.slice(start, end + 1).join('\n');
                 hits.push({
-                    file: path.relative(root, file) || file,
+                    file: relFile,
                     line: lineNo,
-                    lineText: snippet,
+                    lineText: '',
                     pattern,
                     patternValue: params.patternValue,
                 });
             }
         }
     }
+
+    for (const h of hits) {
+        if (h.lineText) continue;
+        const full = path.join(root, h.file);
+        let content: string;
+        try {
+            content = fs.readFileSync(full, 'utf8');
+        } catch {
+            continue;
+        }
+        const fileLines = content.split(/\r?\n/);
+        const idx = h.line - 1;
+        if (idx < 0 || idx >= fileLines.length) continue;
+        const start = Math.max(0, idx - ctx);
+        const end = Math.min(fileLines.length - 1, idx + ctx);
+        h.lineText = fileLines.slice(start, end + 1).join('\n');
+    }
+
     return hits;
 }

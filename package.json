@@ -122,6 +122,26 @@
         "description": "用自然语言描述检索意图，LLM 规划后在本地词典中检索，在参考文献目录中grep，可以多轮次处理"
       },
       {
+        "command": "ai-proofread.referencePrep.openView",
+        "title": "AI Proofreader: open reference prep results"
+      },
+      {
+        "command": "ai-proofread.referencePrep.openHit",
+        "title": "打开命中位置"
+      },
+      {
+        "command": "ai-proofread.referencePrep.pruneHit",
+        "title": "丢弃此命中"
+      },
+      {
+        "command": "ai-proofread.referencePrep.restoreHit",
+        "title": "恢复此命中"
+      },
+      {
+        "command": "ai-proofread.referencePrep.copyBlock",
+        "title": "复制 reference 块"
+      },
+      {
         "command": "ai-proofread.proofreadFile",
         "title": "AI Proofreader: proofread file"
       },
@@ -627,10 +647,10 @@
         "ai-proofread.referencePrep.enabledSources": {
           "order": 36,
           "type": "array",
-          "default": ["dict", "grep_md"],
+          "default": ["dict", "grep_md", "bm25", "vector"],
           "items": {
             "type": "string",
-            "enum": ["dict", "grep_md", "citation", "web"]
+            "enum": ["dict", "grep_md", "bm25", "vector", "citation", "web"]
           },
           "description": "默认启用的参考资料来源。"
         },
@@ -664,11 +684,103 @@
           "maximum": 100000,
           "description": "每轮 grep 结果总字符预算。"
         },
+        "ai-proofread.referencePrep.grep.maxFiles": {
+          "order": 37.75,
+          "type": "number",
+          "default": 500,
+          "minimum": 50,
+          "maximum": 5000,
+          "description": "grep 扫描参考文献文件数上限。"
+        },
+        "ai-proofread.referencePrep.scope.dictCountThreshold": {
+          "order": 37.8,
+          "type": "number",
+          "default": 8,
+          "description": "词典数超过此值时启用 LLM 资源预筛。"
+        },
+        "ai-proofread.referencePrep.scope.fileCountThreshold": {
+          "order": 37.81,
+          "type": "number",
+          "default": 100,
+          "description": "参考文献文件数超过此值时启用 LLM 目录预筛。"
+        },
+        "ai-proofread.referencePrep.scope.dirDepthThreshold": {
+          "order": 37.82,
+          "type": "number",
+          "default": 4,
+          "description": "目录深度超过此值时启用 LLM 预筛。"
+        },
+        "ai-proofread.referencePrep.scope.headingCountThreshold": {
+          "order": 37.83,
+          "type": "number",
+          "default": 40,
+          "description": "单批标题数超过此值时启用标题预筛。"
+        },
+        "ai-proofread.referencePrep.scope.tocCharsThreshold": {
+          "order": 37.84,
+          "type": "number",
+          "default": 8000,
+          "description": "TOC 字符超过此值时启用标题预筛。"
+        },
+        "ai-proofread.referencePrep.scope.fallbackWidenMinHits": {
+          "order": 37.85,
+          "type": "number",
+          "default": 2,
+          "description": "预筛后首轮命中低于此值则自动扩大 scope。"
+        },
+        "ai-proofread.referencePrep.rerank.enabled": {
+          "order": 37.9,
+          "type": "boolean",
+          "default": true,
+          "description": "检索后是否启用 LLM 精排。"
+        },
+        "ai-proofread.referencePrep.rerank.includeReason": {
+          "order": 37.91,
+          "type": "boolean",
+          "default": true,
+          "description": "精排 JSON 是否要求 LLM 给出 reason。"
+        },
+        "ai-proofread.referencePrep.rerank.maxCandidates": {
+          "order": 37.92,
+          "type": "number",
+          "default": 40,
+          "description": "每批送入精排 LLM 的候选上限。"
+        },
+        "ai-proofread.referencePrep.bm25.topK": {
+          "order": 37.93,
+          "type": "number",
+          "default": 25,
+          "description": "BM25 检索 topK。"
+        },
+        "ai-proofread.referencePrep.vector.enabled": {
+          "order": 37.94,
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用轻量向量检索（字符 n-gram）。"
+        },
+        "ai-proofread.referencePrep.vector.topK": {
+          "order": 37.95,
+          "type": "number",
+          "default": 20,
+          "description": "向量检索 topK。"
+        },
+        "ai-proofread.referencePrep.vector.minScore": {
+          "order": 37.96,
+          "type": "number",
+          "default": 0.15,
+          "description": "向量相似度最低阈值。"
+        },
+        "ai-proofread.referencePrep.scoring.weights": {
+          "order": 37.97,
+          "type": "object",
+          "default": {},
+          "description": "混合相关性权重：llmPriority, channelScore, cooccurrence, scopeMatch, clusterBoost。"
+        },
         "ai-proofread.modelRoutes": {
           "order": 9.5,
           "type": "object",
           "default": {},
-          "description": "各功能 LLM 路由覆盖。键为 referencePrep | editorialMemory；inherit 为 true 时跟随校对。",
+          "description": "各功能 LLM 路由覆盖。键为 referencePrep | referencePrepRerank | editorialMemory；inherit 为 true 时跟随校对。",
           "additionalProperties": {
             "type": "object",
             "properties": {
@@ -1168,6 +1280,11 @@
           "id": "ai-proofread.proofreadItems",
           "name": "校对条目",
           "when": "aiProofread.showProofreadItemsView"
+        },
+        {
+          "id": "ai-proofread.referencePrepResults",
+          "name": "参考资料命中",
+          "when": "aiProofread.showReferencePrepResultsView"
         }
       ]
     },
@@ -1254,6 +1371,26 @@
           "command": "ai-proofread.proofreadItems.diffItem",
           "when": "view == ai-proofread.proofreadItems && viewItem == proofreadItem",
           "group": "proofreadItems@1"
+        },
+        {
+          "command": "ai-proofread.referencePrep.openHit",
+          "when": "view == ai-proofread.referencePrepResults && viewItem == referencePrepHitActive",
+          "group": "referencePrep@1"
+        },
+        {
+          "command": "ai-proofread.referencePrep.copyBlock",
+          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitActive || viewItem == referencePrepHitPruned)",
+          "group": "referencePrep@1"
+        },
+        {
+          "command": "ai-proofread.referencePrep.pruneHit",
+          "when": "view == ai-proofread.referencePrepResults && viewItem == referencePrepHitActive",
+          "group": "referencePrep@2"
+        },
+        {
+          "command": "ai-proofread.referencePrep.restoreHit",
+          "when": "view == ai-proofread.referencePrepResults && viewItem == referencePrepHitPruned",
+          "group": "referencePrep@2"
         },
         {
           "command": "ai-proofread.prompts.edit",

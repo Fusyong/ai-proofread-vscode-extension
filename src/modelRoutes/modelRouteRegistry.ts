@@ -2,7 +2,7 @@
  * 各 LLM 管线可独立配置平台与模型；未单独配置时可「跟随校对」。
  */
 
-export type ModelRouteId = 'proofread' | 'referencePrep' | 'editorialMemory';
+export type ModelRouteId = 'proofread' | 'referencePrep' | 'referencePrepRerank' | 'editorialMemory';
 
 export type LlmPlatformId = 'aliyun' | 'deepseek' | 'google' | 'ollama';
 
@@ -32,6 +32,12 @@ export const MODEL_ROUTE_METAS: ModelRouteMeta[] = [
         id: 'referencePrep',
         label: '参考资料准备',
         description: '知识核查 / 多轮检索词典与文献',
+        canInherit: true,
+    },
+    {
+        id: 'referencePrepRerank',
+        label: '参考资料精排',
+        description: '检索结果相关性打分、去重与裁剪',
         canInherit: true,
     },
     {

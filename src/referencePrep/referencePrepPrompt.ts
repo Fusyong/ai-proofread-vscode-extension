@@ -1,6 +1,7 @@
 import type { ResolvedLocalDictConfigItem } from '../localDict/dictConfig';
-import type { ReferencePrepIntent, ReferencePrepPlan, ReferenceSourceId } from './schema';
+import type { ReferencePrepIntent, ReferencePrepPlan, ReferenceSourceId, RetrievalUnit } from './schema';
 import type { CorpusHit } from './schema';
+import type { ResourceScope } from './schema';
 
 export function buildReferencePrepSystemPrompt(params: {
     enabledSources: ReferenceSourceId[];
@@ -9,7 +10,6 @@ export function buildReferencePrepSystemPrompt(params: {
     intents: ReferencePrepIntent[];
     targetKind?: ReferencePrepTargetKind;
 }): string {
-    const srcLines = params.enabledSources.map((s) => '- enabled: ' + s).join('\n');
     const disLines = params.disabledSources.map((s) => '- disabled: ' + s).join('\n');
     const intentList = params.intents.join(', ');
     const targetKind = params.targetKind ?? 'manuscript';
@@ -27,14 +27,18 @@ export function buildReferencePrepSystemPrompt(params: {
         '4) 每个 query 含：queryId, intent, priority(0~1), 以及按来源填写的 dict 或 grep 块（勿写 source 字段）。',
         '5) intent 必须是以下之一：' + intentList,
         '6) dict 块：dictId（从 dicts 选，不确定用 null）, candidates(1~3 个词条), 可选 why。',
-        '7) grep 块：patterns(1~4 个关键词/短语), 可选 contextLines(默认 2)。',
+        '7) grep 块：patterns(1~4 个关键词/短语), 可选 contextLines(默认 2), unit, scopePaths, searchPhrases。',
+        '   unit 取值：line_context | sentence | md_paragraph | heading_section | file_outline。',
+        '   entity_name/word_usage 倾向 sentence；general_fact 倾向 md_paragraph；探索性可用 line_context。',
+        '   searchPhrases 供 BM25/向量检索（可与 patterns 相同或更宽）。',
         '8) prune：列出应丢弃的 hitId（与 corpus 摘要对应）。',
         '',
         '规则：',
         '- 只为当前无法确定、查资料可能有明确收益的信息建 query；宁缺毋滥。',
         '- disabled 来源禁止为其生成 query。',
-        '- enabled 含 dict 时可为专名/术语填 dict；含 grep_md 时可填文献检索 patterns。',
+        '- enabled 含 dict 时可为专名/术语填 dict；含 grep_md/bm25/vector 时可填文献检索。',
         '- 词条不要带书名号；patterns 宜短、可命中参考文献。',
+        disLines ? '\n' + disLines : '',
     ].join('\n');
 }
 
@@ -47,6 +51,9 @@ export function buildReferencePrepUserPrompt(params: {
     roundIndex: number;
     maxRounds: number;
     targetKind?: ReferencePrepTargetKind;
+    catalogSummary?: string;
+    scope?: ResourceScope;
+    navigationHints?: string;
 }): string {
     const dictLines = params.dicts
         .map((d) => {
@@ -62,12 +69,25 @@ export function buildReferencePrepUserPrompt(params: {
             ? ['<search_intent>', params.target, '</search_intent>']
             : ['<target>', params.target, '</target>'];
 
+    const scopeBlock = params.scope
+        ? [
+              'resource_scope:',
+              `  dictIds=[${params.scope.dictIds.join(',')}]`,
+              `  filePaths_count=${params.scope.filePaths.length}`,
+              `  llmFiltered=${params.scope.llmFiltered}`,
+              params.scope.widened ? `  widened=${params.scope.widenReason ?? 'yes'}` : '',
+          ].filter(Boolean)
+        : [];
+
     return [
         'round=' + (params.roundIndex + 1) + '/' + params.maxRounds,
         '',
         'dicts:',
         dictLines || '(空)',
         '',
+        ...(params.catalogSummary ? ['catalog:', params.catalogSummary, ''] : []),
+        ...scopeBlock,
+        ...(params.navigationHints ? ['navigation_hints:', params.navigationHints, ''] : []),
         'corpus_summary:',
         params.corpusSummary || '(尚无)',
         '',
@@ -76,7 +96,10 @@ export function buildReferencePrepUserPrompt(params: {
 }
 
 export function buildCorpusSummary(corpus: CorpusHit[], maxItems = 24): string {
-    const active = corpus.filter((h) => h.status === 'active').slice(0, maxItems);
+    const active = corpus
+        .filter((h) => h.status === 'active')
+        .sort((a, b) => (b.finalScore ?? b.aggregatedValue) - (a.finalScore ?? a.aggregatedValue))
+        .slice(0, maxItems);
     if (active.length === 0) return '';
     return active
         .map(
@@ -86,7 +109,7 @@ export function buildCorpusSummary(corpus: CorpusHit[], maxItems = 24): string {
                     ' source=' +
                     h.source +
                     ' value=' +
-                    h.aggregatedValue.toFixed(2) +
+                    (h.finalScore ?? h.aggregatedValue).toFixed(2) +
                     ' digest=' +
                     h.digest +
                     ' snippet=' +
@@ -105,6 +128,14 @@ function extractJsonObject(raw: string): string {
     }
     return s.slice(start, end + 1);
 }
+
+const VALID_UNITS: RetrievalUnit[] = [
+    'line_context',
+    'sentence',
+    'md_paragraph',
+    'heading_section',
+    'file_outline',
+];
 
 const INTENTS: ReferencePrepIntent[] = [
     'entity_name',
@@ -147,11 +178,22 @@ export function parseReferencePrepPlan(raw: string, allowedIntents: ReferencePre
             const patterns = Array.isArray(x.grep.patterns)
                 ? x.grep.patterns.map((s: unknown) => (typeof s === 'string' ? s.trim() : '')).filter(Boolean)
                 : [];
+            const searchPhrases = Array.isArray(x.grep.searchPhrases)
+                ? x.grep.searchPhrases.map((s: unknown) => (typeof s === 'string' ? s.trim() : '')).filter(Boolean)
+                : undefined;
+            const unitRaw = typeof x.grep.unit === 'string' ? x.grep.unit : undefined;
+            const unit = VALID_UNITS.includes(unitRaw as RetrievalUnit) ? (unitRaw as RetrievalUnit) : undefined;
+            const scopePaths = Array.isArray(x.grep.scopePaths)
+                ? x.grep.scopePaths.filter((s: unknown) => typeof s === 'string')
+                : undefined;
             if (patterns.length > 0) {
                 q.grep = {
                     patterns: patterns.slice(0, 4),
                     contextLines:
                         typeof x.grep.contextLines === 'number' ? Math.max(0, Math.min(10, x.grep.contextLines)) : 2,
+                    unit,
+                    scopePaths,
+                    searchPhrases: searchPhrases?.slice(0, 4),
                 };
             }
         }
@@ -169,7 +211,6 @@ export function parseReferencePrepPlan(raw: string, allowedIntents: ReferencePre
     return { sufficient, queries, prune };
 }
 
-/** 从 target 兜底提取 grep pattern 候选 */
 export function extractFallbackGrepPatterns(target: string): string[] {
     const out: string[] = [];
     const push = (s: string) => {
@@ -187,4 +228,12 @@ export function extractFallbackGrepPatterns(target: string): string[] {
         push(m[1]);
     }
     return out.slice(0, 4);
+}
+
+export function buildNavigationHints(corpus: CorpusHit[]): string {
+    const hints = corpus.filter((h) => h.kind === 'navigation_hint' && h.suggestedScope);
+    if (hints.length === 0) return '';
+    return hints
+        .map((h) => `${h.suggestedScope?.file} -> ${h.suggestedScope?.headingPath ?? '(root)'}`)
+        .join('\n');
 }

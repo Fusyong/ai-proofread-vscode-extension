@@ -183,18 +183,21 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 **统一参考资料准备（知识核查）**：
 
-在批量校对或选段校对前，可多轮检索**本地词典**与**参考文献目录**（`ai-proofread.citation.referencesPath` 下的 md/txt），将结果写入 `reference`，再调用既有校对流程。
+在批量校对或选段校对前，经**资源范围解析**（大库时 LLM 预筛词典/目录/标题）与**多轮 LLM 规划**，从**本地词典**、**grep**、**BM25/FTS**、**轻量向量**（字符 n-gram）检索参考文献（`ai-proofread.citation.referencesPath`），经**混合打分**与**LLM 精排**后写入 `reference`，再调用既有校对流程。
 
 - 选段命令：`AI Proofreader: knowledge verify selection`（可选「仅准备」或「准备并校对」；**记住上次**资料来源与核查强度；「准备并校对」时**另选校对提示词**，默认「知识核查（item）」）
+- 文献检索：`AI Proofreader: LLM-enhanced grep search`（自然语言意图；默认 grep + BM25 + vector）
 - JSON：校对面板 **准备参考资料**，或命令 `prepare references for JSON file`
-- 过程文件：`文档.referenceprep.json`、`文档.referenceprep.log`（详见 `docs/knowledge-verify-plan.md`）
-- 运行前可勾选资料来源（词典 / 参考文献 grep）；强度（轻量 / 标准 / 深入）控制轮次与查询上限
+- 结果查看：侧栏 **参考资料命中** TreeView（命令 `open reference prep results`）；可打开文件跳转、复制块、手动 prune
+- 过程文件：`文档.referenceprep.json`（v0.2 结构化 corpus）、`文档.referenceprep.log`（详见 `docs/knowledge-verify-plan.md`）
+- 运行前可勾选资料来源（词典 / grep / BM25 / 向量）；强度（轻量 / 标准 / 深入）控制轮次与查询上限
+- BM25 需先 **建立引文索引**；向量索引首次使用时懒构建
 
-**参考资料规划提示词**（侧栏 `dict prep prompts`）：可自定义；须要求模型只输出 JSON（`sufficient` / `queries` / `prune`）。未选择时使用内置规划提示词。
+**参考资料规划提示词**（侧栏 `dict prep prompts`）：可自定义；须要求模型只输出 JSON（`sufficient` / `queries` / `prune`；grep 块可含 `unit`、`searchPhrases`）。未选择时使用内置规划提示词。
 
 **模型路由**（默认隐藏；overview 按钮「模型路由」或顶栏齿轮、命令 `open model routes view` 打开侧栏 `model routes`）：
 
-为不同 LLM 管线分别指定平台与模型名称；**参考资料准备**、**编辑记忆合并** 默认**跟随校对**（与 `proofread.platform` / `proofread.models.*` 一致），也可改为独立配置。点击树中某一项即可选择平台、填写模型或切换「跟随校对」。高级用户仍可在设置中编辑 `ai-proofread.modelRoutes`。
+为不同 LLM 管线分别指定平台与模型名称；**参考资料准备**、**参考资料精排**、**编辑记忆合并** 默认**跟随校对**（与 `proofread.platform` / `proofread.models.*` 一致），也可改为独立配置。点击树中某一项即可选择平台、填写模型或切换「跟随校对」。高级用户仍可在设置中编辑 `ai-proofread.modelRoutes`。
 
 
 ### 3.2. 校对
@@ -243,7 +246,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ####  3.2.4. 对文档选段进行知识核查（实验功能）
 
-命令： `knowledge verify selection (prepare references and proofread)`。流程基于“带记忆地校对选段”，先通过本地词典、本地参考文献库检索文中相关知识（暂未集成web搜索）作为reference，然后使用提示词“知识核查（full）”进行校对；可以选择是否使用编辑记忆。 **会消耗比一般校对多得多的token！**
+命令： `knowledge verify selection (prepare references and proofread)`。流程基于“带记忆地校对选段”，先允许referencePrep（参考资料准备） 工作流，即通过本地词典、本地参考文献库检索文中相关知识（暂未集成web搜索）用作reference，然后使用提示词“知识核查（full）”进行校对；可以选择是否使用编辑记忆。 **会消耗比一般校对多得多的token！**
 
 如果要对JSON进行批处理，可以先通过命令`prepare references for JSON file`，或“准备参考资料”按钮，JSON中的所有文本片段准备好参考文本，然后使用提示词“知识核查（full）”进行校对。
 
@@ -386,7 +389,8 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
     * **连线搜索[中华经典古籍库](https://jingdian.ancientbooks.cn)**：`search selection in Ancientbooks (jingdian)`。
     * **连线搜索[识典古籍](https://www.shidianguji.com/)**：`search selection in Shidianguji`。
     * **按选文作词条查本地词典**：`AI Proofreader: exact local dictionary lookup for selection (whole selection as headword)`——将**整段选中文本**视为一个词条，在已配置的 MDict 中做**精确匹配**查询（不做分词或智能规划）。查段落、多词请用 **`knowledge verify selection`**。
-5. **字词检查**：命令`check words`。分类三个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的检查与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》、《古籍印刷通用字规范字形表》、规范人名与年号等数据。用户还可以通过`manage custom tables`命令，加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。这是一个非常强大且灵活的功能，值得深入探索。
+5. **大模型增强grep检索**：命令是`LLM-enhanced grep search`，用户输入（可以通过选中文本作为输入）自己的检索目标，LLM分析后执行对本地词典和参考文献的查询、grep。与知识核查共用referencePrep（参考资料准备） 工作流，仅仅在用户输入解析环节使用不用的语意理解提示。
+6. **字词检查**：命令`check words`。分类三个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的检查与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》、《古籍印刷通用字规范字形表》、规范人名与年号等数据。用户还可以通过`manage custom tables`命令，加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。这是一个非常强大且灵活的功能，值得深入探索。
     ![树视图（提示词管理、字词检查、引文检查）](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/special_checks.png)
 6. **标题树与段内序号检查**：命令`check numbering hierarchy`。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
 7. **引文核对**：指定本地文献库根目录（默认为根目录下的`references`，文件格式为Markdown，可附带同名PDF以便反查），然后使用`build citation reference index`命令建立文献索引（每次更新须手动重建），然后就可以通过`verify selected citation`命令核对选中的引文，或通过`verify citations`批量核对全文中引文（标记是引号、`>`，以及这些句段后的上标、圈码、Markdown注码），结果列表可查看引文和文献的差异，并能在文献PDF中反查。有多种配置可选。需要注意的是，**文献库索引和引文核对的处理单元都是句子**，因此本功能不适用于不成句和没有句末标点的文本，如词语级别的引用、无标点古籍；这样的情况，可以用VSCode自带的多文件全文搜索（Ctrl+Shift+H）功能处理。
@@ -484,7 +488,8 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ### v1.11.1
 
-- 特性：增加按用户意图检索本地词典和参考文件（跟“准备参考文献”逻辑相同，只是LLM会有不同的语意理解）
+- 特性：增加按用户意图检索本地词典和参考文件的命令（跟知识核查共用referencePrep，只是LLM对用户输入有不同的语意理解）
+- referencePrep架构升级为：Phase 0 资源范围 → 多轮 LLM 规划 → 多通道检索 → 混合打分/融合 → LLM 精排 → 结构化 corpus + TreeView。
 
 ### v1.11.0
 

@@ -55,8 +55,47 @@ function rowFromObj(obj: Record<string, unknown>): RefSentenceRow {
 
 const DB_FILENAME = 'citation-refs.db';
 const TABLE_NAME = 'reference_sentences';
+const FTS_TABLE = 'reference_fts';
 const INDEXED_FILES_TABLE = 'indexed_files';
 const EXTENSIONS = ['.md', '.txt'];
+
+export interface Bm25Hit {
+    id: number;
+    file_path: string;
+    content: string;
+    start_line?: number;
+    end_line?: number;
+    paragraph_idx: number;
+    sentence_idx: number;
+    score: number;
+}
+
+/** Markdown 空行分段，返回每段起始/结束行号（1-based） */
+function paragraphLineRanges(content: string): Array<{ startLine: number; endLine: number }> {
+    const lines = normalizeLineEndings(content).split('\n');
+    const ranges: Array<{ startLine: number; endLine: number }> = [];
+    let start = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() === '') {
+            if (start >= 0) {
+                ranges.push({ startLine: start + 1, endLine: i });
+                start = -1;
+            }
+        } else if (start < 0) {
+            start = i;
+        }
+    }
+    if (start >= 0) ranges.push({ startLine: start + 1, endLine: lines.length });
+    return ranges;
+}
+
+function paragraphIndexForLine(line: number, ranges: Array<{ startLine: number; endLine: number }>): number {
+    for (let i = 0; i < ranges.length; i++) {
+        const r = ranges[i];
+        if (line >= r.startLine && line <= r.endLine) return i;
+    }
+    return 0;
+}
 
 /** sql.js 的 Database 类型（运行时注入） */
 type SqlJsDatabase = {
@@ -213,7 +252,44 @@ export class ReferenceStore {
                 size INTEGER NOT NULL
             )
         `);
+        this.ensureFtsTable();
         return this.db;
+    }
+
+    private ensureFtsTable(): void {
+        if (!this.db) return;
+        try {
+            this.db.run(`
+                CREATE VIRTUAL TABLE IF NOT EXISTS ${FTS_TABLE} USING fts5(
+                    content,
+                    file_path UNINDEXED,
+                    tokenize='unicode61'
+                )
+            `);
+        } catch {
+            /* FTS may already exist with different schema */
+        }
+    }
+
+    private rebuildFtsFromSentences(): void {
+        if (!this.db) return;
+        this.ensureFtsTable();
+        try {
+            this.db.run(`DELETE FROM ${FTS_TABLE}`);
+            const rows = this.db.exec(`SELECT id, content, file_path FROM ${TABLE_NAME}`);
+            if (!rows.length || !rows[0].values.length) return;
+            const cols = rows[0].columns;
+            for (const row of rows[0].values) {
+                const obj = cols.reduce((a, c, i) => ({ ...a, [c]: row[i] }), {} as Record<string, unknown>);
+                this.db.run(`INSERT INTO ${FTS_TABLE}(rowid, content, file_path) VALUES (?, ?, ?)`, [
+                    obj.id as number,
+                    obj.content as string,
+                    obj.file_path as string,
+                ]);
+            }
+        } catch {
+            /* FTS rebuild best-effort */
+        }
     }
 
     /** 兼容旧库：若缺少 start_line/end_line 列则添加 */
@@ -309,6 +385,7 @@ export class ReferenceStore {
                 continue;
             }
             const normalizedContent = normalizeLineEndings(content);
+            const paraRanges = paragraphLineRanges(normalizedContent);
             const sentencesWithLines = splitChineseSentencesWithLineNumbers(normalizedContent, true);
             for (let s = 0; s < sentencesWithLines.length; s++) {
                 const [sentence, startLine, endLine] = sentencesWithLines[s];
@@ -316,9 +393,10 @@ export class ReferenceStore {
                 if (!contentTrim) continue;
                 const normalized = normalizeForSimilarity(contentTrim, opts);
                 const len_norm = normalized.length;
+                const pIdx = paragraphIndexForLine(startLine, paraRanges);
                 db.run(
                     `INSERT INTO ${TABLE_NAME} (file_path, paragraph_idx, sentence_idx, content, normalized, len_norm, start_line, end_line) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [relativePath, 0, s, contentTrim, normalized, len_norm, startLine, endLine]
+                    [relativePath, pIdx, s, contentTrim, normalized, len_norm, startLine, endLine]
                 );
                 sentenceCount++;
             }
@@ -329,6 +407,7 @@ export class ReferenceStore {
             filesIndexed++;
         }
 
+        this.rebuildFtsFromSentences();
         this.saveDb();
         return { fileCount: fullRebuild ? files.length : filesIndexed, sentenceCount };
     }
@@ -372,6 +451,81 @@ export class ReferenceStore {
         const escaped = String(filePath).replace(/'/g, "''");
         const result = db.exec(
             `SELECT id, file_path, paragraph_idx, sentence_idx, content, normalized, len_norm, start_line, end_line FROM ${TABLE_NAME} WHERE file_path = '${escaped}' ORDER BY paragraph_idx, sentence_idx`
+        );
+        if (!result.length || !result[0].values.length) return [];
+        const cols = result[0].columns;
+        const rows: RefSentenceRow[] = [];
+        for (const row of result[0].values) {
+            const obj = cols.reduce((a, c, i) => ({ ...a, [c]: row[i] }), {} as Record<string, unknown>);
+            rows.push(rowFromObj(obj));
+        }
+        return rows;
+    }
+
+    /**
+     * BM25/FTS 检索（需先建立引文/检索索引）
+     */
+    async searchBm25(
+        terms: string[],
+        topK: number = 25,
+        scopePaths?: string[]
+    ): Promise<Bm25Hit[]> {
+        const db = await this.ensureDb();
+        const query = terms
+            .map((t) => t.trim())
+            .filter(Boolean)
+            .map((t) => `"${t.replace(/"/g, '')}"`)
+            .join(' OR ');
+        if (!query) return [];
+
+        const escapedQuery = query.replace(/'/g, "''");
+        let sql = `
+            SELECT s.id, s.file_path, s.content, s.start_line, s.end_line, s.paragraph_idx, s.sentence_idx,
+                   bm25(${FTS_TABLE}) AS score
+            FROM ${FTS_TABLE} fts
+            JOIN ${TABLE_NAME} s ON s.id = fts.rowid
+            WHERE ${FTS_TABLE} MATCH '${escapedQuery}'
+        `;
+        if (scopePaths?.length) {
+            const likes = scopePaths
+                .map((p) => {
+                    const like = (p.endsWith('%') ? p : `${p}%`).replace(/'/g, "''");
+                    return `s.file_path LIKE '${like}'`;
+                })
+                .join(' OR ');
+            sql += ` AND (${likes})`;
+        }
+        sql += ` ORDER BY score LIMIT ${Math.max(1, topK)}`;
+
+        try {
+            const result = db.exec(sql);
+            if (!result.length || !result[0].values.length) return [];
+            const cols = result[0].columns;
+            const rows: Bm25Hit[] = [];
+            for (const row of result[0].values) {
+                const obj = cols.reduce((a, c, i) => ({ ...a, [c]: row[i] }), {} as Record<string, unknown>);
+                rows.push({
+                    id: obj.id as number,
+                    file_path: obj.file_path as string,
+                    content: obj.content as string,
+                    start_line: obj.start_line != null ? (obj.start_line as number) : undefined,
+                    end_line: obj.end_line != null ? (obj.end_line as number) : undefined,
+                    paragraph_idx: obj.paragraph_idx as number,
+                    sentence_idx: obj.sentence_idx as number,
+                    score: Math.abs(obj.score as number),
+                });
+            }
+            return rows;
+        } catch {
+            return [];
+        }
+    }
+
+    /** 供向量索引构建：返回全部句子（上限可配置） */
+    async getAllSentences(limit = 50000): Promise<RefSentenceRow[]> {
+        const db = await this.ensureDb();
+        const result = db.exec(
+            `SELECT id, file_path, paragraph_idx, sentence_idx, content, normalized, len_norm, start_line, end_line FROM ${TABLE_NAME} LIMIT ${limit}`
         );
         if (!result.length || !result[0].values.length) return [];
         const cols = result[0].columns;

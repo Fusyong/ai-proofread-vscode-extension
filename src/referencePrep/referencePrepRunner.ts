@@ -1,8 +1,12 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
+import { resolveReferencesPath } from '../citation/referenceStore';
 import { ensureDictFilesExist, resolveLocalDictConfigs } from '../localDict/dictConfig';
+import { getOrBuildCatalog } from './catalog/catalogCache';
+import { summarizeCatalogForPrompt } from './catalog/catalogBuilder';
 import {
     buildCorpusSummary,
+    buildNavigationHints,
     buildReferencePrepSystemPrompt,
     buildReferencePrepUserPrompt,
     parseReferencePrepPlan,
@@ -12,11 +16,12 @@ import { generateReferencePrepPlanJson } from './referencePrepLlm';
 import {
     getDefaultEnabledSources,
     getReferencePrepLlmConfig,
+    getScopeConfig,
     getStrengthPreset,
 } from './config';
 import type {
     ReferencePrepIntent,
-    ReferencePrepProcessFileV010,
+    ReferencePrepProcessFileV020,
     ReferencePrepStrength,
     ReferenceSourceId,
 } from './schema';
@@ -27,6 +32,13 @@ import {
     mergeCorpusDedupe,
 } from './retrieval/executor';
 import { appendProcessLog, loadOrCreateProcessFile, saveProcessFile } from './processFile';
+import {
+    filterDictsByScope,
+    resolveResourceScope,
+    widenResourceScope,
+} from './scope/resourceScope';
+import { runLlmRerank } from './rerank/rerankRunner';
+
 const ALL_INTENTS: ReferencePrepIntent[] = [
     'entity_name',
     'term_norm',
@@ -39,6 +51,7 @@ export interface ReferencePrepProgressHooks {
     onProgress?: (msg: string) => void;
     token?: vscode.CancellationToken;
     onAfterJsonItem?: (itemIndex: number) => void;
+    onProcessUpdated?: (proc: ReferencePrepProcessFileV020) => void;
 }
 
 export interface ReferencePrepRunParams {
@@ -49,9 +62,7 @@ export interface ReferencePrepRunParams {
     strength: ReferencePrepStrength;
     intents?: ReferencePrepIntent[];
     sourceJsonPath?: string;
-    /** JSON 批量时每条独立 corpus */
     freshProcess?: boolean;
-    /** 默认 manuscript；search_intent 用于 LLM 增强参考文献检索命令 */
     targetKind?: ReferencePrepTargetKind;
 }
 
@@ -88,14 +99,11 @@ function resolveDictPrepStylePrompt(context: vscode.ExtensionContext): string | 
     return null;
 }
 
-const ALL_SOURCES: ReferenceSourceId[] = ['dict', 'grep_md', 'citation', 'web'];
+const ALL_SOURCES: ReferenceSourceId[] = ['dict', 'grep_md', 'bm25', 'vector', 'citation', 'web'];
 
-/**
- * 多轮参考资料准备（选段或单条 target）。
- */
 export async function runReferencePrepForTarget(
     params: ReferencePrepRunParams & ReferencePrepProgressHooks
-): Promise<{ mergedReference: string; process: ReferencePrepProcessFileV010 }> {
+): Promise<{ mergedReference: string; process: ReferencePrepProcessFileV020 }> {
     const dicts = resolveLocalDictConfigs();
     if (params.enabledSources.includes('dict')) {
         if (dicts.length === 0) {
@@ -106,6 +114,7 @@ export async function runReferencePrepForTarget(
     }
 
     const preset = getStrengthPreset(params.strength);
+    const scopeCfg = getScopeConfig();
     const maxRounds = vscode.workspace.getConfiguration('ai-proofread').get<number>('referencePrep.maxRounds', preset.maxRounds);
     const intents = params.intents?.length ? params.intents : ALL_INTENTS;
     const { platform, model } = getReferencePrepLlmConfig();
@@ -117,21 +126,44 @@ export async function runReferencePrepForTarget(
         strength: params.strength,
         sourceJsonPath: params.sourceJsonPath,
         targetPreview: params.target.slice(0, 200),
+        userInput: params.target,
     });
     if (params.freshProcess) {
         proc.corpus = [];
         proc.rounds = [];
         proc.mergedReference = undefined;
+        proc.resourceScope = undefined;
     }
     proc.dicts = dicts.map((d) => ({ id: d.id, name: d.name, mdxPath: d.mdxPathResolved }));
 
+    const config = vscode.workspace.getConfiguration('ai-proofread');
+    const refPathRaw = config.get<string>('citation.referencesPath', '${workspaceFolder}/references');
+    const refRoot = resolveReferencesPath(refPathRaw);
+    const catalog = refRoot ? getOrBuildCatalog(refRoot) : null;
+
+    params.onProgress?.('参考资料准备：解析资源范围…');
+    let resourceScope = await resolveResourceScope({
+        target: params.target,
+        dicts,
+        catalog,
+        referencesRoot: refRoot,
+    });
+    proc.resourceScope = resourceScope;
+    proc.catalogSnapshotId = catalog?.snapshotId;
+    appendProcessLog(params.anchorPath, `Phase0 scope: dicts=${resourceScope.dictIds.length} files=${resourceScope.filePaths.length} filtered=${resourceScope.llmFiltered}`);
+
+    const scopedDicts = filterDictsByScope(dicts, resourceScope);
+    const catalogSummary = catalog ? summarizeCatalogForPrompt(catalog, 60) : undefined;
+
     const lookupsBudget = { used: 0, max: preset.maxTotalLookups };
     let mergedReference = proc.mergedReference ?? '';
+    let roundIncomingTotal = 0;
 
     for (let round = 0; round < maxRounds; round++) {
         if (params.token?.isCancellationRequested) break;
 
         const corpusSummary = buildCorpusSummary(proc.corpus);
+        const navigationHints = buildNavigationHints(proc.corpus);
         const systemPrompt = resolvePlanSystemPrompt(
             params.context,
             params.enabledSources,
@@ -142,11 +174,14 @@ export async function runReferencePrepForTarget(
         );
         const userPrompt = buildReferencePrepUserPrompt({
             target: params.target,
-            dicts,
+            dicts: scopedDicts,
             corpusSummary,
             roundIndex: round,
             maxRounds,
             targetKind: params.targetKind,
+            catalogSummary,
+            scope: resourceScope,
+            navigationHints,
         });
 
         params.onProgress?.(`参考资料准备：第 ${round + 1}/${maxRounds} 轮规划…`);
@@ -180,28 +215,50 @@ export async function runReferencePrepForTarget(
             context: params.context,
             existingReference: mergedReference,
             lookupsBudget,
+            scope: resourceScope,
+            roundId,
         });
-        mergeCorpusDedupe(proc.corpus, incoming);
+        roundIncomingTotal += incoming.length;
+
+        params.onProgress?.(`参考资料准备：精排 ${incoming.length} 条候选…`);
+        const reranked = await runLlmRerank({ target: params.target, hits: incoming });
+
+        mergeCorpusDedupe(proc.corpus, reranked);
         applyPruneToCorpus(proc.corpus, plan, preset.valuePruneThreshold);
         mergedReference = buildMergedReference(proc.corpus);
 
         roundEntry.finishedAt = new Date().toISOString();
         proc.rounds.push(roundEntry);
         proc.mergedReference = mergedReference;
+        proc.resourceScope = resourceScope;
         saveProcessFile(params.anchorPath, proc);
+        params.onProcessUpdated?.(proc);
+
+        if (round === 0 && roundIncomingTotal < scopeCfg.fallbackWidenMinHits && resourceScope.llmFiltered) {
+            resourceScope = widenResourceScope(
+                resourceScope,
+                dicts,
+                catalog,
+                `首轮命中 ${roundIncomingTotal} < ${scopeCfg.fallbackWidenMinHits}`
+            );
+            proc.resourceScope = resourceScope;
+            appendProcessLog(params.anchorPath, `fallbackWiden: ${resourceScope.widenReason}`);
+        }
 
         if (plan.sufficient) break;
         if (lookupsBudget.used >= lookupsBudget.max) break;
     }
 
     proc.mergedReference = mergedReference;
+    proc.indexVersions = {
+        catalogSnapshotId: catalog?.snapshotId,
+        citationDb: refRoot ? 'citation-refs.db' : undefined,
+    };
     saveProcessFile(params.anchorPath, proc);
+    params.onProcessUpdated?.(proc);
     return { mergedReference, process: proc };
 }
 
-/**
- * JSON 批量：对每条 item.target 执行参考资料准备并写入 reference。
- */
 export async function runReferencePrepForJsonFile(
     params: {
         jsonFilePath: string;
@@ -236,6 +293,7 @@ export async function runReferencePrepForJsonFile(
             freshProcess: true,
             onProgress: params.onProgress,
             token: params.token,
+            onProcessUpdated: params.onProcessUpdated,
         });
 
         if (mergedReference) {

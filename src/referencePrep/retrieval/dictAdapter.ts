@@ -141,10 +141,15 @@ export async function executeDictQuery(params: {
         queryId: params.query.queryId,
         baseValue: params.priority,
         aggregatedValue: params.priority,
+        llmPriority: params.priority,
+        finalScore: params.priority,
         snippet: one.cleaned.slice(0, 400),
         digest: one.digest,
         referenceBlock: one.block,
         status: 'active',
+        kind: 'evidence' as const,
+        matchedKey: bestGroup.matchedKey,
+        dictId: params.dictBlock.dictId ?? undefined,
     }));
 
     return { hits, lookupsUsed };

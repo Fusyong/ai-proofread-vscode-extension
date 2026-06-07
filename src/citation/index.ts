@@ -4,7 +4,7 @@
 
 export const citationModuleVersion = '0.0.1';
 export { ReferenceStore, resolveReferencesPath, getCitationNormalizeOptions } from './referenceStore';
-export type { ReferenceSentence, RefSentenceRow } from './referenceStore';
+export type { ReferenceSentence, RefSentenceRow, Bm25Hit } from './referenceStore';
 export {
     collectQuotedCitations,
     collectBlockquoteCitations,

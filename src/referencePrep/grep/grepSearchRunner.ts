@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { FilePathUtils } from '../../utils';
 import { runReferencePrepForTarget } from '../referencePrepRunner';
-import type { CorpusHit, ReferencePrepProcessFileV010, ReferencePrepStrength } from '../schema';
+import type { CorpusHit, ReferencePrepProcessFileV020, ReferencePrepStrength } from '../schema';
 
 export interface GrepSearchRunParams {
     description: string;
@@ -15,7 +15,7 @@ export interface GrepSearchRunParams {
 
 export interface GrepSearchRunResult {
     mergedReference: string;
-    process: ReferencePrepProcessFileV010;
+    process: ReferencePrepProcessFileV020;
     hits: CorpusHit[];
 }
 
@@ -28,7 +28,7 @@ export async function runLlmGrepSearch(params: GrepSearchRunParams): Promise<Gre
         target: params.description,
         anchorPath: params.anchorPath,
         context: params.context,
-        enabledSources: ['grep_md'],
+        enabledSources: ['grep_md', 'bm25', 'vector'],
         strength: params.strength,
         targetKind: 'search_intent',
         freshProcess: true,
@@ -56,7 +56,7 @@ export function resolveGrepSearchAnchorPath(editor?: vscode.TextEditor): string 
     throw new Error('请先打开工作区，或在编辑器中打开/保存一个文件。');
 }
 
-export function summarizeGrepPatterns(process: ReferencePrepProcessFileV010): string {
+export function summarizeGrepPatterns(process: ReferencePrepProcessFileV020): string {
     const patterns = process.rounds.flatMap((r) =>
         r.plan.queries.flatMap((q) => q.grep?.patterns ?? [])
     );

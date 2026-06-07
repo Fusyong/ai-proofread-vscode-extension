@@ -59,7 +59,7 @@ export function getRouteOverride(routeId: ModelRouteId): ModelRouteOverride {
     const config = cfg();
     let platform = o?.platform?.trim();
     let model = o?.model?.trim();
-    if (routeId === 'referencePrep') {
+    if (routeId === 'referencePrep' || routeId === 'referencePrepRerank') {
         platform = platform || config.get<string>('referencePrep.platform')?.trim();
         if (platform && !model) {
             model = config.get<string>('referencePrep.models.' + platform)?.trim();

@@ -12,13 +12,16 @@ import {
 } from '../proofreadPromptPick';
 import type { ReferencePrepStrength, ReferenceSourceId } from '../referencePrep/schema';
 import { getDefaultEnabledSources, runReferencePrepForJsonFile, runReferencePrepForTarget } from '../referencePrep/referencePrepRunner';
+import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
 import { loadReferencePrepLastRun, saveReferencePrepLastRun } from '../referencePrep/runPreferences';
 import { WebviewManager } from '../ui/webviewManager';
 import type { ProofreadCommandHandler } from './proofreadCommandHandler';
 
 const SOURCE_OPTIONS: Array<{ id: ReferenceSourceId; label: string; description: string }> = [
     { id: 'dict', label: '本地词典', description: 'MDict 本地词典查词' },
-    { id: 'grep_md', label: '参考文献 grep', description: '在 references 目录 md/txt 中检索' },
+    { id: 'grep_md', label: '参考文献 grep', description: '在 references 目录 md/txt 中字面检索' },
+    { id: 'bm25', label: 'BM25/FTS', description: '需先建立引文索引；语义关键词检索' },
+    { id: 'vector', label: '轻量向量', description: '字符 n-gram 相似度；懒构建向量索引' },
 ];
 
 const STRENGTH_OPTIONS: Array<{ label: string; description: string; value: ReferencePrepStrength }> = [
@@ -32,8 +35,15 @@ export class ReferencePrepCommandHandler {
 
     constructor(
         private webviewManager: WebviewManager,
-        private proofreadHandler?: ProofreadCommandHandler
+        private proofreadHandler?: ProofreadCommandHandler,
+        private resultsProvider?: ReferencePrepResultsProvider
     ) {}
+
+    private async showResultsTree(anchorPath: string, process: import('../referencePrep/schema').ReferencePrepProcessFileV020): Promise<void> {
+        if (!this.resultsProvider) return;
+        await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
+        this.resultsProvider.refresh(process, anchorPath);
+    }
 
     async pickRunOptions(context: vscode.ExtensionContext): Promise<
         | {
@@ -124,7 +134,7 @@ export class ReferencePrepCommandHandler {
         const anchorPath = editor.document.uri.fsPath;
 
         try {
-            const { mergedReference } = await vscode.window.withProgress(
+            const { mergedReference, process } = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
                     title: '参考资料准备',
@@ -140,8 +150,10 @@ export class ReferencePrepCommandHandler {
                         freshProcess: true,
                         onProgress: (m) => _p.report({ message: m }),
                         token,
+                        onProcessUpdated: (proc) => this.resultsProvider?.refresh(proc, anchorPath),
                     })
             );
+            await this.showResultsTree(anchorPath, process);
 
             if (!opts.runProofread) {
                 if (mergedReference) {

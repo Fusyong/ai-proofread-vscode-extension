@@ -6,6 +6,7 @@ import {
     runLlmGrepSearch,
     summarizeGrepPatterns,
 } from '../referencePrep/grep/grepSearchRunner';
+import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
 
 const STRENGTH_OPTIONS: Array<{ label: string; description: string; value: ReferencePrepStrength }> = [
     { label: '轻量', description: '1 轮，较少命中', value: 'light' },
@@ -14,6 +15,8 @@ const STRENGTH_OPTIONS: Array<{ label: string; description: string; value: Refer
 ];
 
 export class GrepSearchCommandHandler {
+    constructor(private resultsProvider?: ReferencePrepResultsProvider) {}
+
     async handleLlmGrepSearchCommand(
         editor: vscode.TextEditor | undefined,
         context: vscode.ExtensionContext
@@ -60,6 +63,11 @@ export class GrepSearchCommandHandler {
                         token,
                     })
             );
+
+            if (this.resultsProvider) {
+                await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
+                this.resultsProvider.refresh(process, anchorPath);
+            }
 
             if (mergedReference) {
                 const doc = await vscode.workspace.openTextDocument({
