@@ -57,11 +57,3 @@ export async function ensurePdfToTextAvailable(): Promise<string> {
         );
     }
 }
-
-/** 为终端命令引用可执行文件路径 */
-export function quotePdfToTextExecutable(exe: string): string {
-    if (exe.includes(path.sep) || exe.includes('/')) {
-        return `"${exe.replace(/"/g, '\\"')}"`;
-    }
-    return exe;
-}

@@ -4,7 +4,7 @@ import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { FilePathUtils, ErrorUtils, CommandBuilder } from './utils';
-import { ensurePdfToTextAvailable, quotePdfToTextExecutable } from './pdfToTextPath';
+import { ensurePdfToTextAvailable } from './pdfToTextPath';
 
 const execAsync = promisify(exec);
 
@@ -242,7 +242,7 @@ function buildPdfToTextCommand(
     const pdfFileName = path.basename(pdfPath);
     const outputFileName = path.basename(outputPath);
 
-    const exe = quotePdfToTextExecutable(pdfToTextExe);
+    const exe = CommandBuilder.formatExecutable(pdfToTextExe);
     const baseCommand = `${exe} ${args.join(' ')} "${pdfFileName}" "${outputFileName}"`;
     return CommandBuilder.buildCommand(pdfDir, baseCommand);
 }

@@ -460,6 +460,23 @@ export class CommandBuilder {
     }
 
     /**
+     * 为终端命令格式化可执行文件路径（含 shell 差异）
+     * PowerShell 中带路径的可执行文件须用调用运算符 &，否则引号内路径会被当作字符串。
+     */
+    public static formatExecutable(exe: string, shellType?: string): string {
+        const shell = shellType ?? this.detectShellType();
+        const needsQuote = exe.includes(path.sep) || exe.includes('/');
+        if (!needsQuote) {
+            return exe;
+        }
+        const quoted = `"${exe.replace(/"/g, '\\"')}"`;
+        if (shell === 'powershell') {
+            return `& ${quoted}`;
+        }
+        return quoted;
+    }
+
+    /**
      * 转义路径中的特殊字符（用于命令行参数）
      * @param filePath 文件路径
      * @param shellType shell 类型
