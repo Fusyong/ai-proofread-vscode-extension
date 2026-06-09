@@ -329,7 +329,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 #### 3.4.5 源文本特性提示词注入
 
-系统默认与预置提示词（见 [3.4.2](#342-预置提示词说明)）可注入源文本（如整本书）特性、校对重点等提示词，目的在于说明整本书的独特之处，提醒 LLM 注意；自定义提示词不会自动注入。请注意，系统会在你注入的提示词之前附加“目标文本（target）是一个更大的源文本的一部分。对这个源文本的整体说明如下：”。逻辑上你可以注入内容，但要考虑注入后的整体逻辑。
+系统默认与预置提示词（见 [3.4.2](#342-预置提示词说明)）可注入源文本（如整本书）特性、校对重点等提示词，目的在于说明整本书的独特之处，提醒 LLM 注意；自定义提示词不会自动注入。请注意，系统会在你注入的提示词之前附加“目标文本（target）是一个更大的源文本的一部分。对这个源文本的整体说明如下：”。逻辑上你可以注入任何内容，但要考虑注入后的整体逻辑。
 
 使用命令 `AI Proofreader: manage prompts` 会同时打开侧栏中的 prompts 与 source characteristics 视图；在后者中可查看内置条目并增删改自定义源文本特性提示词。
 
@@ -412,8 +412,8 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 目前支持这些大语言模型服务：
 
-1. [阿里云百炼](https://bailian.console.aliyun.com/)，[模型列表](https://bailian.console.aliyun.com/?tab=model#/model-market)
-2. [Deepseek开放平台](https://platform.deepseek.com/)（默认）
+1. [阿里云百炼](https://bailian.console.aliyun.com/)，（默认） [模型列表](https://bailian.console.aliyun.com/?tab=model#/model-market)
+2. [Deepseek开放平台](https://platform.deepseek.com/)
 3. [Google Gemini](https://aistudio.google.com/)，[模型列表](https://ai.google.dev/gemini-api/docs/models)
 4. [Ollama本地模型](https://ollama.ai/)，对计算机性能、专业知识要求较高
 
