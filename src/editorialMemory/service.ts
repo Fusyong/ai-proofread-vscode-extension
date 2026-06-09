@@ -8,6 +8,7 @@ import { loadActiveAndArchive, saveActiveAndArchive } from './memoryPersistV2';
 import { summarizeRoundSentenceAligned } from './recentSentenceSummary';
 import type { MemoryRoundContext } from './schemaV2';
 import { clipText, createEmptyActiveV2, createEmptyArchiveV2, formatCurrentRoundsForPrompt, formatMemoryEntryLine } from './schemaV2';
+import { resolveModelRoute } from '../modelRoutes/modelRouteResolver';
 
 const INJECT_GLOBAL_MAX_CHARS = 5_500;
 const INJECT_CURRENT_ROUNDS_MAX_CHARS = 16_000;
@@ -30,7 +31,6 @@ function readConfig() {
     const c = vscode.workspace.getConfiguration('ai-proofread');
     return {
         mergeAfterAccept: c.get<boolean>('editorialMemory.mergeAfterAccept', true),
-        mergeModelOverride: c.get<string>('editorialMemory.mergeModelOverride', ''),
         globalActiveMax: c.get<number>('editorialMemory.globalActiveMax', 30),
         currentProofreadRoundsMax: c.get<number>('editorialMemory.currentProofreadRoundsMax', 3),
     };
@@ -112,8 +112,8 @@ export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Prom
             globalPromptMaxChars: PATCH_PROMPT_GLOBAL_MAX_CHARS,
             currentRoundsPromptMaxChars: PATCH_PROMPT_CURRENT_ROUNDS_MAX_CHARS,
         });
-        const mergeModel = cfg.mergeModelOverride.trim() || args.model;
-        const patch = await runMemoryPatchLlm(args.platform, mergeModel, user);
+        const memRoute = resolveModelRoute('editorialMemory');
+        const patch = await runMemoryPatchLlm(memRoute.platform, memRoute.model, user);
         const applied =
             patch != null
                 ? applyGlobalOpsAndPushCurrentRound({

@@ -24,6 +24,8 @@ import {
     SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM,
     SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL,
     SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL,
+    SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM,
+    SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL,
 } from './promptManager';
 import { getExtensionContext } from './extensionContextHolder';
 import { formatSourceCharacteristicsBlock } from './sourceTextCharacteristics';
@@ -260,6 +262,50 @@ const CORRESPONDENCE_CHECK_SYSTEM_PROMPT_TEMPLATE = `
 </proofreader-system-setting>
 `;
 
+// 预置：知识核查（依据 reference 核查，不臆造；按来源权衡可信度）
+const KNOWLEDGE_VERIFY_SYSTEM_PROMPT_TEMPLATE = `
+<proofreader-system-setting version="0.1.1">
+<role-setting>
+
+你是经验丰富的图书编辑与事实核查编辑。
+
+用户已在阶段 A 为你准备了 **参考资料（reference）**（可能含本地词典摘录、参考文献 grep 片段等）。你的任务是：对照 reference、上下文（context）与目标文本（target），**核查**字词、专名、史实与表述是否成立；**不得编造** reference 与正文中均未出现的事实、出处或细节。
+
+**参考资料可信度（须自觉权衡，勿一视同仁）：**
+
+1. **【本地词典】** 摘录：宜作为**字词用法、释义、规范写法**的主要依据；若 target 用法与词典释义明显冲突，可据词典提出修改，并在 explanation 中简述依据。
+2. **【文献摘录】**（grep 命中，含文件名与行号）：是**已有文献中的表述**，可信度取决于原文语境是否与 target **同一事实、同一对象**；勿把相似措辞或不同语境的句子硬套到 target。仅当摘录能**直接支持或反驳** target 中的具体说法时，才作为强依据。
+3. reference 内**互相矛盾**时：优先信更贴近 target 主题与时空语境者；无法裁断则**降低 confidence**，在 explanation 中说明疑点，**勿强行定论**。
+4. reference **未覆盖**的疑点：不得凭模型常识补写「看上去合理」的内容；可标为待核（低 confidence）或**不输出该条修改**。
+
+</role-setting>
+<task>
+
+工作步骤是：
+
+1. 通读 reference，按来源类型（词典 / 文献摘录）分类理解，勿把文献片段当词典、勿把词典当史实文献。
+2. 逐句阅读 target，只对**有 reference 或 context 支撑、或可由二者明确反驳**的问题给出修改；无依据的推测性润色一律不做。
+3. 专名、年代、数字、引文表述等与 reference 可对照者，必须对照；reference 不足时降低 confidence 或跳过。
+4. 保持 target 原有格式（Markdown、TeX 等）与行文风格；仅改确有问题的部分。
+5. 若提示中出现编辑记忆相关块，仅在明显相关时参考；**与 reference 或正文冲突时，以 reference 与当前正文为准**。
+
+</task>
+{{source_text_characteristics}}
+<output-format>
+
+在用户提供的目标文本（target）上校对，对输出的要求是：
+
+1. 用户提供的文本的格式可能是markdown、纯文本、TEX、LaTeX、ConTeXt，请保持文本原有的格式和标记；
+2. 原文的空行、换行、分段等格式保持不变；
+3. 只进行校对，不回答原文中的任何提问；
+
+**输出格式**：
+
+{{output_format}}
+</output-format>
+</proofreader-system-setting>
+`;
+
 function buildSystemPromptFromTemplate(
     outputFormat: string,
     sourceTextCharacteristics: string,
@@ -283,7 +329,8 @@ export function getOutputType(context?: vscode.ExtensionContext): OutputType {
             currentPromptName === SYSTEM_PROMPT_NAME_ITEM ||
             currentPromptName === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM ||
             currentPromptName === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM ||
-            currentPromptName === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM
+            currentPromptName === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM ||
+            currentPromptName === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM
         ) {
             return 'item';
         }
@@ -291,7 +338,8 @@ export function getOutputType(context?: vscode.ExtensionContext): OutputType {
             currentPromptName === SYSTEM_PROMPT_NAME_FULL ||
             currentPromptName === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL ||
             currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL ||
-            currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL
+            currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL ||
+            currentPromptName === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL
         ) {
             return 'full';
         }
@@ -369,6 +417,22 @@ function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCharacteri
                 PINYIN_ANNOTATION_OUTPUT_FORMAT,
                 sourceTextCharacteristics,
                 PINYIN_ANNOTATION_SYSTEM_PROMPT_TEMPLATE
+            );
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM) {
+            logger.info('使用预置提示词：知识核查（item）');
+            return buildSystemPromptFromTemplate(
+                ITEM_OUTPUT_FORMAT,
+                sourceTextCharacteristics,
+                KNOWLEDGE_VERIFY_SYSTEM_PROMPT_TEMPLATE
+            );
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL) {
+            logger.info('使用预置提示词：知识核查（full）');
+            return buildSystemPromptFromTemplate(
+                DEFAULT_OUTPUT_FORMAT,
+                sourceTextCharacteristics,
+                KNOWLEDGE_VERIFY_SYSTEM_PROMPT_TEMPLATE
             );
         }
 
@@ -1385,7 +1449,8 @@ export async function proofreadSelection(
     sourceCharacteristicsDisplayTitle?: string,
     onItemItems?: (items: ProofreadItem[]) => void,
     onRawItemOutput?: (raw: string) => void,
-    editorialMemoryForceEnabled?: boolean
+    editorialMemoryForceEnabled?: boolean,
+    inlineReferenceText?: string
 ): Promise<string | null> {
     // 获取选中的文本
     const selectedText = editor.document.getText(selection);
@@ -1436,6 +1501,11 @@ export async function proofreadSelection(
     // 如果选择了参考文件，读取参考文件内容
     if (referenceFile && referenceFile[0]) {
         referenceText = fs.readFileSync(referenceFile[0].fsPath, 'utf8');
+    }
+    if (inlineReferenceText?.trim()) {
+        referenceText = referenceText
+            ? `${referenceText}\n\n${inlineReferenceText.trim()}`
+            : inlineReferenceText.trim();
     }
 
     // 构建提示文本

@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.10.8",
+  "version": "1.11.0",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -78,12 +78,68 @@
         "title": "AI Proofreader: merge two files"
       },
       {
-        "command": "ai-proofread.prepareLocalDictReferences",
-        "title": "AI Proofreader: prepare references from local dictionaries (JSON)"
+        "command": "ai-proofread.knowledgeVerifySelection",
+        "title": "AI Proofreader: knowledge verify selection"
+      },
+      {
+        "command": "ai-proofread.prepareReferencesJson",
+        "title": "AI Proofreader: prepare references for JSON file"
+      },
+      {
+        "command": "ai-proofread.modelRoutes.openView",
+        "title": "AI Proofreader: open model routes view",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "ai-proofread.modelRoutes.toggleView",
+        "title": "AI Proofreader: toggle model routes view"
+      },
+      {
+        "command": "ai-proofread.prompts.toggleViews",
+        "title": "AI Proofreader: toggle prompts views"
+      },
+      {
+        "command": "ai-proofread.wordCheck.toggleViews",
+        "title": "AI Proofreader: toggle word check views"
+      },
+      {
+        "command": "ai-proofread.modelRoutes.configure",
+        "title": "配置模型路由"
+      },
+      {
+        "command": "ai-proofread.modelRoutes.refresh",
+        "title": "刷新模型路由",
+        "icon": "$(refresh)"
       },
       {
         "command": "ai-proofread.queryLocalDictSelection",
-        "title": "AI Proofreader: query local dictionary for selection"
+        "title": "AI Proofreader: look up whole selection as headword in the local dictionary",
+        "description": "把选中当作一个词条查本地词典"
+      },
+      {
+        "command": "ai-proofread.llmGrepSearchReferences",
+        "title": "AI Proofreader: LLM-enhanced grep search",
+        "description": "用自然语言描述检索意图，LLM 规划后在本地词典中检索，在参考文献目录中grep，可以多轮次处理"
+      },
+      {
+        "command": "ai-proofread.referencePrep.openView",
+        "title": "AI Proofreader: open reference prep results"
+      },
+      {
+        "command": "ai-proofread.referencePrep.openHit",
+        "title": "打开命中位置"
+      },
+      {
+        "command": "ai-proofread.referencePrep.pruneHit",
+        "title": "丢弃此命中"
+      },
+      {
+        "command": "ai-proofread.referencePrep.restoreHit",
+        "title": "恢复此命中"
+      },
+      {
+        "command": "ai-proofread.referencePrep.copyBlock",
+        "title": "复制 reference 块"
       },
       {
         "command": "ai-proofread.proofreadFile",
@@ -192,6 +248,10 @@
       {
         "command": "ai-proofread.duplicate.scanSelection",
         "title": "AI Proofreader: scan duplicate sentences in selection"
+      },
+      {
+        "command": "ai-proofread.wordCheck.openViews",
+        "title": "AI Proofreader: open word check views"
       },
       {
         "command": "ai-proofread.checkWords",
@@ -484,14 +544,42 @@
           "items": {
             "type": "object",
             "properties": {
-              "id": { "type": "string", "description": "词典ID（稳定标识，用于路由与缓存键）" },
-              "name": { "type": "string", "description": "词典名称（展示用）" },
-              "mdxPath": { "type": "string", "description": "MDX 文件路径（支持绝对路径）" },
-              "tags": { "type": "array", "items": { "type": "string" }, "default": [], "description": "词典标签（如：中文、古汉语、百科等）" },
-              "priority": { "type": "number", "default": 100, "description": "优先级（越小越优先作为回退默认词典）" },
-              "whenToUse": { "type": "string", "default": "", "description": "一句话说明何时使用该词典（供大语言模型参考）" }
+              "id": {
+                "type": "string",
+                "description": "词典ID（稳定标识，用于路由与缓存键）"
+              },
+              "name": {
+                "type": "string",
+                "description": "词典名称（展示用）"
+              },
+              "mdxPath": {
+                "type": "string",
+                "description": "MDX 文件路径（支持绝对路径）"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [],
+                "description": "词典标签（如：中文、古汉语、百科等）"
+              },
+              "priority": {
+                "type": "number",
+                "default": 100,
+                "description": "优先级（越小越优先作为回退默认词典）"
+              },
+              "whenToUse": {
+                "type": "string",
+                "default": "",
+                "description": "一句话说明何时使用该词典（供大语言模型参考）"
+              }
             },
-            "required": ["id", "name", "mdxPath"]
+            "required": [
+              "id",
+              "name",
+              "mdxPath"
+            ]
           },
           "description": "本地 MDict 词典配置（MDX）。用于“本地词典参考准备”流程的词典路由与查询。"
         },
@@ -540,12 +628,177 @@
           "items": {
             "type": "object",
             "properties": {
-              "name": { "type": "string", "description": "词典查询提示词名称" },
-              "content": { "type": "string", "description": "提示词内容（必须要求模型只输出 JSON，并遵循 lookups 结构）" }
+              "name": {
+                "type": "string",
+                "description": "词典查询提示词名称"
+              },
+              "content": {
+                "type": "string",
+                "description": "提示词内容（必须要求模型只输出 JSON，并遵循 lookups 结构）"
+              }
             },
-            "required": ["name", "content"]
+            "required": [
+              "name",
+              "content"
+            ]
           },
-          "description": "词典查询提示词列表（用于“本地词典参考准备”流程）。"
+          "description": "参考资料规划提示词列表（referencePrep 与 dict prep prompts 视图共用）。"
+        },
+        "ai-proofread.referencePrep.enabledSources": {
+          "order": 36,
+          "type": "array",
+          "default": ["dict", "grep_md", "bm25", "vector"],
+          "items": {
+            "type": "string",
+            "enum": ["dict", "grep_md", "bm25", "vector", "citation", "web"]
+          },
+          "description": "默认启用的参考资料来源。"
+        },
+        "ai-proofread.referencePrep.maxRounds": {
+          "order": 37,
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "（已弃用）最大轮次由命令中选择的核查强度（轻量/标准/深入）决定。"
+        },
+        "ai-proofread.referencePrep.continuation.maxRounds": {
+          "order": 37.05,
+          "type": "number",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 5,
+          "description": "续跑时在已有 corpus 上追加的规划轮次。"
+        },
+        "ai-proofread.referencePrep.useEditorialMemory": {
+          "order": 37.5,
+          "type": "boolean",
+          "default": false,
+          "description": "知识核查选段在「准备并校对」时是否注入编辑记忆。"
+        },
+        "ai-proofread.referencePrep.grep.maxHitsPerRound": {
+          "order": 37.6,
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "（已弃用）每轮 grep 命中上限由核查强度决定：轻量 12 / 标准 30 / 深入 50。"
+        },
+        "ai-proofread.referencePrep.grep.maxSnippetChars": {
+          "order": 37.7,
+          "type": "number",
+          "default": 12000,
+          "minimum": 1000,
+          "maximum": 100000,
+          "description": "（已弃用）grep 字符预算由核查强度决定：轻量 6000 / 标准 12000 / 深入 20000。"
+        },
+        "ai-proofread.referencePrep.grep.maxFiles": {
+          "order": 37.75,
+          "type": "number",
+          "default": 500,
+          "minimum": 50,
+          "maximum": 5000,
+          "description": "grep 扫描参考文献文件数上限。"
+        },
+        "ai-proofread.referencePrep.scope.dictCountThreshold": {
+          "order": 37.8,
+          "type": "number",
+          "default": 8,
+          "description": "词典数超过此值时启用 LLM 资源预筛。"
+        },
+        "ai-proofread.referencePrep.scope.fileCountThreshold": {
+          "order": 37.81,
+          "type": "number",
+          "default": 100,
+          "description": "参考文献文件数超过此值时启用 LLM 目录预筛。"
+        },
+        "ai-proofread.referencePrep.scope.dirDepthThreshold": {
+          "order": 37.82,
+          "type": "number",
+          "default": 4,
+          "description": "目录深度超过此值时启用 LLM 预筛。"
+        },
+        "ai-proofread.referencePrep.scope.headingCountThreshold": {
+          "order": 37.83,
+          "type": "number",
+          "default": 40,
+          "description": "单批标题数超过此值时启用标题预筛。"
+        },
+        "ai-proofread.referencePrep.scope.tocCharsThreshold": {
+          "order": 37.84,
+          "type": "number",
+          "default": 8000,
+          "description": "TOC 字符超过此值时启用标题预筛。"
+        },
+        "ai-proofread.referencePrep.scope.fallbackWidenMinHits": {
+          "order": 37.85,
+          "type": "number",
+          "default": 2,
+          "description": "预筛后首轮命中低于此值则自动扩大 scope。"
+        },
+        "ai-proofread.referencePrep.rerank.enabled": {
+          "order": 37.9,
+          "type": "boolean",
+          "default": true,
+          "description": "检索后是否启用 LLM 精排。"
+        },
+        "ai-proofread.referencePrep.rerank.includeReason": {
+          "order": 37.91,
+          "type": "boolean",
+          "default": true,
+          "description": "精排 JSON 是否要求 LLM 给出 reason。"
+        },
+        "ai-proofread.referencePrep.rerank.maxCandidates": {
+          "order": 37.92,
+          "type": "number",
+          "default": 40,
+          "description": "每批送入精排 LLM 的候选上限。"
+        },
+        "ai-proofread.referencePrep.bm25.topK": {
+          "order": 37.93,
+          "type": "number",
+          "default": 25,
+          "description": "BM25 检索 topK。"
+        },
+        "ai-proofread.referencePrep.vector.enabled": {
+          "order": 37.94,
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用轻量向量检索（字符 n-gram）。"
+        },
+        "ai-proofread.referencePrep.vector.topK": {
+          "order": 37.95,
+          "type": "number",
+          "default": 20,
+          "description": "向量检索 topK。"
+        },
+        "ai-proofread.referencePrep.vector.minScore": {
+          "order": 37.96,
+          "type": "number",
+          "default": 0.15,
+          "description": "向量相似度最低阈值。"
+        },
+        "ai-proofread.referencePrep.scoring.weights": {
+          "order": 37.97,
+          "type": "object",
+          "default": {},
+          "description": "混合相关性权重：llmPriority, channelScore, cooccurrence, scopeMatch, clusterBoost。"
+        },
+        "ai-proofread.modelRoutes": {
+          "order": 9.5,
+          "type": "object",
+          "default": {},
+          "description": "各功能 LLM 路由覆盖。键为 referencePrep | referencePrepScope | referencePrepRerank | editorialMemory。inherit 为 true 时跟随上级（见 inheritFrom）。",
+          "markdownDescription": "各功能 LLM 路由覆盖（侧栏顺序：预筛 → 规划 → 精排）。\n\n- **referencePrep**（参考资料规划）：默认跟随校对\n- **referencePrepScope**（预筛）、**referencePrepRerank**（精排）：默认跟随 **referencePrep**；`inheritFrom` 可选 `proofread` 或 `referencePrep`\n- **editorialMemory**：默认跟随校对\n\n示例：`{ \"referencePrepRerank\": { \"inherit\": true, \"inheritFrom\": \"referencePrep\" } }`",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "inherit": { "type": "boolean" },
+              "inheritFrom": { "type": "string", "enum": ["proofread", "referencePrep"] },
+              "platform": { "type": "string", "enum": ["aliyun", "deepseek", "google", "ollama"] },
+              "model": { "type": "string" }
+            }
+          }
         },
         "ai-proofread.proofread.defaultOutputType": {
           "order": 27.5,
@@ -945,15 +1198,16 @@
           "order": 105,
           "type": "string",
           "default": "",
-          "description": "记忆 patch 专用模型名（留空则用当前校对所用 platform 的模型）。",
-          "markdownDescription": "编辑记忆合并（patch）专用模型名；留空则使用当前校对所选 **platform** 的模型。"
+          "deprecationMessage": "已弃用：请使用侧栏「模型路由」中的「编辑记忆合并」，或设置 ai-proofread.modelRoutes.editorialMemory。",
+          "description": "（已弃用）记忆 patch 专用模型名。请改用 modelRoutes.editorialMemory。",
+          "markdownDescription": "**已弃用**。请使用侧栏 **模型路由 → 编辑记忆合并**，或 `ai-proofread.modelRoutes.editorialMemory`。"
         },
         "ai-proofread.debug.enableConsoleLog": {
           "order": 114,
           "type": "boolean",
           "default": false,
           "description": "在开发者工具控制台输出与大模型交互的完整请求与响应。",
-          "markdownDescription": "开启后，在 **开发者工具 → 控制台**（*Help → Toggle Developer Tools*）中输出每次 LLM 调用的 **请求与响应**（OpenAI 兼容接口为 HTTP 返回 JSON；Google 为可序列化的 SDK 结果摘要）。涵盖：**校对**（DeepSeek / 阿里云 / Google / Ollama）、**编辑记忆合并**（`editorialMemoryChat`）、**词典准备**（`dictPrepLlm`）。失败时额外输出 axios 错误响应体（若有）。长文本会完整打印，可能影响性能。"
+          "markdownDescription": "开启后，在 **开发者工具 → 控制台**（*Help → Toggle Developer Tools*）中输出每次 LLM 调用的 **请求与响应**（OpenAI 兼容接口为 HTTP 返回 JSON；Google 为可序列化的 SDK 结果摘要）。涵盖：**校对**、**参考资料预筛 / 规划 / 精排**、**编辑记忆合并**（统一经 `llmClient`）。失败时额外输出 axios 错误响应体（若有）。长文本会完整打印，可能影响性能。"
         }
       }
     },
@@ -972,6 +1226,11 @@
           "id": "ai-proofread.welcome",
           "name": "overview",
           "type": "webview"
+        },
+        {
+          "id": "ai-proofread.modelRoutes",
+          "name": "model routes",
+          "when": "aiProofread.showModelRoutesView"
         },
         {
           "id": "ai-proofread.prompts",
@@ -1032,11 +1291,26 @@
           "id": "ai-proofread.proofreadItems",
           "name": "校对条目",
           "when": "aiProofread.showProofreadItemsView"
+        },
+        {
+          "id": "ai-proofread.referencePrepResults",
+          "name": "reference hit",
+          "when": "aiProofread.showReferencePrepResultsView"
         }
       ]
     },
     "menus": {
       "view/title": [
+        {
+          "command": "ai-proofread.modelRoutes.openView",
+          "when": "view == ai-proofread.welcome",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ai-proofread.modelRoutes.refresh",
+          "when": "view == ai-proofread.modelRoutes",
+          "group": "navigation@1"
+        },
         {
           "command": "ai-proofread.wordCheck.sortAndFilter",
           "when": "view == ai-proofread.wordCheck",
@@ -1108,6 +1382,26 @@
           "command": "ai-proofread.proofreadItems.diffItem",
           "when": "view == ai-proofread.proofreadItems && viewItem == proofreadItem",
           "group": "proofreadItems@1"
+        },
+        {
+          "command": "ai-proofread.referencePrep.openHit",
+          "when": "view == ai-proofread.referencePrepResults && viewItem == referencePrepHitActive",
+          "group": "referencePrep@1"
+        },
+        {
+          "command": "ai-proofread.referencePrep.copyBlock",
+          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitActive || viewItem == referencePrepHitActiveDict || viewItem == referencePrepHitPruned || viewItem == referencePrepHitPrunedDict)",
+          "group": "referencePrep@1"
+        },
+        {
+          "command": "ai-proofread.referencePrep.pruneHit",
+          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitActive || viewItem == referencePrepHitActiveDict)",
+          "group": "referencePrep@2"
+        },
+        {
+          "command": "ai-proofread.referencePrep.restoreHit",
+          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitPruned || viewItem == referencePrepHitPrunedDict)",
+          "group": "referencePrep@2"
         },
         {
           "command": "ai-proofread.prompts.edit",
@@ -1324,9 +1618,14 @@
           "when": "resourceLangId == markdown"
         },
         {
-          "command": "ai-proofread.prepareLocalDictReferences",
+          "command": "ai-proofread.prepareReferencesJson",
           "group": "ai-proofread@30.5",
           "when": "resourceLangId == json"
+        },
+        {
+          "command": "ai-proofread.knowledgeVerifySelection",
+          "group": "ai-proofread@30.4",
+          "when": "editorHasSelection"
         },
         {
           "command": "ai-proofread.proofreadFile",
@@ -1362,10 +1661,12 @@
     "lint": "eslint src --ext ts",
     "package-vsix": "npx vsce package",
     "publish": "npx vsce publish",
-    "mdict:debug": "node scripts/mdict-debug.js"
+    "mdict:debug": "node scripts/mdict-debug.js",
+    "postinstall": "node scripts/patch-mdict-js.js"
   },
   "dependencies": {
     "@google/genai": "^0.7.0",
+    "@vscode/ripgrep": "^1.18.0",
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
     "jieba-wasm": "^2.4.0",
@@ -1395,7 +1696,8 @@
       "includeNodeModules": {
         "vscode": false,
         "sql.js": false,
-        "jieba-wasm": false
+        "jieba-wasm": false,
+        "@vscode/ripgrep": false
       },
       "sourceMap": false,
       "outputFormat": "commonjs",

@@ -43,7 +43,7 @@
 | 步骤 | 操作（优先用 UI） |
 |------|-------------------|
 | 1. 打开校对面板 | 通过左侧活动栏图标的指引打开 **校对面板**；或在命令面板输入「open proofreading panel」→ 打开 **校对面板** |
-| 2. 文件转换（可选） | 面板顶部点 **「docx → Markdown」** 或 **「PDF → Markdown」**（需先安装 Pandoc / pdftotext） |
+| 2. 文件转换（可选） | 面板顶部点 **「docx → Markdown」** 或 **「PDF → Markdown」**（docx 需 Pandoc；PDF 在 Windows 已内置 pdftotext） |
 | 3. 整理（可选） | 面板内点 **「整理段落」**、**「根据目录标记标题」** |
 | 4. 选主文件 | 面板内点 **「选择主文件」** 或 **「从工作区选择」** |
 | 5. 切分 | 面板内点 **「切分文档」**，选择切分模式（见 [3.3](#33-切分模式选择决策简图)） |
@@ -70,8 +70,8 @@
 | 步骤 | 操作（优先用 UI） |
 |------|-------------------|
 | 1. 建索引 | 设置 `citation.referencesPath`（齿轮 ⚙️ → 扩展设置）→ **校对面板** 点 **「建立引文索引」** |
-| 2. 核对 | **校对面板** 点 **「核对全文引文」**；或选中引文后 **右键** → verify selected citation |
-| 3. 反查 | 打开 **侧栏「citations」视图**，对某条引文 **右键** → **search citation in PDF** |
+| 2. 核对选中 | 选中引文 → **verify selected citation**（LLM 参考资料准备 → **参考资料命中** 树） |
+| 3. 核对全文 | **校对面板** **「核对全文引文」** → **citations** 树（相似度匹配，可 diff / PDF） |
 
 ### 1.5 专项检查（错别字、异形词、序号）
 
@@ -99,7 +99,7 @@
 |--------|----------|
 | 校稿、审稿、改错 | proofread selection / proofread file |
 | 出勘误表、审校记录 | diff it with another file → 逐句对齐 |
-| 核对引文、查出处 | verify citations + search citation in PDF |
+| 核对引文、查出处 | verify selected citation（参考资料命中）/ verify citations（Citation 树）+ search citation in PDF |
 | 转 Word、转 Markdown | convert docx/markdown |
 | 查错别字、异形词 | check words |
 | 检查序号、标题层级 | check numbering hierarchy |
@@ -227,7 +227,7 @@ flowchart LR
 |------|----------|
 | **文档转换** | |
 | AI Proofreader: convert docx to markdown | 将 Word(docx) 转为 Markdown，需安装 Pandoc |
-| AI Proofreader: convert PDF to markdown | 将活文字 PDF 转为 Markdown，需安装 pdftotext |
+| AI Proofreader: convert PDF to markdown | 将活文字 PDF 转为 Markdown（Windows 内置 pdftotext；其他系统需自行安装） |
 | AI Proofreader: convert markdown to docx | 将 Markdown 转为 Word(docx) |
 | **文档整理** | |
 | AI Proofreader: format paragraphs | 整理段落：段末加空行 / 删除段内分行 |
@@ -263,8 +263,9 @@ flowchart LR
 | **PDF 与引文** | |
 | AI Proofreader: build citation reference index | 建立本地文献库索引（引文核对前需先执行） |
 | AI Proofreader: verify citations | 打开引文核对视图，批量核对全文引文 |
-| AI Proofreader: verify selected citation | 核对当前选中的引文 |
-| diff citations vs references | 对比引文与文献差异（**侧栏 citations 视图** 中 **右键** 某条使用） |
+| AI Proofreader: verify selected citation | 核对选中引文（LLM 参考资料准备 → **参考资料命中** 树，与 LLM grep 同流程） |
+| AI Proofreader: LLM-enhanced grep search | 自然语言检索词典与文献（同上流程，`search_intent` 提示词） |
+| diff citations vs references | 对比引文与文献差异（**侧栏 citations 视图** 中 **右键** 某条使用；仅 **verify citations** 全文核对） |
 | search citation in PDF | 在文献 PDF 中搜索该条引文（**侧栏 citations 视图** 中 **右键** 某条使用） |
 
 ---

@@ -15,11 +15,17 @@ import { SplitIntoSentencesCommandHandler } from './commands/splitIntoSentencesC
 import { DocumentConvertCommandHandler } from './commands/documentConvertCommandHandler';
 import { UtilityCommandHandler } from './commands/utilityCommandHandler';
 import { CitationCommandHandler } from './commands/citationCommandHandler';
-import { DictPrepCommandHandler } from './commands/dictPrepCommandHandler';
+import { ReferencePrepCommandHandler } from './commands/referencePrepCommandHandler';
 import { registerCitationView } from './citation/citationView';
 import { registerDuplicateView } from './duplicate/duplicateView';
 import { DuplicateCommandHandler } from './commands/duplicateCommandHandler';
 import { WordCheckCommandHandler } from './commands/wordCheckCommandHandler';
+import {
+    hideAllOnDemandSidebarViews,
+    setPromptsViewsVisible,
+    setWordCheckViewsVisible,
+    togglePromptsViewsVisible,
+} from './ui/sidebarViewVisibility';
 import { NumberingTreeDataProvider } from './numbering/numberingTreeProvider';
 import { registerNumberingView } from './numbering/numberingView';
 import { SegmentTreeDataProvider } from './numbering/segmentTreeProvider';
@@ -42,6 +48,17 @@ import { convertOpencc, type OpenccLocale } from './opencc';
 import { DictPrepPromptManager } from './localDict/dictPrepPromptManager';
 import { registerDictPrepPromptsView, type DictPrepPromptTreeItem } from './localDict/dictPrepPromptsView';
 import { LocalDictQueryCommandHandler } from './commands/localDictQueryCommandHandler';
+import { GrepSearchCommandHandler } from './commands/grepSearchCommandHandler';
+import { registerModelRoutesView } from './modelRoutes/modelRoutesView';
+import { ModelRoutesCommandHandler } from './modelRoutes/modelRoutesCommandHandler';
+import {
+    registerReferencePrepResultsView,
+    openCorpusHitInEditor,
+    type ReferencePrepTreeNode,
+} from './referencePrep/referencePrepResultsView';
+import { canOpenHitInEditor } from './referencePrep/referencePrepResultsTree';
+import { resolveReferencesPath } from './citation/referenceStore';
+import type { CorpusHit } from './referencePrep/schema';
 
 const OPENCC_LOCALES: Array<{ id: OpenccLocale; label: string; description: string }> = [
     { id: 'cn', label: 'cn', description: 'Simplified Chinese (Mainland China)' },
@@ -72,6 +89,8 @@ export function activate(context: vscode.ExtensionContext) {
     setExtensionContext(context);
     // 最先注册欢迎视图，避免点击 Activity Bar 图标时出现 "no data provider registered"
     registerWelcomeView(context);
+    const { provider: modelRoutesProvider } = registerModelRoutesView(context);
+    const modelRoutesHandler = new ModelRoutesCommandHandler(modelRoutesProvider);
 
     const logger = Logger.getInstance();
     const configManager = ConfigManager.getInstance();
@@ -88,10 +107,21 @@ export function activate(context: vscode.ExtensionContext) {
     const splitIntoSentencesHandler = new SplitIntoSentencesCommandHandler();
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
-    const dictPrepHandler = new DictPrepCommandHandler(webviewManager);
+    const { provider: referencePrepResultsProvider } = registerReferencePrepResultsView(context);
+    const referencePrepHandler = new ReferencePrepCommandHandler(
+        webviewManager,
+        proofreadHandler,
+        referencePrepResultsProvider
+    );
     const localDictQueryHandler = new LocalDictQueryCommandHandler();
+    const grepSearchHandler = new GrepSearchCommandHandler(referencePrepResultsProvider);
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
-    const citationHandler = new CitationCommandHandler(context, citationTreeProvider, citationTreeView);
+    const citationHandler = new CitationCommandHandler(
+        context,
+        citationTreeProvider,
+        citationTreeView,
+        referencePrepResultsProvider
+    );
     const { provider: duplicateTreeProvider, treeView: duplicateTreeView } = registerDuplicateView(context);
     const duplicateHandler = new DuplicateCommandHandler(context, duplicateTreeProvider, duplicateTreeView);
     const wordCheckHandler = new WordCheckCommandHandler(context);
@@ -117,18 +147,12 @@ export function activate(context: vscode.ExtensionContext) {
     registerProofreadItemsView(context);
 
     // 按需显示 TreeView：默认全部隐藏，由命令显式打开
-    vscode.commands.executeCommand('setContext', 'aiProofread.showPromptsView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showDictPrepPromptsView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showDictCheckTypesView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showTgsccCheckTypesView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', false);
+    void hideAllOnDemandSidebarViews();
     vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showSourceTextCharacteristicsView', false);
 
     // 设置校对、切分、合并的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
@@ -140,15 +164,23 @@ export function activate(context: vscode.ExtensionContext) {
     webviewManager.setMergeCallback((jsonFilePath: string) => {
         return utilityHandler.handleMergeTwoFilesByPath(jsonFilePath);
     });
-    webviewManager.setDictPrepLlmPlanCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
-        return dictPrepHandler.handleDictPrepLlmPlan(jsonFilePath, ctx);
-    });
-    webviewManager.setDictPrepLocalMergeCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
-        return dictPrepHandler.handleDictPrepLocalMerge(jsonFilePath, ctx);
+    webviewManager.setReferencePrepJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
+        return referencePrepHandler.handlePrepareReferencesJson(jsonFilePath, ctx);
     });
 
     // 注册所有命令
     let disposables = [
+        vscode.commands.registerCommand('ai-proofread.modelRoutes.openView', () =>
+            modelRoutesHandler.openView()
+        ),
+        vscode.commands.registerCommand('ai-proofread.modelRoutes.toggleView', () =>
+            modelRoutesHandler.toggleView()
+        ),
+        vscode.commands.registerCommand('ai-proofread.modelRoutes.configure', (item?: { routeId: string }) =>
+            modelRoutesHandler.configureRoute(item as { routeId: import('./modelRoutes/modelRouteRegistry').ModelRouteId })
+        ),
+        vscode.commands.registerCommand('ai-proofread.modelRoutes.refresh', () => modelRoutesProvider.refresh()),
+
         vscode.commands.registerCommand('ai-proofread.splitFile', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
@@ -256,11 +288,9 @@ export function activate(context: vscode.ExtensionContext) {
 
         // 注册提示词管理命令（同时显示 prompts 与源文本特性两个 TreeView，并聚焦 prompts）
         vscode.commands.registerCommand('ai-proofread.managePrompts', async () => {
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showPromptsView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showDictPrepPromptsView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showSourceTextCharacteristicsView', true);
-            PromptManager.getInstance(context).managePrompts();
+            await setPromptsViewsVisible(true);
         }),
+        vscode.commands.registerCommand('ai-proofread.prompts.toggleViews', () => togglePromptsViewsVisible()),
 
         vscode.commands.registerCommand('ai-proofread.prompts.new', async () => {
             await promptManager.addPrompt();
@@ -323,13 +353,22 @@ export function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleMergeTwoFilesCommand(editor);
         }),
 
-        vscode.commands.registerCommand('ai-proofread.prepareLocalDictReferences', async () => {
+        vscode.commands.registerCommand('ai-proofread.knowledgeVerifySelection', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showInformationMessage('No active editor!');
                 return;
             }
-            await dictPrepHandler.handlePrepareLocalDictReferencesCommand(editor, context);
+            await referencePrepHandler.handleKnowledgeVerifySelection(editor, context);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.prepareReferencesJson', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await referencePrepHandler.handlePrepareReferencesFromEditor(editor, context);
         }),
 
         vscode.commands.registerCommand('ai-proofread.queryLocalDictSelection', async () => {
@@ -339,6 +378,36 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await localDictQueryHandler.handleQuerySelectionCommand(editor, context);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.llmGrepSearchReferences', async () => {
+            await grepSearchHandler.handleLlmGrepSearchCommand(vscode.window.activeTextEditor, context);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.referencePrep.openView', async () => {
+            await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
+            const editor = vscode.window.activeTextEditor;
+            if (editor?.document.uri.fsPath) {
+                referencePrepResultsProvider.loadFromAnchor(editor.document.uri.fsPath);
+            }
+        }),
+        vscode.commands.registerCommand('ai-proofread.referencePrep.openHit', async (hit?: CorpusHit) => {
+            if (!hit) return;
+            if (!canOpenHitInEditor(hit)) return;
+            const config = vscode.workspace.getConfiguration('ai-proofread');
+            const refRoot = resolveReferencesPath(config.get<string>('citation.referencesPath', '${workspaceFolder}/references'));
+            await openCorpusHitInEditor(hit, refRoot);
+        }),
+        vscode.commands.registerCommand('ai-proofread.referencePrep.pruneHit', async (node?: ReferencePrepTreeNode) => {
+            if (node?.kind === 'hit') referencePrepResultsProvider.pruneHit(node.hit);
+        }),
+        vscode.commands.registerCommand('ai-proofread.referencePrep.restoreHit', async (node?: ReferencePrepTreeNode) => {
+            if (node?.kind === 'hit') referencePrepResultsProvider.restoreHit(node.hit);
+        }),
+        vscode.commands.registerCommand('ai-proofread.referencePrep.copyBlock', async (node?: ReferencePrepTreeNode) => {
+            if (node?.kind === 'hit' && node.hit.referenceBlock) {
+                await vscode.env.clipboard.writeText(node.hit.referenceBlock);
+            }
         }),
 
         // 注册在PDF中搜索选中文本命令
@@ -515,8 +584,7 @@ export function activate(context: vscode.ExtensionContext) {
             await citationHandler.handleRebuildIndexCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.citation.verifySelection', async () => {
-            // 使用“核对选中引文”命令时，也自动显示引文视图
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', true);
+            await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
             await citationHandler.handleVerifySelectionCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.citation.showDiff', (nodeOrItem?: unknown) => {
@@ -541,12 +609,14 @@ export function activate(context: vscode.ExtensionContext) {
             await vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', true);
             await duplicateHandler.handleScanSelection();
         }),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.openViews', async () => {
+            await wordCheckHandler.openWordCheckViews();
+        }),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.toggleViews', async () => {
+            await wordCheckHandler.toggleWordCheckViews();
+        }),
         vscode.commands.registerCommand('ai-proofread.checkWords', async () => {
-            // 按需显示与字词检查相关的视图
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showDictCheckTypesView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showTgsccCheckTypesView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', true);
+            await wordCheckHandler.openWordCheckViews();
             await wordCheckHandler.handleCheckWordsCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.wordCheck.prevOccurrence', () => wordCheckHandler.handlePrevOccurrenceCommand()),
@@ -563,11 +633,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.wordCheck.applyInsertVisible', () => wordCheckHandler.handleApplyInsertVisibleCommand()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.sortAndFilter', () => wordCheckHandler.handleWordCheckSortAndFilterCommand()),
         vscode.commands.registerCommand('ai-proofread.manageCustomTables', async () => {
-            // 按需显示自定义替换表及相关视图
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showDictCheckTypesView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showTgsccCheckTypesView', true);
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', true);
+            await setWordCheckViewsVisible(true);
             await wordCheckHandler.handleManageCustomTablesCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.customTables.delete', (el: import('./xh7/customTablesView').CustomTableTreeItem) => wordCheckHandler.handleCustomTableDelete(el)),

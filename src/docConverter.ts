@@ -4,6 +4,7 @@ import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { FilePathUtils, ErrorUtils, CommandBuilder } from './utils';
+import { ensurePdfToTextAvailable, quotePdfToTextExecutable } from './pdfToTextPath';
 
 const execAsync = promisify(exec);
 
@@ -190,7 +191,8 @@ export async function convertMarkdownToDocx(mdPath: string, outputPath?: string 
 function buildPdfToTextCommand(
     pdfPath: string,
     outputPath: string,
-    options: PdfToTextOptions
+    options: PdfToTextOptions,
+    pdfToTextExe: string
 ): string {
     const args: string[] = [];
 
@@ -240,7 +242,8 @@ function buildPdfToTextCommand(
     const pdfFileName = path.basename(pdfPath);
     const outputFileName = path.basename(outputPath);
 
-    const baseCommand = `pdftotext ${args.join(' ')} "${pdfFileName}" "${outputFileName}"`;
+    const exe = quotePdfToTextExecutable(pdfToTextExe);
+    const baseCommand = `${exe} ${args.join(' ')} "${pdfFileName}" "${outputFileName}"`;
     return CommandBuilder.buildCommand(pdfDir, baseCommand);
 }
 
@@ -563,23 +566,14 @@ export async function convertPdfToMarkdown(
     }
 
     try {
-        // 检查pdftotext是否可用 - 使用 where 命令检查命令是否存在
-        try {
-            if (process.platform === 'win32') {
-                await execAsync('where pdftotext');
-            } else {
-                await execAsync('which pdftotext');
-            }
-        } catch (error) {
-            throw new Error('pdftotext未安装或不在PATH中，请正确安装');
-        }
+        const pdfToTextExe = await ensurePdfToTextAvailable();
 
         let terminal = vscode.window.terminals.find(t => t.name === 'PDF转换');
         if (!terminal) {
             terminal = vscode.window.createTerminal('PDF转换');
         }
 
-        const command = buildPdfToTextCommand(pdfPath, outputPath, options);
+        const command = buildPdfToTextCommand(pdfPath, outputPath, options, pdfToTextExe);
         terminal.sendText(command);
 
         return outputPath;

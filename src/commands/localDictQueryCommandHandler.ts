@@ -3,6 +3,7 @@ import { ErrorUtils } from '../utils';
 import { resolveLocalDictConfigs, ensureDictFilesExist } from '../localDict/dictConfig';
 import { MdictClient } from '../localDict/mdictClient';
 import { stripHtmlToText } from '../localDict/htmlToText';
+import { getDictPrepConfigKeys } from '../referencePrep/config';
 
 export class LocalDictQueryCommandHandler {
     public async handleQuerySelectionCommand(
@@ -41,17 +42,13 @@ export class LocalDictQueryCommandHandler {
         ];
 
         const picked = await vscode.window.showQuickPick(choices, {
-            title: '本地词典查询',
-            placeHolder: `查询：${term}`,
+            title: '本地词典查询（整段选文作词条）',
+            placeHolder: `查询：${term.length > 40 ? term.slice(0, 40) + '…' : term}`,
             ignoreFocusOut: true,
         });
         if (!picked) return;
 
-        const config = vscode.workspace.getConfiguration('ai-proofread');
-        const maxDefinitionChars = config.get<number>('dictPrep.maxDefinitionChars', 6000);
-        const cacheEnabled = config.get<boolean>('dictPrep.cache.enabled', true);
-        const cacheTtlHours = config.get<number>('dictPrep.cache.ttlHours', 0);
-
+        const { maxDefinitionChars, cacheEnabled, cacheTtlHours } = getDictPrepConfigKeys();
         const client = MdictClient.getInstance(context);
         const targets = picked.id === '__all__' ? dicts : dicts.filter((d) => d.id === picked.id);
 
@@ -61,7 +58,7 @@ export class LocalDictQueryCommandHandler {
                 dictName: string;
                 matchedKey: string;
                 definition: string;
-                entryIndex: number; // 1-based within the same dict+key query
+                entryIndex: number;
             }> = [];
 
             for (const d of targets) {
@@ -97,12 +94,18 @@ export class LocalDictQueryCommandHandler {
 
 function buildMarkdownResult(
     term: string,
-    hits: Array<{ dictId: string; dictName: string; matchedKey: string; definition: string; entryIndex: number }>
+    hits: Array<{
+        dictId: string;
+        dictName: string;
+        matchedKey: string;
+        definition: string;
+        entryIndex: number;
+    }>
 ): string {
     const lines: string[] = [];
     lines.push(`# 本地词典查询`);
     lines.push('');
-    lines.push(`- 查询词：**${escapeMd(term)}**`);
+    lines.push(`- 查询词（整段选文）：**${escapeMd(term)}**`);
     lines.push(`- 命中：**${hits.length}**`);
     lines.push('');
 
@@ -118,7 +121,6 @@ function buildMarkdownResult(
         lines.push('');
         lines.push(`- 词条：**${escapeMd(h.matchedKey)}**`);
         lines.push('');
-        // 与“查词并入 JSON”流程保持一致：清理 HTML 后输出净文本，避免标签间内容粘连
         lines.push(stripHtmlToText(h.definition));
         lines.push('');
     }
@@ -128,4 +130,3 @@ function buildMarkdownResult(
 function escapeMd(s: string): string {
     return s.replace(/[\\`*_{}\[\]()#+\-.!]/g, '\\$&');
 }
-
