@@ -483,6 +483,16 @@ export function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleFormatParagraphsCommand(editor);
         }),
 
+        // 注册删除行中空白字符命令
+        vscode.commands.registerCommand('ai-proofread.deleteInlineWhitespace', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleDeleteInlineWhitespaceCommand(editor);
+        }),
+
         // 注册根据目录标记标题命令
         vscode.commands.registerCommand('ai-proofread.markTitlesFromToc', async () => {
             const editor = vscode.window.activeTextEditor;

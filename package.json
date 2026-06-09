@@ -198,6 +198,10 @@
         "title": "AI Proofreader: format paragraphs"
       },
       {
+        "command": "ai-proofread.deleteInlineWhitespace",
+        "title": "AI Proofreader: delete inline whitespace"
+      },
+      {
         "command": "ai-proofread.markTitlesFromToc",
         "title": "AI Proofreader: mark titles from table of contents"
       },
@@ -887,6 +891,25 @@
           "type": "boolean",
           "default": false,
           "description": "是否在校对后自动将拉丁半角引号转换为中文全角引号"
+        },
+        "ai-proofread.deleteInlineWhitespace.maxConsecutive": {
+          "order": 40.1,
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "description": "删除行中空白字符：仅删除连续个数小于等于此值的空白序列（默认 1）"
+        },
+        "ai-proofread.deleteInlineWhitespace.preserveLineEdges": {
+          "order": 40.2,
+          "type": "boolean",
+          "default": true,
+          "description": "删除行中空白字符：是否保留行首行尾空白（默认是）"
+        },
+        "ai-proofread.deleteInlineWhitespace.askOnRun": {
+          "order": 40.3,
+          "type": "boolean",
+          "default": true,
+          "description": "删除行中空白字符：执行命令时是否弹出选项对话框（默认是）。仅处理汉字、中文标点之间的空白；设为否则直接使用上述配置"
         },
         "ai-proofread.defaultSplitLength": {
           "order": 41,
@@ -1589,6 +1612,11 @@
         },
         {
           "command": "ai-proofread.formatParagraphs",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
+          "command": "ai-proofread.deleteInlineWhitespace",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
         },

@@ -12,6 +12,11 @@ import { searchSelectionInShidianguji } from '../shidiangujiSearch';
 import { searchSelectionInAncientbooks } from '../ancientbooksSearch';
 import { convertQuotes } from '../quoteConverter';
 import { formatParagraphs } from '../paragraphDetector';
+import {
+    DEFAULT_DELETE_INLINE_WHITESPACE_OPTIONS,
+    deleteInlineWhitespace,
+    type DeleteInlineWhitespaceOptions
+} from '../inlineWhitespace';
 import { showDiff } from '../differ';
 import { ErrorUtils, FilePathUtils, normalizeLineEndings } from '../utils';
 import { parseToc, markTitles, TocItem } from '../titleMarker';
@@ -377,6 +382,119 @@ export class UtilityCommandHandler {
             vscode.window.showInformationMessage('引号转换完成！');
         } catch (error) {
             ErrorUtils.showError(error, '转换引号时出错：');
+        }
+    }
+
+    /**
+     * 读取「删除行中空白字符」配置
+     */
+    private getDeleteInlineWhitespaceConfig(): DeleteInlineWhitespaceOptions {
+        const config = vscode.workspace.getConfiguration('ai-proofread.deleteInlineWhitespace');
+        return {
+            maxConsecutive: Math.max(
+                0,
+                config.get<number>('maxConsecutive', DEFAULT_DELETE_INLINE_WHITESPACE_OPTIONS.maxConsecutive)
+            ),
+            preserveLineEdges: config.get<boolean>(
+                'preserveLineEdges',
+                DEFAULT_DELETE_INLINE_WHITESPACE_OPTIONS.preserveLineEdges
+            )
+        };
+    }
+
+    /**
+     * 交互式收集「删除行中空白字符」选项
+     */
+    private async promptDeleteInlineWhitespaceOptions(
+        defaults: DeleteInlineWhitespaceOptions
+    ): Promise<DeleteInlineWhitespaceOptions | undefined> {
+        const maxConsecutiveInput = await vscode.window.showInputBox({
+            title: '删除行中空白字符',
+            prompt: '连续空白个数小于等于（仅删除长度不超过此值的空白序列）',
+            value: String(defaults.maxConsecutive),
+            ignoreFocusOut: true,
+            validateInput: (value) => {
+                const num = Number(value);
+                if (!Number.isInteger(num) || num < 0) {
+                    return '请输入非负整数';
+                }
+                return null;
+            }
+        });
+        if (maxConsecutiveInput === undefined) {
+            return undefined;
+        }
+
+        const preserveLineEdgesChoice = await vscode.window.showQuickPick(
+            [
+                {
+                    label: '是（默认）',
+                    description: '保留每行行首与行尾空白',
+                    value: true
+                },
+                {
+                    label: '否',
+                    description: '行首行尾空白也参与处理',
+                    value: false
+                }
+            ],
+            {
+                title: '删除行中空白字符',
+                placeHolder: '是否保留行首行尾空白？',
+                ignoreFocusOut: true
+            }
+        );
+        if (preserveLineEdgesChoice === undefined) {
+            return undefined;
+        }
+
+        return {
+            maxConsecutive: Number(maxConsecutiveInput),
+            preserveLineEdges: preserveLineEdgesChoice.value
+        };
+    }
+
+    /**
+     * 处理删除行中空白字符命令
+     */
+    public async handleDeleteInlineWhitespaceCommand(editor: vscode.TextEditor): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor!');
+            return;
+        }
+
+        try {
+            const config = vscode.workspace.getConfiguration('ai-proofread.deleteInlineWhitespace');
+            const askOnRun = config.get<boolean>('askOnRun', true);
+            const defaultOptions = this.getDeleteInlineWhitespaceConfig();
+            const options = askOnRun
+                ? await this.promptDeleteInlineWhitespaceOptions(defaultOptions)
+                : defaultOptions;
+
+            if (!options) {
+                return;
+            }
+
+            const document = editor.document;
+            const selection = editor.selection;
+            const text = selection.isEmpty ? document.getText() : document.getText(selection);
+            const processedText = deleteInlineWhitespace(text, options);
+
+            await editor.edit((editBuilder) => {
+                if (selection.isEmpty) {
+                    const fullRange = new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(document.getText().length)
+                    );
+                    editBuilder.replace(fullRange, processedText);
+                } else {
+                    editBuilder.replace(selection, processedText);
+                }
+            });
+
+            vscode.window.showInformationMessage('行中空白字符已处理完成！');
+        } catch (error) {
+            ErrorUtils.showError(error, '删除行中空白字符时出错：');
         }
     }
 
