@@ -509,6 +509,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 - 特性：增加按用户意图检索本地词典和参考文件的命令（跟知识核查共用referencePrep，只是LLM对用户输入有不同的语意理解）
 - referencePrep架构升级为：Phase 0 资源范围 → 多轮 LLM 规划 → 多通道检索 → 混合打分/融合 → LLM 精排 → 结构化 corpus + TreeView。
+- debug：修复buildPdfToTextCommand在powershell下的错误
 
 ### v1.11.0
 
