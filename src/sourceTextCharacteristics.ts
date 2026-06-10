@@ -48,6 +48,8 @@ export function getSourceCharacteristicContentInputPrompt(): string {
     );
 }
 
+export const SOURCE_TEXT_CHARACTERISTICS_TEMPORARY_DISPLAY_TITLE = '本次临时输入';
+
 export function summarizeSourceCharacteristicsForLog(raw: string, maxLen = 72): string {
     const t = raw.trim();
     if (!t) {
@@ -55,4 +57,16 @@ export function summarizeSourceCharacteristicsForLog(raw: string, maxLen = 72): 
     }
     const oneLine = t.replace(/\s+/g, ' ');
     return oneLine.length <= maxLen ? oneLine : `${oneLine.slice(0, maxLen)}…`;
+}
+
+/** 日志中的 SrcHint 行：临时输入时附带完整正文，其余用展示标题或摘要 */
+export function formatSourceCharacteristicsForLog(
+    injectText: string,
+    displayTitle?: string
+): string {
+    if (displayTitle === SOURCE_TEXT_CHARACTERISTICS_TEMPORARY_DISPLAY_TITLE) {
+        const t = injectText.trim();
+        return t ? `${SOURCE_TEXT_CHARACTERISTICS_TEMPORARY_DISPLAY_TITLE}\n${t}` : '无';
+    }
+    return displayTitle ?? summarizeSourceCharacteristicsForLog(injectText);
 }

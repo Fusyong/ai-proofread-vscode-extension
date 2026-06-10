@@ -11,7 +11,10 @@ import { runEditorialMemoryAfterAccept } from '../editorialMemory/service';
 import { FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
 import { getPromptDisplayName } from '../promptManager';
 import { isUsingSystemDefaultPrompt, pickSourceTextCharacteristicsInjection } from '../sourceTextCharacteristicsPicker';
-import { summarizeSourceCharacteristicsForLog } from '../sourceTextCharacteristics';
+import {
+    formatSourceCharacteristicsForLog,
+    summarizeSourceCharacteristicsForLog,
+} from '../sourceTextCharacteristics';
 import {
     buildDefaultProofreadSelectionWithMemoryConfig,
     mapConfigToSelectionContext,
@@ -121,7 +124,7 @@ export class ProofreadCommandHandler {
         let logMessage = `\n${'='.repeat(50)}\n`;
         logMessage += `Start: ${startTime}\n`;
         logMessage += `Prompt: ${currentPromptName}\n`;
-        logMessage += `SrcHint: ${sourceCharacteristicsDisplayTitle ?? summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)}\n`;
+        logMessage += `SrcHint: ${formatSourceCharacteristicsForLog(sourceTextCharacteristics, sourceCharacteristicsDisplayTitle)}\n`;
         logMessage += `Model: ${platform}, ${model}, T. ${temperature}\n`;
         logMessage += `RPM: ${rpm}\n`;
         logMessage += `MaxConcurrent: ${maxConcurrent}\n`;
@@ -714,7 +717,7 @@ export class ProofreadCommandHandler {
 
             const logFilePath = FilePathUtils.getFilePath(editor.document.uri.fsPath, '.proofread', '.log');
             const resultForLog = rawItemOutput !== undefined ? rawItemOutput : result;
-            const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nSrcHint: ${sourceCharacteristicsDisplayTitle ?? summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)}\nRepetitionMode: ${repetitionModeName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${resultForLog}\n${'='.repeat(50)}\n\n`;
+            const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nSrcHint: ${formatSourceCharacteristicsForLog(sourceTextCharacteristics, sourceCharacteristicsDisplayTitle)}\nRepetitionMode: ${repetitionModeName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${resultForLog}\n${'='.repeat(50)}\n\n`;
             fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
             await new Promise<void>((resolve) => setImmediate(resolve));

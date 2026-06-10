@@ -13,7 +13,10 @@ import {
     SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL,
     SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL,
 } from './promptManager';
-import { BUILTIN_SOURCE_TEXT_CHARACTERISTICS } from './sourceTextCharacteristics';
+import {
+    BUILTIN_SOURCE_TEXT_CHARACTERISTICS,
+    SOURCE_TEXT_CHARACTERISTICS_TEMPORARY_DISPLAY_TITLE,
+} from './sourceTextCharacteristics';
 import type { UserSourceTextCharacteristicPrompt } from './sourceTextCharacteristics';
 import { SourceTextCharacteristicManager } from './sourceTextCharacteristicManager';
 
@@ -112,7 +115,7 @@ export async function pickSourceTextCharacteristicsInjection(
         const injectText = text.trim();
         return {
             injectText,
-            displayTitle: injectText ? '本次临时输入' : '无',
+            displayTitle: injectText ? SOURCE_TEXT_CHARACTERISTICS_TEMPORARY_DISPLAY_TITLE : '无',
         };
     }
     return {
