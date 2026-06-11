@@ -21,7 +21,7 @@ import { registerDuplicateView } from './duplicate/duplicateView';
 import { DuplicateCommandHandler } from './commands/duplicateCommandHandler';
 import { WordCheckCommandHandler } from './commands/wordCheckCommandHandler';
 import {
-    hideAllOnDemandSidebarViews,
+    restoreSidebarToggleStateOnActivate,
     setPromptsViewsVisible,
     setWordCheckViewsVisible,
     togglePromptsViewsVisible,
@@ -85,8 +85,10 @@ async function askOpenccLocale(
     return (picked?.id ?? defaultValue) as OpenccLocale;
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     setExtensionContext(context);
+    // 先恢复/初始化侧栏开关，避免激活末尾异步 hide 与后续操作竞态
+    await restoreSidebarToggleStateOnActivate();
     // 最先注册欢迎视图，避免点击 Activity Bar 图标时出现 "no data provider registered"
     registerWelcomeView(context);
     const { provider: modelRoutesProvider } = registerModelRoutesView(context);
@@ -146,8 +148,6 @@ export function activate(context: vscode.ExtensionContext) {
     );
     registerProofreadItemsView(context);
 
-    // 按需显示 TreeView：默认全部隐藏，由命令显式打开
-    void hideAllOnDemandSidebarViews();
     vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', false);
     vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', false);

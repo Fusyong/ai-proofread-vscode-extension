@@ -3,6 +3,7 @@
  */
 
 import * as vscode from 'vscode';
+import { getExtensionContext } from '../extensionContextHolder';
 import { focusWordCheckView } from '../xh7/wordCheckView';
 
 export interface SidebarToggleState {
@@ -10,6 +11,8 @@ export interface SidebarToggleState {
     prompts: boolean;
     wordCheck: boolean;
 }
+
+const SIDEBAR_TOGGLE_STATE_KEY = 'sidebarToggleState';
 
 const state: SidebarToggleState = {
     modelRoutes: false,
@@ -27,6 +30,13 @@ function notify(): void {
     }
 }
 
+async function persistSidebarToggleState(): Promise<void> {
+    const ctx = getExtensionContext();
+    if (ctx) {
+        await ctx.globalState.update(SIDEBAR_TOGGLE_STATE_KEY, getSidebarToggleState());
+    }
+}
+
 export function getSidebarToggleState(): SidebarToggleState {
     return { ...state };
 }
@@ -38,16 +48,37 @@ export function onSidebarToggleStateChanged(listener: StateListener): vscode.Dis
 
 /** 扩展激活时：默认隐藏所有按需视图 */
 export async function hideAllOnDemandSidebarViews(): Promise<void> {
-    await setModelRoutesVisible(false);
-    await setPromptsViewsVisible(false);
-    await setWordCheckViewsVisible(false);
+    await setModelRoutesVisible(false, { persist: false });
+    await setPromptsViewsVisible(false, { persist: false });
+    await setWordCheckViewsVisible(false, { persist: false });
+    await persistSidebarToggleState();
 }
 
-export async function setModelRoutesVisible(visible: boolean): Promise<void> {
+/** 扩展激活时：从 globalState 恢复侧栏开关，无记录则全部隐藏 */
+export async function restoreSidebarToggleStateOnActivate(): Promise<void> {
+    const saved = getExtensionContext()?.globalState.get<SidebarToggleState>(SIDEBAR_TOGGLE_STATE_KEY);
+    if (!saved) {
+        await hideAllOnDemandSidebarViews();
+        return;
+    }
+    await setModelRoutesVisible(!!saved.modelRoutes, { persist: false });
+    await setPromptsViewsVisible(!!saved.prompts, { persist: false });
+    await setWordCheckViewsVisible(!!saved.wordCheck, { persist: false });
+    await persistSidebarToggleState();
+}
+
+interface SetVisibleOptions {
+    persist?: boolean;
+}
+
+export async function setModelRoutesVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
     state.modelRoutes = visible;
     await vscode.commands.executeCommand('setContext', 'aiProofread.showModelRoutesView', visible);
     if (visible) {
         await vscode.commands.executeCommand('ai-proofread.modelRoutes.focus');
+    }
+    if (options?.persist !== false) {
+        await persistSidebarToggleState();
     }
     notify();
 }
@@ -57,13 +88,16 @@ export async function toggleModelRoutesVisible(): Promise<boolean> {
     return state.modelRoutes;
 }
 
-export async function setPromptsViewsVisible(visible: boolean): Promise<void> {
+export async function setPromptsViewsVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
     state.prompts = visible;
     await vscode.commands.executeCommand('setContext', 'aiProofread.showPromptsView', visible);
     await vscode.commands.executeCommand('setContext', 'aiProofread.showDictPrepPromptsView', visible);
     await vscode.commands.executeCommand('setContext', 'aiProofread.showSourceTextCharacteristicsView', visible);
     if (visible) {
         await vscode.commands.executeCommand('ai-proofread.prompts.focus');
+    }
+    if (options?.persist !== false) {
+        await persistSidebarToggleState();
     }
     notify();
 }
@@ -73,7 +107,7 @@ export async function togglePromptsViewsVisible(): Promise<boolean> {
     return state.prompts;
 }
 
-export async function setWordCheckViewsVisible(visible: boolean): Promise<void> {
+export async function setWordCheckViewsVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
     state.wordCheck = visible;
     await vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', visible);
     await vscode.commands.executeCommand('setContext', 'aiProofread.showDictCheckTypesView', visible);
@@ -81,6 +115,9 @@ export async function setWordCheckViewsVisible(visible: boolean): Promise<void> 
     await vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', visible);
     if (visible) {
         await focusWordCheckView();
+    }
+    if (options?.persist !== false) {
+        await persistSidebarToggleState();
     }
     notify();
 }
