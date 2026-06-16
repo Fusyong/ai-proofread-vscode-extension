@@ -34,6 +34,23 @@ export interface VectorConfig {
     minScore: number;
 }
 
+export interface WikipediaConfig {
+    userAgentContactUrl: string;
+    defaultLang: 'zh' | 'en';
+    fallbackLang: 'zh' | 'en';
+    includeWikidata: boolean;
+    requestsPerMinute: number;
+    minIntervalMs: number;
+    budgetLight: number;
+    budgetStandard: number;
+    budgetThorough: number;
+    cacheEnabled: boolean;
+    cacheTtlHoursPage: number;
+    cacheTtlHoursSearch: number;
+    cacheTtlHoursEntity: number;
+    maxExtractChars: number;
+}
+
 function cfg() {
     return vscode.workspace.getConfiguration('ai-proofread');
 }
@@ -46,7 +63,7 @@ export function getStrengthPreset(strength: ReferencePrepStrength): StrengthPres
 export function getDefaultEnabledSources(): ReferenceSourceId[] {
     const config = cfg();
     const raw = config.get<string[]>('referencePrep.enabledSources', ['dict', 'grep_md']);
-    const allowed: ReferenceSourceId[] = ['dict', 'grep_md', 'bm25', 'vector', 'citation', 'web'];
+    const allowed: ReferenceSourceId[] = ['dict', 'grep_md', 'bm25', 'vector', 'citation', 'web', 'wikipedia'];
     const out = raw.filter((x): x is ReferenceSourceId => (allowed as string[]).includes(x));
     return out.length > 0 ? out : ['dict', 'grep_md'];
 }
@@ -132,4 +149,42 @@ export function getBm25TopK(): number {
 
 export function getGrepMaxFiles(): number {
     return cfg().get<number>('referencePrep.grep.maxFiles', 500);
+}
+
+const DEFAULT_WIKI_CONTACT_URL =
+    'https://github.com/ah21/ai-proofread-vscode-extension';
+
+export function getWikipediaConfig(): WikipediaConfig {
+    const config = cfg();
+    return {
+        userAgentContactUrl: config.get<string>(
+            'referencePrep.wikipedia.userAgentContactUrl',
+            DEFAULT_WIKI_CONTACT_URL
+        ),
+        defaultLang: config.get<'zh' | 'en'>('referencePrep.wikipedia.defaultLang', 'zh'),
+        fallbackLang: config.get<'zh' | 'en'>('referencePrep.wikipedia.fallbackLang', 'en'),
+        includeWikidata: config.get<boolean>('referencePrep.wikipedia.includeWikidata', true),
+        requestsPerMinute: config.get<number>('referencePrep.wikipedia.rateLimit.requestsPerMinute', 30),
+        minIntervalMs: config.get<number>('referencePrep.wikipedia.rateLimit.minIntervalMs', 200),
+        budgetLight: config.get<number>('referencePrep.wikipedia.budget.light', 15),
+        budgetStandard: config.get<number>('referencePrep.wikipedia.budget.standard', 30),
+        budgetThorough: config.get<number>('referencePrep.wikipedia.budget.thorough', 50),
+        cacheEnabled: config.get<boolean>('referencePrep.wikipedia.cache.enabled', true),
+        cacheTtlHoursPage: config.get<number>('referencePrep.wikipedia.cache.ttlHours.page', 168),
+        cacheTtlHoursSearch: config.get<number>('referencePrep.wikipedia.cache.ttlHours.search', 24),
+        cacheTtlHoursEntity: config.get<number>('referencePrep.wikipedia.cache.ttlHours.entity', 168),
+        maxExtractChars: config.get<number>('referencePrep.wikipedia.maxExtractChars', 4000),
+    };
+}
+
+export function getWikipediaBudgetForStrength(strength: ReferencePrepStrength): number {
+    const c = getWikipediaConfig();
+    switch (strength) {
+        case 'light':
+            return c.budgetLight;
+        case 'thorough':
+            return c.budgetThorough;
+        default:
+            return c.budgetStandard;
+    }
 }

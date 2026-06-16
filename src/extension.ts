@@ -393,6 +393,10 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('ai-proofread.referencePrep.openHit', async (hit?: CorpusHit) => {
             if (!hit) return;
+            if (hit.source === 'wikipedia' && hit.pageUrl) {
+                await vscode.env.openExternal(vscode.Uri.parse(hit.pageUrl));
+                return;
+            }
             if (!canOpenHitInEditor(hit)) return;
             const config = vscode.workspace.getConfiguration('ai-proofread');
             const refRoot = resolveReferencesPath(config.get<string>('citation.referencesPath', '${workspaceFolder}/references'));

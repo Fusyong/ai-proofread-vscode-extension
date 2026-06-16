@@ -1,6 +1,6 @@
 import type { DictPrepLookupPoint } from '../localDict/dictPrepPrompt';
 
-export type ReferenceSourceId = 'dict' | 'grep_md' | 'bm25' | 'vector' | 'citation' | 'web';
+export type ReferenceSourceId = 'dict' | 'grep_md' | 'bm25' | 'vector' | 'citation' | 'web' | 'wikipedia';
 
 export type ReferencePrepStrength = 'light' | 'standard' | 'thorough';
 
@@ -20,7 +20,9 @@ export type RetrievalUnit =
 
 export type CorpusHitKind = 'evidence' | 'navigation_hint';
 
-export type CorpusHitSource = 'dict' | 'grep_md' | 'bm25' | 'vector';
+export type CorpusHitSource = 'dict' | 'grep_md' | 'bm25' | 'vector' | 'wikipedia';
+
+export type WikipediaLang = 'zh' | 'en';
 
 export interface ReferencePrepDictQuery {
     dictId: string | null;
@@ -36,12 +38,21 @@ export interface ReferencePrepGrepQuery {
     searchPhrases?: string[];
 }
 
+export interface ReferencePrepWikipediaQuery {
+    searchTerms?: string[];
+    titles?: string[];
+    lang?: WikipediaLang;
+    includeWikidata?: boolean;
+    why?: string;
+}
+
 export interface ReferencePrepPlanQuery {
     queryId: string;
     intent: ReferencePrepIntent;
     priority: number;
     dict?: ReferencePrepDictQuery;
     grep?: ReferencePrepGrepQuery;
+    wikipedia?: ReferencePrepWikipediaQuery;
 }
 
 export interface ReferencePrepPlan {
@@ -93,6 +104,12 @@ export interface CorpusHit {
     roundId?: string;
     suggestedScope?: SuggestedScope;
     channelScores?: Partial<Record<CorpusHitSource, number>>;
+    /** wikipedia */
+    pageTitle?: string;
+    pageUrl?: string;
+    wikiLang?: WikipediaLang;
+    wikidataId?: string;
+    wikidataClaims?: string;
 }
 
 export interface ReferencePrepRound {
@@ -101,6 +118,8 @@ export interface ReferencePrepRound {
     finishedAt?: string;
     plan: ReferencePrepPlan;
     queryCount: number;
+    /** 本轮 Wikipedia API 网络请求次数（不含缓存命中） */
+    wikiRequestsUsed?: number;
 }
 
 export interface ReferencePrepJsonPlanItem {
@@ -188,5 +207,6 @@ export function isRetrievalSourceEnabled(
     if (source === 'bm25') return enabled.includes('bm25');
     if (source === 'vector') return enabled.includes('vector');
     if (source === 'dict') return enabled.includes('dict');
+    if (source === 'wikipedia') return enabled.includes('wikipedia');
     return false;
 }

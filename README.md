@@ -183,7 +183,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 **统一参考资料准备（知识核查）**：
 
-在批量校对或选段校对前，经**资源范围解析**（大库时 LLM 预筛词典/目录/标题）与**多轮 LLM 规划**，从**本地词典**、**grep**、**BM25/FTS**、**轻量向量**（字符 n-gram）检索参考文献（`ai-proofread.citation.referencesPath`），经**混合打分**与**LLM 精排**后写入 `reference`，再调用既有校对流程。
+在批量校对或选段校对前，经**资源范围解析**（大库时 LLM 预筛词典/目录/标题）与**多轮 LLM 规划**，从**本地词典**、**grep**、**BM25/FTS**、**轻量向量**（字符 n-gram）、可选 **维基百科/Wikidata API** 检索，经**混合打分**与**LLM 精排**后写入 `reference`，再调用既有校对流程。
 
 - 选段命令：`AI Proofreader: knowledge verify selection`（**第一步**选：准备并验证 / 仅准备 / 用已有资料验证；后两种再选资料来源与强度，**记住上次**；准备并验证或「用已有资料」时**另选校对提示词**，默认「知识核查（item）」）
 - 文献检索：`AI Proofreader: LLM-enhanced grep search`（自然语言检索意图；与知识核查共用预筛 / 规划 / 精排与 **参考资料命中** 树；默认词典 + grep + BM25 + 向量）
@@ -192,7 +192,8 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 - 结果查看：侧栏 **参考资料命中** TreeView（命令 `open reference prep results`）；可打开文件跳转、复制块、手动 prune
 - **续跑**：「仅准备」、LLM grep、核对选中引文 若已有过程文件，可选择继续上次（追加 1 轮）或重新开始；「准备并验证」始终全新开始
 - 过程文件：`文档.referenceprep.json`（v0.2 结构化 corpus）、`文档.referenceprep.log`（详见 `docs/knowledge-verify-plan.md`）
-- 运行前可勾选资料来源（词典 / grep / BM25 / 向量）；强度（轻量 / 标准 / 深入）控制轮次与查询上限
+- 运行前可勾选资料来源（词典 / grep / BM25 / 向量 / **维基百科**）；强度（轻量 / 标准 / 深入）控制轮次与查询上限
+- **维基百科资料来源**（默认不勾选）：只读访问 MediaWiki + Wikidata；串行限速（默认 30 次/分钟）、会话 HTTP 预算、工作区缓存 `.proofread/wiki-cache.json`；TreeView 命中项可在浏览器打开条目 URL。配置见 `ai-proofread.referencePrep.wikipedia.*`
 - BM25 需先 **建立引文索引**；向量索引首次使用时懒构建
 
 **参考资料规划提示词**（侧栏 `dict prep prompts`）：可自定义；须要求模型只输出 JSON（`sufficient` / `queries` / `prune`；grep 块可含 `unit`、`searchPhrases`）。未选择时使用内置规划提示词。
@@ -265,7 +266,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ####  3.2.4. 对文档选段进行知识核查（实验功能）
 
-命令： `knowledge verify selection (prepare references and proofread)`。流程基于“带记忆地校对选段”，先允许referencePrep（参考资料准备） 工作流，即通过本地词典、本地参考文献库检索文中相关知识（暂未集成web搜索）用作reference，然后使用提示词“知识核查（full）”进行校对；可以选择是否使用编辑记忆。 **会消耗比一般校对多得多的token！**
+命令： `knowledge verify selection (prepare references and proofread)`。流程基于“带记忆地校对选段”，先运行 referencePrep（参考资料准备）工作流，从本地词典、本地参考文献库检索文中相关知识；可选勾选 **维基百科（API）** 作百科事实参考，然后使用提示词「知识核查（full）」进行校对；可以选择是否使用编辑记忆。 **会消耗比一般校对多得多的 token！**
 
 如果要对JSON进行批处理，可以先通过命令`prepare references for JSON file`，或“准备参考资料”按钮，JSON中的所有文本片段准备好参考文本，然后使用提示词“知识核查（full）”进行校对。
 
@@ -415,7 +416,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 7. **引文核对**：指定本地文献库根目录（默认为根目录下的`references`），执行 `build citation reference index` 建立索引（BM25/向量检索亦依赖此索引）。**核对选中引文**（`verify selected citation`）走 LLM 参考资料准备流程，结果在 **参考资料命中** 树。**核对全文引文**（`verify citations`）仍按句子相似度匹配，结果在 **Citation** 树，可 diff、PDF 反查。全文核对以句子为单元，不成句引用宜用 LLM 检索或 VSCode 多文件搜索。
 8. **文档内重复句核查**：功能类似引文核对，扫描当前文档或选中范围，按句发现**完全重复**（归一化后与引文核对相同的规则）与**近似重复**（长度分桶 + Jaccard，与引文核对、句子对齐共用 `ai-proofread.alignment` 与 `ai-proofread.jieba` 中的相似度相关设置）；**默认一次扫描同时给出两类结果**。命令为 `scan duplicate sentences in document`（全文）与 `scan duplicate sentences in selection`（选区）。最短句长、归一化选项、繁简转换后再比相似度、长度容差等，与引文核对共用 `ai-proofread.citation` 中的对应项，无需单独配置。
 9. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
-10. **删除空白字符**：使用`delete inline whitespace`命令，删除汉字和中文标点内部小于指定长度的空白字符穿。
+10. **删除空白字符**：使用`delete inline whitespace`命令，删除汉字和中文标点内部小于指定长度的空白字符串。
 11.  **OpenCC**：集成了[opencc-js](https://github.com/nk2028/opencc-js)，支持繁简转换，命令为`opencc`和`opencc selection`。
 12. **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
 13. **按句子切分**：使用 `split into sentences` 命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子。
@@ -486,7 +487,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 ## 5. TODO
 
 1. 分词连写检查提示词
-2. 在知识核查中集成（模型）web搜索服务
+2. ~~在知识核查中集成（模型）web搜索服务~~ → 已集成可选 **维基百科/Wikidata API** 通道（`wikipedia` 资料来源；通用 web 搜索仍 TODO）
 3. 一个memo管理智能体
     1. 三段式：原文；改后；说明
     2. 分类、加标签存储（字词层为穷尽举例式、句段层为举例加格式说明）

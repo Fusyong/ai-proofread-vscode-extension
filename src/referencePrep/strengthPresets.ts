@@ -8,6 +8,8 @@ export interface StrengthPreset {
     grepMaxSnippetChars: number;
     valuePruneThreshold: number;
     maxPointsPerItem: number;
+    wikipediaMaxHitsPerRound: number;
+    wikipediaMaxExtractChars: number;
 }
 
 export const STRENGTH_PRESETS: Record<ReferencePrepStrength, StrengthPreset> = {
@@ -19,6 +21,8 @@ export const STRENGTH_PRESETS: Record<ReferencePrepStrength, StrengthPreset> = {
         grepMaxSnippetChars: 6000,
         valuePruneThreshold: 0.3,
         maxPointsPerItem: 4,
+        wikipediaMaxHitsPerRound: 3,
+        wikipediaMaxExtractChars: 2000,
     },
     standard: {
         maxRounds: 3,
@@ -28,6 +32,8 @@ export const STRENGTH_PRESETS: Record<ReferencePrepStrength, StrengthPreset> = {
         grepMaxSnippetChars: 12000,
         valuePruneThreshold: 0.25,
         maxPointsPerItem: 6,
+        wikipediaMaxHitsPerRound: 5,
+        wikipediaMaxExtractChars: 4000,
     },
     thorough: {
         maxRounds: 5,
@@ -37,6 +43,8 @@ export const STRENGTH_PRESETS: Record<ReferencePrepStrength, StrengthPreset> = {
         grepMaxSnippetChars: 20000,
         valuePruneThreshold: 0.2,
         maxPointsPerItem: 10,
+        wikipediaMaxHitsPerRound: 8,
+        wikipediaMaxExtractChars: 6000,
     },
 };
 

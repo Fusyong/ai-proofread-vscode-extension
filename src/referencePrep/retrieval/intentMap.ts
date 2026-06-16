@@ -5,12 +5,13 @@ export function sourcesForIntent(intent: ReferencePrepIntent): ReferenceSourceId
     switch (intent) {
         case 'entity_name':
         case 'term_norm':
+            return ['dict', 'grep_md', 'wikipedia'];
         case 'word_usage':
             return ['dict', 'grep_md'];
         case 'citation':
             return ['grep_md'];
         case 'general_fact':
-            return ['grep_md', 'dict'];
+            return ['grep_md', 'dict', 'wikipedia'];
         default:
             return ['dict', 'grep_md'];
     }

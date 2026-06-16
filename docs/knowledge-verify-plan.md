@@ -5,7 +5,7 @@
 将原「dictPrep + 校对」双步流程合并为：
 
 1. **阶段 0 — 资源范围**（`ResourceScope`）：目录缓存、条件式 LLM 预筛词典/文件/标题；命中不足时 `fallbackWiden`
-2. **阶段 A — 参考资料准备**（`referencePrep`）：多轮 LLM 规划 + 多通道检索（dict / grep / BM25 / 轻量向量）
+2. **阶段 A — 参考资料准备**（`referencePrep`）：多轮 LLM 规划 + 多通道检索（dict / grep / BM25 / 轻量向量 / 可选 wikipedia）
 3. **阶段 A′ — LLM 精排**：`refTag` 标注候选，打分、去重、裁剪
 4. **阶段 B — 校对**：复用现有 `proofreadSelection` / `processJsonFileAsync`
 
@@ -21,7 +21,7 @@
 
 **全文引文核对**（`verify citations`）仍走引文索引 + 相似度匹配 + **Citation** 树，与上表三条不同。
 
-三条「参考资料准备」命令默认资料来源均为：**词典 + grep + BM25 + 向量**（需引文索引与词典配置）；差异仅在输入语义（提示词）与是否进入阶段 B 校对。
+三条「参考资料准备」命令默认资料来源均为：**词典 + grep + BM25 + 向量**（需引文索引与词典配置）；**维基百科**需在选来源时手动勾选。差异仅在输入语义（提示词）与是否进入阶段 B 校对。
 
 ## 过程文件
 
@@ -29,10 +29,12 @@
 - `{basename}.referenceprep.log` — 运行日志
 - `{workspace}/.proofread/reference-catalog.json` — 参考文献目录缓存
 - `{workspace}/.proofread/reference-vectors.json` — 轻量向量索引（字符 n-gram）
+- `{workspace}/.proofread/wiki-cache.json` — 维基百科/Wikidata 响应缓存（启用 wikipedia 来源时）
 
 ## 配置（节选）
 
-- `ai-proofread.referencePrep.enabledSources` — 默认 `["dict","grep_md","bm25","vector"]`
+- `ai-proofread.referencePrep.enabledSources` — 默认 `["dict","grep_md","bm25","vector"]`（不含 wikipedia）
+- `ai-proofread.referencePrep.wikipedia.*` — User-Agent 联系 URL、语言、速率限制、会话预算、缓存 TTL
 - `ai-proofread.referencePrep.scope.*` — 预筛阈值与 fallbackWiden
 - `ai-proofread.referencePrep.rerank.*` — 精排开关与候选上限
 - `ai-proofread.referencePrep.bm25.topK` / `vector.*` — 检索通道
@@ -56,6 +58,11 @@
         "unit": "sentence",
         "contextLines": 2,
         "scopePaths": ["tang-dynasty/"]
+      },
+      "wikipedia": {
+        "searchTerms": ["李白"],
+        "lang": "zh",
+        "includeWikidata": true
       }
     }
   ],
@@ -75,11 +82,11 @@
 
 ### CorpusHit（v0.2 结构化字段）
 
-`refTag`, `source`, `kind`, `unit`, `startLine`/`endLine`, `headingPath`, `grepPatterns`, `rgCommand`, `bm25Score`, `vectorScore`, `finalScore`, `rerankScore`, `fileMtimeMs`, `rerankReason` 等。
+`refTag`, `source`, `kind`, `unit`, `startLine`/`endLine`, `headingPath`, `grepPatterns`, `rgCommand`, `bm25Score`, `vectorScore`, `finalScore`, `rerankScore`, `fileMtimeMs`, `rerankReason`, `pageTitle`, `pageUrl`, `wikiLang`, `wikidataId`, `wikidataClaims` 等。
 
 ## TreeView
 
-侧栏 **参考资料命中**：`轮次 → 查询 → 命中项`。支持打开文件跳转、复制 reference 块、手动 prune/restore。
+侧栏 **参考资料命中**：`轮次 → 查询 → 命中项`。支持打开文献文件跳转、**维基条目在浏览器打开**、复制 reference 块、手动 prune/restore。
 
 ## 续跑（仅准备 / LLM grep）
 
@@ -95,4 +102,10 @@
 
 ## 终止条件
 
-程序 `maxRounds`、查词预算、grep 字符预算；`sufficient: true` 且 queries 为空可提前结束；精排与混合打分后的阈值 prune。
+程序 `maxRounds`、查词预算、grep 字符预算、**Wikipedia HTTP 预算**（`.referenceprep.log` 记录 `wiki HTTP=` 与 cache hit/miss）；`sufficient: true` 且 queries 为空可提前结束；精排与混合打分后的阈值 prune。
+
+## 维基百科通道（合规要点）
+
+- 扩展维护者 User-Agent（`referencePrep.wikipedia.userAgentContactUrl`），串行请求，软限速默认 30/min
+- 429/503 退避；连续 429 暂停该会话维基检索
+- 缓存命中不计入 HTTP 预算；详见 README「维基百科资料来源」

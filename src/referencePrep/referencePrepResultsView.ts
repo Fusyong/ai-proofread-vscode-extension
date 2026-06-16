@@ -5,6 +5,7 @@ import { loadProcessFile, saveProcessFile } from './processFile';
 import { buildMergedReference } from './retrieval/executor';
 import {
     canOpenHitInEditor,
+    canOpenHitInBrowser,
     getHitsForRoundQuery,
     getQueryIdsWithHits,
     getRoundHitCount,
@@ -103,13 +104,15 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
         item.iconPath =
             h.status === 'pruned'
                 ? new vscode.ThemeIcon('circle-slash')
-                : h.source === 'dict'
-                  ? new vscode.ThemeIcon('book')
-                  : new vscode.ThemeIcon('file');
-        if (canOpenHitInEditor(h)) {
+                : h.source === 'wikipedia'
+                  ? new vscode.ThemeIcon('globe')
+                  : h.source === 'dict'
+                    ? new vscode.ThemeIcon('book')
+                    : new vscode.ThemeIcon('file');
+        if (canOpenHitInEditor(h) || canOpenHitInBrowser(h)) {
             item.command = {
                 command: 'ai-proofread.referencePrep.openHit',
-                title: '打开命中位置',
+                title: h.source === 'wikipedia' ? '在浏览器打开维基条目' : '打开命中位置',
                 arguments: [h],
             };
         }

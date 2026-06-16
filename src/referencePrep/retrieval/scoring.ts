@@ -15,7 +15,7 @@ function tokenizeForMatch(text: string): string[] {
 function scopeMatchScore(target: string, hit: CorpusHit): number {
     const tokens = tokenizeForMatch(target);
     if (tokens.length === 0) return 0;
-    const hay = `${hit.relPath ?? ''} ${hit.headingPath ?? ''} ${hit.snippet}`.toLowerCase();
+    const hay = `${hit.relPath ?? ''} ${hit.headingPath ?? ''} ${hit.pageTitle ?? ''} ${hit.snippet}`.toLowerCase();
     let matched = 0;
     for (const tok of tokens) {
         if (hay.includes(tok)) matched++;
@@ -23,10 +23,18 @@ function scopeMatchScore(target: string, hit: CorpusHit): number {
     return matched / tokens.length;
 }
 
+function hitGroupKey(h: CorpusHit): string {
+    if (h.source === 'wikipedia') {
+        return h.pageUrl ?? h.digest;
+    }
+    return h.relPath ?? h.file ?? '';
+}
+
 function normalizeChannelScore(hit: CorpusHit): number {
     if (hit.bm25Score != null) return Math.min(1, hit.bm25Score / 10);
     if (hit.vectorScore != null) return Math.min(1, hit.vectorScore);
     if (hit.source === 'grep_md') return hit.baseValue;
+    if (hit.source === 'wikipedia') return hit.baseValue;
     return hit.baseValue;
 }
 
@@ -54,18 +62,24 @@ export function scoreAndSortHits(hits: CorpusHit[], target: string): CorpusHit[]
     const unitPatterns = new Map<string, number>();
     const fileCounts = new Map<string, number>();
     for (const h of hits) {
-        const key = unitKey(h.relPath ?? h.file ?? '', h.startLine ?? h.line ?? 0, h.endLine ?? h.line ?? 0);
+        const key =
+            h.source === 'wikipedia'
+                ? `wiki:${h.pageUrl ?? h.digest}`
+                : unitKey(h.relPath ?? h.file ?? '', h.startLine ?? h.line ?? 0, h.endLine ?? h.line ?? 0);
         unitPatterns.set(key, (unitPatterns.get(key) ?? 0) + (h.grepPatterns?.length ?? 1));
-        const f = h.relPath ?? h.file ?? '';
+        const f = hitGroupKey(h);
         fileCounts.set(f, (fileCounts.get(f) ?? 0) + 1);
     }
     for (const h of hits) {
-        const key = unitKey(h.relPath ?? h.file ?? '', h.startLine ?? h.line ?? 0, h.endLine ?? h.line ?? 0);
+        const key =
+            h.source === 'wikipedia'
+                ? `wiki:${h.pageUrl ?? h.digest}`
+                : unitKey(h.relPath ?? h.file ?? '', h.startLine ?? h.line ?? 0, h.endLine ?? h.line ?? 0);
         h.finalScore = computeFinalScore(
             h,
             target,
             unitPatterns.get(key) ?? 1,
-            fileCounts.get(h.relPath ?? h.file ?? '') ?? 1
+            fileCounts.get(hitGroupKey(h)) ?? 1
         );
         h.aggregatedValue = h.finalScore;
     }
@@ -89,7 +103,9 @@ export function dedupeHitsByOverlap(hits: CorpusHit[], threshold = 0.85): Corpus
         const dup = kept.find(
             (k) =>
                 k.digest === h.digest ||
+                (k.source === 'wikipedia' && h.source === 'wikipedia' && k.pageUrl === h.pageUrl) ||
                 ((k.relPath ?? k.file) === (h.relPath ?? h.file) &&
+                    (k.relPath ?? k.file) !== '' &&
                     textOverlapRatio(k.snippet, h.snippet) >= threshold)
         );
         if (!dup) {
@@ -106,9 +122,9 @@ export function capHitsPerFile(hits: CorpusHit[], maxPerFile = 5): CorpusHit[] {
     const counts = new Map<string, number>();
     const out: CorpusHit[] = [];
     for (const h of hits) {
-        const f = h.relPath ?? h.file ?? '';
+        const f = hitGroupKey(h);
         const n = counts.get(f) ?? 0;
-        if (n >= maxPerFile) continue;
+        if (f && n >= maxPerFile) continue;
         counts.set(f, n + 1);
         out.push(h);
     }
