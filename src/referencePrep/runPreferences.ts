@@ -4,7 +4,7 @@ import { getDefaultEnabledSources } from './config';
 
 const KEY_LAST_RUN = 'ai-proofread.referencePrep.lastRun';
 
-const ALLOWED_SOURCES: ReferenceSourceId[] = ['dict', 'grep_md', 'citation', 'web'];
+const ALLOWED_SOURCES: ReferenceSourceId[] = ['dict', 'grep_md', 'bm25', 'vector', 'citation', 'web', 'wikipedia'];
 const ALLOWED_STRENGTHS: ReferencePrepStrength[] = ['light', 'standard', 'thorough'];
 
 export interface ReferencePrepLastRun {

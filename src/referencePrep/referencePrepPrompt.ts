@@ -27,19 +27,22 @@ export function buildReferencePrepSystemPrompt(params: {
         '1) 只输出 JSON，无 markdown、无解释。',
         '2) 顶层：{"sufficient":boolean,"queries":[...],"prune":[...]}',
         '3) queries 长度不超过 ' + params.maxQueries + '；sufficient 为 true 时表示资料已够，本轮 queries 可为空数组。',
-        '4) 每个 query 含：queryId, intent, priority(0~1), 以及按来源填写的 dict 或 grep 块（勿写 source 字段）。',
+        '4) 每个 query 含：queryId, intent, priority(0~1), 以及按来源填写的 dict、grep 或 wikipedia 块（勿写 source 字段）。',
         '5) intent 必须是以下之一：' + intentList,
         '6) dict 块：dictId（从 dicts 选，不确定用 null）, candidates(1~3 个词条), 可选 why。',
         '7) grep 块：patterns(1~4 个关键词/短语), 可选 contextLines(默认 2), unit, scopePaths, searchPhrases。',
         '   unit 取值：line_context | sentence | md_paragraph | heading_section | file_outline。',
         '   entity_name/word_usage 倾向 sentence；general_fact 倾向 md_paragraph；探索性可用 line_context。',
         '   searchPhrases 供 BM25/向量检索（可与 patterns 相同或更宽）。',
-        '8) prune：列出应丢弃的 hitId（与 corpus 摘要对应）。',
+        '8) wikipedia 块：searchTerms(1~3) 或 titles(1~3 已知条目名), 可选 lang(zh|en), includeWikidata(boolean), why。',
+        '   entity_name/general_fact 优先填 wikipedia；勿把百科检索写成 grep.patterns。',
+        '9) prune：列出应丢弃的 hitId（与 corpus 摘要对应）。',
         '',
         '规则：',
         '- 只为当前无法确定、查资料可能有明确收益的信息建 query；宁缺毋滥。',
         '- disabled 来源禁止为其生成 query。',
         '- enabled 含 dict 时可为专名/术语填 dict；含 grep_md/bm25/vector 时可填文献检索。',
+        '- enabled 含 wikipedia 时可为专名/史实/百科事实填 wikipedia 块（非 grep）。',
         '- 词条不要带书名号；patterns 宜短、可命中参考文献。',
         params.continuation
             ? [
@@ -212,7 +215,31 @@ export function parseReferencePrepPlan(raw: string, allowedIntents: ReferencePre
                 };
             }
         }
-        if (q.dict || q.grep) {
+        if (x?.wikipedia && typeof x.wikipedia === 'object') {
+            const searchTerms = Array.isArray(x.wikipedia.searchTerms)
+                ? x.wikipedia.searchTerms
+                      .map((s: unknown) => (typeof s === 'string' ? s.trim() : ''))
+                      .filter(Boolean)
+                : [];
+            const titles = Array.isArray(x.wikipedia.titles)
+                ? x.wikipedia.titles.map((s: unknown) => (typeof s === 'string' ? s.trim() : '')).filter(Boolean)
+                : [];
+            const langRaw = x.wikipedia.lang;
+            const lang = langRaw === 'en' || langRaw === 'zh' ? langRaw : undefined;
+            if (searchTerms.length > 0 || titles.length > 0) {
+                q.wikipedia = {
+                    searchTerms: searchTerms.slice(0, 3),
+                    titles: titles.slice(0, 3),
+                    lang,
+                    includeWikidata:
+                        typeof x.wikipedia.includeWikidata === 'boolean'
+                            ? x.wikipedia.includeWikidata
+                            : undefined,
+                    why: typeof x.wikipedia.why === 'string' ? x.wikipedia.why : undefined,
+                };
+            }
+        }
+        if (q.dict || q.grep || q.wikipedia) {
             queries.push(q);
         }
     }

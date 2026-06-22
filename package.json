@@ -654,7 +654,7 @@
           "default": ["dict", "grep_md", "bm25", "vector"],
           "items": {
             "type": "string",
-            "enum": ["dict", "grep_md", "bm25", "vector", "citation", "web"]
+            "enum": ["dict", "grep_md", "bm25", "vector", "citation", "web", "wikipedia"]
           },
           "description": "默认启用的参考资料来源。"
         },
@@ -787,6 +787,107 @@
           "type": "object",
           "default": {},
           "description": "混合相关性权重：llmPriority, channelScore, cooccurrence, scopeMatch, clusterBoost。"
+        },
+        "ai-proofread.referencePrep.wikipedia.userAgentContactUrl": {
+          "order": 37.98,
+          "type": "string",
+          "default": "https://github.com/ah21/ai-proofread-vscode-extension",
+          "description": "Wikimedia API User-Agent 中的项目联系 URL（维护者信息，非用户邮箱）。"
+        },
+        "ai-proofread.referencePrep.wikipedia.defaultLang": {
+          "order": 37.981,
+          "type": "string",
+          "enum": ["zh", "en"],
+          "default": "zh",
+          "description": "维基百科检索首选语言。"
+        },
+        "ai-proofread.referencePrep.wikipedia.fallbackLang": {
+          "order": 37.982,
+          "type": "string",
+          "enum": ["zh", "en"],
+          "default": "en",
+          "description": "首选语言无结果时的备选语言。"
+        },
+        "ai-proofread.referencePrep.wikipedia.includeWikidata": {
+          "order": 37.983,
+          "type": "boolean",
+          "default": true,
+          "description": "命中维基条目时是否拉取 Wikidata 结构化属性。"
+        },
+        "ai-proofread.referencePrep.wikipedia.rateLimit.requestsPerMinute": {
+          "order": 37.984,
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 120,
+          "description": "Wikimedia API 软限速（请求/分钟，串行发送）。"
+        },
+        "ai-proofread.referencePrep.wikipedia.rateLimit.minIntervalMs": {
+          "order": 37.985,
+          "type": "number",
+          "default": 200,
+          "minimum": 0,
+          "maximum": 5000,
+          "description": "两次 Wikipedia API 请求之间的最小间隔（毫秒）。"
+        },
+        "ai-proofread.referencePrep.wikipedia.budget.light": {
+          "order": 37.986,
+          "type": "number",
+          "default": 15,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "轻量强度下每会话 Wikipedia 网络请求上限。"
+        },
+        "ai-proofread.referencePrep.wikipedia.budget.standard": {
+          "order": 37.987,
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "标准强度下每会话 Wikipedia 网络请求上限。"
+        },
+        "ai-proofread.referencePrep.wikipedia.budget.thorough": {
+          "order": 37.988,
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "深入强度下每会话 Wikipedia 网络请求上限。"
+        },
+        "ai-proofread.referencePrep.wikipedia.cache.enabled": {
+          "order": 37.989,
+          "type": "boolean",
+          "default": true,
+          "description": "是否缓存 Wikipedia/Wikidata 响应到 .proofread/wiki-cache.json。"
+        },
+        "ai-proofread.referencePrep.wikipedia.cache.ttlHours.page": {
+          "order": 37.9891,
+          "type": "number",
+          "default": 168,
+          "minimum": 0,
+          "description": "条目摘录缓存 TTL（小时，0 为永不过期）。"
+        },
+        "ai-proofread.referencePrep.wikipedia.cache.ttlHours.search": {
+          "order": 37.9892,
+          "type": "number",
+          "default": 24,
+          "minimum": 0,
+          "description": "搜索结果缓存 TTL（小时）。"
+        },
+        "ai-proofread.referencePrep.wikipedia.cache.ttlHours.entity": {
+          "order": 37.9893,
+          "type": "number",
+          "default": 168,
+          "minimum": 0,
+          "description": "Wikidata 实体缓存 TTL（小时）。"
+        },
+        "ai-proofread.referencePrep.wikipedia.maxExtractChars": {
+          "order": 37.9894,
+          "type": "number",
+          "default": 4000,
+          "minimum": 500,
+          "maximum": 20000,
+          "description": "单条维基导语摘录最大字符数（可被核查强度覆盖）。"
         },
         "ai-proofread.modelRoutes": {
           "order": 9.5,
@@ -1408,22 +1509,22 @@
         },
         {
           "command": "ai-proofread.referencePrep.openHit",
-          "when": "view == ai-proofread.referencePrepResults && viewItem == referencePrepHitActive",
+          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitActive || viewItem == referencePrepHitActiveWeb)",
           "group": "referencePrep@1"
         },
         {
           "command": "ai-proofread.referencePrep.copyBlock",
-          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitActive || viewItem == referencePrepHitActiveDict || viewItem == referencePrepHitPruned || viewItem == referencePrepHitPrunedDict)",
+          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitActive || viewItem == referencePrepHitActiveDict || viewItem == referencePrepHitActiveWeb || viewItem == referencePrepHitPruned || viewItem == referencePrepHitPrunedDict || viewItem == referencePrepHitPrunedWeb)",
           "group": "referencePrep@1"
         },
         {
           "command": "ai-proofread.referencePrep.pruneHit",
-          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitActive || viewItem == referencePrepHitActiveDict)",
+          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitActive || viewItem == referencePrepHitActiveDict || viewItem == referencePrepHitActiveWeb)",
           "group": "referencePrep@2"
         },
         {
           "command": "ai-proofread.referencePrep.restoreHit",
-          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitPruned || viewItem == referencePrepHitPrunedDict)",
+          "when": "view == ai-proofread.referencePrepResults && (viewItem == referencePrepHitPruned || viewItem == referencePrepHitPrunedDict || viewItem == referencePrepHitPrunedWeb)",
           "group": "referencePrep@2"
         },
         {

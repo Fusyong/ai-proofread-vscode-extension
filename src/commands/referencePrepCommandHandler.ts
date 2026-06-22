@@ -27,6 +27,11 @@ const SOURCE_OPTIONS: Array<{ id: ReferenceSourceId; label: string; description:
     { id: 'grep_md', label: '参考文献 grep', description: '在 references 目录 md/txt 中字面检索' },
     { id: 'bm25', label: 'BM25/FTS', description: '需先建立引文索引；语义关键词检索' },
     { id: 'vector', label: '轻量向量', description: '字符 n-gram 相似度；懒构建向量索引' },
+    {
+        id: 'wikipedia',
+        label: '维基百科（API）',
+        description: '只读访问 zh/en 维基与 Wikidata；遵守速率限制，结果缓存于 .proofread/wiki-cache.json',
+    },
 ];
 
 const STRENGTH_OPTIONS: Array<{ label: string; description: string; value: ReferencePrepStrength }> = [
@@ -117,6 +122,17 @@ export class ReferencePrepCommandHandler {
         );
         if (!pickedSources?.length) return undefined;
         const enabledSources = pickedSources.map((p) => p.id);
+
+        if (enabledSources.includes('wikipedia')) {
+            const noticeKey = 'ai-proofread.wikipedia.complianceNoticeShown';
+            if (!context.globalState.get<boolean>(noticeKey)) {
+                await context.globalState.update(noticeKey, true);
+                await vscode.window.showInformationMessage(
+                    '已启用维基百科检索：扩展将以只读方式访问 Wikimedia API（串行限速、本地缓存）。请勿高频批量请求；详见 README「维基百科资料来源」。',
+                    { modal: false }
+                );
+            }
+        }
 
         const strengthPick = await vscode.window.showQuickPick(
             STRENGTH_OPTIONS.map((o) => ({

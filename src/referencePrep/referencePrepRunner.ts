@@ -18,6 +18,7 @@ import {
     getReferencePrepLlmConfig,
     getScopeConfig,
     getStrengthPreset,
+    getWikipediaBudgetForStrength,
 } from './config';
 import type {
     ReferencePrepIntent,
@@ -39,6 +40,7 @@ import {
 } from './scope/resourceScope';
 import { runLlmRerank } from './rerank/rerankRunner';
 import { recordRecentSession } from './continuation';
+import { getWikiCacheStats, resetWikiCacheStats } from './wikipedia/wikiCache';
 
 const ALL_INTENTS: ReferencePrepIntent[] = [
     'entity_name',
@@ -106,7 +108,7 @@ function resolveDictPrepStylePrompt(context: vscode.ExtensionContext): string | 
     return null;
 }
 
-const ALL_SOURCES: ReferenceSourceId[] = ['dict', 'grep_md', 'bm25', 'vector', 'citation', 'web'];
+const ALL_SOURCES: ReferenceSourceId[] = ['dict', 'grep_md', 'bm25', 'vector', 'citation', 'web', 'wikipedia'];
 
 export async function runReferencePrepForTarget(
     params: ReferencePrepRunParams & ReferencePrepProgressHooks
@@ -177,6 +179,10 @@ export async function runReferencePrepForTarget(
     const catalogSummary = catalog ? summarizeCatalogForPrompt(catalog, 60) : undefined;
 
     const lookupsBudget = { used: 0, max: preset.maxTotalLookups };
+    const wikiRequestsBudget = params.enabledSources.includes('wikipedia')
+        ? { used: 0, max: getWikipediaBudgetForStrength(params.strength) }
+        : undefined;
+    resetWikiCacheStats();
     let mergedReference = proc.mergedReference ?? '';
     let roundIncomingTotal = 0;
 
@@ -244,10 +250,18 @@ export async function runReferencePrepForTarget(
             context: params.context,
             existingReference: mergedReference,
             lookupsBudget,
+            wikiRequestsBudget,
             scope: resourceScope,
             roundId,
         });
         roundIncomingTotal += incoming.length;
+
+        const cacheStats = getWikiCacheStats();
+        roundEntry.wikiRequestsUsed = wikiRequestsBudget?.used ?? 0;
+        appendProcessLog(
+            params.anchorPath,
+            `Round ${round + 1} wiki HTTP=${wikiRequestsBudget?.used ?? 0} cache hit=${cacheStats.hits} miss=${cacheStats.misses}`
+        );
 
         params.onProgress?.(`精排 ${incoming.length} 条候选…`);
         const reranked = await runLlmRerank({ target: params.target, hits: incoming });
@@ -276,6 +290,7 @@ export async function runReferencePrepForTarget(
 
         if (plan.sufficient) break;
         if (lookupsBudget.used >= lookupsBudget.max) break;
+        if (wikiRequestsBudget && wikiRequestsBudget.used >= wikiRequestsBudget.max) break;
     }
 
     proc.mergedReference = mergedReference;

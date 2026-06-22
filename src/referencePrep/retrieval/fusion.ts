@@ -5,11 +5,14 @@ import { capHitsPerFile, dedupeHitsByOverlap, scoreAndSortHits } from './scoring
 export function fuseChannelHits(hits: CorpusHit[], target: string): CorpusHit[] {
     const byUnit = new Map<string, CorpusHit>();
     for (const h of hits) {
-        const key = unitKey(
-            h.relPath ?? h.file ?? '',
-            h.startLine ?? h.line ?? 0,
-            h.endLine ?? h.line ?? 0
-        );
+        const key =
+            h.source === 'wikipedia'
+                ? `wiki:${h.pageUrl ?? h.digest}`
+                : unitKey(
+                      h.relPath ?? h.file ?? '',
+                      h.startLine ?? h.line ?? 0,
+                      h.endLine ?? h.line ?? 0
+                  );
         const prev = byUnit.get(key);
         if (!prev) {
             byUnit.set(key, {

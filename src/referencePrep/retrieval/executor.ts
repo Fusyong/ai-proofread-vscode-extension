@@ -13,6 +13,7 @@ import { executeDictQuery } from './dictAdapter';
 import { executeGrepQuery } from './grepAdapter';
 import { executeBm25Query } from './bm25Adapter';
 import { executeVectorQuery } from './vectorAdapter';
+import { executeWikipediaQuery } from './wikipediaAdapter';
 import { extractFallbackGrepPatterns } from '../referencePrepPrompt';
 import { fuseChannelHits } from './fusion';
 import { filterDictsByScope } from '../scope/resourceScope';
@@ -26,6 +27,7 @@ export async function executeReferencePrepPlan(params: {
     context: vscode.ExtensionContext;
     existingReference: string;
     lookupsBudget: { used: number; max: number };
+    wikiRequestsBudget?: { used: number; max: number };
     scope?: ResourceScope;
     roundId?: string;
 }): Promise<CorpusHit[]> {
@@ -65,6 +67,28 @@ export async function executeReferencePrepPlan(params: {
                 h.roundId = params.roundId;
                 if (q.dict?.dictId) h.dictId = q.dict.dictId;
                 queryHits.push(h);
+            }
+        }
+
+        if (
+            params.enabledSources.includes('wikipedia') &&
+            q.wikipedia &&
+            params.wikiRequestsBudget
+        ) {
+            const { hits, requestsUsed } = await executeWikipediaQuery({
+                query: q,
+                wikiBlock: q.wikipedia,
+                existingReference: reference,
+                priority: q.priority,
+                strength: params.strength,
+                roundId: params.roundId,
+                requestsBudget: params.wikiRequestsBudget,
+            });
+            for (const h of hits) {
+                queryHits.push(h);
+            }
+            if (requestsUsed > 0) {
+                /* logged by runner via budget */
             }
         }
 

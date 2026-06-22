@@ -2,12 +2,19 @@ import type { CorpusHit, ReferencePrepProcessFileV020, ReferencePrepRound } from
 
 /** 词典命中无文献路径，不宜「打开命中位置」 */
 export function canOpenHitInEditor(hit: CorpusHit): boolean {
-    if (hit.source === 'dict') return false;
+    if (hit.source === 'dict' || hit.source === 'wikipedia') return false;
     const rel = (hit.relPath ?? hit.file)?.trim();
     return Boolean(rel);
 }
 
+export function canOpenHitInBrowser(hit: CorpusHit): boolean {
+    return hit.source === 'wikipedia' && Boolean(hit.pageUrl?.trim());
+}
+
 export function referencePrepHitContextValue(hit: CorpusHit): string {
+    if (hit.source === 'wikipedia') {
+        return hit.status === 'pruned' ? 'referencePrepHitPrunedWeb' : 'referencePrepHitActiveWeb';
+    }
     const openable = canOpenHitInEditor(hit);
     if (hit.status === 'pruned') {
         return openable ? 'referencePrepHitPruned' : 'referencePrepHitPrunedDict';
