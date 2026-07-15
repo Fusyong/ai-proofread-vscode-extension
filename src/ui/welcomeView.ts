@@ -3,11 +3,6 @@
  */
 
 import * as vscode from 'vscode';
-import {
-    getSidebarToggleState,
-    onSidebarToggleStateChanged,
-    type SidebarToggleState,
-} from './sidebarViewVisibility';
 
 const VIEW_ID = 'ai-proofread.welcome';
 
@@ -16,8 +11,7 @@ const EXTENSION_ID = 'HuangFusyong.ai-proofreader';
 /** 扩展详情页（编辑器内打开失败时用浏览器打开） */
 const EXTENSION_MARKETPLACE_URL = `https://marketplace.visualstudio.com/items?itemName=${EXTENSION_ID}`;
 
-function getHtml(initial: SidebarToggleState): string {
-    const stateJson = JSON.stringify(initial);
+function getHtml(): string {
     return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -82,58 +76,10 @@ function getHtml(initial: SidebarToggleState): string {
             outline: 1px solid var(--vscode-focusBorder);
             outline-offset: -1px;
         }
-        .cell-on {
-            border-color: var(--vscode-focusBorder);
-            background: var(--vscode-list-activeSelectionBackground, var(--vscode-sideBar-background));
-        }
         .cell-label {
             flex: 1;
             min-width: 0;
             user-select: none;
-        }
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 34px;
-            height: 18px;
-            flex-shrink: 0;
-        }
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            inset: 0;
-            background: var(--vscode-input-background);
-            border: 1px solid var(--vscode-input-border, transparent);
-            border-radius: 10px;
-            transition: background 0.15s;
-        }
-        .slider::before {
-            position: absolute;
-            content: "";
-            height: 12px;
-            width: 12px;
-            left: 2px;
-            bottom: 2px;
-            background: var(--vscode-foreground);
-            border-radius: 50%;
-            transition: transform 0.15s;
-        }
-        .switch input:checked + .slider {
-            background: var(--vscode-button-background);
-            border-color: var(--vscode-button-border, transparent);
-        }
-        .switch input:checked + .slider::before {
-            transform: translateX(16px);
-            background: var(--vscode-button-foreground);
-        }
-        .switch input:focus-visible + .slider {
-            outline: 1px solid var(--vscode-focusBorder);
-            outline-offset: 1px;
         }
         .hint {
             margin-top: 16px;
@@ -154,29 +100,17 @@ function getHtml(initial: SidebarToggleState): string {
 <body>
     <button type="button" class="btn-primary" data-action="openPanel">打开校对面板</button>
     <div class="action-grid">
-        <div class="cell" data-cell="modelRoutes">
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="modelRoutes" title="显示或隐藏模型路由 TreeView">
             <span class="cell-label">模型路由</span>
-            <label class="switch" title="显示或隐藏模型路由 TreeView">
-                <input type="checkbox" data-toggle="modelRoutes" aria-label="模型路由">
-                <span class="slider"></span>
-            </label>
-        </div>
-        <div class="cell" data-cell="prompts">
+        </button>
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="prompts" title="显示或隐藏提示词相关 TreeView">
             <span class="cell-label">管理提示词</span>
-            <label class="switch" title="显示或隐藏提示词相关 TreeView">
-                <input type="checkbox" data-toggle="prompts" aria-label="管理提示词">
-                <span class="slider"></span>
-            </label>
-        </div>
+        </button>
     </div>
     <div class="action-grid">
-        <div class="cell" data-cell="wordCheck">
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="wordCheck" title="显示或隐藏字词检查相关 TreeView">
             <span class="cell-label">字词检查</span>
-            <label class="switch" title="显示或隐藏字词检查相关 TreeView">
-                <input type="checkbox" data-toggle="wordCheck" aria-label="字词检查">
-                <span class="slider"></span>
-            </label>
-        </div>
+        </button>
         <button type="button" class="cell cell-action" data-action="openSettings">
             <span class="cell-label">打开设置</span>
         </button>
@@ -199,47 +133,14 @@ function getHtml(initial: SidebarToggleState): string {
     </div>
     <script>
         const vscode = acquireVsCodeApi();
-        let toggleState = ${stateJson};
-
-        function applyToggleState(s) {
-            toggleState = s;
-            document.querySelectorAll('[data-toggle]').forEach(el => {
-                const key = el.dataset.toggle;
-                if (!key || !Object.prototype.hasOwnProperty.call(s, key)) return;
-                el.checked = !!s[key];
-                const cell = el.closest('[data-cell]');
-                if (cell) cell.classList.toggle('cell-on', !!s[key]);
-            });
-        }
-        applyToggleState(toggleState);
-
         document.querySelectorAll('[data-action]').forEach(el => {
             el.addEventListener('click', () => {
-                vscode.postMessage({ action: el.dataset.action });
+                vscode.postMessage({ action: el.dataset.action, key: el.dataset.key });
             });
-        });
-
-        document.querySelectorAll('[data-toggle]').forEach(input => {
-            input.addEventListener('change', () => {
-                const key = input.dataset.toggle;
-                input.checked = !input.checked;
-                vscode.postMessage({ action: 'toggleSidebar', key });
-            });
-        });
-
-        window.addEventListener('message', event => {
-            const msg = event.data;
-            if (msg && msg.type === 'toggleState') {
-                applyToggleState(msg.state);
-            }
         });
     </script>
 </body>
 </html>`;
-}
-
-function postToggleState(webview: vscode.Webview, state: SidebarToggleState): void {
-    webview.postMessage({ type: 'toggleState', state });
 }
 
 /** 在编辑器内打开扩展视图并定位到本扩展，并主动打开 README 预览页；失败则用浏览器打开 Marketplace */
@@ -255,16 +156,6 @@ async function showExtensionInEditor(extensionContext: vscode.ExtensionContext):
 }
 
 export function registerWelcomeView(context: vscode.ExtensionContext): void {
-    let activeWebview: vscode.Webview | undefined;
-
-    context.subscriptions.push(
-        onSidebarToggleStateChanged((state) => {
-            if (activeWebview) {
-                postToggleState(activeWebview, state);
-            }
-        })
-    );
-
     const provider: vscode.WebviewViewProvider = {
         resolveWebviewView(
             webviewView: vscode.WebviewView,
@@ -276,26 +167,7 @@ export function registerWelcomeView(context: vscode.ExtensionContext): void {
                 localResourceRoots: [],
                 retainContextWhenHidden: true,
             };
-            activeWebview = webviewView.webview;
-
-            const refreshToggleUi = () => {
-                postToggleState(webviewView.webview, getSidebarToggleState());
-            };
-
-            webviewView.webview.html = getHtml(getSidebarToggleState());
-            refreshToggleUi();
-
-            webviewView.onDidChangeVisibility((visible) => {
-                if (visible) {
-                    refreshToggleUi();
-                }
-            });
-
-            webviewView.onDidDispose(() => {
-                if (activeWebview === webviewView.webview) {
-                    activeWebview = undefined;
-                }
-            });
+            webviewView.webview.html = getHtml();
 
             webviewView.webview.onDidReceiveMessage(async (message: { action: string; key?: string }) => {
                 switch (message.action) {
@@ -328,4 +200,3 @@ export function registerWelcomeView(context: vscode.ExtensionContext): void {
     };
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(VIEW_ID, provider));
 }
-

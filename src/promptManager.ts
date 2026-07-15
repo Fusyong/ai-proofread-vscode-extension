@@ -26,6 +26,8 @@ export const SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL = '__preset_pinyin_annota
 export const SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM = '__preset_knowledge_verify_item__';
 /** 预置「知识核查（full）」在 globalState 中的存值 */
 export const SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL = '__preset_knowledge_verify_full__';
+/** 预置「段内重组与重述（full）」在 globalState 中的存值 */
+export const SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL = '__preset_para_restructure_full__';
 
 function isReservedPromptStorageName(name: string): boolean {
     return (
@@ -37,7 +39,8 @@ function isReservedPromptStorageName(name: string): boolean {
         name === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL ||
         name === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL ||
         name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM ||
-        name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL
+        name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL ||
+        name === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL
     );
 }
 
@@ -53,6 +56,7 @@ export function getPromptDisplayName(name: string): string {
     if (name === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL) return '拼音加注（full）';
     if (name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM) return '知识核查（item）';
     if (name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL) return '知识核查（full）';
+    if (name === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL) return '段内重组与重述（full）';
     return name || '系统默认提示词（full）';
 }
 
@@ -100,6 +104,7 @@ export class PromptManager {
         if (name === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL) return '拼音加注（full）';
         if (name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM) return '知识核查（item）';
         if (name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL) return '知识核查（full）';
+        if (name === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL) return '段内重组与重述（full）';
         return name;
     }
 

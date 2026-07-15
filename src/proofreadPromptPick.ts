@@ -11,6 +11,7 @@ import {
     SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM,
     SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL,
     SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL,
+    SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL,
     getPromptDisplayName,
 } from './promptManager';
 
@@ -52,6 +53,11 @@ export function listProofreadPromptPickOptions(context: vscode.ExtensionContext)
             label: '表述正常化（item）',
             description: '条目',
             storageName: SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM,
+        },
+        {
+            label: '段内重组与重述（full）',
+            description: '全文 · 理顺混乱段落，必要时可增删拆合段',
+            storageName: SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL,
         },
         { label: '硬伤发现（item）', description: '条目', storageName: SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM },
         {

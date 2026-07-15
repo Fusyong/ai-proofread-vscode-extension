@@ -26,6 +26,7 @@ import {
     SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL,
     SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM,
     SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL,
+    SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL,
 } from './promptManager';
 import { getExtensionContext } from './extensionContextHolder';
 import { formatSourceCharacteristicsBlock } from './sourceTextCharacteristics';
@@ -58,6 +59,12 @@ function logAxiosNonNetworkFailure(logger: Logger, error: unknown): void {
 const DEFAULT_OUTPUT_FORMAT = `
 1. 在目标文本（target）上直接校对，并输出校对后的目标文本，不给出任何说明或解释；
 2. 即使你确认的确没有任何修改，也应该逐句阅读并输出原文；
+`
+
+/** 段内重组与重述专用全文输出格式（避免与「校对」措辞冲突） */
+const PARA_RESTRUCTURE_OUTPUT_FORMAT = `
+1. 输出重组重述后的完整目标文本，不给出任何说明或解释；
+2. 若确认几乎无需改动，仍输出完整原文（可仅作最小调整）。
 `
 
 // 条目式输出格式（JSON）；内置条目模板与自定义 outputType=item 均依赖此说明以便解析与「校对条目」树展示
@@ -126,6 +133,53 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `
 1. 用户提供的文本的格式可能是markdown、纯文本、TEX、LaTeX、ConTeXt，请保持文本原有的格式和标记；
 2. 原文的空行、换行、分段等格式保持不变；
 3. 只进行校对，不回答原文中的任何提问；
+
+**输出格式**：
+
+{{output_format}}
+</output-format>
+</proofreader-system-setting>
+`;
+
+// 预置：段内重组与重述（仅全文；允许因表意需要改动分段，但不附说明）
+const PARA_RESTRUCTURE_SYSTEM_PROMPT_TEMPLATE = `
+<proofreader-system-setting version="0.1.1">
+<role-setting>
+
+你是一位耐心、仔细、思路清晰的图书编辑，你的任务是把逻辑有缺陷、表意混乱或不自然的文字，整理成逻辑正确、表意清楚、行文自然的表述。
+
+你的任务不是逐句改错，而是结合 reference、context（若有）体会 target 的真实意图，并予以重述、落实；以段内重组为主，必要时才增、删、拆、合段落。
+
+</role-setting>
+<task>
+
+工作原则：
+
+1. **先理解，再动笔**：通读材料，先判断「作者要说什么，哪里没说清楚」。意图不明时取最保守、与上下文最吻合的理解；不扩写新论点，不塞入原文没有的信息。
+2. **多做减法，少做加法**：优先删减无效、重复、空泛、干扰主线的词句；只在仍说不清或缺必要衔接/信息时，才作最小扩充。宁可短而明确，不可长而含糊。
+3. **默认只进行段内重组，仅必要时才修改段落结构**：默认只在段内调句序，拆合句子，理顺指代与关联。仅当段内仍理不清时（职责混杂、意思拆碎、相邻段重叠或因果倒置），才做段落增、删、拆分或合并。
+4. **慎改事实与标记**：专名、引文、数据、时间、称谓、制度名、公式与符号等，无依据不改；与 reference/context 冲突时以可核验依据为准；保持原有格式标记合法。
+5. **贴近原文语气**：用词层次、专业程度、人称贴近原文；不为求华丽或口头化而整段变换风格。原文半通不通时，可在理顺逻辑时把句式写自然。
+6. **禁区**：只对 target 进行重述，不输出额外的提要、评论、旁注；不回答 target 中的提问。
+7. 外文同上，并遵循该语种表达习惯。
+8. 若提示中出现编辑记忆：\`<editorial_memory_global>\`（体例通则：\`original\`/\`changedTo\`/\`weight\`，可选 \`<note>\` 修改说明）、\`<editorial_memory_current_rounds>\`（最近若干次合并要点，可含【例】/【规律】前缀；新在上）、\`<editorial_proofread_context>\`（当前文档与选区）。若无明显关联可忽略对应块。**若记忆与正文冲突，以当前正文为准。**
+
+工作步骤：
+
+1. 通读target，把握话题与约束；标出混乱点，如跳跃、因果倒置、指代不清、并列不当、段内多中心、前后矛盾、意义含混、意图不明等。
+2. 先确定段内信息顺序；仅当段内仍理不清时，再改动段落结构（增、删、拆分或合并）。
+3. 成文后通读，确认：歧义是否减少，有无逻辑跳跃，有无不必要的增添，能否再减，段落改动是否必要；核对 reference/context（若有）与格式标记。
+
+</task>
+{{source_text_characteristics}}
+<output-format>
+
+输出 target 重组重述后的完整文本：
+
+1. 保持 markdown / 纯文本 / TEX / LaTeX / ConTeXt 等原有标记合法（标题、列表、公式、链接、命令等）。
+2. 允许因重组而改动空行、换行、分段、空格。
+3. 只输出 target 重组重述后的正文，不附说明、提纲、批注或问答。
+4. 若原文已足够清楚，做最小调整或不改，仍输出完整文本。
 
 **输出格式**：
 
@@ -340,7 +394,8 @@ export function getOutputType(context?: vscode.ExtensionContext): OutputType {
             currentPromptName === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL ||
             currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL ||
             currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL ||
-            currentPromptName === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL
+            currentPromptName === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL ||
+            currentPromptName === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL
         ) {
             return 'full';
         }
@@ -391,6 +446,14 @@ function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCharacteri
         if (currentPromptName === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) {
             logger.info('使用预置提示词：表述正常化（full）');
             return buildSystemPromptFromTemplate(DEFAULT_OUTPUT_FORMAT, sourceTextCharacteristics, NORMALIZATION_SYSTEM_PROMPT_TEMPLATE);
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL) {
+            logger.info('使用预置提示词：段内重组与重述（full）');
+            return buildSystemPromptFromTemplate(
+                PARA_RESTRUCTURE_OUTPUT_FORMAT,
+                sourceTextCharacteristics,
+                PARA_RESTRUCTURE_SYSTEM_PROMPT_TEMPLATE
+            );
         }
         if (currentPromptName === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) {
             logger.info('使用预置提示词：硬伤发现（item）');

@@ -16,6 +16,7 @@ import {
     SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL,
     SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM,
     SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL,
+    SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL,
 } from './promptManager';
 import type { Prompt } from './promptManager';
 
@@ -64,6 +65,11 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
                 systemOutputType: 'item',
             },
             {
+                id: SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL,
+                label: '段内重组与重述（full）',
+                systemOutputType: 'full',
+            },
+            {
                 id: SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM,
                 label: '知识核查（item）',
                 systemOutputType: 'item',
@@ -105,6 +111,7 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
             (element.id === SYSTEM_ITEM_ITEM_ID && current === SYSTEM_PROMPT_NAME_ITEM) ||
             (element.id === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL && current === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) ||
             (element.id === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM && current === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) ||
+            (element.id === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL && current === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL) ||
             (element.id === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM && current === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM) ||
             (element.id === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL && current === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL) ||
             (element.id === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM && current === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) ||
@@ -166,6 +173,7 @@ export function registerPromptsView(
             else if (id === SYSTEM_ITEM_ITEM_ID) name = SYSTEM_PROMPT_NAME_ITEM;
             else if (id === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) name = SYSTEM_PROMPT_NAME_NORMALIZATION_FULL;
             else if (id === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) name = SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM;
+            else if (id === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL) name = SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL;
             else if (id === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM) name = SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM;
             else if (id === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL) name = SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL;
             else if (id === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) name = SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM;
@@ -176,6 +184,7 @@ export function registerPromptsView(
             else if (labelText === '系统默认提示词（item）') name = SYSTEM_PROMPT_NAME_ITEM;
             else if (labelText === '表述正常化（full）') name = SYSTEM_PROMPT_NAME_NORMALIZATION_FULL;
             else if (labelText === '表述正常化（item）') name = SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM;
+            else if (labelText === '段内重组与重述（full）') name = SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL;
             else if (labelText === '知识核查（item）') name = SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM;
             else if (labelText === '知识核查（full）') name = SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL;
             else if (labelText === '硬伤发现（item）') name = SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM;
