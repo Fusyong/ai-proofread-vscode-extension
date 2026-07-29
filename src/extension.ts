@@ -42,6 +42,7 @@ import {
     segmentsJsonPathToSplitMarkdownPath,
 } from './proofreadSplitLayout';
 import { registerWelcomeView } from './ui/welcomeView';
+import { registerLastActiveTextEditorTracker } from './ui/lastActiveTextEditor';
 import { getJiebaWasm } from './jiebaLoader';
 import { setExtensionContext } from './extensionContextHolder';
 import { convertOpencc, type OpenccLocale } from './opencc';
@@ -89,6 +90,8 @@ async function askOpenccLocale(
 
 export async function activate(context: vscode.ExtensionContext) {
     setExtensionContext(context);
+    // Webview 获焦时 activeTextEditor 为空：先跟踪最近活动的编辑器
+    registerLastActiveTextEditorTracker(context);
     // 先恢复/初始化侧栏开关，避免激活末尾异步 hide 与后续操作竞态
     await restoreSidebarToggleStateOnActivate();
     // 最先注册欢迎视图，避免点击 Activity Bar 图标时出现 "no data provider registered"
@@ -422,6 +425,13 @@ export async function activate(context: vscode.ExtensionContext) {
             if (editor?.document.uri.fsPath) {
                 referencePrepResultsProvider.loadFromAnchor(editor.document.uri.fsPath);
             }
+        }),
+        vscode.commands.registerCommand('ai-proofread.referencePrep.clearRetrievalCache', async () => {
+            const { clearRetrievalCache } = await import('./referencePrep/retrieval/retrievalCache');
+            const ok = clearRetrievalCache();
+            vscode.window.showInformationMessage(
+                ok ? '已清除项目检索资料缓存（.proofread/retrieval-cache.json）。' : '未找到工作区或缓存文件。'
+            );
         }),
         vscode.commands.registerCommand('ai-proofread.referencePrep.openHit', async (hit?: CorpusHit) => {
             if (!hit) return;

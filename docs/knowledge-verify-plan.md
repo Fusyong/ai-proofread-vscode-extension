@@ -38,10 +38,12 @@
 - `{workspace}/.proofread/reference-catalog.json` — 参考文献目录缓存
 - `{workspace}/.proofread/reference-vectors.json` — 轻量向量索引（字符 n-gram）
 - `{workspace}/.proofread/wiki-cache.json` — 维基百科/Wikidata 响应缓存（启用 wikipedia 来源时）
+- `{workspace}/.proofread/retrieval-cache.json` — **项目级检索命中缓存**（dict/grep/bm25/vector/wikipedia 等通道查询结果；默认开启，TTL 可配）
 
 ## 配置（节选）
 
 - `ai-proofread.referencePrep.enabledSources` — 默认 `["dict","grep_md","bm25","vector"]`（不含 wikipedia）
+- `ai-proofread.referencePrep.retrievalCache.enabled` / `ttlHours` / `maxEntries` — 项目检索命中缓存
 - `ai-proofread.referencePrep.wikipedia.*` — User-Agent 联系 URL、语言、速率限制、会话预算、缓存 TTL
 - `ai-proofread.referencePrep.scope.*` — 预筛阈值与 fallbackWiden
 - `ai-proofread.referencePrep.rerank.*` — 精排开关与候选上限

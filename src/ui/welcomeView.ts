@@ -42,6 +42,16 @@ function getHtml(): string {
         .btn-primary:hover {
             background: var(--vscode-button-hoverBackground);
         }
+        .btn-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .btn-row .btn-primary {
+            margin-bottom: 0;
+            text-align: center;
+        }
         .action-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -98,7 +108,10 @@ function getHtml(): string {
     </style>
 </head>
 <body>
-    <button type="button" class="btn-primary" data-action="openPanel">打开校对面板</button>
+    <div class="btn-row">
+        <button type="button" class="btn-primary" data-action="openPanel" title="打开校对面板">校对面板</button>
+        <button type="button" class="btn-primary" data-action="openSearchConsole" title="打开参考资料检索控制台">检索面板</button>
+    </div>
     <div class="action-grid">
         <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="modelRoutes" title="显示或隐藏模型路由 TreeView">
             <span class="cell-label">模型路由</span>
@@ -126,9 +139,9 @@ function getHtml(): string {
     <div class="hint">
         可通过三种方式使用本扩展：
         <ol>
-            <li>打开校对面板 (open Proofreading panel)，使用按钮</li>
-            <li>打开命令面板 (Ctrl+Shift+P)，输入 AI Proofreader … 筛查命令并使用</li>
-            <li>在编辑窗口使用鼠标右键菜单，使用 AI Proofreader 开头的选项</li>
+            <li>打开校对面板 / 搜索面板，使用按钮</li>
+            <li>打开命令面板 (Ctrl+Shift+P)，输入 AI Proofreader Search … 筛查检索命令</li>
+            <li>在编辑窗口使用鼠标右键菜单</li>
         </ol>
     </div>
     <script>
@@ -173,6 +186,9 @@ export function registerWelcomeView(context: vscode.ExtensionContext): void {
                 switch (message.action) {
                     case 'openPanel':
                         await vscode.commands.executeCommand('ai-proofread.openProofreadingPanel');
+                        break;
+                    case 'openSearchConsole':
+                        await vscode.commands.executeCommand('ai-proofread.referencePrep.openConsole');
                         break;
                     case 'toggleSidebar': {
                         const key = message.key;

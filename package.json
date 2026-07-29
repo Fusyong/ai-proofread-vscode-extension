@@ -177,6 +177,11 @@
         "category": "AI Proofreader Search"
       },
       {
+        "command": "ai-proofread.referencePrep.clearRetrievalCache",
+        "title": "Clear Project Retrieval Cache",
+        "category": "AI Proofreader Search"
+      },
+      {
         "command": "ai-proofread.referencePrep.openHit",
         "title": "打开命中位置"
       },
@@ -939,6 +944,26 @@
           "default": 168,
           "minimum": 0,
           "description": "Wikidata 实体缓存 TTL（小时）。"
+        },
+        "ai-proofread.referencePrep.retrievalCache.enabled": {
+          "order": 37.98935,
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用项目级检索命中缓存（.proofread/retrieval-cache.json），相同查询可跳过重复检索。"
+        },
+        "ai-proofread.referencePrep.retrievalCache.ttlHours": {
+          "order": 37.98936,
+          "type": "number",
+          "default": 168,
+          "minimum": 0,
+          "description": "检索命中缓存 TTL（小时，0 为永不过期）。grep/BM25/向量在文献目录快照变化时会提前失效。"
+        },
+        "ai-proofread.referencePrep.retrievalCache.maxEntries": {
+          "order": 37.98937,
+          "type": "number",
+          "default": 800,
+          "minimum": 50,
+          "description": "检索命中缓存最大条目数；超出时淘汰最旧条目。"
         },
         "ai-proofread.referencePrep.wikipedia.maxExtractChars": {
           "order": 37.9894,

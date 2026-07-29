@@ -14,6 +14,7 @@ import { generateHtmlReport } from '../alignmentReportGenerator';
 import { getJiebaWasm } from '../jiebaLoader';
 import { collectWordErrors, formatWordErrors, parseDelimitersFromConfig } from '../wordErrorCollector';
 import { proofreadJsonPathToSegmentsJsonPath, segmentsJsonPathToSplitMarkdownPath } from '../proofreadSplitLayout';
+import { focusWorkingTextEditor } from './lastActiveTextEditor';
 
 // 接口定义
 /** 配套文档检测结果 */
@@ -349,6 +350,16 @@ export class WebviewManager {
     public async handleWebviewMessage(message: any, panel: vscode.WebviewPanel, context: vscode.ExtensionContext): Promise<void> {
         const { command, data } = message;
 
+        /** 依赖当前编辑器/选区的命令：先把最近活动编辑器重新激活，避免 Webview 获焦后 activeTextEditor 为空 */
+        const runWithWorkingEditor = async (cmd: string): Promise<void> => {
+            const ed = await focusWorkingTextEditor();
+            if (!ed) {
+                vscode.window.showWarningMessage('请先打开目标文档，再使用此按钮（焦点可留在校对面板上）。');
+                return;
+            }
+            await vscode.commands.executeCommand(cmd);
+        };
+
         try {
             switch (command) {
                 case 'showMainFile': {
@@ -405,8 +416,7 @@ export class WebviewManager {
                 }
                 case 'formatParagraphs':
                 case 'markTitlesFromToc': {
-                    // 头部按钮：使用当前编辑窗口文件
-                    await vscode.commands.executeCommand(
+                    await runWithWorkingEditor(
                         command === 'formatParagraphs' ? 'ai-proofread.formatParagraphs' : 'ai-proofread.markTitlesFromToc'
                     );
                     break;
@@ -427,10 +437,10 @@ export class WebviewManager {
                     break;
                 }
                 case 'proofreadSelection':
-                    await vscode.commands.executeCommand('ai-proofread.proofreadSelection');
+                    await runWithWorkingEditor('ai-proofread.proofreadSelection');
                     break;
                 case 'proofreadSelectionWithMemory':
-                    await vscode.commands.executeCommand('ai-proofread.proofreadSelectionWithMemory');
+                    await runWithWorkingEditor('ai-proofread.proofreadSelectionWithMemory');
                     break;
                 case 'convertDocxToMarkdown':
                     await vscode.commands.executeCommand('ai-proofread.convertDocxToMarkdown');
@@ -650,21 +660,18 @@ export class WebviewManager {
                     break;
                 }
                 case 'convertMarkdownToDocx': {
-                    // 头部按钮：使用当前编辑窗口文件
-                    await vscode.commands.executeCommand('ai-proofread.convertMarkdownToDocx');
+                    await runWithWorkingEditor('ai-proofread.convertMarkdownToDocx');
                     break;
                 }
                 case 'convertQuotes': {
-                    // 头部按钮：使用当前编辑窗口文件
-                    await vscode.commands.executeCommand('ai-proofread.convertQuotes');
+                    await runWithWorkingEditor('ai-proofread.convertQuotes');
                     break;
                 }
                 case 'citationOpenView':
                     await vscode.commands.executeCommand('ai-proofread.citation.openView');
                     break;
                 case 'checkWords': {
-                    // 头部按钮：使用当前编辑窗口文件
-                    await vscode.commands.executeCommand('ai-proofread.checkWords');
+                    await runWithWorkingEditor('ai-proofread.checkWords');
                     break;
                 }
                 case 'splitIntoSentences':
@@ -677,7 +684,6 @@ export class WebviewManager {
                 case 'searchSelectionInReferences':
                 case 'duplicateScanDocument':
                 case 'numberingCheck': {
-                    // 头部按钮：使用当前编辑窗口文件
                     const cmdMap: Record<string, string> = {
                         splitIntoSentences: 'ai-proofread.splitIntoSentences',
                         segmentFile: 'ai-proofread.segmentFile',
@@ -690,7 +696,7 @@ export class WebviewManager {
                         duplicateScanDocument: 'ai-proofread.duplicate.scanDocument',
                         numberingCheck: 'ai-proofread.numbering.check'
                     };
-                    await vscode.commands.executeCommand(cmdMap[command]);
+                    await runWithWorkingEditor(cmdMap[command]);
                     break;
                 }
                 case 'citationRebuildIndex':

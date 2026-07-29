@@ -41,6 +41,10 @@ import {
 import { runLlmRerank } from './rerank/rerankRunner';
 import { recordRecentSession } from './continuation';
 import { getWikiCacheStats, resetWikiCacheStats } from './wikipedia/wikiCache';
+import {
+    getRetrievalCacheStats,
+    resetRetrievalCacheStats,
+} from './retrieval/retrievalCache';
 import { bridgePrepEventToProgress, type PrepEventListener } from './prepEvents';
 
 const ALL_INTENTS: ReferencePrepIntent[] = [
@@ -196,6 +200,7 @@ export async function runReferencePrepForTarget(
             ? { used: 0, max: getWikipediaBudgetForStrength(params.strength) }
             : undefined;
         resetWikiCacheStats();
+        resetRetrievalCacheStats();
         let mergedReference = proc.mergedReference ?? '';
         let roundIncomingTotal = 0;
 
@@ -284,6 +289,7 @@ export async function runReferencePrepForTarget(
                 wikiRequestsBudget,
                 scope: resourceScope,
                 roundId,
+                catalogSnapshotId: catalog?.snapshotId,
             });
             roundIncomingTotal += incoming.length;
             emit?.({
@@ -294,10 +300,11 @@ export async function runReferencePrepForTarget(
             });
 
             const cacheStats = getWikiCacheStats();
+            const retrievalCacheStats = getRetrievalCacheStats();
             roundEntry.wikiRequestsUsed = wikiRequestsBudget?.used ?? 0;
             appendProcessLog(
                 params.anchorPath,
-                `Round ${round + 1} wiki HTTP=${wikiRequestsBudget?.used ?? 0} cache hit=${cacheStats.hits} miss=${cacheStats.misses}`
+                `Round ${round + 1} wiki HTTP=${wikiRequestsBudget?.used ?? 0} wikiCache hit=${cacheStats.hits} miss=${cacheStats.misses}; retrievalCache hit=${retrievalCacheStats.hits} miss=${retrievalCacheStats.misses}`
             );
 
             emit?.({

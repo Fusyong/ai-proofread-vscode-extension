@@ -3,7 +3,6 @@ import { resolveReferencesPath } from '../../citation/referenceStore';
 import type {
     CorpusHit,
     ReferencePrepPlan,
-    ReferencePrepPlanQuery,
     ReferenceSourceId,
     ReferencePrepStrength,
 } from '../schema';
@@ -19,6 +18,7 @@ import { extractFallbackGrepPatterns } from '../referencePrepPrompt';
 import { fuseChannelHits } from './fusion';
 import { filterDictsByScope } from '../scope/resourceScope';
 import { resolveLocalDictConfigs } from '../../localDict/dictConfig';
+import { buildScopeCacheKey, withRetrievalCache } from './retrievalCache';
 
 export async function executeReferencePrepPlan(params: {
     plan: ReferencePrepPlan;
@@ -31,10 +31,19 @@ export async function executeReferencePrepPlan(params: {
     wikiRequestsBudget?: { used: number; max: number };
     scope?: ResourceScope;
     roundId?: string;
+    catalogSnapshotId?: string;
 }): Promise<CorpusHit[]> {
     const config = vscode.workspace.getConfiguration('ai-proofread');
     const refPathRaw = config.get<string>('citation.referencesPath', '${workspaceFolder}/references');
     const refRoot = resolveReferencesPath(refPathRaw);
+
+    const scopeKey = params.scope
+        ? buildScopeCacheKey({
+              catalogSnapshotId: params.catalogSnapshotId,
+              dictIds: params.scope.dictIds,
+              filePaths: params.scope.filePaths,
+          })
+        : undefined;
 
     const channelHits: CorpusHit[] = [];
     let reference = params.existingReference;
@@ -54,21 +63,38 @@ export async function executeReferencePrepPlan(params: {
                     dict: { ...q.dict, dictId: scopedDicts[0]?.id ?? q.dict.dictId },
                 };
             }
-            const { hits, lookupsUsed } = await executeDictQuery({
-                query: q,
-                dictBlock: q.dict,
-                context: params.context,
-                existingReference: reference,
+            const dictBlock = q.dict;
+            const { hits } = await withRetrievalCache({
+                source: 'dict',
+                keyParts: {
+                    intent: q.intent,
+                    dictId: dictBlock.dictId,
+                    candidates: dictBlock.candidates,
+                    strength: params.strength,
+                },
+                scopeKey,
+                catalogSnapshotId: params.catalogSnapshotId,
+                roundId: params.roundId,
                 priority: q.priority,
-                lookupsBudget: params.lookupsBudget,
+                produce: async () => {
+                    const { hits: produced, lookupsUsed } = await executeDictQuery({
+                        query: q,
+                        dictBlock,
+                        context: params.context,
+                        existingReference: reference,
+                        priority: q.priority,
+                        lookupsBudget: params.lookupsBudget,
+                    });
+                    params.lookupsBudget.used += lookupsUsed;
+                    for (const h of produced) {
+                        h.llmPriority = q.priority;
+                        h.roundId = params.roundId;
+                        if (dictBlock.dictId) h.dictId = dictBlock.dictId;
+                    }
+                    return produced;
+                },
             });
-            params.lookupsBudget.used += lookupsUsed;
-            for (const h of hits) {
-                h.llmPriority = q.priority;
-                h.roundId = params.roundId;
-                if (q.dict?.dictId) h.dictId = q.dict.dictId;
-                queryHits.push(h);
-            }
+            queryHits.push(...hits);
         }
 
         if (
@@ -76,21 +102,35 @@ export async function executeReferencePrepPlan(params: {
             q.wikipedia &&
             params.wikiRequestsBudget
         ) {
-            const { hits, requestsUsed } = await executeWikipediaQuery({
-                query: q,
-                wikiBlock: q.wikipedia,
-                existingReference: reference,
-                priority: q.priority,
-                strength: params.strength,
+            const wikiBlock = q.wikipedia;
+            const { hits } = await withRetrievalCache({
+                source: 'wikipedia',
+                keyParts: {
+                    intent: q.intent,
+                    searchTerms: wikiBlock.searchTerms,
+                    titles: wikiBlock.titles,
+                    lang: wikiBlock.lang,
+                    includeWikidata: wikiBlock.includeWikidata,
+                    strength: params.strength,
+                },
+                scopeKey,
+                catalogSnapshotId: params.catalogSnapshotId,
                 roundId: params.roundId,
-                requestsBudget: params.wikiRequestsBudget,
+                priority: q.priority,
+                produce: async () => {
+                    const { hits: produced } = await executeWikipediaQuery({
+                        query: q,
+                        wikiBlock,
+                        existingReference: reference,
+                        priority: q.priority,
+                        strength: params.strength,
+                        roundId: params.roundId,
+                        requestsBudget: params.wikiRequestsBudget!,
+                    });
+                    return produced;
+                },
             });
-            for (const h of hits) {
-                queryHits.push(h);
-            }
-            if (requestsUsed > 0) {
-                /* logged by runner via budget */
-            }
+            queryHits.push(...hits);
         }
 
         if (params.enabledSources.includes('web') && isWebSearchConfigured()) {
@@ -102,14 +142,25 @@ export async function executeReferencePrepPlan(params: {
                       ? { searchTerms: q.grep.patterns.slice(0, 3) }
                       : undefined);
             if (webBlock?.searchTerms?.length) {
-                const webBudget = { used: 0, max: 10 };
-                const { hits } = await executeWebQuery({
-                    query: q,
-                    webBlock,
-                    priority: q.priority,
-                    existingReference: reference,
+                const { hits } = await withRetrievalCache({
+                    source: 'web',
+                    keyParts: { intent: q.intent, searchTerms: webBlock.searchTerms },
+                    scopeKey,
+                    catalogSnapshotId: params.catalogSnapshotId,
                     roundId: params.roundId,
-                    requestsBudget: webBudget,
+                    priority: q.priority,
+                    produce: async () => {
+                        const webBudget = { used: 0, max: 10 };
+                        const { hits: produced } = await executeWebQuery({
+                            query: q,
+                            webBlock,
+                            priority: q.priority,
+                            existingReference: reference,
+                            roundId: params.roundId,
+                            requestsBudget: webBudget,
+                        });
+                        return produced;
+                    },
                 });
                 queryHits.push(...hits);
             }
@@ -118,50 +169,91 @@ export async function executeReferencePrepPlan(params: {
         const grepBlock =
             q.grep ??
             (sources.includes('grep_md')
-                ? { patterns: extractFallbackGrepPatterns(params.target).slice(0, 2), contextLines: 2, unit: 'line_context' as const }
+                ? {
+                      patterns: extractFallbackGrepPatterns(params.target).slice(0, 2),
+                      contextLines: 2,
+                      unit: 'line_context' as const,
+                  }
                 : undefined);
 
         if (grepBlock && grepBlock.patterns.length > 0) {
+            const grepKeyParts = {
+                intent: q.intent,
+                patterns: grepBlock.patterns,
+                searchPhrases: grepBlock.searchPhrases,
+                contextLines: grepBlock.contextLines,
+                unit: grepBlock.unit,
+                scopePaths: grepBlock.scopePaths,
+                strength: params.strength,
+            };
+
             if (params.enabledSources.includes('grep_md')) {
-                const grepHits = executeGrepQuery({
-                    query: q,
-                    grepBlock,
-                    priority: q.priority,
-                    strength: params.strength,
-                    existingReference: reference,
-                    scope: params.scope,
-                    referencesRoot: refRoot,
+                const { hits } = await withRetrievalCache({
+                    source: 'grep_md',
+                    keyParts: grepKeyParts,
+                    scopeKey,
+                    catalogSnapshotId: params.catalogSnapshotId,
                     roundId: params.roundId,
+                    priority: q.priority,
+                    produce: () =>
+                        executeGrepQuery({
+                            query: q,
+                            grepBlock,
+                            priority: q.priority,
+                            strength: params.strength,
+                            existingReference: reference,
+                            scope: params.scope,
+                            referencesRoot: refRoot,
+                            roundId: params.roundId,
+                        }),
                 });
-                queryHits.push(...grepHits);
+                queryHits.push(...hits);
             }
 
             if (params.enabledSources.includes('bm25')) {
-                const bm25Hits = await executeBm25Query({
-                    query: q,
-                    grepBlock,
-                    priority: q.priority,
-                    existingReference: reference,
-                    context: params.context,
-                    referencesRoot: refRoot,
-                    scope: params.scope,
+                const { hits } = await withRetrievalCache({
+                    source: 'bm25',
+                    keyParts: grepKeyParts,
+                    scopeKey,
+                    catalogSnapshotId: params.catalogSnapshotId,
                     roundId: params.roundId,
+                    priority: q.priority,
+                    produce: () =>
+                        executeBm25Query({
+                            query: q,
+                            grepBlock,
+                            priority: q.priority,
+                            existingReference: reference,
+                            context: params.context,
+                            referencesRoot: refRoot,
+                            scope: params.scope,
+                            roundId: params.roundId,
+                        }),
                 });
-                queryHits.push(...bm25Hits);
+                queryHits.push(...hits);
             }
 
             if (params.enabledSources.includes('vector')) {
-                const vectorHits = await executeVectorQuery({
-                    query: q,
-                    grepBlock,
-                    priority: q.priority,
-                    existingReference: reference,
-                    context: params.context,
-                    referencesRoot: refRoot,
-                    scope: params.scope,
+                const { hits } = await withRetrievalCache({
+                    source: 'vector',
+                    keyParts: grepKeyParts,
+                    scopeKey,
+                    catalogSnapshotId: params.catalogSnapshotId,
                     roundId: params.roundId,
+                    priority: q.priority,
+                    produce: () =>
+                        executeVectorQuery({
+                            query: q,
+                            grepBlock,
+                            priority: q.priority,
+                            existingReference: reference,
+                            context: params.context,
+                            referencesRoot: refRoot,
+                            scope: params.scope,
+                            roundId: params.roundId,
+                        }),
                 });
-                queryHits.push(...vectorHits);
+                queryHits.push(...hits);
             }
         }
 

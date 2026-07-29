@@ -2,6 +2,8 @@
  * 参考资料复合查询控制台：配置来源、执行选段/JSON 准备、展示 LLM 规划过程与命中结果。
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import type { ReferencePrepCommandHandler } from '../commands/referencePrepCommandHandler';
 import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
@@ -18,6 +20,15 @@ import type {
 } from '../referencePrep/schema';
 import { canOpenHitInBrowser, canOpenHitInEditor } from '../referencePrep/referencePrepResultsTree';
 import { isWebSearchConfigured } from '../referencePrep/retrieval/webAdapter';
+import {
+    cleanBlockForLlm,
+    formatSelectedHitsAsJsonDocument,
+    formatSelectedHitsAsMarkdown,
+    formatSelectedHitsAsReferenceField,
+    sortHitsForLlm,
+} from '../referencePrep/exportSelectedHits';
+import { getWorkingTextEditor } from './lastActiveTextEditor';
+import { FilePathUtils } from '../utils';
 
 const PANEL_ID = 'ai-proofread.referencePrepConsole';
 const PANEL_TITLE = '参考资料检索';
@@ -27,6 +38,7 @@ export class ReferencePrepWebview {
     private cancelSource: vscode.CancellationTokenSource | undefined;
     private lastAnchorPath: string | undefined;
     private lastProcess: ReferencePrepProcessFileV020 | undefined;
+    private panelListeners: vscode.Disposable[] = [];
 
     constructor(
         private context: vscode.ExtensionContext,
@@ -61,9 +73,19 @@ export class ReferencePrepWebview {
                 this.panel = undefined;
                 this.cancelSource?.cancel();
                 this.cancelSource = undefined;
+                for (const d of this.panelListeners) d.dispose();
+                this.panelListeners = [];
             },
             undefined,
             this.context.subscriptions
+        );
+        this.panelListeners.push(
+            vscode.window.onDidChangeTextEditorSelection(() => {
+                if (this.panel?.visible) this.postState();
+            }),
+            vscode.window.onDidChangeActiveTextEditor(() => {
+                if (this.panel?.visible) this.postState();
+            })
         );
         this.postState();
     }
@@ -77,7 +99,7 @@ export class ReferencePrepWebview {
         const defaults = getDefaultEnabledSources();
         const enabledSources =
             last.enabledSources.length > 0 ? last.enabledSources : defaults;
-        const editor = vscode.window.activeTextEditor;
+        const editor = getWorkingTextEditor();
         const selection = editor?.document.getText(editor.selection)?.trim() ?? '';
         const isJson = editor?.document.languageId === 'json';
         this.post({
@@ -93,6 +115,9 @@ export class ReferencePrepWebview {
             isJson,
             jsonPath: isJson ? editor?.document.uri.fsPath : undefined,
             webConfigured: isWebSearchConfigured(),
+            documentLabel: editor
+                ? `${editor.document.languageId} · ${editor.document.uri.fsPath.split(/[/\\]/).pop()}`
+                : undefined,
         });
         if (this.lastProcess && this.lastAnchorPath) {
             this.postProcess(this.lastProcess, this.lastAnchorPath);
@@ -109,7 +134,7 @@ export class ReferencePrepWebview {
     }
 
     private postProcess(process: ReferencePrepProcessFileV020, anchorPath: string): void {
-        const hits = process.corpus.map((h) => this.serializeHit(h));
+        const hits = sortHitsForLlm(process.corpus).map((h) => this.serializeHit(h));
         this.post({
             type: 'process',
             anchorPath,
@@ -129,21 +154,164 @@ export class ReferencePrepWebview {
     }
 
     private serializeHit(h: CorpusHit): Record<string, unknown> {
+        const exportText = cleanBlockForLlm(h.referenceBlock || h.snippet || '');
         return {
             hitId: h.hitId,
             source: h.source,
             status: h.status,
+            kind: h.kind,
             snippet: h.snippet?.slice(0, 240) ?? '',
             refTag: h.refTag,
             file: h.relPath ?? h.file,
             line: h.startLine ?? h.line,
+            endLine: h.endLine,
+            headingPath: h.headingPath,
             pageUrl: h.pageUrl,
             pageTitle: h.pageTitle,
+            dictId: h.dictId,
+            matchedKey: h.matchedKey,
+            finalScore: h.finalScore ?? h.aggregatedValue,
             canOpenEditor: canOpenHitInEditor(h),
             canOpenBrowser: canOpenHitInBrowser(h),
-            referenceBlock: h.referenceBlock,
-            pruneReason: h.pruneReason,
+            /** 导出正文的字符数（与导出洗净规则一致） */
+            charCount: exportText.length,
+            /** 默认勾选：active 且非导航提示 */
+            defaultChecked: h.status === 'active' && h.kind !== 'navigation_hint',
         };
+    }
+
+    private resolveSelectedHits(hitIds?: string[]): CorpusHit[] {
+        if (!this.lastProcess || !hitIds?.length) return [];
+        const want = new Set(hitIds);
+        return this.lastProcess.corpus.filter((h) => want.has(h.hitId));
+    }
+
+    private resolveJsonPathForMerge(): string | undefined {
+        const editor = getWorkingTextEditor();
+        if (editor?.document.languageId === 'json' && editor.document.uri.fsPath) {
+            return editor.document.uri.fsPath;
+        }
+        if (this.lastAnchorPath?.toLowerCase().endsWith('.json')) {
+            return this.lastAnchorPath;
+        }
+        return undefined;
+    }
+
+    private async exportSelectedAsMd(hitIds?: string[]): Promise<void> {
+        const hits = this.resolveSelectedHits(hitIds);
+        if (!hits.length) {
+            vscode.window.showWarningMessage('请先勾选要导出的命中。');
+            return;
+        }
+        const md = formatSelectedHitsAsMarkdown(hits);
+        const anchor = this.lastAnchorPath ?? getWorkingTextEditor()?.document.uri.fsPath;
+        if (anchor) {
+            const outPath = FilePathUtils.getFilePath(anchor, '.selected-refs', '.md');
+            fs.writeFileSync(outPath, md, 'utf8');
+            const doc = await vscode.workspace.openTextDocument(outPath);
+            await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
+            vscode.window.showInformationMessage(`已导出 ${hits.length} 条为 Markdown：${path.basename(outPath)}`);
+        } else {
+            const doc = await vscode.workspace.openTextDocument({ content: md, language: 'markdown' });
+            await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
+            vscode.window.showInformationMessage(`已导出 ${hits.length} 条为 Markdown（未保存）。`);
+        }
+    }
+
+    private async exportSelectedAsJson(hitIds?: string[]): Promise<void> {
+        const hits = this.resolveSelectedHits(hitIds);
+        if (!hits.length) {
+            vscode.window.showWarningMessage('请先勾选要导出的命中。');
+            return;
+        }
+        const payload = formatSelectedHitsAsJsonDocument(hits);
+        const text = JSON.stringify(payload, null, 2);
+        const jsonPath = this.resolveJsonPathForMerge();
+        const anchor = jsonPath ?? this.lastAnchorPath ?? getWorkingTextEditor()?.document.uri.fsPath;
+        if (anchor) {
+            const outPath = FilePathUtils.getFilePath(anchor, '.selected-refs', '.json');
+            fs.writeFileSync(outPath, text, 'utf8');
+            const doc = await vscode.workspace.openTextDocument(outPath);
+            await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
+            vscode.window.showInformationMessage(`已导出 ${hits.length} 条为 JSON：${path.basename(outPath)}`);
+        } else {
+            const doc = await vscode.workspace.openTextDocument({ content: text, language: 'json' });
+            await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
+            vscode.window.showInformationMessage(`已导出 ${hits.length} 条为 JSON（未保存）。`);
+        }
+    }
+
+    private async mergeSelectedIntoSourceJson(hitIds?: string[]): Promise<void> {
+        const hits = this.resolveSelectedHits(hitIds);
+        if (!hits.length) {
+            vscode.window.showWarningMessage('请先勾选要合并的命中。');
+            return;
+        }
+        const jsonPath = this.resolveJsonPathForMerge();
+        if (!jsonPath || !fs.existsSync(jsonPath)) {
+            vscode.window.showErrorMessage('请先打开切分 JSON 文件（目标选「当前 JSON 文件」）。');
+            return;
+        }
+
+        let items: unknown;
+        try {
+            items = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+        } catch (e) {
+            vscode.window.showErrorMessage(`无法解析 JSON：${e instanceof Error ? e.message : String(e)}`);
+            return;
+        }
+        if (!Array.isArray(items) || !items.every((x) => x && typeof x === 'object')) {
+            vscode.window.showErrorMessage('JSON 格式不正确：需要对象数组（含 target 字段）。');
+            return;
+        }
+
+        const merged = formatSelectedHitsAsReferenceField(hits);
+        if (!merged.trim()) {
+            vscode.window.showWarningMessage('选中命中没有可写入的 reference 正文。');
+            return;
+        }
+
+        const mode = await vscode.window.showQuickPick(
+            [
+                {
+                    label: '覆盖写入全部条目的 reference',
+                    description: '每条 item.reference 替换为选中资料',
+                    value: 'overwrite_all' as const,
+                },
+                {
+                    label: '仅写入尚无 reference 的条目',
+                    description: '已有 reference 的条目跳过',
+                    value: 'fill_empty' as const,
+                },
+                {
+                    label: '追加到全部条目的 reference',
+                    description: '在已有内容后追加',
+                    value: 'append_all' as const,
+                },
+            ],
+            { title: '合并选中资料到源 JSON', ignoreFocusOut: true }
+        );
+        if (!mode) return;
+
+        let touched = 0;
+        for (const raw of items as Array<Record<string, unknown>>) {
+            if (!('target' in raw)) continue;
+            const prev = typeof raw.reference === 'string' ? raw.reference : '';
+            if (mode.value === 'fill_empty' && prev.trim()) continue;
+            if (mode.value === 'append_all' && prev.trim()) {
+                raw.reference = `${prev}\n\n${merged}`;
+            } else {
+                raw.reference = merged;
+            }
+            touched++;
+        }
+
+        fs.writeFileSync(jsonPath, JSON.stringify(items, null, 2), 'utf8');
+        const doc = await vscode.workspace.openTextDocument(jsonPath);
+        await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
+        vscode.window.showInformationMessage(
+            `已将 ${hits.length} 条选中资料合并到源 JSON（更新 ${touched} 个条目）。`
+        );
     }
 
     private async handleMessage(msg: {
@@ -152,6 +320,7 @@ export class ReferencePrepWebview {
         strength?: ReferencePrepStrength;
         targetMode?: 'selection' | 'json';
         hitId?: string;
+        hitIds?: string[];
         anchorPath?: string;
     }): Promise<void> {
         switch (msg.command) {
@@ -173,32 +342,6 @@ export class ReferencePrepWebview {
                     this.findHit(msg.hitId)
                 );
                 break;
-            case 'pruneHit':
-                if (msg.hitId && this.resultsProvider) {
-                    const hit = this.findHit(msg.hitId);
-                    if (hit) this.resultsProvider.pruneHit(hit);
-                    if (this.lastAnchorPath) {
-                        const proc = loadProcessFile(this.lastAnchorPath);
-                        if (proc) {
-                            this.lastProcess = proc;
-                            this.postProcess(proc, this.lastAnchorPath);
-                        }
-                    }
-                }
-                break;
-            case 'restoreHit':
-                if (msg.hitId && this.resultsProvider) {
-                    const hit = this.findHit(msg.hitId);
-                    if (hit) this.resultsProvider.restoreHit(hit);
-                    if (this.lastAnchorPath) {
-                        const proc = loadProcessFile(this.lastAnchorPath);
-                        if (proc) {
-                            this.lastProcess = proc;
-                            this.postProcess(proc, this.lastAnchorPath);
-                        }
-                    }
-                }
-                break;
             case 'copyBlock':
                 if (msg.hitId) {
                     const hit = this.findHit(msg.hitId);
@@ -207,6 +350,15 @@ export class ReferencePrepWebview {
                         vscode.window.showInformationMessage('已复制 reference 块');
                     }
                 }
+                break;
+            case 'exportSelectedMd':
+                await this.exportSelectedAsMd(msg.hitIds);
+                break;
+            case 'exportSelectedJson':
+                await this.exportSelectedAsJson(msg.hitIds);
+                break;
+            case 'mergeSelectedIntoJson':
+                await this.mergeSelectedIntoSourceJson(msg.hitIds);
                 break;
             case 'run':
                 await this.runPrep(msg);
@@ -222,7 +374,7 @@ export class ReferencePrepWebview {
     }
 
     private async replayFromAnchor(anchorPath?: string): Promise<void> {
-        const editor = vscode.window.activeTextEditor;
+        const editor = getWorkingTextEditor();
         const path = anchorPath || editor?.document.uri.fsPath;
         if (!path) {
             vscode.window.showWarningMessage('请先打开带有 .referenceprep.json 的文档，或传入锚点路径。');
@@ -263,9 +415,9 @@ export class ReferencePrepWebview {
         await saveReferencePrepLastRun(this.context, { enabledSources, strength });
         await this.prepHandler.maybeShowWikipediaNotice(this.context, enabledSources);
 
-        const editor = vscode.window.activeTextEditor;
+        const editor = getWorkingTextEditor();
         if (!editor) {
-            vscode.window.showErrorMessage('请先打开编辑器。');
+            vscode.window.showErrorMessage('请先打开并选中目标文档（焦点可在检索面板上）。');
             return;
         }
 
@@ -383,11 +535,25 @@ select, textarea {
 #hits li {
   border: 1px solid var(--vscode-widget-border);
   border-radius: 4px; padding: 8px; margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 10px;
+  align-items: start;
 }
 #hits li.pruned { opacity: 0.55; }
+#hits li .hit-check { margin-top: 2px; }
+.hit-body { min-width: 0; }
 .hit-meta { font-size: 0.9em; color: var(--vscode-descriptionForeground); margin-bottom: 4px; }
 .hit-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .hit-actions button { padding: 2px 8px; font-size: 0.9em; }
+.export-bar {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 8px 0 12px; padding: 8px 0;
+  border-bottom: 1px solid var(--vscode-widget-border);
+}
+.export-bar .mode-only { display: none; }
+.export-bar.mode-selection .for-selection { display: inline-block; }
+.export-bar.mode-json .for-json { display: inline-block; }
 .status { color: var(--vscode-descriptionForeground); font-size: 0.9em; margin-left: 8px; }
 .warn { color: var(--vscode-errorForeground); }
 </style>
@@ -414,6 +580,9 @@ select, textarea {
   <textarea class="preview" id="selectionPreview" readonly placeholder="选区预览…"></textarea>
 </div>
 <div class="row">
+  <span class="status" id="targetDoc"></span>
+</div>
+<div class="row">
   <button id="btnRun">开始准备</button>
   <button class="secondary" id="btnCancel" disabled>取消</button>
   <button class="secondary" id="btnReplay">重放过程文件</button>
@@ -425,6 +594,14 @@ select, textarea {
 <div id="timeline"><div class="tl-item"><span class="tag">就绪</span>选择来源后点击「开始准备」</div></div>
 
 <h2>结果</h2>
+<div class="export-bar mode-selection" id="exportBar">
+  <button type="button" class="secondary" id="btnSelectAll">全选</button>
+  <button type="button" class="secondary" id="btnSelectNone">全不选</button>
+  <button type="button" class="mode-only for-selection" id="btnExportMd">导出选中为 md</button>
+  <button type="button" class="mode-only for-json" id="btnExportJson">导出选中为 JSON</button>
+  <button type="button" class="mode-only for-json" id="btnMergeJson">合并选中到源 JSON</button>
+  <span class="status" id="selectedCount"></span>
+</div>
 <ul id="hits"></ul>
 
 <script nonce="${nonce}">
@@ -433,11 +610,17 @@ const sourcesEl = document.getElementById('sources');
 const strengthEl = document.getElementById('strength');
 const targetModeEl = document.getElementById('targetMode');
 const previewEl = document.getElementById('selectionPreview');
+const targetDocEl = document.getElementById('targetDoc');
 const timelineEl = document.getElementById('timeline');
 const hitsEl = document.getElementById('hits');
+const exportBar = document.getElementById('exportBar');
+const selectedCountEl = document.getElementById('selectedCount');
 const runStatus = document.getElementById('runStatus');
 const btnRun = document.getElementById('btnRun');
 const btnCancel = document.getElementById('btnCancel');
+
+/** @type {Map<string, boolean>} */
+const checkedByHitId = new Map();
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -459,6 +642,33 @@ function setRunning(running) {
   btnRun.disabled = running;
   btnCancel.disabled = !running;
   runStatus.textContent = running ? '运行中…' : '';
+}
+
+function updateExportBarMode() {
+  const mode = targetModeEl.value === 'json' ? 'json' : 'selection';
+  exportBar.className = 'export-bar mode-' + mode;
+}
+
+function updateSelectedCount() {
+  const boxes = hitsEl.querySelectorAll('input.hit-check');
+  let n = 0;
+  let selectedChars = 0;
+  let totalChars = 0;
+  boxes.forEach(cb => {
+    const chars = Number(cb.dataset.chars || 0) || 0;
+    totalChars += chars;
+    if (cb.checked) {
+      n++;
+      selectedChars += chars;
+    }
+  });
+  selectedCountEl.textContent = boxes.length
+    ? ('已选 ' + n + ' / ' + boxes.length + ' · 选中 ' + selectedChars + ' / ' + totalChars + ' 字符')
+    : '';
+}
+
+function getSelectedHitIds() {
+  return Array.from(hitsEl.querySelectorAll('input.hit-check:checked')).map(el => el.value);
 }
 
 function renderSources(sources, enabled) {
@@ -485,18 +695,43 @@ function getEnabledSources() {
 function renderHits(hits) {
   hitsEl.innerHTML = '';
   if (!hits || !hits.length) {
-    hitsEl.innerHTML = '<li class="hit-meta">暂无命中</li>';
+    hitsEl.innerHTML = '<li class="hit-meta" style="display:block">暂无命中</li>';
+    updateSelectedCount();
     return;
   }
+  const seen = new Set(hits.map(h => h.hitId));
+  for (const id of [...checkedByHitId.keys()]) {
+    if (!seen.has(id)) checkedByHitId.delete(id);
+  }
   for (const h of hits) {
+    if (!checkedByHitId.has(h.hitId)) {
+      checkedByHitId.set(h.hitId, h.defaultChecked !== false);
+    }
     const li = document.createElement('li');
     if (h.status === 'pruned') li.className = 'pruned';
-    li.innerHTML =
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'hit-check';
+    cb.value = h.hitId;
+    cb.dataset.chars = String(h.charCount || 0);
+    cb.checked = checkedByHitId.get(h.hitId) !== false;
+    cb.addEventListener('change', () => {
+      checkedByHitId.set(h.hitId, cb.checked);
+      updateSelectedCount();
+    });
+    li.appendChild(cb);
+
+    const body = document.createElement('div');
+    body.className = 'hit-body';
+    body.innerHTML =
       '<div class="hit-meta">' + esc(h.source) +
       (h.refTag ? ' · ' + esc(h.refTag) : '') +
+      (h.matchedKey ? ' · ' + esc(h.matchedKey) : '') +
       (h.file ? ' · ' + esc(h.file) + (h.line != null ? ':' + h.line : '') : '') +
       (h.pageTitle ? ' · ' + esc(h.pageTitle) : '') +
-      ' · ' + esc(h.status) + '</div>' +
+      (h.finalScore != null ? ' · score ' + Number(h.finalScore).toFixed(2) : '') +
+      (h.status === 'pruned' ? ' · pruned' : '') + '</div>' +
       '<div>' + esc(h.snippet) + '</div>';
     const actions = document.createElement('div');
     actions.className = 'hit-actions';
@@ -512,17 +747,15 @@ function renderHits(hits) {
     copy.textContent = '复制';
     copy.onclick = () => vscode.postMessage({ command: 'copyBlock', hitId: h.hitId });
     actions.appendChild(copy);
-    const prune = document.createElement('button');
-    prune.className = 'secondary';
-    prune.textContent = h.status === 'pruned' ? '恢复' : '丢弃';
-    prune.onclick = () => vscode.postMessage({
-      command: h.status === 'pruned' ? 'restoreHit' : 'pruneHit',
-      hitId: h.hitId
-    });
-    actions.appendChild(prune);
-    li.appendChild(actions);
+    body.appendChild(actions);
+    li.appendChild(body);
     hitsEl.appendChild(li);
   }
+  updateSelectedCount();
+}
+
+function postExport(command) {
+  vscode.postMessage({ command: command, hitIds: getSelectedHitIds() });
 }
 
 btnRun.onclick = () => {
@@ -536,14 +769,37 @@ btnRun.onclick = () => {
 btnCancel.onclick = () => vscode.postMessage({ command: 'cancel' });
 document.getElementById('btnReplay').onclick = () => vscode.postMessage({ command: 'replay' });
 document.getElementById('btnRefresh').onclick = () => vscode.postMessage({ command: 'refreshState' });
+targetModeEl.addEventListener('change', updateExportBarMode);
+document.getElementById('btnSelectAll').onclick = () => {
+  hitsEl.querySelectorAll('input.hit-check').forEach(cb => {
+    cb.checked = true;
+    checkedByHitId.set(cb.value, true);
+  });
+  updateSelectedCount();
+};
+document.getElementById('btnSelectNone').onclick = () => {
+  hitsEl.querySelectorAll('input.hit-check').forEach(cb => {
+    cb.checked = false;
+    checkedByHitId.set(cb.value, false);
+  });
+  updateSelectedCount();
+};
+document.getElementById('btnExportMd').onclick = () => postExport('exportSelectedMd');
+document.getElementById('btnExportJson').onclick = () => postExport('exportSelectedJson');
+document.getElementById('btnMergeJson').onclick = () => postExport('mergeSelectedIntoJson');
+updateExportBarMode();
 
 window.addEventListener('message', (ev) => {
   const msg = ev.data;
   if (msg.type === 'state') {
     renderSources(msg.sources || [], msg.enabledSources || []);
     if (msg.strength) strengthEl.value = msg.strength;
-    previewEl.value = msg.selectionPreview || (msg.hasSelection ? '' : '（无选区）');
-    if (msg.isJson) targetModeEl.value = targetModeEl.value;
+    previewEl.value = msg.selectionPreview || (msg.hasSelection ? '' : '（无选区 — 请先在文稿中选中文本，再点「刷新状态」或「开始准备」）');
+    targetDocEl.textContent = msg.documentLabel
+      ? ('目标：' + msg.documentLabel)
+      : '目标：尚未关联编辑器（请先打开文稿）';
+    if (msg.isJson) targetModeEl.value = 'json';
+    updateExportBarMode();
   } else if (msg.type === 'clearTimeline') {
     clearTimeline();
   } else if (msg.type === 'running') {
@@ -557,6 +813,8 @@ window.addEventListener('message', (ev) => {
     else if (e.type === 'error') appendTimeline('error', e.message);
     else if (e.type === 'cancelled') appendTimeline('cancelled', '已取消');
   } else if (msg.type === 'process') {
+    // 新结果到来时按 defaultChecked 重置勾选
+    checkedByHitId.clear();
     renderHits(msg.hits || []);
   }
 });
