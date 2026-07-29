@@ -13,15 +13,23 @@
 
 | 命令 | 共用流程 | 规划提示词（targetKind） | 是否校对 |
 |------|----------|--------------------------|----------|
-| `knowledge verify selection`（仅准备 / 准备并验证） | 预筛 → 规划 → 检索 → 精排 → **参考资料命中** TreeView | `manuscript`（默认） | 可选 |
+| `prepare references for selection` | 预筛 → 规划 → 检索 → 精排 → TreeView / 检索控制台 | `manuscript` | 否 |
+| `prepare references for JSON file` / 校对面板 **准备参考资料** | 同上（批量） | `manuscript` | 可选 |
+| `knowledge verify selection` | 调用选段准备 → 可选校对；或用已有资料校对 | `manuscript` | 可选 |
 | `LLM-enhanced grep search` | 同上 | `search_intent` | 否 |
 | `verify selected citation` | 同上 | `citation_selection` | 否 |
-| `prepare references for JSON file` / 校对面板 **准备参考资料** | 同上（批量） | `manuscript` | 可选 |
+| 单源：`search.dictPrep` / `search.refsGrep` / `refsBm25` / `refsVector` / `wikipedia` / `web` | 固定 `enabledSources` 跑同一流水线 | `search_intent` | 否 |
+| `open reference search console` | Webview：配置多源、执行、展示规划过程与命中 | — | — |
 | `open reference prep results` | 打开 TreeView | — | — |
 
-**全文引文核对**（`verify citations`）仍走引文索引 + 相似度匹配 + **Citation** 树，与上表三条不同。
+**正式资料来源**：本地词典、本地参考文献（grep / BM25 / 向量）、维基百科、Web（适配器待配置）。  
+**便捷工具（不进入 corpus）**：同名 PDF 搜索、识典古籍、中华经典古籍库。
 
-三条「参考资料准备」命令默认资料来源均为：**词典 + grep + BM25 + 向量**（需引文索引与词典配置）；**维基百科**需在选来源时手动勾选。差异仅在输入语义（提示词）与是否进入阶段 B 校对。
+**全文引文核对**（`verify citations`）仍走引文索引 + 相似度匹配 + **Citation** 树，与上表不同。
+
+复合准备默认来源：**词典 + grep + BM25 + 向量**；**维基百科**需勾选；**Web** 在适配器未配置时不可用。
+
+过程事件：`referencePrepRunner` 通过结构化 `PrepEvent`（phase / plan / query / hits / process）推送给检索控制台 Webview；TreeView 仍经 `onProcessUpdated` 同步。
 
 ## 过程文件
 

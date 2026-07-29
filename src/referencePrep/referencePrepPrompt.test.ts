@@ -27,7 +27,7 @@ describe('parseReferencePrepPlan', () => {
         expect(plan.queries[0].dict?.candidates).toEqual(['李白']);
     });
 
-    it('drops queries without dict, grep or wikipedia', () => {
+    it('drops queries without dict, grep, wikipedia or web', () => {
         const raw = JSON.stringify({
             sufficient: true,
             queries: [{ queryId: 'q1', intent: 'general_fact', priority: 0.5 }],
@@ -54,6 +54,24 @@ describe('parseReferencePrepPlan', () => {
         expect(plan.queries).toHaveLength(1);
         expect(plan.queries[0].wikipedia?.searchTerms).toEqual(['李白']);
         expect(plan.queries[0].wikipedia?.lang).toBe('zh');
+    });
+
+    it('parses web block only', () => {
+        const raw = JSON.stringify({
+            sufficient: false,
+            queries: [
+                {
+                    queryId: 'q3',
+                    intent: 'general_fact',
+                    priority: 0.7,
+                    web: { searchTerms: ['某史实'], why: '外网' },
+                },
+            ],
+            prune: [],
+        });
+        const plan = parseReferencePrepPlan(raw, [...intents]);
+        expect(plan.queries).toHaveLength(1);
+        expect(plan.queries[0].web?.searchTerms).toEqual(['某史实']);
     });
 });
 

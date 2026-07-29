@@ -41,6 +41,7 @@ import {
 import { runLlmRerank } from './rerank/rerankRunner';
 import { recordRecentSession } from './continuation';
 import { getWikiCacheStats, resetWikiCacheStats } from './wikipedia/wikiCache';
+import { bridgePrepEventToProgress, type PrepEventListener } from './prepEvents';
 
 const ALL_INTENTS: ReferencePrepIntent[] = [
     'entity_name',
@@ -52,6 +53,8 @@ const ALL_INTENTS: ReferencePrepIntent[] = [
 
 export interface ReferencePrepProgressHooks {
     onProgress?: (msg: string) => void;
+    /** 结构化过程事件（供 Webview 时间线）；与 onProgress 可同时使用 */
+    onEvent?: PrepEventListener;
     token?: vscode.CancellationToken;
     onAfterJsonItem?: (itemIndex: number) => void;
     onProcessUpdated?: (proc: ReferencePrepProcessFileV020) => void;
@@ -113,195 +116,244 @@ const ALL_SOURCES: ReferenceSourceId[] = ['dict', 'grep_md', 'bm25', 'vector', '
 export async function runReferencePrepForTarget(
     params: ReferencePrepRunParams & ReferencePrepProgressHooks
 ): Promise<{ mergedReference: string; process: ReferencePrepProcessFileV020 }> {
-    const dicts = resolveLocalDictConfigs();
-    if (params.enabledSources.includes('dict')) {
-        if (dicts.length === 0) {
-            throw new Error('未配置本地词典：请在设置中配置 ai-proofread.localDicts');
-        }
-        const exist = ensureDictFilesExist(dicts);
-        if (!exist.ok) throw new Error(exist.errors.join('\n'));
-    }
+    const emit = bridgePrepEventToProgress(params.onEvent, params.onProgress);
+    const emitProcess = (proc: ReferencePrepProcessFileV020) => {
+        params.onProcessUpdated?.(proc);
+        emit?.({ type: 'process', process: proc, anchorPath: params.anchorPath });
+    };
 
-    const preset = getStrengthPreset(params.strength);
-    const scopeCfg = getScopeConfig();
-    const maxRounds = params.continuation
-        ? (params.maxRoundsOverride ??
-          vscode.workspace.getConfiguration('ai-proofread').get<number>('referencePrep.continuation.maxRounds', 1))
-        : preset.maxRounds;
-    const intents = params.intents?.length ? params.intents : ALL_INTENTS;
-    const { platform, model } = getReferencePrepLlmConfig();
-    const disabled = ALL_SOURCES.filter((s) => !params.enabledSources.includes(s));
-
-    const proc = loadOrCreateProcessFile({
-        anchorPath: params.anchorPath,
-        enabledSources: params.enabledSources,
-        strength: params.strength,
-        sourceJsonPath: params.sourceJsonPath,
-        targetPreview: params.target.slice(0, 200),
-        userInput: params.target,
-    });
-    if (params.freshProcess) {
-        proc.corpus = [];
-        proc.rounds = [];
-        proc.mergedReference = undefined;
-        proc.resourceScope = undefined;
-    }
-    proc.dicts = dicts.map((d) => ({ id: d.id, name: d.name, mdxPath: d.mdxPathResolved }));
-
-    const config = vscode.workspace.getConfiguration('ai-proofread');
-    const refPathRaw = config.get<string>('citation.referencesPath', '${workspaceFolder}/references');
-    const refRoot = resolveReferencesPath(refPathRaw);
-    const catalog = refRoot ? getOrBuildCatalog(refRoot) : null;
-
-    if (params.continuation) {
-        appendProcessLog(
-            params.anchorPath,
-            `Continuation: prior rounds=${proc.rounds.length} active_hits=${proc.corpus.filter((h) => h.status === 'active').length}`
-        );
-        params.onProgress?.('续跑（保留已有 corpus）…');
-    }
-
-    params.onProgress?.('解析资源范围…');
-    let resourceScope =
-        params.continuation && proc.resourceScope
-            ? proc.resourceScope
-            : await resolveResourceScope({
-                  target: params.target,
-                  dicts,
-                  catalog,
-                  referencesRoot: refRoot,
-              });
-    proc.resourceScope = resourceScope;
-    proc.catalogSnapshotId = catalog?.snapshotId;
-    appendProcessLog(params.anchorPath, `Phase0 scope: dicts=${resourceScope.dictIds.length} files=${resourceScope.filePaths.length} filtered=${resourceScope.llmFiltered}`);
-
-    const scopedDicts = filterDictsByScope(dicts, resourceScope);
-    const catalogSummary = catalog ? summarizeCatalogForPrompt(catalog, 60) : undefined;
-
-    const lookupsBudget = { used: 0, max: preset.maxTotalLookups };
-    const wikiRequestsBudget = params.enabledSources.includes('wikipedia')
-        ? { used: 0, max: getWikipediaBudgetForStrength(params.strength) }
-        : undefined;
-    resetWikiCacheStats();
-    let mergedReference = proc.mergedReference ?? '';
-    let roundIncomingTotal = 0;
-
-    for (let round = 0; round < maxRounds; round++) {
-        if (params.token?.isCancellationRequested) break;
-
-        const corpusSummary = buildCorpusSummary(proc.corpus);
-        const navigationHints = buildNavigationHints(proc.corpus);
-        const systemPrompt = resolvePlanSystemPrompt(
-            params.context,
-            params.enabledSources,
-            disabled,
-            preset.maxQueriesPerRound,
-            intents,
-            params.targetKind,
-            params.continuation
-        );
-        const userPrompt = buildReferencePrepUserPrompt({
-            target: params.target,
-            dicts: scopedDicts,
-            corpusSummary,
-            roundIndex: round,
-            maxRounds,
-            targetKind: params.targetKind,
-            catalogSummary,
-            scope: resourceScope,
-            navigationHints,
-            continuation: params.continuation,
-        });
-
-        params.onProgress?.(`第 ${round + 1}/${maxRounds} 轮规划…`);
-        appendProcessLog(params.anchorPath, `Round ${round + 1} plan LLM`);
-
-        const raw = await generateReferencePrepPlanJson({ platform, model, systemPrompt, userPrompt });
-        const plan = parseReferencePrepPlan(raw, intents);
-        plan.queries = plan.queries.slice(0, preset.maxQueriesPerRound);
-
-        const roundId = `r-${Date.now()}`;
-        const roundEntry = {
-            roundId,
-            startedAt: new Date().toISOString(),
-            plan,
-            queryCount: plan.queries.length,
-        };
-
-        if (plan.sufficient && plan.queries.length === 0 && !params.continuation) {
-            roundEntry.finishedAt = new Date().toISOString();
-            proc.rounds.push(roundEntry);
-            applyPruneToCorpus(proc.corpus, plan, preset.valuePruneThreshold);
-            break;
-        }
-        if (plan.sufficient && plan.queries.length === 0 && params.continuation) {
-            appendProcessLog(params.anchorPath, 'Continuation: plan returned sufficient with no queries, stopping');
-            roundEntry.finishedAt = new Date().toISOString();
-            proc.rounds.push(roundEntry);
-            break;
+    try {
+        const dicts = resolveLocalDictConfigs();
+        if (params.enabledSources.includes('dict')) {
+            if (dicts.length === 0) {
+                throw new Error('未配置本地词典：请在设置中配置 ai-proofread.localDicts');
+            }
+            const exist = ensureDictFilesExist(dicts);
+            if (!exist.ok) throw new Error(exist.errors.join('\n'));
         }
 
-        params.onProgress?.(`执行 ${plan.queries.length} 个查询…`);
-        const incoming = await executeReferencePrepPlan({
-            plan,
-            target: params.target,
+        const preset = getStrengthPreset(params.strength);
+        const scopeCfg = getScopeConfig();
+        const maxRounds = params.continuation
+            ? (params.maxRoundsOverride ??
+              vscode.workspace.getConfiguration('ai-proofread').get<number>('referencePrep.continuation.maxRounds', 1))
+            : preset.maxRounds;
+        const intents = params.intents?.length ? params.intents : ALL_INTENTS;
+        const { platform, model } = getReferencePrepLlmConfig();
+        const disabled = ALL_SOURCES.filter((s) => !params.enabledSources.includes(s));
+
+        const proc = loadOrCreateProcessFile({
+            anchorPath: params.anchorPath,
             enabledSources: params.enabledSources,
             strength: params.strength,
-            context: params.context,
-            existingReference: mergedReference,
-            lookupsBudget,
-            wikiRequestsBudget,
-            scope: resourceScope,
-            roundId,
+            sourceJsonPath: params.sourceJsonPath,
+            targetPreview: params.target.slice(0, 200),
+            userInput: params.target,
         });
-        roundIncomingTotal += incoming.length;
+        if (params.freshProcess) {
+            proc.corpus = [];
+            proc.rounds = [];
+            proc.mergedReference = undefined;
+            proc.resourceScope = undefined;
+        }
+        proc.dicts = dicts.map((d) => ({ id: d.id, name: d.name, mdxPath: d.mdxPathResolved }));
 
-        const cacheStats = getWikiCacheStats();
-        roundEntry.wikiRequestsUsed = wikiRequestsBudget?.used ?? 0;
-        appendProcessLog(
-            params.anchorPath,
-            `Round ${round + 1} wiki HTTP=${wikiRequestsBudget?.used ?? 0} cache hit=${cacheStats.hits} miss=${cacheStats.misses}`
-        );
+        const config = vscode.workspace.getConfiguration('ai-proofread');
+        const refPathRaw = config.get<string>('citation.referencesPath', '${workspaceFolder}/references');
+        const refRoot = resolveReferencesPath(refPathRaw);
+        const catalog = refRoot ? getOrBuildCatalog(refRoot) : null;
 
-        params.onProgress?.(`精排 ${incoming.length} 条候选…`);
-        const reranked = await runLlmRerank({ target: params.target, hits: incoming });
-
-        mergeCorpusDedupe(proc.corpus, reranked);
-        applyPruneToCorpus(proc.corpus, plan, preset.valuePruneThreshold);
-        mergedReference = buildMergedReference(proc.corpus);
-
-        roundEntry.finishedAt = new Date().toISOString();
-        proc.rounds.push(roundEntry);
-        proc.mergedReference = mergedReference;
-        proc.resourceScope = resourceScope;
-        saveProcessFile(params.anchorPath, proc);
-        params.onProcessUpdated?.(proc);
-
-        if (round === 0 && roundIncomingTotal < scopeCfg.fallbackWidenMinHits && resourceScope.llmFiltered) {
-            resourceScope = widenResourceScope(
-                resourceScope,
-                dicts,
-                catalog,
-                `首轮命中 ${roundIncomingTotal} < ${scopeCfg.fallbackWidenMinHits}`
+        if (params.continuation) {
+            appendProcessLog(
+                params.anchorPath,
+                `Continuation: prior rounds=${proc.rounds.length} active_hits=${proc.corpus.filter((h) => h.status === 'active').length}`
             );
-            proc.resourceScope = resourceScope;
-            appendProcessLog(params.anchorPath, `fallbackWiden: ${resourceScope.widenReason}`);
+            emit?.({ type: 'phase', name: 'scope', message: '续跑（保留已有 corpus）…' });
         }
 
-        if (plan.sufficient) break;
-        if (lookupsBudget.used >= lookupsBudget.max) break;
-        if (wikiRequestsBudget && wikiRequestsBudget.used >= wikiRequestsBudget.max) break;
-    }
+        emit?.({ type: 'phase', name: 'scope', message: '解析资源范围…' });
+        let resourceScope =
+            params.continuation && proc.resourceScope
+                ? proc.resourceScope
+                : await resolveResourceScope({
+                      target: params.target,
+                      dicts,
+                      catalog,
+                      referencesRoot: refRoot,
+                  });
+        proc.resourceScope = resourceScope;
+        proc.catalogSnapshotId = catalog?.snapshotId;
+        appendProcessLog(
+            params.anchorPath,
+            `Phase0 scope: dicts=${resourceScope.dictIds.length} files=${resourceScope.filePaths.length} filtered=${resourceScope.llmFiltered}`
+        );
 
-    proc.mergedReference = mergedReference;
-    proc.indexVersions = {
-        catalogSnapshotId: catalog?.snapshotId,
-        citationDb: refRoot ? 'citation-refs.db' : undefined,
-    };
-    saveProcessFile(params.anchorPath, proc);
-    await recordRecentSession(params.context, params.anchorPath, proc);
-    params.onProcessUpdated?.(proc);
-    return { mergedReference, process: proc };
+        const scopedDicts = filterDictsByScope(dicts, resourceScope);
+        const catalogSummary = catalog ? summarizeCatalogForPrompt(catalog, 60) : undefined;
+
+        const lookupsBudget = { used: 0, max: preset.maxTotalLookups };
+        const wikiRequestsBudget = params.enabledSources.includes('wikipedia')
+            ? { used: 0, max: getWikipediaBudgetForStrength(params.strength) }
+            : undefined;
+        resetWikiCacheStats();
+        let mergedReference = proc.mergedReference ?? '';
+        let roundIncomingTotal = 0;
+
+        for (let round = 0; round < maxRounds; round++) {
+            if (params.token?.isCancellationRequested) {
+                emit?.({ type: 'cancelled' });
+                break;
+            }
+
+            const corpusSummary = buildCorpusSummary(proc.corpus);
+            const navigationHints = buildNavigationHints(proc.corpus);
+            const systemPrompt = resolvePlanSystemPrompt(
+                params.context,
+                params.enabledSources,
+                disabled,
+                preset.maxQueriesPerRound,
+                intents,
+                params.targetKind,
+                params.continuation
+            );
+            const userPrompt = buildReferencePrepUserPrompt({
+                target: params.target,
+                dicts: scopedDicts,
+                corpusSummary,
+                roundIndex: round,
+                maxRounds,
+                targetKind: params.targetKind,
+                catalogSummary,
+                scope: resourceScope,
+                navigationHints,
+                continuation: params.continuation,
+            });
+
+            emit?.({
+                type: 'phase',
+                name: 'plan',
+                round,
+                message: `第 ${round + 1}/${maxRounds} 轮规划…`,
+            });
+            appendProcessLog(params.anchorPath, `Round ${round + 1} plan LLM`);
+
+            const raw = await generateReferencePrepPlanJson({ platform, model, systemPrompt, userPrompt });
+            const plan = parseReferencePrepPlan(raw, intents);
+            plan.queries = plan.queries.slice(0, preset.maxQueriesPerRound);
+            emit?.({ type: 'plan', round, plan });
+
+            const roundId = `r-${Date.now()}`;
+            const roundEntry: import('./schema').ReferencePrepRound = {
+                roundId,
+                startedAt: new Date().toISOString(),
+                plan,
+                queryCount: plan.queries.length,
+            };
+
+            if (plan.sufficient && plan.queries.length === 0 && !params.continuation) {
+                roundEntry.finishedAt = new Date().toISOString();
+                proc.rounds.push(roundEntry);
+                applyPruneToCorpus(proc.corpus, plan, preset.valuePruneThreshold);
+                break;
+            }
+            if (plan.sufficient && plan.queries.length === 0 && params.continuation) {
+                appendProcessLog(params.anchorPath, 'Continuation: plan returned sufficient with no queries, stopping');
+                roundEntry.finishedAt = new Date().toISOString();
+                proc.rounds.push(roundEntry);
+                break;
+            }
+
+            emit?.({
+                type: 'phase',
+                name: 'execute',
+                round,
+                message: `执行 ${plan.queries.length} 个查询…`,
+            });
+            for (const q of plan.queries) {
+                emit?.({ type: 'query', round, queryId: q.queryId, detail: q });
+            }
+
+            const incoming = await executeReferencePrepPlan({
+                plan,
+                target: params.target,
+                enabledSources: params.enabledSources,
+                strength: params.strength,
+                context: params.context,
+                existingReference: mergedReference,
+                lookupsBudget,
+                wikiRequestsBudget,
+                scope: resourceScope,
+                roundId,
+            });
+            roundIncomingTotal += incoming.length;
+            emit?.({
+                type: 'hits',
+                round,
+                added: incoming.length,
+                total: proc.corpus.filter((h) => h.status === 'active').length + incoming.length,
+            });
+
+            const cacheStats = getWikiCacheStats();
+            roundEntry.wikiRequestsUsed = wikiRequestsBudget?.used ?? 0;
+            appendProcessLog(
+                params.anchorPath,
+                `Round ${round + 1} wiki HTTP=${wikiRequestsBudget?.used ?? 0} cache hit=${cacheStats.hits} miss=${cacheStats.misses}`
+            );
+
+            emit?.({
+                type: 'phase',
+                name: 'rerank',
+                round,
+                message: `精排 ${incoming.length} 条候选…`,
+            });
+            const reranked = await runLlmRerank({ target: params.target, hits: incoming });
+
+            mergeCorpusDedupe(proc.corpus, reranked);
+            applyPruneToCorpus(proc.corpus, plan, preset.valuePruneThreshold);
+            mergedReference = buildMergedReference(proc.corpus);
+
+            roundEntry.finishedAt = new Date().toISOString();
+            proc.rounds.push(roundEntry);
+            proc.mergedReference = mergedReference;
+            proc.resourceScope = resourceScope;
+            saveProcessFile(params.anchorPath, proc);
+            emitProcess(proc);
+
+            if (round === 0 && roundIncomingTotal < scopeCfg.fallbackWidenMinHits && resourceScope.llmFiltered) {
+                resourceScope = widenResourceScope(
+                    resourceScope,
+                    dicts,
+                    catalog,
+                    `首轮命中 ${roundIncomingTotal} < ${scopeCfg.fallbackWidenMinHits}`
+                );
+                proc.resourceScope = resourceScope;
+                appendProcessLog(params.anchorPath, `fallbackWiden: ${resourceScope.widenReason}`);
+            }
+
+            if (plan.sufficient) break;
+            if (lookupsBudget.used >= lookupsBudget.max) break;
+            if (wikiRequestsBudget && wikiRequestsBudget.used >= wikiRequestsBudget.max) break;
+        }
+
+        proc.mergedReference = mergedReference;
+        proc.indexVersions = {
+            catalogSnapshotId: catalog?.snapshotId,
+            citationDb: refRoot ? 'citation-refs.db' : undefined,
+        };
+        saveProcessFile(params.anchorPath, proc);
+        await recordRecentSession(params.context, params.anchorPath, proc);
+        emitProcess(proc);
+        emit?.({
+            type: 'phase',
+            name: 'done',
+            message: mergedReference ? '参考资料准备完成' : '准备完成，未检索到命中',
+        });
+        return { mergedReference, process: proc };
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        emit?.({ type: 'error', message });
+        throw e;
+    }
 }
 
 export async function runReferencePrepForJsonFile(
@@ -327,6 +379,13 @@ export async function runReferencePrepForJsonFile(
         const target = String(item.target ?? '');
         if (!target.trim()) continue;
 
+        params.onEvent?.({
+            type: 'phase',
+            name: 'json_item',
+            message: `准备第 ${idx + 1}/${items.length} 条…`,
+        });
+        params.onProgress?.(`准备第 ${idx + 1}/${items.length} 条…`);
+
         const { mergedReference } = await runReferencePrepForTarget({
             target,
             anchorPath: params.jsonFilePath,
@@ -337,6 +396,7 @@ export async function runReferencePrepForJsonFile(
             sourceJsonPath: params.jsonFilePath,
             freshProcess: true,
             onProgress: params.onProgress,
+            onEvent: params.onEvent,
             token: params.token,
             onProcessUpdated: params.onProcessUpdated,
         });

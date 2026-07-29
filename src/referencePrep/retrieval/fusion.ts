@@ -6,8 +6,8 @@ export function fuseChannelHits(hits: CorpusHit[], target: string): CorpusHit[] 
     const byUnit = new Map<string, CorpusHit>();
     for (const h of hits) {
         const key =
-            h.source === 'wikipedia'
-                ? `wiki:${h.pageUrl ?? h.digest}`
+            h.source === 'wikipedia' || h.source === 'web'
+                ? `${h.source}:${h.pageUrl ?? h.digest}`
                 : unitKey(
                       h.relPath ?? h.file ?? '',
                       h.startLine ?? h.line ?? 0,

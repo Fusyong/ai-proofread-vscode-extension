@@ -260,13 +260,19 @@ flowchart LR
 | AI Proofreader: check words | 字词检查：词典检查、通用规范汉字表、自定义替换表 |
 | AI Proofreader: manage custom tables | 管理自定义替换表 |
 | AI Proofreader: check numbering hierarchy | 检查标题序号层级与段内序号 |
-| **PDF 与引文** | |
-| AI Proofreader: build citation reference index | 建立本地文献库索引（引文核对前需先执行） |
-| AI Proofreader: verify citations | 打开引文核对视图，批量核对全文引文 |
-| AI Proofreader: verify selected citation | 核对选中引文（LLM 参考资料准备 → **参考资料命中** 树，与 LLM grep 同流程） |
-| AI Proofreader: LLM-enhanced grep search | 自然语言检索词典与文献（同上流程，`search_intent` 提示词） |
-| diff citations vs references | 对比引文与文献差异（**侧栏 citations 视图** 中 **右键** 某条使用；仅 **verify citations** 全文核对） |
-| search citation in PDF | 在文献 PDF 中搜索该条引文（**侧栏 citations 视图** 中 **右键** 某条使用） |
+| **参考资料检索**（命令面板搜 `AI Proofreader Search`） | |
+| Open Reference Search Console | 打开检索控制台 Webview（多源配置、过程时间线、命中列表） |
+| Prepare References for Selection | 对当前选段多源准备参考资料（不校对） |
+| Prepare References for JSON File | 对切分 JSON 批量准备 reference |
+| Knowledge Verify Selection | 选段知识核查（准备 ± 校对 / 用已有资料） |
+| Look Up Selection in Local Dictionary | 精确整词查本地 MDX（无 LLM） |
+| Search with Local Dictionary / References Grep·BM25·Vector / Wikipedia / Web | 单源 LLM 规划检索 |
+| LLM-Enhanced Grep Search | 自然语言多源检索（`search_intent`） |
+| Search Selection in References (Find in Files) | Find in Files（即时工具，无 LLM） |
+| Verify Selected Citation / Verify Citations / Build Citation Reference Index | 引文核对相关 |
+| **便捷工具**（命令面板搜 `AI Proofreader Tools`） | |
+| Search Selection in PDF / Shidianguji / Ancientbooks | 外跳；不进入 reference corpus |
+| Search Citation in PDF | Citation 树右键：文献 PDF 反查 |
 
 ---
 

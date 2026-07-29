@@ -49,6 +49,8 @@ import { DictPrepPromptManager } from './localDict/dictPrepPromptManager';
 import { registerDictPrepPromptsView, type DictPrepPromptTreeItem } from './localDict/dictPrepPromptsView';
 import { LocalDictQueryCommandHandler } from './commands/localDictQueryCommandHandler';
 import { GrepSearchCommandHandler } from './commands/grepSearchCommandHandler';
+import { SearchCommandHandler } from './commands/searchCommandHandler';
+import { registerReferencePrepConsole } from './ui/referencePrepWebview';
 import { registerModelRoutesView } from './modelRoutes/modelRoutesView';
 import { ModelRoutesCommandHandler } from './modelRoutes/modelRoutesCommandHandler';
 import {
@@ -117,6 +119,8 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     const localDictQueryHandler = new LocalDictQueryCommandHandler();
     const grepSearchHandler = new GrepSearchCommandHandler(referencePrepResultsProvider);
+    const searchHandler = new SearchCommandHandler(referencePrepResultsProvider);
+    registerReferencePrepConsole(context, referencePrepHandler, referencePrepResultsProvider);
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
     const citationHandler = new CitationCommandHandler(
         context,
@@ -362,6 +366,15 @@ export async function activate(context: vscode.ExtensionContext) {
             await referencePrepHandler.handleKnowledgeVerifySelection(editor, context);
         }),
 
+        vscode.commands.registerCommand('ai-proofread.prepareReferencesSelection', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await referencePrepHandler.handlePrepareReferencesSelection(editor, context);
+        }),
+
         vscode.commands.registerCommand('ai-proofread.prepareReferencesJson', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
@@ -380,6 +393,25 @@ export async function activate(context: vscode.ExtensionContext) {
             await localDictQueryHandler.handleQuerySelectionCommand(editor, context);
         }),
 
+        vscode.commands.registerCommand('ai-proofread.search.dictPrep', async () => {
+            await searchHandler.handleDictPrep(vscode.window.activeTextEditor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.search.refsGrep', async () => {
+            await searchHandler.handleRefsGrep(vscode.window.activeTextEditor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.search.refsBm25', async () => {
+            await searchHandler.handleRefsBm25(vscode.window.activeTextEditor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.search.refsVector', async () => {
+            await searchHandler.handleRefsVector(vscode.window.activeTextEditor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.search.wikipedia', async () => {
+            await searchHandler.handleWikipedia(vscode.window.activeTextEditor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.search.web', async () => {
+            await searchHandler.handleWeb(vscode.window.activeTextEditor, context);
+        }),
+
         vscode.commands.registerCommand('ai-proofread.llmGrepSearchReferences', async () => {
             await grepSearchHandler.handleLlmGrepSearchCommand(vscode.window.activeTextEditor, context);
         }),
@@ -393,7 +425,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('ai-proofread.referencePrep.openHit', async (hit?: CorpusHit) => {
             if (!hit) return;
-            if (hit.source === 'wikipedia' && hit.pageUrl) {
+            if ((hit.source === 'wikipedia' || hit.source === 'web') && hit.pageUrl) {
                 await vscode.env.openExternal(vscode.Uri.parse(hit.pageUrl));
                 return;
             }

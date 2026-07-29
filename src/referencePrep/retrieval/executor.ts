@@ -14,6 +14,7 @@ import { executeGrepQuery } from './grepAdapter';
 import { executeBm25Query } from './bm25Adapter';
 import { executeVectorQuery } from './vectorAdapter';
 import { executeWikipediaQuery } from './wikipediaAdapter';
+import { executeWebQuery, isWebSearchConfigured } from './webAdapter';
 import { extractFallbackGrepPatterns } from '../referencePrepPrompt';
 import { fuseChannelHits } from './fusion';
 import { filterDictsByScope } from '../scope/resourceScope';
@@ -89,6 +90,28 @@ export async function executeReferencePrepPlan(params: {
             }
             if (requestsUsed > 0) {
                 /* logged by runner via budget */
+            }
+        }
+
+        if (params.enabledSources.includes('web') && isWebSearchConfigured()) {
+            const webBlock =
+                q.web ??
+                (q.wikipedia?.searchTerms
+                    ? { searchTerms: q.wikipedia.searchTerms, why: q.wikipedia.why }
+                    : q.grep?.patterns
+                      ? { searchTerms: q.grep.patterns.slice(0, 3) }
+                      : undefined);
+            if (webBlock?.searchTerms?.length) {
+                const webBudget = { used: 0, max: 10 };
+                const { hits } = await executeWebQuery({
+                    query: q,
+                    webBlock,
+                    priority: q.priority,
+                    existingReference: reference,
+                    roundId: params.roundId,
+                    requestsBudget: webBudget,
+                });
+                queryHits.push(...hits);
             }
         }
 

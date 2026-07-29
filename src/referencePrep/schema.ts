@@ -20,7 +20,7 @@ export type RetrievalUnit =
 
 export type CorpusHitKind = 'evidence' | 'navigation_hint';
 
-export type CorpusHitSource = 'dict' | 'grep_md' | 'bm25' | 'vector' | 'wikipedia';
+export type CorpusHitSource = 'dict' | 'grep_md' | 'bm25' | 'vector' | 'wikipedia' | 'web';
 
 export type WikipediaLang = 'zh' | 'en';
 
@@ -46,6 +46,11 @@ export interface ReferencePrepWikipediaQuery {
     why?: string;
 }
 
+export interface ReferencePrepWebQuery {
+    searchTerms?: string[];
+    why?: string;
+}
+
 export interface ReferencePrepPlanQuery {
     queryId: string;
     intent: ReferencePrepIntent;
@@ -53,6 +58,7 @@ export interface ReferencePrepPlanQuery {
     dict?: ReferencePrepDictQuery;
     grep?: ReferencePrepGrepQuery;
     wikipedia?: ReferencePrepWikipediaQuery;
+    web?: ReferencePrepWebQuery;
 }
 
 export interface ReferencePrepPlan {
@@ -208,5 +214,6 @@ export function isRetrievalSourceEnabled(
     if (source === 'vector') return enabled.includes('vector');
     if (source === 'dict') return enabled.includes('dict');
     if (source === 'wikipedia') return enabled.includes('wikipedia');
+    if (source === 'web') return enabled.includes('web');
     return false;
 }

@@ -24,7 +24,7 @@ function scopeMatchScore(target: string, hit: CorpusHit): number {
 }
 
 function hitGroupKey(h: CorpusHit): string {
-    if (h.source === 'wikipedia') {
+    if (h.source === 'wikipedia' || h.source === 'web') {
         return h.pageUrl ?? h.digest;
     }
     return h.relPath ?? h.file ?? '';
@@ -34,7 +34,9 @@ function normalizeChannelScore(hit: CorpusHit): number {
     if (hit.bm25Score != null) return Math.min(1, hit.bm25Score / 10);
     if (hit.vectorScore != null) return Math.min(1, hit.vectorScore);
     if (hit.source === 'grep_md') return hit.baseValue;
-    if (hit.source === 'wikipedia') return hit.baseValue;
+    if (hit.source === 'wikipedia' || hit.source === 'web') {
+        return hit.baseValue;
+    }
     return hit.baseValue;
 }
 
@@ -63,8 +65,8 @@ export function scoreAndSortHits(hits: CorpusHit[], target: string): CorpusHit[]
     const fileCounts = new Map<string, number>();
     for (const h of hits) {
         const key =
-            h.source === 'wikipedia'
-                ? `wiki:${h.pageUrl ?? h.digest}`
+            h.source === 'wikipedia' || h.source === 'web'
+                ? `${h.source}:${h.pageUrl ?? h.digest}`
                 : unitKey(h.relPath ?? h.file ?? '', h.startLine ?? h.line ?? 0, h.endLine ?? h.line ?? 0);
         unitPatterns.set(key, (unitPatterns.get(key) ?? 0) + (h.grepPatterns?.length ?? 1));
         const f = hitGroupKey(h);
@@ -72,8 +74,8 @@ export function scoreAndSortHits(hits: CorpusHit[], target: string): CorpusHit[]
     }
     for (const h of hits) {
         const key =
-            h.source === 'wikipedia'
-                ? `wiki:${h.pageUrl ?? h.digest}`
+            h.source === 'wikipedia' || h.source === 'web'
+                ? `${h.source}:${h.pageUrl ?? h.digest}`
                 : unitKey(h.relPath ?? h.file ?? '', h.startLine ?? h.line ?? 0, h.endLine ?? h.line ?? 0);
         h.finalScore = computeFinalScore(
             h,
@@ -104,6 +106,7 @@ export function dedupeHitsByOverlap(hits: CorpusHit[], threshold = 0.85): Corpus
             (k) =>
                 k.digest === h.digest ||
                 (k.source === 'wikipedia' && h.source === 'wikipedia' && k.pageUrl === h.pageUrl) ||
+                (k.source === 'web' && h.source === 'web' && k.pageUrl === h.pageUrl) ||
                 ((k.relPath ?? k.file) === (h.relPath ?? h.file) &&
                     (k.relPath ?? k.file) !== '' &&
                     textOverlapRatio(k.snippet, h.snippet) >= threshold)

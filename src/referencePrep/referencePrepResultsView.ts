@@ -104,7 +104,7 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
         item.iconPath =
             h.status === 'pruned'
                 ? new vscode.ThemeIcon('circle-slash')
-                : h.source === 'wikipedia'
+                : h.source === 'wikipedia' || h.source === 'web'
                   ? new vscode.ThemeIcon('globe')
                   : h.source === 'dict'
                     ? new vscode.ThemeIcon('book')
@@ -112,7 +112,10 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
         if (canOpenHitInEditor(h) || canOpenHitInBrowser(h)) {
             item.command = {
                 command: 'ai-proofread.referencePrep.openHit',
-                title: h.source === 'wikipedia' ? '在浏览器打开维基条目' : '打开命中位置',
+                title:
+                    h.source === 'wikipedia' || h.source === 'web'
+                        ? '在浏览器打开'
+                        : '打开命中位置',
                 arguments: [h],
             };
         }

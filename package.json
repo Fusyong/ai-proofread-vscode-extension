@@ -79,11 +79,23 @@
       },
       {
         "command": "ai-proofread.knowledgeVerifySelection",
-        "title": "AI Proofreader: knowledge verify selection"
+        "title": "Knowledge Verify Selection",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.prepareReferencesJson",
-        "title": "AI Proofreader: prepare references for JSON file"
+        "title": "Prepare References for JSON File",
+        "category": "AI Proofreader Search"
+      },
+      {
+        "command": "ai-proofread.prepareReferencesSelection",
+        "title": "Prepare References for Selection",
+        "category": "AI Proofreader Search"
+      },
+      {
+        "command": "ai-proofread.referencePrep.openConsole",
+        "title": "Open Reference Search Console",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.modelRoutes.openView",
@@ -113,17 +125,56 @@
       },
       {
         "command": "ai-proofread.queryLocalDictSelection",
-        "title": "AI Proofreader: look up whole selection as headword in the local dictionary",
+        "title": "Look Up Selection in Local Dictionary",
+        "category": "AI Proofreader Search",
         "description": "把选中当作一个词条查本地词典"
       },
       {
+        "command": "ai-proofread.search.dictPrep",
+        "title": "Search with Local Dictionary (LLM Plan)",
+        "category": "AI Proofreader Search",
+        "description": "仅本地词典：LLM 规划后查 MDX"
+      },
+      {
+        "command": "ai-proofread.search.refsGrep",
+        "title": "Search References with Grep (LLM Plan)",
+        "category": "AI Proofreader Search",
+        "description": "仅参考文献 grep"
+      },
+      {
+        "command": "ai-proofread.search.refsBm25",
+        "title": "Search References with BM25 (LLM Plan)",
+        "category": "AI Proofreader Search",
+        "description": "仅参考文献 BM25/FTS"
+      },
+      {
+        "command": "ai-proofread.search.refsVector",
+        "title": "Search References with Vector (LLM Plan)",
+        "category": "AI Proofreader Search",
+        "description": "仅参考文献轻量向量"
+      },
+      {
+        "command": "ai-proofread.search.wikipedia",
+        "title": "Search Wikipedia (LLM Plan)",
+        "category": "AI Proofreader Search",
+        "description": "仅维基百科 API"
+      },
+      {
+        "command": "ai-proofread.search.web",
+        "title": "Search the Web (LLM Plan)",
+        "category": "AI Proofreader Search",
+        "description": "Web 搜索（适配器未配置时提示）"
+      },
+      {
         "command": "ai-proofread.llmGrepSearchReferences",
-        "title": "AI Proofreader: LLM-enhanced grep search",
+        "title": "LLM-Enhanced Grep Search",
+        "category": "AI Proofreader Search",
         "description": "用自然语言描述检索意图，LLM 规划后在本地词典中检索，在参考文献目录中grep，可以多轮次处理"
       },
       {
         "command": "ai-proofread.referencePrep.openView",
-        "title": "AI Proofreader: open reference prep results"
+        "title": "Open Reference Prep Results",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.referencePrep.openHit",
@@ -163,19 +214,23 @@
       },
       {
         "command": "ai-proofread.searchSelectionInPDF",
-        "title": "AI Proofreader: search selection in PDF"
+        "title": "Search Selection in PDF",
+        "category": "AI Proofreader Tools"
       },
       {
         "command": "ai-proofread.searchSelectionInShidianguji",
-        "title": "AI Proofreader: search selection in Shidianguji"
+        "title": "Search Selection in Shidianguji",
+        "category": "AI Proofreader Tools"
       },
       {
         "command": "ai-proofread.searchSelectionInAncientbooks",
-        "title": "AI Proofreader: search selection in Ancientbooks (jingdian)"
+        "title": "Search Selection in Ancientbooks",
+        "category": "AI Proofreader Tools"
       },
       {
         "command": "ai-proofread.searchSelectionInReferences",
-        "title": "AI Proofreader: search selection in References"
+        "title": "Search Selection in References (Find in Files)",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.convertDocxToMarkdown",
@@ -227,23 +282,27 @@
       },
       {
         "command": "ai-proofread.citation.openView",
-        "title": "AI Proofreader: verify citations"
+        "title": "Verify Citations",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.citation.rebuildIndex",
-        "title": "AI Proofreader: build citation reference index"
+        "title": "Build Citation Reference Index",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.citation.verifySelection",
-        "title": "AI Proofreader: verify selected citation"
+        "title": "Verify Selected Citation",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.citation.showDiff",
-        "title": "diff citations vs references"
+        "title": "Diff Citations vs References"
       },
       {
         "command": "ai-proofread.citation.searchInPdf",
-        "title": "search citation in PDF"
+        "title": "Search Citation in PDF",
+        "category": "AI Proofreader Tools"
       },
       {
         "command": "ai-proofread.duplicate.scanDocument",
@@ -1663,28 +1722,68 @@
         },
         {
           "command": "ai-proofread.searchSelectionInPDF",
-          "group": "ai-proofread@12",
+          "group": "ai-proofread-tools@12",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.searchSelectionInShidianguji",
-          "group": "ai-proofread@12.1",
+          "group": "ai-proofread-tools@12.1",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.searchSelectionInAncientbooks",
-          "group": "ai-proofread@12.2",
+          "group": "ai-proofread-tools@12.2",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.searchSelectionInReferences",
-          "group": "ai-proofread@12.3",
+          "group": "ai-proofread-refs@12.0",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.search.refsGrep",
+          "group": "ai-proofread-refs@12.1",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.search.refsBm25",
+          "group": "ai-proofread-refs@12.2",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.search.refsVector",
+          "group": "ai-proofread-refs@12.3",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.citation.verifySelection",
-          "group": "ai-proofread@12",
+          "group": "ai-proofread-refs@12.4",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.queryLocalDictSelection",
+          "group": "ai-proofread-dict@13.0",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "ai-proofread.search.dictPrep",
+          "group": "ai-proofread-dict@13.1",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "ai-proofread.search.wikipedia",
+          "group": "ai-proofread-web@14.0",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "ai-proofread.prepareReferencesSelection",
+          "group": "ai-proofread-prep@15.0",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.referencePrep.openConsole",
+          "group": "ai-proofread-prep@15.1",
+          "when": "editorTextFocus"
         },
         {
           "command": "ai-proofread.duplicate.scanDocument",
@@ -1700,11 +1799,6 @@
           "command": "ai-proofread.splitIntoSentences",
           "group": "ai-proofread@13",
           "when": "editorTextFocus && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
-        },
-        {
-          "command": "ai-proofread.queryLocalDictSelection",
-          "group": "ai-proofread@13.1",
-          "when": "editorHasSelection"
         },
         {
           "command": "ai-proofread.convertQuotes",

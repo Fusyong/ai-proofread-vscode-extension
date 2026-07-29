@@ -5,7 +5,7 @@ import {
     type ReferencePrepSessionResult,
 } from '../referencePrepSession';
 
-export type GrepSearchRunParams = Omit<ReferencePrepSessionParams, 'targetKind'> & {
+export type GrepSearchRunParams = Omit<ReferencePrepSessionParams, 'targetKind' | 'target'> & {
     description: string;
 };
 
