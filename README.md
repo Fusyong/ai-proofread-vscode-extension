@@ -52,7 +52,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ![所有命令](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/command_palette.png)
 
-用`open proofreading panel`打开校对面板，用`Open Reference Search Console`打开检索面板。
+用`open proofreading panel`打开校对面板，用`Open Reference Search Panel`打开检索面板。
 
 更详细的命令速查与业务流程图见[docs/commands-cheatsheet.md](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/docs/commands-cheatsheet.md)。
 
@@ -139,7 +139,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 #### 3.1.5 检索面板与统一参考资料准备
 
-**打开方式**：活动栏 overview → **检索面板**，或命令 `Open Reference Search Console`。
+**打开方式**：活动栏 overview → **检索面板**，或命令 `Open Reference Search Panel`。
 
 在检索面板中可：
 
@@ -518,13 +518,16 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ## 6. 更新日志
 
+### v1.12.0
+
+- 特性：**检索面板**（参考资料复合查询控制台）：多源配置、过程时间线、命中勾选导出、参考选中校对选段；与校对面板底部快捷命令按职责拆分
+- 特性：活动栏 overview 可开关侧栏视图（资料检索、引文核查、重文检查、标题树、段内序号、校对条目等）
+- 特性：项目级检索缓存 `.proofread/retrieval-cache.json`；检索完成后不再自动打开未保存合并预览
+
 ### v1.11.4
 
 - 特性：增加提示词“段内重构与重述”
 - 特性：在知识核查中集成维基百科搜索
-- 特性：**检索面板**（参考资料复合查询控制台）：多源配置、过程时间线、命中勾选导出、参考选中校对选段；与校对面板底部快捷命令按职责拆分
-- 特性：活动栏 overview 可开关侧栏视图（资料检索、引文核查、重文检查、标题树、段内序号、校对条目等）
-- 特性：项目级检索缓存 `.proofread/retrieval-cache.json`；检索完成后不再自动打开未保存合并预览
 - 更新：拼音提示词“某边”不（按照词典）轻声
 - debug：修复treeview按钮状态错乱
 

@@ -230,7 +230,7 @@ flowchart LR
 **优先用 UI**：
 
 - **校对面板**（overview「校对面板」或 `open proofreading panel`）：文档转换/整理、切分校对、字词与序号、重文、diff、提示词与设置。
-- **检索面板**（overview「检索面板」或 `Open Reference Search Console`）：多源准备、单源检索、外跳搜索、引文核对、清除检索缓存；命中可勾选导出 md/JSON，或「参考选中校对当前选段」。
+- **检索面板**（overview「检索面板」或 `Open Reference Search Panel`）：多源准备、单源检索、外跳搜索、引文核对、清除检索缓存；命中可勾选导出 md/JSON，或「参考选中校对当前选段」。
 - 两面板底部快捷命令**不重复**；命令面板（Ctrl+Shift+P）输入「AI Proofreader」可查全部。⭐ 表示核心/常用。
 
 | 命令 | 简短说明 |
@@ -271,7 +271,7 @@ flowchart LR
 | AI Proofreader: check numbering hierarchy | 检查标题序号层级与段内序号 |
 | AI Proofreader: scan duplicate sentences in document / selection | 重文检查（全文 / 选区） |
 | **参考资料检索**（检索面板；命令面板搜 `AI Proofreader Search`） | |
-| Open Reference Search Console ⭐ | 打开 **检索面板**（配置、时间线、勾选命中、导出、底部快捷命令） |
+| Open Reference Search Panel ⭐ | 打开 **检索面板**（配置、时间线、勾选命中、导出、底部快捷命令） |
 | Prepare References for Selection / JSON File | 选段或多源批量准备 reference |
 | Knowledge Verify Selection | 选段知识核查（准备 ± 校对 / 用已有资料） |
 | Look Up Selection in Local Dictionary | 精确整词查本地 MDX（无 LLM） |

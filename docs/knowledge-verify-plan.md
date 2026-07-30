@@ -19,7 +19,7 @@
 | `LLM-enhanced grep search` | 同上 | `search_intent` | 否 |
 | `verify selected citation` | 同上 | `citation_selection` | 否 |
 | 单源：`search.dictPrep` / `search.refsGrep` / `refsBm25` / `refsVector` / `wikipedia` / `web` | 固定 `enabledSources` 跑同一流水线 | `search_intent` | 否 |
-| `open reference search console` | Webview：配置多源、执行、展示规划过程与命中 | — | — |
+| `Open Reference Search Panel` | Webview：配置多源、执行、展示规划过程与命中 | — | — |
 | `open reference prep results` | 打开 TreeView | — | — |
 
 **正式资料来源**：本地词典、本地参考文献（grep / BM25 / 向量）、维基百科、Web（适配器待配置）。  

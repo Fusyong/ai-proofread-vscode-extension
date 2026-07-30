@@ -33,7 +33,7 @@ import type { ProofreadCommandHandler } from '../commands/proofreadCommandHandle
 import { setReferenceHitVisible } from './sidebarViewVisibility';
 
 const PANEL_ID = 'ai-proofread.referencePrepConsole';
-const PANEL_TITLE = 'References searching panel';
+const PANEL_TITLE = 'References search panel';
 /** 递增以在扩展更新后强制刷新已打开面板的 HTML（避免旧界面缺导出提示条）。 */
 const WEBVIEW_HTML_REVISION = 6;
 
