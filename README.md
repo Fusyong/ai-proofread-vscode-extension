@@ -43,15 +43,16 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ### 2.3. 尝试所有命令
 
-本扩展可以通过命令面板中的命令、校对面板按钮和文件窗口右键菜单三种形式进行操作。
+本扩展主要有四种操作入口：
 
-其中，命令的功能最全。本扩展的所有功能都可以通过命令面板（Ctrl+Shift+P）查找、访问：
+1. **活动栏 overview**：打开 **校对面板** / **检索面板**，并开关侧栏 TreeView（资料检索、引文核查、重文检查、标题树等）
+2. **校对面板**：文档准备、切分、批量校对、比较结果；底部快捷栏含格式整理、校对选中、字词/序号/重文、diff、提示词与设置
+3. **检索面板**：多源参考资料准备、命中勾选与导出、引文核对；底部快捷栏含单源检索与 PDF/古籍等外跳工具（与校对面板底部命令不重复）
+4. **命令面板**（Ctrl+Shift+P）与**右键菜单**：可访问全部命令
 
 ![所有命令](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/command_palette.png)
 
-用`open proofreading panel`打开校对面板，也可看到以按钮形式呈现的大多数命令。
-
-打开markdown文件（或选中其中一段文字），或上述切分得到JSON文件，这时可以使用右键菜单访问与文本类型相关的命令，如切分或校对。
+用`open proofreading panel`打开校对面板，用`Open Reference Search Console`打开检索面板。
 
 更详细的命令速查与业务流程图见[docs/commands-cheatsheet.md](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/docs/commands-cheatsheet.md)。
 
@@ -134,13 +135,22 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 组织校对语境是一个看起来有些麻烦，但非常有效的工作。比如校对练习册，有必要把练习和答案拼成语境（拼在一个target中更能节省费用）。而对一首古诗的解释如果不可靠，可以用一篇可靠的作为reference。包含人物的内容，则可以用词典中的任务条目作为reference。
 
-命令`prepare references for JSON file`，或“准备参考资料”按钮，可以通过本地的甸子词典、参考文献为JSON文本篇段准备参考文本。详见下文对知识核查智能体的介绍。
+命令`prepare references for JSON file`，或校对面板「准备参考资料」按钮，可通过本地词典、参考文献等为 JSON 片段准备参考文本。选段检索与勾选导出请用 **检索面板**（见下）。
 
-#### 3.1.5 检索本地词典，组织参考资料（实验功能）
+#### 3.1.5 检索面板与统一参考资料准备
 
-本扩展支持由大模型查询有本地 MDict 词典（`.mdx`），把词典释义整理到 JSON 条目的 `reference` 字段中，用作后续校对的参考资料。
+**打开方式**：活动栏 overview → **检索面板**，或命令 `Open Reference Search Console`。
 
-**配置本地词典**：在设置中配置 `ai-proofread.localDicts`（可配置多本词典，按 `priority` 控制回退顺序；数值越小越优先）：
+在检索面板中可：
+
+1. 勾选资料来源（词典 / grep / BM25 / 向量 / 维基百科 / Web）与强度（轻量 / 标准 / 深入）
+2. 对**当前选段**或**当前 JSON**执行多轮 LLM 规划检索；过程显示在时间线，命中同步到侧栏 **资料检索**
+3. 勾选命中后：**导出选中为 md/JSON**、**合并到源 JSON**，或 **参考选中校对当前选段**（导出 md 并以此为参考文件调用 `proofread selection`，其余交互不变）
+4. 使用底部快捷命令：单源检索、查词典、PDF/识典/古籍库/References、引文核对、清除检索缓存
+
+检索完成后**不再**自动打开未保存的合并预览文档；请以侧栏与导出文件为准。过程文件仍为 `文档.referenceprep.json` / `.referenceprep.log`。项目级查询缓存位于 `.proofread/retrieval-cache.json`（可清除）。
+
+**本地词典配置**：在设置中配置 `ai-proofread.localDicts`（可配置多本词典，按 `priority` 控制回退顺序；数值越小越优先）：
 
 - **id**: 词典 ID（稳定标识，用于路由与缓存键）
 - **name**: 词典名称（展示用）
@@ -183,22 +193,23 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 **统一参考资料准备（知识核查）**：
 
-在批量校对或选段校对前，经**资源范围解析**（大库时 LLM 预筛词典/目录/标题）与**多轮 LLM 规划**，从**本地词典**、**grep**、**BM25/FTS**、**轻量向量**（字符 n-gram）、可选 **维基百科/Wikidata API** 检索，经**混合打分**与**LLM 精排**后写入 `reference`，再调用既有校对流程。
+在批量校对或选段校对前，经**资源范围解析**（大库时 LLM 预筛词典/目录/标题）与**多轮 LLM 规划**，从**本地词典**、**grep**、**BM25/FTS**、**轻量向量**（字符 n-gram）、可选 **维基百科/Wikidata API** 检索，经**混合打分**与**LLM 精排**后写入 `reference`，再调用既有校对流程。日常操作优先用 **检索面板**。
 
 - 选段命令：`AI Proofreader: knowledge verify selection`（**第一步**选：准备并验证 / 仅准备 / 用已有资料验证；后两种再选资料来源与强度，**记住上次**；准备并验证或「用已有资料」时**另选校对提示词**，默认「知识核查（item）」）
-- 文献检索：`AI Proofreader: LLM-enhanced grep search`（自然语言检索意图；与知识核查共用预筛 / 规划 / 精排与 **参考资料命中** 树；默认词典 + grep + BM25 + 向量）
-- 核对选中引文：`AI Proofreader: verify selected citation`（选中引文片段；**同一套** referencePrep 流程，规划提示词为 `citation_selection`；结果在 **参考资料命中** 树，不校对。全文批量核对仍用 `verify citations` + Citation 树）
+- 文献检索：`AI Proofreader: LLM-enhanced grep search`（自然语言检索意图；与知识核查共用预筛 / 规划 / 精排与侧栏 **资料检索**；默认词典 + grep + BM25 + 向量）
+- 核对选中引文：`AI Proofreader: verify selected citation`（选中引文片段；**同一套** referencePrep，规划提示词为 `citation_selection`；结果在 **资料检索** 树，不校对。全文批量核对仍用 `verify citations` + **引文核查** 树）
 - JSON：校对面板 **准备参考资料**，或命令 `prepare references for JSON file`
-- 结果查看：侧栏 **参考资料命中** TreeView（命令 `open reference prep results`）；可打开文件跳转、复制块、手动 prune
+- 结果查看：侧栏 **资料检索**（overview 可开关；命令 `open reference prep results`）；可打开文件跳转、复制块、手动 prune；检索面板内勾选导出
 - **续跑**：「仅准备」、LLM grep、核对选中引文 若已有过程文件，可选择继续上次（追加 1 轮）或重新开始；「准备并验证」始终全新开始
 - 过程文件：`文档.referenceprep.json`（v0.2 结构化 corpus）、`文档.referenceprep.log`（详见 `docs/knowledge-verify-plan.md`）
 - 运行前可勾选资料来源（词典 / grep / BM25 / 向量 / **维基百科**）；强度（轻量 / 标准 / 深入）控制轮次与查询上限
 - **维基百科资料来源**（默认不勾选）：只读访问 MediaWiki + Wikidata；串行限速（默认 30 次/分钟）、会话 HTTP 预算、工作区缓存 `.proofread/wiki-cache.json`；TreeView 命中项可在浏览器打开条目 URL。配置见 `ai-proofread.referencePrep.wikipedia.*`
 - BM25 需先 **建立引文索引**；向量索引首次使用时懒构建
+- **检索缓存**：`.proofread/retrieval-cache.json`（`referencePrep.retrievalCache.*`）；可用检索面板「清除检索缓存」
 
 **参考资料规划提示词**（侧栏 `dict prep prompts`）：可自定义；须要求模型只输出 JSON（`sufficient` / `queries` / `prune`；grep 块可含 `unit`、`searchPhrases`）。未选择时使用内置规划提示词。
 
-**模型路由**（默认隐藏；overview 按钮「模型路由」或顶栏齿轮、命令 `open model routes view` 打开侧栏 `model routes`）：
+**模型路由**（默认隐藏；overview「模型路由」或命令 `open model routes view` 打开侧栏 `model routes`）：
 
 为不同 LLM 管线分别指定平台与模型名称。默认继承关系：
 
@@ -403,24 +414,24 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 1. **转换文档格式**：前面说到`convert docx to markdown`和`convert PDF to markdown`两个命令。还有`convert markdown to docx`，可转换Markdown为docx（Word、WPS的常用格式）。
 2. **标记标题**：前面说到`mark titles from table of contents`命令可基于目录列表标记标题。如果文档标题以序号引导，还可以使用后面提到的`check numbering hierarchy`命令来标记。
 3. **段落整理**：前面说到`format paragraphs`命令，可以在段末加空行，即整理成符合Markdown格式的段落；还可以删除符合Markdown格式但不符合一般习惯的段内分行。基于文档行长众数来计算，因而适合整体较长，并且以长段落为主的文档；短小、段落零碎时准确率会比较低。
-4. **搜索选中文本**
-    * **从md反查PDF**：从markdown文件选择文本，使用`Search Selection In PDF`命令，将调用PDF查看器SumatraPDF打开同名的PDF文件，并搜索选中文本。须先安装好[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)，在高级选项中设置`ReuseInstance = true`可以避免重复打开同一个文件。
-    * **在参考文献库中搜索**：`search selection in References`。如果参考文献目录在工作区外，可能受版本限制会没有结果，可将该目录加入工作区后再搜。
-    * **连线搜索[中华经典古籍库](https://jingdian.ancientbooks.cn)**：`search selection in Ancientbooks (jingdian)`。
-    * **连线搜索[识典古籍](https://www.shidianguji.com/)**：`search selection in Shidianguji`。
-    * **按选文作词条查本地词典**：`AI Proofreader: exact local dictionary lookup for selection (whole selection as headword)`——将**整段选中文本**视为一个词条，在已配置的 MDict 中做**精确匹配**查询（不做分词或智能规划）。查段落、多词请用 **`knowledge verify selection`**。
-5. **大模型增强检索 / 核对选中引文**：`LLM-enhanced grep search` 与 `verify selected citation` 与知识核查「仅准备」**共用同一套** referencePrep（资源预筛、多轮规划、词典+文献检索、LLM 精排、`.referenceprep.json` 与侧栏 **参考资料命中**）。三者差异仅为规划阶段的输入语义（`search_intent` / `citation_selection` / `manuscript`）以及是否进入校对。全文 `verify citations` 仍使用引文索引相似度匹配与 Citation 树。
-6. **字词检查**：命令`check words`。分类三个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的检查与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》、《古籍印刷通用字规范字形表》、规范人名与年号等数据。用户还可以通过`manage custom tables`命令，加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。这是一个非常强大且灵活的功能，值得深入探索。
+4. **搜索选中文本**（优先在 **检索面板** 底部快捷栏）
+    * **从md反查PDF**：`Search Selection In PDF`（需 [SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)；建议 `ReuseInstance = true`）
+    * **在参考文献库中搜索**：`search selection in References`
+    * **连线搜索[中华经典古籍库](https://jingdian.ancientbooks.cn)**：`search selection in Ancientbooks (jingdian)`
+    * **连线搜索[识典古籍](https://www.shidianguji.com/)**：`search selection in Shidianguji`
+    * **按选文作词条查本地词典**：精确整词查 MDX；查段落、多词请用检索面板「开始准备」或 `knowledge verify selection`
+5. **大模型增强检索 / 核对选中引文**：与知识核查「仅准备」共用 referencePrep；结果在侧栏 **资料检索**。全文 `verify citations` 仍用 **引文核查** 树。入口见检索面板。
+6. **字词检查**：命令`check words`（**校对面板**）。分类三个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的检查与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》、《古籍印刷通用字规范字形表》、规范人名与年号等数据。用户还可以通过`manage custom tables`命令，加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。这是一个非常强大且灵活的功能，值得深入探索。
     ![树视图（提示词管理、字词检查、引文检查）](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/special_checks.png)
-6. **标题树与段内序号检查**：命令`check numbering hierarchy`。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
-7. **引文核对**：指定本地文献库根目录（默认为根目录下的`references`），执行 `build citation reference index` 建立索引（BM25/向量检索亦依赖此索引）。**核对选中引文**（`verify selected citation`）走 LLM 参考资料准备流程，结果在 **参考资料命中** 树。**核对全文引文**（`verify citations`）仍按句子相似度匹配，结果在 **Citation** 树，可 diff、PDF 反查。全文核对以句子为单元，不成句引用宜用 LLM 检索或 VSCode 多文件搜索。
-8. **文档内重复句核查**：功能类似引文核对，扫描当前文档或选中范围，按句发现**完全重复**（归一化后与引文核对相同的规则）与**近似重复**（长度分桶 + Jaccard，与引文核对、句子对齐共用 `ai-proofread.alignment` 与 `ai-proofread.jieba` 中的相似度相关设置）；**默认一次扫描同时给出两类结果**。命令为 `scan duplicate sentences in document`（全文）与 `scan duplicate sentences in selection`（选区）。最短句长、归一化选项、繁简转换后再比相似度、长度容差等，与引文核对共用 `ai-proofread.citation` 中的对应项，无需单独配置。
-9. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
-10. **删除空白字符**：使用`delete inline whitespace`命令，删除汉字和中文标点内部小于指定长度的空白字符串。
-11.  **OpenCC**：集成了[opencc-js](https://github.com/nk2028/opencc-js)，支持繁简转换，命令为`opencc`和`opencc selection`。
-12. **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
-13. **按句子切分**：使用 `split into sentences` 命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子。
-14. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
+7. **标题树与段内序号检查**：命令`check numbering hierarchy`（**校对面板** / overview 开关）。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
+8. **引文核对**：指定本地文献库根目录（默认为根目录下的`references`），在 **检索面板** 执行 `build citation reference index`。**核对选中引文** → **资料检索**；**核对全文引文** → **引文核查**。
+9. **文档内重复句核查**（**校对面板**）：`scan duplicate sentences in document` / `selection`；侧栏 **重文检查**。设置与引文核对共用 `ai-proofread.citation` 相关项。
+10. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
+11. **删除空白字符**：使用`delete inline whitespace`命令，删除汉字和中文标点内部小于指定长度的空白字符串。
+12.  **OpenCC**：集成了[opencc-js](https://github.com/nk2028/opencc-js)，支持繁简转换，命令为`opencc`和`opencc selection`。
+13. **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
+14. **按句子切分**：使用 `split into sentences` 命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子。
+15. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
 
 ### 3.7. 注意事项
 
@@ -511,6 +522,9 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 - 特性：增加提示词“段内重构与重述”
 - 特性：在知识核查中集成维基百科搜索
+- 特性：**检索面板**（参考资料复合查询控制台）：多源配置、过程时间线、命中勾选导出、参考选中校对选段；与校对面板底部快捷命令按职责拆分
+- 特性：活动栏 overview 可开关侧栏视图（资料检索、引文核查、重文检查、标题树、段内序号、校对条目等）
+- 特性：项目级检索缓存 `.proofread/retrieval-cache.json`；检索完成后不再自动打开未保存合并预览
 - 更新：拼音提示词“某边”不（按照词典）轻声
 - debug：修复treeview按钮状态错乱
 
