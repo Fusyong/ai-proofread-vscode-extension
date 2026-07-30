@@ -14,6 +14,7 @@ import {
 import type { ReferencePrepProcessFileV020, ReferencePrepStrength, ReferenceSourceId } from '../referencePrep/schema';
 import { getDefaultEnabledSources, runReferencePrepForJsonFile, runReferencePrepForTarget } from '../referencePrep/referencePrepRunner';
 import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
+import { setReferenceHitVisible } from '../ui/sidebarViewVisibility';
 import { loadReferencePrepLastRun, saveReferencePrepLastRun } from '../referencePrep/runPreferences';
 import {
     pickExistingReferenceForProofread,
@@ -79,7 +80,7 @@ export class ReferencePrepCommandHandler {
 
     private async showResultsTree(anchorPath: string, process: ReferencePrepProcessFileV020): Promise<void> {
         if (!this.resultsProvider) return;
-        await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
+        await setReferenceHitVisible(true);
         this.resultsProvider.refresh(process, anchorPath);
     }
 

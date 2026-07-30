@@ -27,11 +27,15 @@ import {
     formatSelectedHitsAsReferenceField,
     sortHitsForLlm,
 } from '../referencePrep/exportSelectedHits';
-import { getWorkingTextEditor } from './lastActiveTextEditor';
+import { getWorkingTextEditor, focusWorkingTextEditor } from './lastActiveTextEditor';
 import { FilePathUtils } from '../utils';
+import type { ProofreadCommandHandler } from '../commands/proofreadCommandHandler';
+import { setReferenceHitVisible } from './sidebarViewVisibility';
 
 const PANEL_ID = 'ai-proofread.referencePrepConsole';
 const PANEL_TITLE = '参考资料检索';
+/** 递增以在扩展更新后强制刷新已打开面板的 HTML（避免旧界面缺导出提示条）。 */
+const WEBVIEW_HTML_REVISION = 4;
 
 export class ReferencePrepWebview {
     private panel: vscode.WebviewPanel | undefined;
@@ -39,15 +43,21 @@ export class ReferencePrepWebview {
     private lastAnchorPath: string | undefined;
     private lastProcess: ReferencePrepProcessFileV020 | undefined;
     private panelListeners: vscode.Disposable[] = [];
+    private appliedHtmlRevision = 0;
 
     constructor(
         private context: vscode.ExtensionContext,
         private prepHandler: ReferencePrepCommandHandler,
-        private resultsProvider?: ReferencePrepResultsProvider
+        private resultsProvider?: ReferencePrepResultsProvider,
+        private proofreadHandler?: ProofreadCommandHandler
     ) {}
 
     open(): void {
         if (this.panel) {
+            if (this.appliedHtmlRevision !== WEBVIEW_HTML_REVISION) {
+                this.panel.webview.html = this.getHtml();
+                this.appliedHtmlRevision = WEBVIEW_HTML_REVISION;
+            }
             this.panel.reveal(vscode.ViewColumn.Beside);
             this.postState();
             return;
@@ -63,6 +73,7 @@ export class ReferencePrepWebview {
             }
         );
         this.panel.webview.html = this.getHtml();
+        this.appliedHtmlRevision = WEBVIEW_HTML_REVISION;
         this.panel.webview.onDidReceiveMessage(
             (msg) => this.handleMessage(msg),
             undefined,
@@ -71,6 +82,7 @@ export class ReferencePrepWebview {
         this.panel.onDidDispose(
             () => {
                 this.panel = undefined;
+                this.appliedHtmlRevision = 0;
                 this.cancelSource?.cancel();
                 this.cancelSource = undefined;
                 for (const d of this.panelListeners) d.dispose();
@@ -88,6 +100,17 @@ export class ReferencePrepWebview {
             })
         );
         this.postState();
+    }
+
+    /** 先亮起搜索面板提示，再弹出可点击的通知；避免先打开文件抢走焦点导致看不到提示。 */
+    private async notifyExportDone(tip: string, openUri?: vscode.Uri): Promise<void> {
+        this.post({ type: 'exportDone', message: tip });
+        this.panel?.reveal(this.panel.viewColumn ?? vscode.ViewColumn.Beside, false);
+        const choice = await vscode.window.showInformationMessage(tip, '打开文件', '知道了');
+        if (choice === '打开文件' && openUri) {
+            const doc = await vscode.workspace.openTextDocument(openUri);
+            await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
+        }
     }
 
     private post(message: Record<string, unknown>): void {
@@ -197,25 +220,88 @@ export class ReferencePrepWebview {
         return undefined;
     }
 
-    private async exportSelectedAsMd(hitIds?: string[]): Promise<void> {
+    /**
+     * 准备勾选命中的 Markdown 导出内容。
+     * 有锚点文档时写入 `.selected-refs.md`；否则仅返回正文供预览（校对流程需要落盘文件）。
+     */
+    private prepareSelectedMdExport(
+        hitIds?: string[]
+    ):
+        | { kind: 'file'; uri: vscode.Uri; tip: string; md: string }
+        | { kind: 'preview'; tip: string; md: string }
+        | undefined {
         const hits = this.resolveSelectedHits(hitIds);
         if (!hits.length) {
             vscode.window.showWarningMessage('请先勾选要导出的命中。');
-            return;
+            return undefined;
         }
         const md = formatSelectedHitsAsMarkdown(hits);
+        const charCount = md.length;
         const anchor = this.lastAnchorPath ?? getWorkingTextEditor()?.document.uri.fsPath;
         if (anchor) {
             const outPath = FilePathUtils.getFilePath(anchor, '.selected-refs', '.md');
             fs.writeFileSync(outPath, md, 'utf8');
-            const doc = await vscode.workspace.openTextDocument(outPath);
-            await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
-            vscode.window.showInformationMessage(`已导出 ${hits.length} 条为 Markdown：${path.basename(outPath)}`);
-        } else {
-            const doc = await vscode.workspace.openTextDocument({ content: md, language: 'markdown' });
-            await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
-            vscode.window.showInformationMessage(`已导出 ${hits.length} 条为 Markdown（未保存）。`);
+            return {
+                kind: 'file',
+                uri: vscode.Uri.file(outPath),
+                tip: `导出完成：${hits.length} 条、${charCount} 字符 → ${path.basename(outPath)}`,
+                md,
+            };
         }
+        return {
+            kind: 'preview',
+            tip: `导出完成：${hits.length} 条、${charCount} 字符（未落盘）`,
+            md,
+        };
+    }
+
+    private async exportSelectedAsMd(hitIds?: string[]): Promise<void> {
+        const prepared = this.prepareSelectedMdExport(hitIds);
+        if (!prepared) return;
+        if (prepared.kind === 'file') {
+            await this.notifyExportDone(prepared.tip, prepared.uri);
+            return;
+        }
+        this.post({ type: 'exportDone', message: prepared.tip });
+        this.panel?.reveal(this.panel.viewColumn ?? vscode.ViewColumn.Beside, false);
+        const choice = await vscode.window.showInformationMessage(prepared.tip, '打开预览', '知道了');
+        if (choice === '打开预览') {
+            const doc = await vscode.workspace.openTextDocument({ content: prepared.md, language: 'markdown' });
+            await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
+        }
+    }
+
+    /**
+     * 导出勾选命中为 md，并以该文件为参考文件调用 Proofread selection（其余交互不变）。
+     */
+    private async proofreadSelectionWithExportedMd(hitIds?: string[]): Promise<void> {
+        if (!this.proofreadHandler) {
+            vscode.window.showErrorMessage('校对模块未就绪，无法启动选段校对。');
+            return;
+        }
+        const prepared = this.prepareSelectedMdExport(hitIds);
+        if (!prepared) return;
+        if (prepared.kind !== 'file') {
+            vscode.window.showWarningMessage('请先打开文稿，以便将参考资料保存为 md 并用于校对。');
+            return;
+        }
+
+        this.post({ type: 'exportDone', message: prepared.tip + '；开始校对选段…' });
+        this.panel?.reveal(this.panel.viewColumn ?? vscode.ViewColumn.Beside, true);
+
+        const editor = await focusWorkingTextEditor();
+        if (!editor) {
+            vscode.window.showWarningMessage('请先打开并选中要校对的文稿选段。');
+            return;
+        }
+        if (editor.selection.isEmpty) {
+            vscode.window.showWarningMessage('请先在文稿中选中要校对的文本。');
+            return;
+        }
+
+        await this.proofreadHandler.handleProofreadSelectionCommand(editor, this.context, {
+            presetReferenceFile: prepared.uri,
+        });
     }
 
     private async exportSelectedAsJson(hitIds?: string[]): Promise<void> {
@@ -231,13 +317,19 @@ export class ReferencePrepWebview {
         if (anchor) {
             const outPath = FilePathUtils.getFilePath(anchor, '.selected-refs', '.json');
             fs.writeFileSync(outPath, text, 'utf8');
-            const doc = await vscode.workspace.openTextDocument(outPath);
-            await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
-            vscode.window.showInformationMessage(`已导出 ${hits.length} 条为 JSON：${path.basename(outPath)}`);
+            await this.notifyExportDone(
+                `已导出 ${hits.length} 条为 JSON：${path.basename(outPath)}`,
+                vscode.Uri.file(outPath)
+            );
         } else {
-            const doc = await vscode.workspace.openTextDocument({ content: text, language: 'json' });
-            await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
-            vscode.window.showInformationMessage(`已导出 ${hits.length} 条为 JSON（未保存）。`);
+            const tip = `已导出 ${hits.length} 条为 JSON（未保存）`;
+            this.post({ type: 'exportDone', message: tip });
+            this.panel?.reveal(this.panel.viewColumn ?? vscode.ViewColumn.Beside, false);
+            const choice = await vscode.window.showInformationMessage(tip, '打开预览', '知道了');
+            if (choice === '打开预览') {
+                const doc = await vscode.workspace.openTextDocument({ content: text, language: 'json' });
+                await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
+            }
         }
     }
 
@@ -354,6 +446,9 @@ export class ReferencePrepWebview {
             case 'exportSelectedMd':
                 await this.exportSelectedAsMd(msg.hitIds);
                 break;
+            case 'proofreadSelectionWithExportedMd':
+                await this.proofreadSelectionWithExportedMd(msg.hitIds);
+                break;
             case 'exportSelectedJson':
                 await this.exportSelectedAsJson(msg.hitIds);
                 break;
@@ -388,7 +483,7 @@ export class ReferencePrepWebview {
         this.lastProcess = proc;
         this.lastAnchorPath = path;
         this.resultsProvider?.refresh(proc, path);
-        await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
+        await setReferenceHitVisible(true);
         this.post({ type: 'clearTimeline' });
         this.postProcess(proc, path);
         for (let i = 0; i < proc.rounds.length; i++) {
@@ -555,6 +650,14 @@ select, textarea {
 .export-bar.mode-selection .for-selection { display: inline-block; }
 .export-bar.mode-json .for-json { display: inline-block; }
 .status { color: var(--vscode-descriptionForeground); font-size: 0.9em; margin-left: 8px; }
+.export-done {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: var(--vscode-inputValidation-infoBackground, rgba(0,120,212,0.15));
+  border: 1px solid var(--vscode-inputValidation-infoBorder, var(--vscode-focusBorder));
+  color: var(--vscode-foreground);
+}
 .warn { color: var(--vscode-errorForeground); }
 </style>
 </head>
@@ -598,10 +701,12 @@ select, textarea {
   <button type="button" class="secondary" id="btnSelectAll">全选</button>
   <button type="button" class="secondary" id="btnSelectNone">全不选</button>
   <button type="button" class="mode-only for-selection" id="btnExportMd">导出选中为 md</button>
+  <button type="button" class="mode-only for-selection" id="btnProofreadWithMd" title="导出选中为 md，并以该文件为参考调用 Proofread selection">参考选中校对当前选段</button>
   <button type="button" class="mode-only for-json" id="btnExportJson">导出选中为 JSON</button>
   <button type="button" class="mode-only for-json" id="btnMergeJson">合并选中到源 JSON</button>
   <span class="status" id="selectedCount"></span>
 </div>
+<div class="export-done" id="exportDone" style="display:none" role="status"></div>
 <ul id="hits"></ul>
 
 <script nonce="${nonce}">
@@ -614,6 +719,7 @@ const targetDocEl = document.getElementById('targetDoc');
 const timelineEl = document.getElementById('timeline');
 const hitsEl = document.getElementById('hits');
 const exportBar = document.getElementById('exportBar');
+const exportDoneEl = document.getElementById('exportDone');
 const selectedCountEl = document.getElementById('selectedCount');
 const runStatus = document.getElementById('runStatus');
 const btnRun = document.getElementById('btnRun');
@@ -621,6 +727,16 @@ const btnCancel = document.getElementById('btnCancel');
 
 /** @type {Map<string, boolean>} */
 const checkedByHitId = new Map();
+
+function showExportDone(message) {
+  const text = message || '导出完成';
+  if (exportDoneEl) {
+    exportDoneEl.style.display = 'block';
+    exportDoneEl.textContent = text;
+    exportDoneEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  appendTimeline('export', text);
+}
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -785,6 +901,7 @@ document.getElementById('btnSelectNone').onclick = () => {
   updateSelectedCount();
 };
 document.getElementById('btnExportMd').onclick = () => postExport('exportSelectedMd');
+document.getElementById('btnProofreadWithMd').onclick = () => postExport('proofreadSelectionWithExportedMd');
 document.getElementById('btnExportJson').onclick = () => postExport('exportSelectedJson');
 document.getElementById('btnMergeJson').onclick = () => postExport('mergeSelectedIntoJson');
 updateExportBarMode();
@@ -815,7 +932,13 @@ window.addEventListener('message', (ev) => {
   } else if (msg.type === 'process') {
     // 新结果到来时按 defaultChecked 重置勾选
     checkedByHitId.clear();
+    if (exportDoneEl) {
+      exportDoneEl.style.display = 'none';
+      exportDoneEl.textContent = '';
+    }
     renderHits(msg.hits || []);
+  } else if (msg.type === 'exportDone') {
+    showExportDone(msg.message);
   }
 });
 
@@ -829,9 +952,10 @@ vscode.postMessage({ command: 'ready' });
 export function registerReferencePrepConsole(
     context: vscode.ExtensionContext,
     prepHandler: ReferencePrepCommandHandler,
-    resultsProvider?: ReferencePrepResultsProvider
+    resultsProvider?: ReferencePrepResultsProvider,
+    proofreadHandler?: ProofreadCommandHandler
 ): ReferencePrepWebview {
-    const webview = new ReferencePrepWebview(context, prepHandler, resultsProvider);
+    const webview = new ReferencePrepWebview(context, prepHandler, resultsProvider, proofreadHandler);
     context.subscriptions.push(
         vscode.commands.registerCommand('ai-proofread.referencePrep.openConsole', () => {
             webview.open();

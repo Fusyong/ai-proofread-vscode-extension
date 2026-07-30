@@ -1,4 +1,16 @@
-import type { CorpusHit, ReferencePrepProcessFileV020, ReferencePrepRound } from './schema';
+import type { CorpusHit, ReferencePrepIntent, ReferencePrepProcessFileV020, ReferencePrepRound } from './schema';
+
+/** 查询意图英文枚举 → 侧栏展示用中文（entity_name 等是合法 intent，不是实体名） */
+export function formatReferencePrepIntent(intent: string): string {
+    const map: Record<ReferencePrepIntent, string> = {
+        entity_name: '专名',
+        term_norm: '术语',
+        citation: '引文',
+        general_fact: '通识',
+        word_usage: '用法',
+    };
+    return map[intent as ReferencePrepIntent] ?? intent;
+}
 
 /** 词典命中无文献路径，不宜「打开命中位置」 */
 export function canOpenHitInEditor(hit: CorpusHit): boolean {

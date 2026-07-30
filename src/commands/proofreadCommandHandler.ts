@@ -345,12 +345,14 @@ export class ProofreadCommandHandler {
 
     /**
      * 处理校对选中文本命令
+     * @param options.presetReferenceFile 已选定的参考文件（跳过「是否使用参考文件」与文件选择对话框）
      */
     public async handleProofreadSelectionCommand(
         editor: vscode.TextEditor,
-        context: vscode.ExtensionContext
+        context: vscode.ExtensionContext,
+        options?: { presetReferenceFile?: vscode.Uri }
     ): Promise<void> {
-        await this.executeProofreadSelectionFlow(editor, context);
+        await this.executeProofreadSelectionFlow(editor, context, undefined, options);
     }
 
     /**
@@ -366,11 +368,13 @@ export class ProofreadCommandHandler {
     /**
      * 执行校对选中文本的核心流程
      * @param editorialMemoryForceEnabled 为 true：与「Proofread Selection with Memory」等价；为 false/undefined：普通选段不写记忆。
+     * @param options.presetReferenceFile 预设参考文件时跳过参考文件相关交互，其余步骤不变。
      */
     private async executeProofreadSelectionFlow(
         editor: vscode.TextEditor,
         context: vscode.ExtensionContext,
-        editorialMemoryForceEnabled?: boolean
+        editorialMemoryForceEnabled?: boolean,
+        options?: { presetReferenceFile?: vscode.Uri }
     ): Promise<void> {
         try {
             const platform = this.configManager.getPlatform();
@@ -465,32 +469,36 @@ export class ProofreadCommandHandler {
             }
 
             let referenceFile: vscode.Uri[] | undefined;
-            const useReference = await vscode.window.showQuickPick(
-                ['否', '是'],
-                {
-                    placeHolder: '是否使用参考文件？',
-                    ignoreFocusOut: true
-                }
-            );
+            if (options?.presetReferenceFile) {
+                referenceFile = [options.presetReferenceFile];
+            } else {
+                const useReference = await vscode.window.showQuickPick(
+                    ['否', '是'],
+                    {
+                        placeHolder: '是否使用参考文件？',
+                        ignoreFocusOut: true
+                    }
+                );
 
-            // 如果用户按 ESC 取消，立即中断
-            if (useReference === undefined) {
-                return;
-            }
-
-            if (useReference === '是') {
-                referenceFile = await vscode.window.showOpenDialog({
-                    canSelectFiles: true,
-                    canSelectFolders: false,
-                    canSelectMany: false,
-                    filters: {
-                        'Text files': ['txt', 'md']
-                    },
-                    title: '选择参考文件'
-                });
                 // 如果用户按 ESC 取消，立即中断
-                if (referenceFile === undefined) {
+                if (useReference === undefined) {
                     return;
+                }
+
+                if (useReference === '是') {
+                    referenceFile = await vscode.window.showOpenDialog({
+                        canSelectFiles: true,
+                        canSelectFolders: false,
+                        canSelectMany: false,
+                        filters: {
+                            'Text files': ['txt', 'md']
+                        },
+                        title: '选择参考文件'
+                    });
+                    // 如果用户按 ESC 取消，立即中断
+                    if (referenceFile === undefined) {
+                        return;
+                    }
                 }
             }
 

@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { FilePathUtils } from '../utils';
 import { runReferencePrepForTarget } from './referencePrepRunner';
 import type { ReferencePrepResultsProvider } from './referencePrepResultsView';
+import { setReferenceHitVisible } from '../ui/sidebarViewVisibility';
 import type {
     CorpusHit,
     ReferencePrepProcessFileV020,
@@ -150,7 +151,7 @@ export async function presentReferencePrepSessionResult(params: {
     openMergedBeside?: boolean;
 }): Promise<void> {
     if (params.resultsProvider) {
-        await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
+        await setReferenceHitVisible(true);
         params.resultsProvider.refresh(params.process, params.anchorPath);
     }
     if (params.mergedReference.trim()) {

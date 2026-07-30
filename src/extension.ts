@@ -22,9 +22,21 @@ import { DuplicateCommandHandler } from './commands/duplicateCommandHandler';
 import { WordCheckCommandHandler } from './commands/wordCheckCommandHandler';
 import {
     restoreSidebarToggleStateOnActivate,
+    setCitationsVisible,
+    setDuplicatesVisible,
+    setNumberingSegmentsVisible,
+    setNumberingVisible,
+    setProofreadItemsVisible,
     setPromptsViewsVisible,
+    setReferenceHitVisible,
     setWordCheckViewsVisible,
+    toggleCitationsVisible,
+    toggleDuplicatesVisible,
+    toggleNumberingSegmentsVisible,
+    toggleNumberingVisible,
+    toggleProofreadItemsVisible,
     togglePromptsViewsVisible,
+    toggleReferenceHitVisible,
 } from './ui/sidebarViewVisibility';
 import { NumberingTreeDataProvider } from './numbering/numberingTreeProvider';
 import { registerNumberingView } from './numbering/numberingView';
@@ -123,7 +135,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const localDictQueryHandler = new LocalDictQueryCommandHandler();
     const grepSearchHandler = new GrepSearchCommandHandler(referencePrepResultsProvider);
     const searchHandler = new SearchCommandHandler(referencePrepResultsProvider);
-    registerReferencePrepConsole(context, referencePrepHandler, referencePrepResultsProvider);
+    registerReferencePrepConsole(context, referencePrepHandler, referencePrepResultsProvider, proofreadHandler);
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
     const citationHandler = new CitationCommandHandler(
         context,
@@ -155,11 +167,8 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     registerProofreadItemsView(context);
 
-    vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', false);
-    vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', false);
+    // numbering / proofreadItems 由侧栏开关或相关命令控制显示
+    // （激活时由 restoreSidebarToggleStateOnActivate 统一恢复）
 
     // 设置校对、切分、合并的回调
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
@@ -420,12 +429,15 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
 
         vscode.commands.registerCommand('ai-proofread.referencePrep.openView', async () => {
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
+            await setReferenceHitVisible(true);
             const editor = vscode.window.activeTextEditor;
             if (editor?.document.uri.fsPath) {
                 referencePrepResultsProvider.loadFromAnchor(editor.document.uri.fsPath);
             }
         }),
+        vscode.commands.registerCommand('ai-proofread.referencePrep.toggleResultsView', () =>
+            toggleReferenceHitVisible()
+        ),
         vscode.commands.registerCommand('ai-proofread.referencePrep.clearRetrievalCache', async () => {
             const { clearRetrievalCache } = await import('./referencePrep/retrieval/retrievalCache');
             const ok = clearRetrievalCache();
@@ -632,15 +644,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
         // 引文核对
         vscode.commands.registerCommand('ai-proofread.citation.openView', async () => {
-            // 按需显示引文核对视图
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', true);
+            await setCitationsVisible(true);
             citationHandler.handleOpenViewCommand();
         }),
+        vscode.commands.registerCommand('ai-proofread.citation.toggleView', () => toggleCitationsVisible()),
         vscode.commands.registerCommand('ai-proofread.citation.rebuildIndex', async () => {
             await citationHandler.handleRebuildIndexCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.citation.verifySelection', async () => {
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
+            await setReferenceHitVisible(true);
             await citationHandler.handleVerifySelectionCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.citation.showDiff', (nodeOrItem?: unknown) => {
@@ -658,13 +670,14 @@ export async function activate(context: vscode.ExtensionContext) {
             await citationHandler.handleSearchSelectionInReferencesCommand(editor);
         }),
         vscode.commands.registerCommand('ai-proofread.duplicate.scanDocument', async () => {
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', true);
+            await setDuplicatesVisible(true);
             await duplicateHandler.handleScanDocument();
         }),
         vscode.commands.registerCommand('ai-proofread.duplicate.scanSelection', async () => {
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', true);
+            await setDuplicatesVisible(true);
             await duplicateHandler.handleScanSelection();
         }),
+        vscode.commands.registerCommand('ai-proofread.duplicate.toggleView', () => toggleDuplicatesVisible()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.openViews', async () => {
             await wordCheckHandler.openWordCheckViews();
         }),
@@ -712,25 +725,27 @@ export async function activate(context: vscode.ExtensionContext) {
             );
             if (!choice) return;
             if (choice.value === 'title') {
-                await vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', true);
+                await setNumberingVisible(true);
                 await new Promise((r) => setTimeout(r, 50));
                 await numberingHandler.handleCheckCommand();
             } else {
-                await vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', true);
+                await setNumberingSegmentsVisible(true);
                 await new Promise((r) => setTimeout(r, 50));
                 await numberingHandler.handleSegmentCheckCommand();
             }
         }),
+        vscode.commands.registerCommand('ai-proofread.numbering.toggleView', () => toggleNumberingVisible()),
         vscode.commands.registerCommand('ai-proofread.numbering.reveal', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleRevealCommand(node)),
         vscode.commands.registerCommand('ai-proofread.numbering.markAsTitle', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleMarkAsTitleCommand(node)),
         vscode.commands.registerCommand('ai-proofread.numbering.promote', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handlePromoteCommand(node)),
         vscode.commands.registerCommand('ai-proofread.numbering.demote', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleDemoteCommand(node)),
         vscode.commands.registerCommand('ai-proofread.numbering.toggleSimplifiedLevel', () => numberingHandler.handleToggleSimplifiedLevelCommand()),
         vscode.commands.registerCommand('ai-proofread.numberingSegments.toggleSimplifiedLevel', () => numberingHandler.handleSegmentToggleSimplifiedLevelCommand()),
+        vscode.commands.registerCommand('ai-proofread.numberingSegments.toggleView', () => toggleNumberingSegmentsVisible()),
         vscode.commands.registerCommand('ai-proofread.numbering.defineTitle', () => numberingHandler.handleDefineTitleCommand()),
         vscode.commands.registerCommand('ai-proofread.numbering.defineSegmentPattern', () => numberingHandler.handleDefineSegmentPatternCommand()),
         vscode.commands.registerCommand('ai-proofread.numbering.checkSegments', async () => {
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', true);
+            await setNumberingSegmentsVisible(true);
             await new Promise((r) => setTimeout(r, 50));
             await numberingHandler.handleSegmentCheckCommand();
         }),
@@ -752,7 +767,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
         }),
         vscode.commands.registerCommand('ai-proofread.showProofreadItemsTree', async () => {
-            await vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', true);
+            await setProofreadItemsVisible(true);
             const ed = vscode.window.activeTextEditor;
             let segmentsJsonPath: string | undefined;
             if (ed) {
@@ -779,6 +794,9 @@ export async function activate(context: vscode.ExtensionContext) {
             await new Promise((r) => setTimeout(r, 50));
             await vscode.commands.executeCommand('ai-proofread.proofreadItems.focus');
         }),
+        vscode.commands.registerCommand('ai-proofread.proofreadItems.toggleView', () =>
+            toggleProofreadItemsVisible()
+        ),
     ];
 
     context.subscriptions.push(...disposables, configManager);

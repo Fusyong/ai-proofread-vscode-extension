@@ -6,6 +6,7 @@ import { buildMergedReference } from './retrieval/executor';
 import {
     canOpenHitInEditor,
     canOpenHitInBrowser,
+    formatReferencePrepIntent,
     getHitsForRoundQuery,
     getQueryIdsWithHits,
     getRoundHitCount,
@@ -79,7 +80,8 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
                     : vscode.TreeItemCollapsibleState.None
             );
             item.id = `rp-query:${element.roundIndex}:${element.queryId}`;
-            item.description = `${element.intent} · ${hits.length} 条`;
+            item.description = `${formatReferencePrepIntent(element.intent)} · ${hits.length} 条`;
+            item.tooltip = `intent: ${element.intent}`;
             return item;
         }
         const h = element.hit;

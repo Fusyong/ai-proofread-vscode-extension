@@ -177,6 +177,11 @@
         "category": "AI Proofreader Search"
       },
       {
+        "command": "ai-proofread.referencePrep.toggleResultsView",
+        "title": "Toggle Reference Hit View",
+        "category": "AI Proofreader Search"
+      },
+      {
         "command": "ai-proofread.referencePrep.clearRetrievalCache",
         "title": "Clear Project Retrieval Cache",
         "category": "AI Proofreader Search"
@@ -291,6 +296,11 @@
         "category": "AI Proofreader Search"
       },
       {
+        "command": "ai-proofread.citation.toggleView",
+        "title": "Toggle Citations View",
+        "category": "AI Proofreader Search"
+      },
+      {
         "command": "ai-proofread.citation.rebuildIndex",
         "title": "Build Citation Reference Index",
         "category": "AI Proofreader Search"
@@ -316,6 +326,11 @@
       {
         "command": "ai-proofread.duplicate.scanSelection",
         "title": "AI Proofreader: scan duplicate sentences in selection"
+      },
+      {
+        "command": "ai-proofread.duplicate.toggleView",
+        "title": "Toggle Duplicates View",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.wordCheck.openViews",
@@ -405,6 +420,16 @@
         "title": "AI Proofreader: check numbering hierarchy"
       },
       {
+        "command": "ai-proofread.numbering.toggleView",
+        "title": "Toggle Numbering (Title Tree) View",
+        "category": "AI Proofreader"
+      },
+      {
+        "command": "ai-proofread.numberingSegments.toggleView",
+        "title": "Toggle Numbering Segments View",
+        "category": "AI Proofreader"
+      },
+      {
         "command": "ai-proofread.numbering.reveal",
         "title": "定位到文档"
       },
@@ -447,6 +472,11 @@
       {
         "command": "ai-proofread.showProofreadItemsTree",
         "title": "AI Proofreader: show proofread items tree"
+      },
+      {
+        "command": "ai-proofread.proofreadItems.toggleView",
+        "title": "Toggle Proofread Items View",
+        "category": "AI Proofreader"
       },
       {
         "command": "ai-proofread.proofreadItems.setSort",
@@ -1477,12 +1507,12 @@
         },
         {
           "id": "ai-proofread.citation",
-          "name": "citations",
+          "name": "引文核查",
           "when": "aiProofread.showCitationView"
         },
         {
           "id": "ai-proofread.duplicate",
-          "name": "duplicates",
+          "name": "重文检查",
           "when": "aiProofread.showDuplicateView"
         },
         {
@@ -1502,7 +1532,7 @@
         },
         {
           "id": "ai-proofread.referencePrepResults",
-          "name": "reference hit",
+          "name": "资料检索",
           "when": "aiProofread.showReferencePrepResultsView"
         }
       ]

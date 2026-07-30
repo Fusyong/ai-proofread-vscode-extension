@@ -15,6 +15,7 @@ import { getJiebaWasm } from '../jiebaLoader';
 import { collectWordErrors, formatWordErrors, parseDelimitersFromConfig } from '../wordErrorCollector';
 import { proofreadJsonPathToSegmentsJsonPath, segmentsJsonPathToSplitMarkdownPath } from '../proofreadSplitLayout';
 import { focusWorkingTextEditor } from './lastActiveTextEditor';
+import { setProofreadItemsVisible } from './sidebarViewVisibility';
 
 // 接口定义
 /** 配套文档检测结果 */
@@ -714,7 +715,7 @@ export class WebviewManager {
                         const doc = await vscode.workspace.openTextDocument(mdUri);
                         await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
                     }
-                    await vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', true);
+                    await setProofreadItemsVisible(true);
                     await new Promise((r) => setTimeout(r, 50));
                     await vscode.commands.executeCommand('ai-proofread.proofreadItems.focus');
                     break;

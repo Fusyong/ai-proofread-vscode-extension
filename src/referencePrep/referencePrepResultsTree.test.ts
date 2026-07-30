@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     canOpenHitInEditor,
+    formatReferencePrepIntent,
     getHitsForRoundQuery,
     getQueryIdsWithHits,
     referencePrepHitContextValue,
@@ -18,6 +19,12 @@ function proc(partial: Partial<ReferencePrepProcessFileV020>): ReferencePrepProc
 }
 
 describe('referencePrepResultsTree', () => {
+    it('formats intent enum for display', () => {
+        expect(formatReferencePrepIntent('entity_name')).toBe('专名');
+        expect(formatReferencePrepIntent('general_fact')).toBe('通识');
+        expect(formatReferencePrepIntent('unknown_x')).toBe('unknown_x');
+    });
+
     it('dict hits are not openable in editor', () => {
         const hit = {
             hitId: 'h-dict-1',
