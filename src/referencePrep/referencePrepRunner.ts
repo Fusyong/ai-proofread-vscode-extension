@@ -145,7 +145,7 @@ export async function runReferencePrepForTarget(
               vscode.workspace.getConfiguration('ai-proofread').get<number>('referencePrep.continuation.maxRounds', 1))
             : preset.maxRounds;
         const intents = params.intents?.length ? params.intents : ALL_INTENTS;
-        const { platform, model } = getReferencePrepLlmConfig();
+        const { platform, model, disableThinking } = getReferencePrepLlmConfig();
         const disabled = ALL_SOURCES.filter((s) => !params.enabledSources.includes(s));
 
         const proc = loadOrCreateProcessFile({
@@ -248,7 +248,13 @@ export async function runReferencePrepForTarget(
             });
             appendProcessLog(params.anchorPath, `Round ${round + 1} plan LLM`);
 
-            const raw = await generateReferencePrepPlanJson({ platform, model, systemPrompt, userPrompt });
+            const raw = await generateReferencePrepPlanJson({
+                platform,
+                model,
+                systemPrompt,
+                userPrompt,
+                disableThinking,
+            });
             const plan = parseReferencePrepPlan(raw, intents);
             plan.queries = plan.queries.slice(0, preset.maxQueriesPerRound);
             emit?.({ type: 'plan', round, plan });

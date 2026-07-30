@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     parseReferencePrepPlan,
     extractFallbackGrepPatterns,
+    extractFallbackSearchPhrases,
     buildReferencePrepUserPrompt,
 } from './referencePrepPrompt';
 
@@ -108,5 +109,15 @@ describe('extractFallbackGrepPatterns', () => {
         const p = extractFallbackGrepPatterns('据「史记」记载，《李白传》颇详。');
         expect(p).toContain('史记');
         expect(p).toContain('李白传');
+    });
+});
+
+describe('extractFallbackSearchPhrases', () => {
+    it('extracts heading and CJK name-like runs', () => {
+        const text =
+            '## 张大千\n\n张大千（1899—1983年），原名权，改名爰，字季爰，号大千，斋名大风堂。生于四川省内江。';
+        const p = extractFallbackSearchPhrases(text);
+        expect(p.some((x) => x.includes('张大千') || x === '张大千')).toBe(true);
+        expect(p.length).toBeGreaterThan(0);
     });
 });

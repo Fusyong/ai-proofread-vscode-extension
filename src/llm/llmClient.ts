@@ -24,14 +24,18 @@ export async function llmGenerateJson(params: {
     systemPrompt: string;
     userPrompt: string;
     temperature?: number;
+    /** 未传时回退到 proofread.disableThinking */
+    disableThinking?: boolean;
     logTag?: string;
 }): Promise<string> {
     const tag = params.logTag ?? 'llmClient';
     const logger = Logger.getInstance();
     const config = vscode.workspace.getConfiguration('ai-proofread');
-    const { retryAttempts, retryDelay, disableThinking } = readProofreadLlmSettings();
+    const settings = readProofreadLlmSettings();
+    const { retryAttempts, retryDelay } = settings;
+    const disableThinking = params.disableThinking ?? settings.disableThinking;
     const timeout = secondsToMs(config.get<number>('proofread.timeout', 120), 120);
-    const temperature = params.temperature ?? readProofreadLlmSettings().temperature;
+    const temperature = params.temperature ?? settings.temperature;
 
     for (let attempt = 1; attempt <= retryAttempts; attempt++) {
         try {
@@ -41,6 +45,7 @@ export async function llmGenerateJson(params: {
                     systemPrompt: params.systemPrompt,
                     userPrompt: params.userPrompt,
                     temperature,
+                    disableThinking,
                     logTag: tag,
                 });
             }
@@ -103,10 +108,13 @@ export async function llmChat(
     system: string,
     user: string,
     temperature: number = 0.3,
-    logTag: string = 'llmClient'
+    logTag: string = 'llmClient',
+    disableThinking?: boolean
 ): Promise<string | null> {
     const config = vscode.workspace.getConfiguration('ai-proofread');
-    const { retryAttempts, retryDelay, disableThinking } = readProofreadLlmSettings();
+    const settings = readProofreadLlmSettings();
+    const { retryAttempts, retryDelay } = settings;
+    const effectiveDisableThinking = disableThinking ?? settings.disableThinking;
     const timeout = secondsToMs(config.get<number>('proofread.timeout', 50), 50);
     const logger = Logger.getInstance();
     const cm = ConfigManager.getInstance();
@@ -115,12 +123,14 @@ export async function llmChat(
         const apiKey = cm.getApiKey('google');
         if (!apiKey) return null;
         const ai = new GoogleGenAI({ apiKey });
+        const thinkingBudget = effectiveDisableThinking ? 0 : 1;
+        const googleThinking = { thinkingBudget } as any;
         const gReq = {
             model,
             config: {
                 systemInstruction: system,
                 temperature,
-                thinkingConfig: { thinkingBudget: 0 },
+                thinkingConfig: googleThinking,
             },
             contents: user,
         };
@@ -131,7 +141,7 @@ export async function llmChat(
                     config: {
                         systemInstruction: system,
                         temperature,
-                        thinkingConfig: { thinkingBudget: 0 },
+                        thinkingConfig: googleThinking,
                     },
                     contents: user,
                 });
@@ -196,13 +206,20 @@ export async function llmChat(
                     { role: 'system', content: system },
                     { role: 'user', content: user },
                 ],
-                temperature,
             };
-            if (platform === 'deepseek' && disableThinking) {
-                body.thinking = { type: 'disabled' };
-            }
-            if (platform === 'aliyun') {
-                body.enable_thinking = !disableThinking;
+            if (platform === 'deepseek') {
+                if (effectiveDisableThinking) {
+                    body.thinking = { type: 'disabled' };
+                    body.temperature = temperature;
+                } else {
+                    body.thinking = { type: 'enabled' };
+                    body.reasoning_effort = 'high';
+                }
+            } else if (platform === 'aliyun') {
+                body.enable_thinking = !effectiveDisableThinking;
+                body.temperature = temperature;
+            } else {
+                body.temperature = temperature;
             }
 
             bodyForLog = body;
@@ -297,18 +314,21 @@ async function callGoogle(params: {
     systemPrompt: string;
     userPrompt: string;
     temperature: number;
+    disableThinking: boolean;
     logTag: string;
 }): Promise<string> {
     const logger = Logger.getInstance();
     const apiKey = ConfigManager.getInstance().getApiKey('google');
     if (!apiKey) throw new Error('未配置 Google Gemini API 密钥');
     const ai = new GoogleGenAI({ apiKey });
+    const thinkingBudget = params.disableThinking ? 0 : 1;
+    const googleThinking = { thinkingBudget } as any;
     const reqSnap = {
         model: params.model,
         config: {
             systemInstruction: params.systemPrompt,
             temperature: params.temperature,
-            thinkingConfig: { thinkingBudget: 0 },
+            thinkingConfig: googleThinking,
         },
         contents: params.userPrompt,
     };
@@ -318,7 +338,7 @@ async function callGoogle(params: {
             config: {
                 systemInstruction: params.systemPrompt,
                 temperature: params.temperature,
-                thinkingConfig: { thinkingBudget: 0 },
+                thinkingConfig: googleThinking,
             },
             contents: params.userPrompt,
         });

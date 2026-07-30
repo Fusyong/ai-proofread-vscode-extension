@@ -309,7 +309,8 @@ flowchart LR
 | **proofread.timeout** | 单次 API 请求超时（**秒**），默认 90 |
 | **proofread.rpm** | 每分钟最大请求数；百炼 qwen-max 稳定版常为 600 |
 | **proofread.maxConcurrent** | 最大并发请求数，默认 10 |
-| **proofread.disableThinking** | 是否禁用模型“思考”（Gemini 2.5 等），校对建议开启 |
+| **proofread.disableThinking** | 校对管线默认禁用思考（快模式）；子管线可在「模型路由」中覆盖 |
+| **modelRoutes** | 各管线平台/模型/思考覆盖；`disableThinking` 可单独覆盖，侧栏会提示收益与负担 |
 | **convertQuotes** | 是否在校对后自动将半角引号转为中文全角 |
 | **defaultSplitLength** | 按长度切分时的默认目标字符数，默认 600 |
 | **defaultTitleLevels** | 按标题切分时的默认标题级别，如 [2] |

@@ -36,6 +36,7 @@ import {
     PINYIN_PROOFREAD_OUTPUT_FORMAT,
     PINYIN_ANNOTATION_OUTPUT_FORMAT,
 } from './pinyinPrompt';
+import { resolveProofreadModel } from './modelRoutes/modelRouteResolver';
 
 // 加载环境变量
 dotenv.config();
@@ -420,7 +421,7 @@ function appendItemOutputFormatIfNeeded(content: string, outputType?: string): s
 
 // 获取用户配置的提示词；优先使用调用方传入的 context，否则使用激活时持有的 context
 // sourceTextCharacteristics 仅在当前为内置全文/条目模板（系统默认、表述正常化、硬伤发现、对应关系核对等）时生效，自定义提示词忽略
-function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCharacteristics: string = ''): string {
+export function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCharacteristics: string = ''): string {
     const config = vscode.workspace.getConfiguration('ai-proofread');
     const prompts = config.get<Array<{ name: string; content: string; outputType?: string }>>('prompts', []);
     const logger = Logger.getInstance();
@@ -659,7 +660,7 @@ export class DeepseekApiClient implements ApiClient {
             messages,
         };
 
-        const disableThinking = config.get<boolean>('proofread.disableThinking', true);
+        const disableThinking = resolveProofreadModel().disableThinking;
         if (disableThinking) {
             requestBody.thinking = { type: 'disabled' as const };
         } else {
@@ -812,7 +813,7 @@ export class AliyunApiClient implements ApiClient {
 
         // 百炼 Qwen3 等混合式模型通过 enable_thinking 控制思考，见
         // https://www.alibabacloud.com/help/en/model-studio/deep-thinking
-        const disableThinking = config.get<boolean>('proofread.disableThinking', true);
+        const disableThinking = resolveProofreadModel().disableThinking;
         requestBody.enable_thinking = !disableThinking;
 
         if (finalTemperature !== undefined) {
@@ -928,7 +929,7 @@ export class GoogleApiClient implements ApiClient {
         }
 
         const finalTemperature = temperature || config.get<number>('proofread.temperature');
-        const disableThinking = config.get<boolean>('proofread.disableThinking', true);
+        const disableThinking = resolveProofreadModel().disableThinking;
 
         const configObj: any = {
             systemInstruction: getSystemPrompt(context, sourceTextCharacteristics),

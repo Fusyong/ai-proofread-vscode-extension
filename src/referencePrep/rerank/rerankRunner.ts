@@ -18,12 +18,14 @@ export async function runLlmRerank(params: {
     const candidates = params.hits.slice(0, cfg.maxCandidates);
     assignRefTags(candidates);
 
-    const { platform, model } = getReferencePrepRerankLlmConfig();
+    const { platform, model, disableThinking } = getReferencePrepRerankLlmConfig();
     const raw = await referencePrepLlmGenerateJson({
         platform,
         model,
         systemPrompt: buildRerankSystemPrompt(cfg.includeReason),
         userPrompt: buildRerankUserPrompt(params.target, candidates),
+        disableThinking,
+        logTag: 'referencePrepRerank',
     });
 
     const result = parseRerankResult(raw);

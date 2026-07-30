@@ -14,7 +14,7 @@ import { executeBm25Query } from './bm25Adapter';
 import { executeVectorQuery } from './vectorAdapter';
 import { executeWikipediaQuery } from './wikipediaAdapter';
 import { executeWebQuery, isWebSearchConfigured } from './webAdapter';
-import { extractFallbackGrepPatterns } from '../referencePrepPrompt';
+import { extractFallbackGrepPatterns, extractFallbackSearchPhrases } from '../referencePrepPrompt';
 import { fuseChannelHits } from './fusion';
 import { filterDictsByScope } from '../scope/resourceScope';
 import { resolveLocalDictConfigs } from '../../localDict/dictConfig';
@@ -170,17 +170,33 @@ export async function executeReferencePrepPlan(params: {
             }
         }
 
-        const grepBlock =
-            q.grep ??
-            (sources.includes('grep_md')
-                ? {
-                      patterns: extractFallbackGrepPatterns(params.target).slice(0, 2),
-                      contextLines: 2,
-                      unit: 'line_context' as const,
-                  }
-                : undefined);
+        const wantsCorpusSearch =
+            sources.includes('grep_md') || sources.includes('bm25') || sources.includes('vector');
 
-        if (grepBlock && grepBlock.patterns.length > 0) {
+        let grepBlock = q.grep;
+        if (!grepBlock && wantsCorpusSearch) {
+            const fromQuotes = extractFallbackGrepPatterns(params.target);
+            const fromDict = q.dict?.candidates?.map((c) => c.trim()).filter(Boolean) ?? [];
+            const phrases =
+                fromQuotes.length > 0
+                    ? fromQuotes
+                    : fromDict.length > 0
+                      ? fromDict
+                      : extractFallbackSearchPhrases(params.target);
+            if (phrases.length > 0) {
+                grepBlock = {
+                    patterns: phrases.slice(0, 4),
+                    searchPhrases: phrases.slice(0, 6),
+                    contextLines: 2,
+                    unit: 'sentence',
+                };
+            }
+        }
+
+        if (grepBlock && (grepBlock.patterns.length > 0 || (grepBlock.searchPhrases?.length ?? 0) > 0)) {
+            if (!grepBlock.patterns.length && grepBlock.searchPhrases?.length) {
+                grepBlock = { ...grepBlock, patterns: grepBlock.searchPhrases.slice(0, 4) };
+            }
             const grepKeyParts = {
                 intent: q.intent,
                 patterns: grepBlock.patterns,

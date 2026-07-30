@@ -10,6 +10,14 @@ import * as path from 'path';
 import { splitChineseSentencesWithLineNumbers } from '../splitter';
 import { normalizeForSimilarity, NormalizeForSimilarityOptions } from '../similarity';
 import { normalizeLineEndings } from '../utils';
+import { getJiebaWasm } from '../jiebaLoader';
+import {
+    buildTermFrequency,
+    scoreBm25,
+    tokenizeWithJieba,
+    type Bm25Document,
+} from './bm25Search';
+import { normalizeRelPath } from './pathNormalize';
 
 /** 文献句记录（与 SQLite 表对应） */
 export interface ReferenceSentence {
@@ -55,7 +63,6 @@ function rowFromObj(obj: Record<string, unknown>): RefSentenceRow {
 
 const DB_FILENAME = 'citation-refs.db';
 const TABLE_NAME = 'reference_sentences';
-const FTS_TABLE = 'reference_fts';
 const INDEXED_FILES_TABLE = 'indexed_files';
 const EXTENSIONS = ['.md', '.txt'];
 
@@ -158,7 +165,7 @@ function collectMdTxtFiles(refRoot: string, baseDir: string = refRoot): string[]
     const entries = fs.readdirSync(baseDir, { withFileTypes: true });
     for (const e of entries) {
         const full = path.join(baseDir, e.name);
-        const rel = path.relative(refRoot, full);
+        const rel = normalizeRelPath(path.relative(refRoot, full));
         if (e.isDirectory()) {
             result.push(...collectMdTxtFiles(refRoot, full));
         } else if (e.isFile()) {
@@ -244,6 +251,7 @@ export class ReferenceStore {
             )
         `);
         this.migrateAddLineNumbers();
+        this.migrateNormalizeRelPaths();
         this.db.run(`CREATE INDEX IF NOT EXISTS idx_len_norm ON ${TABLE_NAME}(len_norm)`);
         this.db.run(`
             CREATE TABLE IF NOT EXISTS ${INDEXED_FILES_TABLE} (
@@ -252,44 +260,7 @@ export class ReferenceStore {
                 size INTEGER NOT NULL
             )
         `);
-        this.ensureFtsTable();
         return this.db;
-    }
-
-    private ensureFtsTable(): void {
-        if (!this.db) return;
-        try {
-            this.db.run(`
-                CREATE VIRTUAL TABLE IF NOT EXISTS ${FTS_TABLE} USING fts5(
-                    content,
-                    file_path UNINDEXED,
-                    tokenize='unicode61'
-                )
-            `);
-        } catch {
-            /* FTS may already exist with different schema */
-        }
-    }
-
-    private rebuildFtsFromSentences(): void {
-        if (!this.db) return;
-        this.ensureFtsTable();
-        try {
-            this.db.run(`DELETE FROM ${FTS_TABLE}`);
-            const rows = this.db.exec(`SELECT id, content, file_path FROM ${TABLE_NAME}`);
-            if (!rows.length || !rows[0].values.length) return;
-            const cols = rows[0].columns;
-            for (const row of rows[0].values) {
-                const obj = cols.reduce((a, c, i) => ({ ...a, [c]: row[i] }), {} as Record<string, unknown>);
-                this.db.run(`INSERT INTO ${FTS_TABLE}(rowid, content, file_path) VALUES (?, ?, ?)`, [
-                    obj.id as number,
-                    obj.content as string,
-                    obj.file_path as string,
-                ]);
-            }
-        } catch {
-            /* FTS rebuild best-effort */
-        }
     }
 
     /** 兼容旧库：若缺少 start_line/end_line 列则添加 */
@@ -303,6 +274,33 @@ export class ReferenceStore {
         }
         if (!columns.includes('end_line')) {
             this.db.run(`ALTER TABLE ${TABLE_NAME} ADD COLUMN end_line INTEGER`);
+        }
+    }
+
+    /** 将历史 Windows 反斜杠路径统一为正斜杠，便于与 catalog scope 匹配 */
+    private migrateNormalizeRelPaths(): void {
+        if (!this.db) return;
+        try {
+            const tables = [TABLE_NAME, INDEXED_FILES_TABLE];
+            let changed = false;
+            for (const table of tables) {
+                const rows = this.db.exec(`SELECT file_path FROM ${table}`);
+                if (!rows.length || !rows[0].values.length) continue;
+                for (const row of rows[0].values) {
+                    const oldPath = String(row[0] ?? '');
+                    const newPath = normalizeRelPath(oldPath);
+                    if (newPath !== oldPath) {
+                        this.db.run(`UPDATE ${table} SET file_path = ? WHERE file_path = ?`, [
+                            newPath,
+                            oldPath,
+                        ]);
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) this.saveDb();
+        } catch {
+            /* best-effort */
         }
     }
 
@@ -324,7 +322,7 @@ export class ReferenceStore {
         const db = await this.ensureDb();
         const files = collectMdTxtFiles(refRoot);
         const opts = getCitationNormalizeOptions();
-        const currentRelPaths = new Set(files.map((f) => path.relative(refRoot, f)));
+        const currentRelPaths = new Set(files.map((f) => normalizeRelPath(path.relative(refRoot, f))));
 
         if (fullRebuild) {
             db.run(`DELETE FROM ${INDEXED_FILES_TABLE}`);
@@ -364,7 +362,7 @@ export class ReferenceStore {
         for (let f = 0; f < files.length; f++) {
             if (cancelToken?.isCancellationRequested) break;
             const filePath = files[f];
-            const relativePath = path.relative(refRoot, filePath);
+            const relativePath = normalizeRelPath(path.relative(refRoot, filePath));
             let stat: fs.Stats;
             try {
                 stat = fs.statSync(filePath);
@@ -407,7 +405,6 @@ export class ReferenceStore {
             filesIndexed++;
         }
 
-        this.rebuildFtsFromSentences();
         this.saveDb();
         return { fileCount: fullRebuild ? files.length : filesIndexed, sentenceCount };
     }
@@ -463,62 +460,95 @@ export class ReferenceStore {
     }
 
     /**
-     * BM25/FTS 检索（需先建立引文/检索索引）
+     * BM25 检索（jieba 分词 + 应用层打分；需先建立引文/检索索引）
      */
     async searchBm25(
         terms: string[],
         topK: number = 25,
         scopePaths?: string[]
     ): Promise<Bm25Hit[]> {
-        const db = await this.ensureDb();
-        const query = terms
-            .map((t) => t.trim())
-            .filter(Boolean)
-            .map((t) => `"${t.replace(/"/g, '')}"`)
-            .join(' OR ');
-        if (!query) return [];
+        const phrases = terms.map((t) => t.trim()).filter(Boolean);
+        if (!phrases.length) return [];
 
-        const escapedQuery = query.replace(/'/g, "''");
-        let sql = `
-            SELECT s.id, s.file_path, s.content, s.start_line, s.end_line, s.paragraph_idx, s.sentence_idx,
-                   bm25(${FTS_TABLE}) AS score
-            FROM ${FTS_TABLE} fts
-            JOIN ${TABLE_NAME} s ON s.id = fts.rowid
-            WHERE ${FTS_TABLE} MATCH '${escapedQuery}'
-        `;
+        const db = await this.ensureDb();
+        let sql = `SELECT id, file_path, content, start_line, end_line, paragraph_idx, sentence_idx FROM ${TABLE_NAME}`;
         if (scopePaths?.length) {
             const likes = scopePaths
-                .map((p) => {
-                    const like = (p.endsWith('%') ? p : `${p}%`).replace(/'/g, "''");
-                    return `s.file_path LIKE '${like}'`;
+                .flatMap((p) => {
+                    const fwd = normalizeRelPath(p);
+                    const bwd = fwd.replace(/\//g, '\\');
+                    const esc = (s: string) => (s.endsWith('%') ? s : `${s}%`).replace(/'/g, "''");
+                    const parts = [`file_path LIKE '${esc(fwd)}'`];
+                    if (bwd !== fwd) parts.push(`file_path LIKE '${esc(bwd)}'`);
+                    return parts;
                 })
                 .join(' OR ');
-            sql += ` AND (${likes})`;
+            sql += ` WHERE (${likes})`;
         }
-        sql += ` ORDER BY score LIMIT ${Math.max(1, topK)}`;
 
+        let result: { columns: string[]; values: unknown[][] }[];
         try {
-            const result = db.exec(sql);
-            if (!result.length || !result[0].values.length) return [];
-            const cols = result[0].columns;
-            const rows: Bm25Hit[] = [];
-            for (const row of result[0].values) {
-                const obj = cols.reduce((a, c, i) => ({ ...a, [c]: row[i] }), {} as Record<string, unknown>);
-                rows.push({
-                    id: obj.id as number,
-                    file_path: obj.file_path as string,
-                    content: obj.content as string,
-                    start_line: obj.start_line != null ? (obj.start_line as number) : undefined,
-                    end_line: obj.end_line != null ? (obj.end_line as number) : undefined,
-                    paragraph_idx: obj.paragraph_idx as number,
-                    sentence_idx: obj.sentence_idx as number,
-                    score: Math.abs(obj.score as number),
-                });
-            }
-            return rows;
+            result = db.exec(sql);
         } catch {
             return [];
         }
+        if (!result.length || !result[0].values.length) return [];
+
+        const distDir = path.join(this.context.extensionPath, 'dist');
+        const customDictPath = vscode.workspace
+            .getConfiguration('ai-proofread.jieba')
+            .get<string>('customDictPath', '');
+        let cut: (text: string, hmm?: boolean) => string[];
+        try {
+            const jieba = getJiebaWasm(distDir, customDictPath || undefined);
+            const cutMode = vscode.workspace
+                .getConfiguration('ai-proofread.jieba')
+                .get<'default' | 'search'>('cutMode', 'default');
+            cut =
+                cutMode === 'search' && typeof jieba.cut_for_search === 'function'
+                    ? (text, hmm) => jieba.cut_for_search(text, hmm)
+                    : (text, hmm) => jieba.cut(text, hmm);
+        } catch {
+            return [];
+        }
+
+        const cols = result[0].columns;
+        const byId = new Map<number, Record<string, unknown>>();
+        const docs: Bm25Document[] = [];
+        for (const row of result[0].values) {
+            const obj = cols.reduce((a, c, i) => ({ ...a, [c]: row[i] }), {} as Record<string, unknown>);
+            const id = obj.id as number;
+            const content = String(obj.content ?? '');
+            byId.set(id, obj);
+            const tokens = tokenizeWithJieba(content, cut);
+            docs.push({ id, tokens, tf: buildTermFrequency(tokens) });
+        }
+
+        const queryTokens: string[] = [];
+        for (const phrase of phrases) {
+            queryTokens.push(...tokenizeWithJieba(phrase, cut));
+            // 短语本身也作为查询项，便于专名整词命中
+            const whole = phrase.trim().toLowerCase();
+            if (whole.length >= 2) queryTokens.push(whole);
+        }
+
+        const ranked = scoreBm25(docs, queryTokens, { topK });
+        const hits: Bm25Hit[] = [];
+        for (const r of ranked) {
+            const obj = byId.get(r.id);
+            if (!obj) continue;
+            hits.push({
+                id: r.id,
+                file_path: obj.file_path as string,
+                content: obj.content as string,
+                start_line: obj.start_line != null ? (obj.start_line as number) : undefined,
+                end_line: obj.end_line != null ? (obj.end_line as number) : undefined,
+                paragraph_idx: obj.paragraph_idx as number,
+                sentence_idx: obj.sentence_idx as number,
+                score: r.score,
+            });
+        }
+        return hits;
     }
 
     /** 供向量索引构建：返回全部句子（上限可配置） */

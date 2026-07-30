@@ -10,6 +10,7 @@ import { getScopeConfig } from '../config';
 import { generateReferencePrepPlanJson } from '../referencePrepLlm';
 import { getReferencePrepScopeLlmConfig } from '../config';
 import type { ResourceScope } from '../schema';
+import { normalizeRelPath, relPathEqualsOrUnder } from '../../citation/pathNormalize';
 
 export interface ResolveResourceScopeParams {
     target: string;
@@ -47,7 +48,7 @@ async function llmFilterScope(params: {
     catalog: ReferenceCatalog;
     headings: HeadingEntry[];
 }): Promise<Partial<ResourceScope> & { filterReason?: string }> {
-    const { platform, model } = getReferencePrepScopeLlmConfig();
+    const { platform, model, disableThinking } = getReferencePrepScopeLlmConfig();
     const dictLines = params.dicts
         .map((d) => `- id=${d.id}; name=${d.name}; tags=[${(d.tags ?? []).slice(0, 4).join(', ')}]`)
         .join('\n');
@@ -72,7 +73,13 @@ async function llmFilterScope(params: {
         '</target>',
     ].join('\n');
 
-    const raw = await generateReferencePrepPlanJson({ platform, model, systemPrompt, userPrompt });
+    const raw = await generateReferencePrepPlanJson({
+        platform,
+        model,
+        systemPrompt,
+        userPrompt,
+        disableThinking,
+    });
     const start = raw.indexOf('{');
     const end = raw.lastIndexOf('}');
     if (start === -1 || end <= start) return {};
@@ -163,7 +170,8 @@ export function filterDictsByScope(dicts: ResolvedLocalDictConfigItem[], scope: 
 }
 
 export function isFileInScope(relPath: string, scope: ResourceScope): boolean {
-    if (scope.excludePaths.some((ex) => relPath.startsWith(ex))) return false;
+    const n = normalizeRelPath(relPath);
+    if (scope.excludePaths.some((ex) => relPathEqualsOrUnder(n, ex))) return false;
     if (scope.filePaths.length === 0) return true;
-    return scope.filePaths.some((p) => relPath === p || relPath.startsWith(p + '/'));
+    return scope.filePaths.some((p) => relPathEqualsOrUnder(n, p));
 }

@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../utils';
 import {
+    formatThinkingHintDetail,
     getDefaultInheritFrom,
+    getRouteMeta,
     inheritFromLabel,
     LLM_PLATFORMS,
     routeSupportsInheritFromChoice,
@@ -12,12 +14,15 @@ import {
 import type { ModelRoutesTreeDataProvider } from './modelRoutesView';
 import { setModelRoutesVisible, toggleModelRoutesVisible } from '../ui/sidebarViewVisibility';
 import {
+    formatThinkingCurrentLabel,
     getEffectiveInheritFrom,
+    hasRouteThinkingOverride,
     isRouteInherited,
     resolveModelRoute,
     resolveProofreadModel,
     setProofreadModel,
     setProofreadPlatform,
+    setRouteDisableThinking,
     setRouteOverride,
 } from './modelRouteResolver';
 
@@ -36,7 +41,11 @@ export class ModelRoutesCommandHandler {
         const routeId = item?.routeId;
         if (!routeId) return;
 
-        const actions: Array<{ label: string; id: string }> = [
+        const resolved = resolveModelRoute(routeId);
+        const thinkingCurrent = formatThinkingCurrentLabel(resolved);
+        const thinkingDetail = formatThinkingHintDetail(routeId, thinkingCurrent);
+
+        const actions: Array<{ label: string; id: string; description?: string; detail?: string }> = [
             { label: '$(server-environment) 选择平台', id: 'platform' },
             { label: '$(edit) 填写模型名称', id: 'model' },
         ];
@@ -53,11 +62,36 @@ export class ModelRoutesCommandHandler {
                 actions.push({ label: '$(git-merge) 选择跟随对象', id: 'inheritFrom' });
             }
         }
+
+        const thinkingOn = !resolved.disableThinking;
+        actions.push({
+            label: thinkingOn
+                ? '$(lightbulb) 关闭思考模式'
+                : '$(lightbulb) 开启思考模式',
+            id: 'toggleThinking',
+            description: thinkingCurrent,
+            detail:
+                thinkingDetail +
+                (routeId !== 'proofread'
+                    ? '｜仅覆盖本管线思考，平台/模型仍可跟随上级'
+                    : ''),
+        });
+        if (routeId !== 'proofread' && hasRouteThinkingOverride(routeId)) {
+            actions.push({
+                label: '$(discard) 恢复跟随上级思考',
+                id: 'clearThinking',
+                detail: thinkingDetail,
+            });
+        }
+
         actions.push({ label: '$(key) 打开 API 密钥设置', id: 'apikeys' });
 
         const picked = await vscode.window.showQuickPick(actions, {
-            title: '模型路由：' + routeId,
+            title: '模型路由：' + getRouteMeta(routeId).label,
+            placeHolder: thinkingDetail,
             ignoreFocusOut: true,
+            matchOnDescription: true,
+            matchOnDetail: true,
         });
         if (!picked) return;
 
@@ -74,11 +108,23 @@ export class ModelRoutesCommandHandler {
             case 'inheritFrom':
                 await this.pickInheritFrom(routeId);
                 break;
+            case 'toggleThinking':
+                await this.toggleThinking(routeId);
+                break;
+            case 'clearThinking':
+                await setRouteDisableThinking(routeId, undefined);
+                break;
             case 'apikeys':
                 await vscode.commands.executeCommand('workbench.action.openSettings', 'ai-proofread.apiKeys');
                 break;
         }
         this.treeProvider.refresh();
+    }
+
+    private async toggleThinking(routeId: ModelRouteId): Promise<void> {
+        const resolved = resolveModelRoute(routeId);
+        const nextDisable = !resolved.disableThinking;
+        await setRouteDisableThinking(routeId, nextDisable);
     }
 
     private async pickPlatform(routeId: ModelRouteId): Promise<void> {

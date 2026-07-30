@@ -42,7 +42,8 @@ export function buildReferencePrepSystemPrompt(params: {
         '规则：',
         '- 只为当前无法确定、查资料可能有明确收益的信息建 query；宁缺毋滥。',
         '- disabled 来源禁止为其生成 query。',
-        '- enabled 含 dict 时可为专名/术语填 dict；含 grep_md/bm25/vector 时可填文献检索。',
+        '- enabled 含 dict 时可为专名/术语填 dict；含 grep_md/bm25/vector 时必须填 grep 块（patterns/searchPhrases）做文献检索，勿只写 dict。',
+        '- 仅启用 bm25/vector/grep_md 时：专名、地名、斋号等写入 grep.patterns 与 searchPhrases。',
         '- enabled 含 wikipedia 时可为专名/史实/百科事实填 wikipedia 块（非 grep）。',
         '- enabled 含 web 时可为需外网核实的事实填 web 块。',
         '- 词条不要带书名号；patterns 宜短、可命中参考资料。',
@@ -285,6 +286,37 @@ export function extractFallbackGrepPatterns(target: string): string[] {
         push(m[1]);
     }
     return out.slice(0, 4);
+}
+
+/**
+ * 无书名号/引号时，从正文抽 2~4 字中文片段作 BM25/向量回退查询词。
+ */
+export function extractFallbackSearchPhrases(target: string): string[] {
+    const quoted = extractFallbackGrepPatterns(target);
+    if (quoted.length) return quoted;
+    const out: string[] = [];
+    const push = (s: string) => {
+        const t = s.trim();
+        if (t.length < 2 || t.length > 8 || out.includes(t)) return;
+        out.push(t);
+    };
+    // 标题行：## 张大千
+    const headingRe = /^#{1,6}\s*([\u4e00-\u9fff]{2,8})\s*$/gm;
+    let m: RegExpExecArray | null;
+    while ((m = headingRe.exec(target)) !== null) {
+        push(m[1]);
+    }
+    // 句首/专名常见：连续 2~4 个汉字（优先较短专名）
+    const cjkRe = /[\u4e00-\u9fff]{2,4}/g;
+    while ((m = cjkRe.exec(target)) !== null) {
+        push(m[0]);
+        if (out.length >= 8) break;
+    }
+    if (out.length === 0) {
+        const slice = target.replace(/\s+/g, '').slice(0, 40);
+        if (slice.length >= 2) out.push(slice);
+    }
+    return out.slice(0, 6);
 }
 
 export function buildNavigationHints(corpus: CorpusHit[]): string {

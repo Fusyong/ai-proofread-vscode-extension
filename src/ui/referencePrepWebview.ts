@@ -730,6 +730,13 @@ select, textarea {
   font-size: 12px;
 }
 .cmd-sep--between-groups { margin: 0 8px; opacity: 0.7; }
+.cmd-group-label {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  margin-right: 2px;
+  white-space: nowrap;
+  user-select: none;
+}
 </style>
 </head>
 <body>
@@ -783,29 +790,30 @@ select, textarea {
 <div class="panel-footer-commands">
   <p class="header-commands-hint">常用检索命令（作用于当前编辑器选区/文档；Ctrl+Shift+P 可查全部）</p>
   <div class="header-actions">
-    <button type="button" class="link-button" data-cmd="ai-proofread.llmGrepSearchReferences" title="LLM-Enhanced Grep Search">LLM检索参考资料库</button>
+    <span class="cmd-group-label">LLM检索精排：</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.dictPrep" title="仅本地词典（规划+精排）">查词典</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsGrep" title="仅参考资料 grep（规划+精排）">Grep</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="仅 BM25（规划+精排）">BM25</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsVector" title="仅轻量向量（规划+精排）">向量</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.wikipedia" title="仅维基百科（规划+精排）">查维基</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.web" title="仅 Web 搜索（规划+精排）">Web</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.dictPrep" title="Search with Local Dictionary">LLM查词典</button>
-    <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsGrep" title="Search References with Grep">LLM Grep</button>
-    <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="Search References with BM25">BM25</button>
-    <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsVector" title="Search References with Vector">向量</button>
-    <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.wikipedia" title="Search Wikipedia">维基</button>
-    <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.web" title="Search the Web">Web</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.llmGrepSearchReferences" title="用自然语言描述检索意图，LLM 规划后多源检索（默认词典+grep+BM25+向量）">用户指令LLM综合检索</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.queryLocalDictSelection" title="Look Up Selection in Local Dictionary">直接查词典</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.queryLocalDictSelection" title="Look Up Selection in Local Dictionary">查词典</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInPDF" title="search selection in PDF">PDF 搜索</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInPDF" title="search selection in PDF">从md反查PDF</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInShidianguji" title="search selection in Shidianguji">识典古籍</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInAncientbooks" title="search selection in Ancientbooks">中华经典古籍库</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInReferences" title="search selection in References">搜索参考资料库</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInReferences" title="search selection in References">VSCode搜索参考资料库</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.citation.verifySelection" title="Verify Selected Citation">核对选中引文</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
@@ -990,6 +998,9 @@ btnRun.onclick = () => {
     targetMode: targetModeEl.value
   });
 };
+document.querySelectorAll('.panel-footer-commands [data-action="panelRun"]').forEach((el) => {
+  el.addEventListener('click', () => btnRun.click());
+});
 btnCancel.onclick = () => vscode.postMessage({ command: 'cancel' });
 document.getElementById('btnReplay').onclick = () => vscode.postMessage({ command: 'replay' });
 document.getElementById('btnRefresh').onclick = () => vscode.postMessage({ command: 'refreshState' });

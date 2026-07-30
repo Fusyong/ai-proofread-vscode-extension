@@ -1,11 +1,16 @@
 import * as vscode from 'vscode';
 import {
+    formatThinkingHintDetail,
     inheritFromLabel,
     MODEL_ROUTE_METAS,
     MODEL_ROUTES_VIEW_ID,
     type ModelRouteId,
 } from './modelRouteRegistry';
-import { isRouteInherited, resolveModelRoute } from './modelRouteResolver';
+import {
+    formatThinkingCurrentLabel,
+    isRouteInherited,
+    resolveModelRoute,
+} from './modelRouteResolver';
 
 export interface ModelRouteTreeItem {
     routeId: ModelRouteId;
@@ -36,13 +41,27 @@ export class ModelRoutesTreeDataProvider implements vscode.TreeDataProvider<Mode
         const inherited = element.canInherit && isRouteInherited(element.routeId);
         const platformLabel = resolved.platform;
         const modelLabel = resolved.model;
+        const thinkingLabel = '思考' + formatThinkingCurrentLabel(resolved);
         const summary = inherited
-            ? '跟随' + inheritFromLabel(resolved.inheritedFrom ?? 'proofread') + ' · ' + platformLabel + ' / ' + modelLabel
-            : platformLabel + ' / ' + modelLabel;
+            ? '跟随' +
+              inheritFromLabel(resolved.inheritedFrom ?? 'proofread') +
+              ' · ' +
+              platformLabel +
+              ' / ' +
+              modelLabel +
+              ' · ' +
+              thinkingLabel
+            : platformLabel + ' / ' + modelLabel + ' · ' + thinkingLabel;
 
         const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
         item.description = summary;
-        item.tooltip = element.description + '\n' + summary + '\n\n点击配置平台与模型';
+        item.tooltip =
+            element.description +
+            '\n' +
+            summary +
+            '\n' +
+            formatThinkingHintDetail(element.routeId, formatThinkingCurrentLabel(resolved)) +
+            '\n\n点击配置平台、模型与思考模式';
         item.contextValue = element.canInherit ? 'modelRouteInheritable' : 'modelRouteProofread';
         item.command = {
             command: 'ai-proofread.modelRoutes.configure',
@@ -72,6 +91,7 @@ export function registerModelRoutesView(
             if (
                 e.affectsConfiguration('ai-proofread.proofread.platform') ||
                 e.affectsConfiguration('ai-proofread.proofread.models') ||
+                e.affectsConfiguration('ai-proofread.proofread.disableThinking') ||
                 e.affectsConfiguration('ai-proofread.modelRoutes')
             ) {
                 refresh();

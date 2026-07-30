@@ -68,23 +68,29 @@ export function getDefaultEnabledSources(): ReferenceSourceId[] {
     return out.length > 0 ? out : ['dict', 'grep_md'];
 }
 
-function requireModel(routeId: Parameters<typeof resolveModelRoute>[0]): { platform: string; model: string } {
-    const { platform, model } = resolveModelRoute(routeId);
+export interface ReferencePrepLlmConfig {
+    platform: string;
+    model: string;
+    disableThinking: boolean;
+}
+
+function requireModel(routeId: Parameters<typeof resolveModelRoute>[0]): ReferencePrepLlmConfig {
+    const { platform, model, disableThinking } = resolveModelRoute(routeId);
     if (!model) {
         throw new Error('未配置模型：ai-proofread.proofread.models.' + platform);
     }
-    return { platform, model };
+    return { platform, model, disableThinking };
 }
 
-export function getReferencePrepLlmConfig(): { platform: string; model: string } {
+export function getReferencePrepLlmConfig(): ReferencePrepLlmConfig {
     return requireModel('referencePrep');
 }
 
-export function getReferencePrepScopeLlmConfig(): { platform: string; model: string } {
+export function getReferencePrepScopeLlmConfig(): ReferencePrepLlmConfig {
     return requireModel('referencePrepScope');
 }
 
-export function getReferencePrepRerankLlmConfig(): { platform: string; model: string } {
+export function getReferencePrepRerankLlmConfig(): ReferencePrepLlmConfig {
     return requireModel('referencePrepRerank');
 }
 

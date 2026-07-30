@@ -109,9 +109,18 @@ export async function runMemoryPatchLlm(
     platform: string,
     model: string,
     user: string,
-    temperature: number = 0.25
+    temperature: number = 0.25,
+    disableThinking?: boolean
 ): Promise<MemoryPatchResponse | null> {
-    const raw = await editorialMemoryChat(platform, model, PATCH_SYSTEM, user, temperature);
+    const raw = await editorialMemoryChat(
+        platform,
+        model,
+        PATCH_SYSTEM,
+        user,
+        temperature,
+        'editorialMemory',
+        disableThinking
+    );
     if (!raw) {
         return null;
     }

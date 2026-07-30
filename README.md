@@ -211,24 +211,26 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 **模型路由**（默认隐藏；overview「模型路由」或命令 `open model routes view` 打开侧栏 `model routes`）：
 
-为不同 LLM 管线分别指定平台与模型名称。默认继承关系：
+为不同 LLM 管线分别指定平台、模型与**思考模式**。默认继承关系：
 
 | 管线（侧栏顺序） | 默认跟随 | 说明 |
 |------------------|----------|------|
-| 校对 | — | `proofread.platform` / `proofread.models.*` |
+| 校对 | — | `proofread.platform` / `proofread.models.*`；思考由 `proofread.disableThinking` 控制（默认关） |
 | 参考资料预筛 | 参考资料规划 | 大目录时筛选词典与文献（规划前，条件触发） |
 | 参考资料规划 | 校对 | 多轮生成检索计划 JSON |
 | 参考资料精排 | 参考资料规划 | 每轮检索后打分去重 |
 | 编辑记忆合并 | 校对 | 带记忆校对写回后整理 |
 
-精排与预筛可在配置中选择跟随「校对」或「参考资料规划」。点击树中某一项即可选择平台、填写模型或切换跟随对象。高级用户可编辑 `ai-proofread.modelRoutes`（支持 `inheritFrom`: `proofread` | `referencePrep`）。
+精排与预筛可在配置中选择跟随「校对」或「参考资料规划」。点击树中某一项即可选择平台、填写模型、切换跟随，或**单独开关思考模式**（可在跟随平台/模型的同时覆盖思考）。配置思考时侧栏与菜单会提示：当前生效、产品默认、开启的收益与负担。
+
+高级用户可编辑 `ai-proofread.modelRoutes`（支持 `inheritFrom`: `proofread` | `referencePrep`，以及 `disableThinking`）。示例：仅为规划开启思考：`{ "referencePrep": { "disableThinking": false } }`。
 
 **推荐模型组合**（DeepSeek 示例，可按平台替换）：
 
-- **校对**：`deepseek-v4-pro`（质量优先）
-- **参考资料规划**：`deepseek-v4-flash` 或 `qwen3-max`（多轮 JSON 规划，成本适中）
-- **预筛 / 精排**：跟随参考资料规划，或单独指定 flash 模型以进一步降本
-- **编辑记忆合并**：跟随校对，或单独指定较小模型（结构化 patch，对推理要求较低）
+- **校对**：`deepseek-v4-pro`（质量优先）；日常建议关闭思考
+- **参考资料规划**：`deepseek-v4-flash` 或 `qwen3-max`（多轮 JSON 规划，成本适中）；复杂书稿可单独开思考
+- **预筛 / 精排**：跟随参考资料规划，建议保持关思考
+- **编辑记忆合并**：跟随校对；需要时再开思考
 
 
 ### 3.2. 校对

@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { processJsonFileAsync, proofreadSelection } from '../proofreader';
+import { processJsonFileAsync, proofreadSelection, getSystemPrompt } from '../proofreader';
 import { showSelectionProofreadDiffWithApply } from '../differ';
 import { runEditorialMemoryAfterAccept } from '../editorialMemory/service';
 import { FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
@@ -25,6 +25,14 @@ import {
 } from '../proofreadSelectionWithMemoryConfig';
 import { WebviewManager, ProcessResult } from '../ui/webviewManager';
 import { ProgressTracker } from '../progressTracker';
+import {
+    addStats,
+    countRequestableItems,
+    formatCharTokenLine,
+    scaleStats,
+    statsFromText,
+    summarizeJsonBatchContentStats
+} from '../tokenEstimate';
 
 export class ProofreadCommandHandler {
     private webviewManager: WebviewManager;
@@ -85,6 +93,7 @@ export class ProofreadCommandHandler {
 
         const confirmResult = await this.showJsonBatchConfirmation({
             jsonFilePath,
+            jsonContent,
             totalCount: jsonContent.length,
             platform,
             model,
@@ -92,6 +101,7 @@ export class ProofreadCommandHandler {
             maxConcurrent,
             temperature,
             context,
+            sourceTextCharacteristics,
             sourceCharacteristicsInjectSummary: useSystemDefaultPrompt
                 ? sourceCharacteristicsDisplayTitle ??
                   summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)
@@ -776,6 +786,7 @@ export class ProofreadCommandHandler {
      */
     private async showJsonBatchConfirmation(params: {
         jsonFilePath: string;
+        jsonContent: unknown[];
         totalCount: number;
         platform: string;
         model: string;
@@ -783,11 +794,14 @@ export class ProofreadCommandHandler {
         maxConcurrent: number;
         temperature: number;
         context?: vscode.ExtensionContext;
+        /** 实际注入系统提示词的源文本特性正文（与批量请求一致） */
+        sourceTextCharacteristics?: string;
         /** 系统默认提示词时：已在上一环节选择的源文本特性注入摘要（如「无」、预设名） */
         sourceCharacteristicsInjectSummary?: string;
     }): Promise<boolean> {
         const {
             jsonFilePath,
+            jsonContent,
             totalCount,
             platform,
             model,
@@ -795,6 +809,7 @@ export class ProofreadCommandHandler {
             maxConcurrent,
             temperature,
             context,
+            sourceTextCharacteristics = '',
             sourceCharacteristicsInjectSummary
         } = params;
 
@@ -826,12 +841,18 @@ export class ProofreadCommandHandler {
             tokenWarning = '   ⚠️ 提示词重复模式：重复完整对话流程，会增加输入token';
         }
 
+        const contentStats = summarizeJsonBatchContentStats(jsonContent);
+        const promptOnce = statsFromText(getSystemPrompt(context, sourceTextCharacteristics));
+        const requestCount = countRequestableItems(jsonContent);
+        const promptBatch = scaleStats(promptOnce, requestCount);
+        const estimatedInputTotal = addStats(contentStats.total, promptBatch);
+
         // 构建确认信息
         const confirmationMessage = [
             '📋 JSON批量校对参数确认',
             '',
             `📁 文件路径: ${jsonFilePath}`,
-            `📊 总段落数: ${totalCount}`,
+            `📊 总段落数: ${totalCount}（将请求 ${requestCount} 条）`,
             '',
             '⚙️ 处理参数:',
             `   • 提示词: ${currentPromptName}`,
@@ -848,6 +869,15 @@ export class ProofreadCommandHandler {
             `   • 请求超时: ${timeout} 秒`,
             `   • 重试间隔: ${retryDelay} 秒`,
             `   • 重试次数: ${retryAttempts} 次`,
+            '',
+            '📏 内容体量（token 为粗估；不含提示词重复带来的加倍）:',
+            formatCharTokenLine('prompt（单次）', promptOnce),
+            formatCharTokenLine(`prompt×${requestCount}`, promptBatch),
+            formatCharTokenLine('target', contentStats.target),
+            formatCharTokenLine('reference', contentStats.reference),
+            formatCharTokenLine('context', contentStats.context),
+            formatCharTokenLine('内容合计', contentStats.total),
+            formatCharTokenLine('预估输入合计', estimatedInputTotal),
             '',
             '⚠️ 注意事项:',
             '   • 💰批处理中使用思考/推理模型极易出错并形成高计费！！！',

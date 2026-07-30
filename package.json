@@ -145,7 +145,7 @@
         "command": "ai-proofread.search.refsBm25",
         "title": "Search References with BM25 (LLM Plan)",
         "category": "AI Proofreader Search",
-        "description": "仅参考资料 BM25/FTS"
+        "description": "仅参考资料 BM25（jieba）"
       },
       {
         "command": "ai-proofread.search.refsVector",
@@ -167,9 +167,9 @@
       },
       {
         "command": "ai-proofread.llmGrepSearchReferences",
-        "title": "LLM-Enhanced Grep Search",
+        "title": "User-Directed LLM Combined Search",
         "category": "AI Proofreader Search",
-        "description": "用自然语言描述检索意图，LLM 规划后在本地词典中检索，在参考资料目录中grep，可以多轮次处理"
+        "description": "用户指令LLM综合检索：用自然语言描述检索意图，LLM 规划后默认词典+grep+BM25+向量多源检索"
       },
       {
         "command": "ai-proofread.referencePrep.openView",
@@ -575,7 +575,8 @@
           "order": 20,
           "type": "boolean",
           "default": true,
-          "description": "禁用思考模式：阿里云百炼（OpenAI 兼容）发送 `enable_thinking: false`；DeepSeek v4 发送 `thinking: disabled`；一般校对建议保持关闭。Google Gemini 2.5 用思考预算；在 Gemini 2.5 Pro 上无法完全停用思考"
+          "description": "校对管线默认禁用思考模式（快模式）。子管线可在侧栏「模型路由」中单独覆盖。阿里云百炼发送 enable_thinking；DeepSeek 发送 thinking enabled/disabled；Gemini 用 thinkingBudget。一般校对建议保持关闭。",
+          "markdownDescription": "校对管线默认禁用思考（快模式）。其他管线（参考资料规划/预筛/精排、编辑记忆）可在侧栏 **模型路由** 中单独开启或关闭，并会提示收益与负担。一般校对建议保持关闭。"
         },
         "ai-proofread.proofread.retryAttempts": {
           "order": 21,
@@ -1007,15 +1008,19 @@
           "order": 9.5,
           "type": "object",
           "default": {},
-          "description": "各功能 LLM 路由覆盖。键为 referencePrep | referencePrepScope | referencePrepRerank | editorialMemory。inherit 为 true 时跟随上级（见 inheritFrom）。",
-          "markdownDescription": "各功能 LLM 路由覆盖（侧栏顺序：预筛 → 规划 → 精排）。\n\n- **referencePrep**（参考资料规划）：默认跟随校对\n- **referencePrepScope**（预筛）、**referencePrepRerank**（精排）：默认跟随 **referencePrep**；`inheritFrom` 可选 `proofread` 或 `referencePrep`\n- **editorialMemory**：默认跟随校对\n\n示例：`{ \"referencePrepRerank\": { \"inherit\": true, \"inheritFrom\": \"referencePrep\" } }`",
+          "description": "各功能 LLM 路由覆盖。键为 referencePrep | referencePrepScope | referencePrepRerank | editorialMemory。可设 inherit、inheritFrom、platform、model、disableThinking。",
+          "markdownDescription": "各功能 LLM 路由覆盖（侧栏顺序：预筛 → 规划 → 精排）。\n\n- **referencePrep**（参考资料规划）：默认跟随校对\n- **referencePrepScope**（预筛）、**referencePrepRerank**（精排）：默认跟随 **referencePrep**；`inheritFrom` 可选 `proofread` 或 `referencePrep`\n- **editorialMemory**：默认跟随校对\n- **disableThinking**：可选；本管线是否禁用思考。可在跟随平台/模型的同时单独覆盖思考；未设置则跟随上级（最终落到 `proofread.disableThinking`，默认关思考）\n\n示例：`{ \"referencePrep\": { \"disableThinking\": false }, \"referencePrepRerank\": { \"inherit\": true, \"inheritFrom\": \"referencePrep\" } }`",
           "additionalProperties": {
             "type": "object",
             "properties": {
               "inherit": { "type": "boolean" },
               "inheritFrom": { "type": "string", "enum": ["proofread", "referencePrep"] },
               "platform": { "type": "string", "enum": ["aliyun", "deepseek", "google", "ollama"] },
-              "model": { "type": "string" }
+              "model": { "type": "string" },
+              "disableThinking": {
+                "type": "boolean",
+                "description": "本管线是否禁用思考。未设置则跟随上级 / 校对根开关。"
+              }
             }
           }
         },
