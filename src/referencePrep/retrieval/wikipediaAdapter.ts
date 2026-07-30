@@ -39,8 +39,10 @@ export async function executeWikipediaQuery(params: {
     const maxHits = preset.wikipediaMaxHitsPerRound;
 
     const client = getWikimediaClient();
+    // 以 runner 侧 requestsBudget 为准；先按剩余额度重置客户端预算，
+    // 避免上一条 JSON 条目用尽 limiter 后本条被 isBudgetExhausted 误拦。
     const budgetMax = params.requestsBudget.max - params.requestsBudget.used;
-    if (budgetMax <= 0 || client.isBudgetExhausted()) {
+    if (budgetMax <= 0) {
         return { hits: [], requestsUsed: 0 };
     }
     client.resetSessionBudget(budgetMax);

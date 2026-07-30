@@ -41,6 +41,7 @@ import {
 import { runLlmRerank } from './rerank/rerankRunner';
 import { recordRecentSession } from './continuation';
 import { getWikiCacheStats, resetWikiCacheStats } from './wikipedia/wikiCache';
+import { getWikimediaClient } from './wikipedia/wikimediaClient';
 import {
     getRetrievalCacheStats,
     resetRetrievalCacheStats,
@@ -205,6 +206,10 @@ export async function runReferencePrepForTarget(
         const wikiRequestsBudget = params.enabledSources.includes('wikipedia')
             ? { used: 0, max: getWikipediaBudgetForStrength(params.strength) }
             : undefined;
+        // 每条 target（含 JSON 批量中的每一项）独立会话预算；速率窗口仍由进程内单例限速器跨条目共享
+        if (wikiRequestsBudget) {
+            getWikimediaClient().resetSessionBudget(wikiRequestsBudget.max);
+        }
         resetWikiCacheStats();
         resetRetrievalCacheStats();
         let mergedReference = proc.mergedReference ?? '';
