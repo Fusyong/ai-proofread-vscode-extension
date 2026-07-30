@@ -383,8 +383,10 @@ export async function runReferencePrepForJsonFile(
         strength: ReferencePrepStrength;
         intents?: ReferencePrepIntent[];
         mergeMode?: 'overwrite' | 'append';
+        /** 跳过已有非空 reference 的条目（断点续跑） */
+        skipExistingReference?: boolean;
     } & ReferencePrepProgressHooks
-): Promise<{ processed: number; total: number }> {
+): Promise<{ processed: number; skipped: number; total: number; cancelled: boolean }> {
     const raw = fs.readFileSync(params.jsonFilePath, 'utf8');
     const items = JSON.parse(raw);
     if (!Array.isArray(items) || !items.every((x) => x && typeof x === 'object' && 'target' in x)) {
@@ -392,11 +394,29 @@ export async function runReferencePrepForJsonFile(
     }
 
     let processed = 0;
+    let skipped = 0;
+    let cancelled = false;
     for (let idx = 0; idx < items.length; idx++) {
-        if (params.token?.isCancellationRequested) break;
+        if (params.token?.isCancellationRequested) {
+            cancelled = true;
+            // 条目之间取消：目标内尚未发出 cancelled
+            params.onEvent?.({ type: 'cancelled' });
+            break;
+        }
         const item = items[idx];
         const target = String(item.target ?? '');
         if (!target.trim()) continue;
+
+        if (params.skipExistingReference && String(item.reference ?? '').trim()) {
+            skipped++;
+            params.onEvent?.({
+                type: 'phase',
+                name: 'json_item',
+                message: `跳过第 ${idx + 1}/${items.length} 条（已有资料）`,
+            });
+            params.onProgress?.(`跳过第 ${idx + 1}/${items.length} 条（已有资料）`);
+            continue;
+        }
 
         params.onEvent?.({
             type: 'phase',
@@ -430,8 +450,14 @@ export async function runReferencePrepForJsonFile(
         fs.writeFileSync(params.jsonFilePath, JSON.stringify(items, null, 2), 'utf8');
         processed++;
         params.onAfterJsonItem?.(idx);
+
+        if (params.token?.isCancellationRequested) {
+            // 轮间取消：runReferencePrepForTarget 已发 cancelled，此处不再重复
+            cancelled = true;
+            break;
+        }
     }
-    return { processed, total: items.length };
+    return { processed, skipped, total: items.length, cancelled };
 }
 
 export function getDefaultIntents(): ReferencePrepIntent[] {

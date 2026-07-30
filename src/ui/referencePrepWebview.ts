@@ -35,7 +35,7 @@ import { setReferenceHitVisible } from './sidebarViewVisibility';
 const PANEL_ID = 'ai-proofread.referencePrepConsole';
 const PANEL_TITLE = 'References search panel';
 /** 递增以在扩展更新后强制刷新已打开面板的 HTML（避免旧界面缺导出提示条）。 */
-const WEBVIEW_HTML_REVISION = 8;
+const WEBVIEW_HTML_REVISION = 9;
 
 export class ReferencePrepWebview {
     private panel: vscode.WebviewPanel | undefined;
@@ -412,6 +412,7 @@ export class ReferencePrepWebview {
         enabledSources?: ReferenceSourceId[];
         strength?: ReferencePrepStrength;
         targetMode?: 'selection' | 'json';
+        resume?: boolean;
         hitId?: string;
         hitIds?: string[];
         anchorPath?: string;
@@ -425,6 +426,9 @@ export class ReferencePrepWebview {
                 break;
             case 'cancel':
                 this.cancelSource?.cancel();
+                break;
+            case 'run':
+                await this.runPrep(msg);
                 break;
             case 'replay':
                 await this.replayFromAnchor(msg.anchorPath);
@@ -455,9 +459,6 @@ export class ReferencePrepWebview {
                 break;
             case 'mergeSelectedIntoJson':
                 await this.mergeSelectedIntoSourceJson(msg.hitIds);
-                break;
-            case 'run':
-                await this.runPrep(msg);
                 break;
             case 'runCommand':
                 await this.runQuickSearchCommand(msg.commandId);
@@ -533,6 +534,7 @@ export class ReferencePrepWebview {
         enabledSources?: ReferenceSourceId[];
         strength?: ReferencePrepStrength;
         targetMode?: 'selection' | 'json';
+        resume?: boolean;
     }): Promise<void> {
         const enabledSources = (msg.enabledSources ?? []).filter((s) => s !== 'web' || isWebSearchConfigured());
         if (!enabledSources.length) {
@@ -572,6 +574,8 @@ export class ReferencePrepWebview {
                         strength,
                         runProofread: false,
                         onEvent,
+                        token,
+                        skipExistingReference: !!msg.resume,
                     }
                 );
             } else {
@@ -682,6 +686,8 @@ select, textarea {
 .export-bar .mode-only { display: none; }
 .export-bar.mode-selection .for-selection { display: inline-block; }
 .export-bar.mode-json .for-json { display: inline-block; }
+.btn-json-only { display: none; }
+body.mode-json .btn-json-only { display: inline-block; }
 .status { color: var(--vscode-descriptionForeground); font-size: 0.9em; margin-left: 8px; }
 .export-done {
   margin: 8px 0;
@@ -765,6 +771,7 @@ select, textarea {
 </div>
 <div class="row">
   <button id="btnRun">开始准备</button>
+  <button class="secondary btn-json-only" id="btnResume" title="跳过已有 reference 的条目，只处理未完成项">继续未完成部分</button>
   <button class="secondary" id="btnCancel" disabled>取消</button>
   <button class="secondary" id="btnReplay">重放过程文件</button>
   <button class="secondary" id="btnRefresh">刷新状态</button>
@@ -839,6 +846,7 @@ const exportDoneEl = document.getElementById('exportDone');
 const selectedCountEl = document.getElementById('selectedCount');
 const runStatus = document.getElementById('runStatus');
 const btnRun = document.getElementById('btnRun');
+const btnResume = document.getElementById('btnResume');
 const btnCancel = document.getElementById('btnCancel');
 
 /** @type {Map<string, boolean>} */
@@ -872,6 +880,7 @@ function clearTimeline() {
 
 function setRunning(running) {
   btnRun.disabled = running;
+  if (btnResume) btnResume.disabled = running;
   btnCancel.disabled = !running;
   runStatus.textContent = running ? '运行中…' : '';
 }
@@ -879,6 +888,7 @@ function setRunning(running) {
 function updateExportBarMode() {
   const mode = targetModeEl.value === 'json' ? 'json' : 'selection';
   exportBar.className = 'export-bar mode-' + mode;
+  document.body.classList.toggle('mode-json', mode === 'json');
 }
 
 function updateSelectedCount() {
@@ -998,6 +1008,17 @@ btnRun.onclick = () => {
     targetMode: targetModeEl.value
   });
 };
+if (btnResume) {
+  btnResume.onclick = () => {
+    vscode.postMessage({
+      command: 'run',
+      enabledSources: getEnabledSources(),
+      strength: strengthEl.value,
+      targetMode: 'json',
+      resume: true
+    });
+  };
+}
 document.querySelectorAll('.panel-footer-commands [data-action="panelRun"]').forEach((el) => {
   el.addEventListener('click', () => btnRun.click());
 });
@@ -1052,7 +1073,7 @@ window.addEventListener('message', (ev) => {
     else if (e.type === 'query') appendTimeline('query', e.queryId + ' ' + JSON.stringify(e.detail));
     else if (e.type === 'hits') appendTimeline('hits', '本轮 +' + e.added + '（累计约 ' + e.total + '）');
     else if (e.type === 'error') appendTimeline('error', e.message);
-    else if (e.type === 'cancelled') appendTimeline('cancelled', '已取消');
+    else if (e.type === 'cancelled') appendTimeline('cancelled', '已取消（可点「继续未完成部分」接着跑）');
   } else if (msg.type === 'process') {
     // 新结果到来时按 defaultChecked 重置勾选
     checkedByHitId.clear();

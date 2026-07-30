@@ -491,6 +491,8 @@ export class ReferencePrepCommandHandler {
             enabledSources?: ReferenceSourceId[];
             strength?: ReferencePrepStrength;
             runProofread?: boolean;
+            token?: vscode.CancellationToken;
+            skipExistingReference?: boolean;
         }
     ): Promise<void> {
         let enabledSources = options?.enabledSources;
@@ -518,27 +520,60 @@ export class ReferencePrepCommandHandler {
             const stats = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
-                    title: '批量准备参考资料',
+                    title: options?.skipExistingReference
+                        ? '继续准备参考资料（跳过已有）'
+                        : '批量准备参考资料',
                     cancellable: true,
                 },
-                async (_p, token) =>
-                    runReferencePrepForJsonFile({
-                        jsonFilePath,
-                        context,
-                        enabledSources: enabledSources!,
-                        strength: strength!,
-                        onProgress: (m) => _p.report({ message: m }),
-                        onEvent: options?.onEvent,
-                        token,
-                        onAfterJsonItem: () => {},
-                        onProcessUpdated: (proc) => this.resultsProvider?.refresh(proc, jsonFilePath),
-                    })
-            );
-            vscode.window.showInformationMessage(
-                `参考资料准备完成：${stats.processed}/${stats.total} 条`
+                async (_p, progressToken) => {
+                    const linked = new vscode.CancellationTokenSource();
+                    const disposables = [
+                        progressToken.onCancellationRequested(() => linked.cancel()),
+                    ];
+                    if (options?.token) {
+                        if (options.token.isCancellationRequested) {
+                            linked.cancel();
+                        } else {
+                            disposables.push(
+                                options.token.onCancellationRequested(() => linked.cancel())
+                            );
+                        }
+                    }
+                    try {
+                        return await runReferencePrepForJsonFile({
+                            jsonFilePath,
+                            context,
+                            enabledSources: enabledSources!,
+                            strength: strength!,
+                            skipExistingReference: options?.skipExistingReference,
+                            onProgress: (m) => _p.report({ message: m }),
+                            onEvent: options?.onEvent,
+                            token: linked.token,
+                            onAfterJsonItem: () => {},
+                            onProcessUpdated: (proc) => this.resultsProvider?.refresh(proc, jsonFilePath),
+                        });
+                    } finally {
+                        for (const d of disposables) {
+                            d.dispose();
+                        }
+                        linked.dispose();
+                    }
+                }
             );
 
-            if (runProofread) {
+            const skipPart =
+                stats.skipped > 0 ? `，跳过 ${stats.skipped} 条` : '';
+            if (stats.cancelled) {
+                vscode.window.showInformationMessage(
+                    `参考资料准备已中断：完成 ${stats.processed}/${stats.total} 条${skipPart}。可点「继续未完成部分」接着跑。`
+                );
+            } else {
+                vscode.window.showInformationMessage(
+                    `参考资料准备完成：${stats.processed}/${stats.total} 条${skipPart}`
+                );
+            }
+
+            if (runProofread && !stats.cancelled) {
                 await this.runProofreadJson(jsonFilePath, context);
             }
         } catch (e) {
