@@ -105,7 +105,7 @@
 | 校稿、审稿、改错 | proofread selection / proofread file |
 | 出勘误表、审校记录 | diff it with another file → 逐句对齐 |
 | 核对引文、查出处 | verify selected citation（资料检索）/ verify citations（引文核查） |
-| 查词典、查参考文献 | 检索面板；Look Up Selection / Search References* |
+| 查词典、查参考资料 | 检索面板；Look Up Selection / Search References* |
 | 转 Word、转 Markdown | convert docx/markdown |
 | 查错别字、异形词 | check words |
 | 检查序号、标题层级 | check numbering hierarchy |

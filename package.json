@@ -139,19 +139,19 @@
         "command": "ai-proofread.search.refsGrep",
         "title": "Search References with Grep (LLM Plan)",
         "category": "AI Proofreader Search",
-        "description": "仅参考文献 grep"
+        "description": "仅参考资料 grep"
       },
       {
         "command": "ai-proofread.search.refsBm25",
         "title": "Search References with BM25 (LLM Plan)",
         "category": "AI Proofreader Search",
-        "description": "仅参考文献 BM25/FTS"
+        "description": "仅参考资料 BM25/FTS"
       },
       {
         "command": "ai-proofread.search.refsVector",
         "title": "Search References with Vector (LLM Plan)",
         "category": "AI Proofreader Search",
-        "description": "仅参考文献轻量向量"
+        "description": "仅参考资料轻量向量"
       },
       {
         "command": "ai-proofread.search.wikipedia",
@@ -169,7 +169,7 @@
         "command": "ai-proofread.llmGrepSearchReferences",
         "title": "LLM-Enhanced Grep Search",
         "category": "AI Proofreader Search",
-        "description": "用自然语言描述检索意图，LLM 规划后在本地词典中检索，在参考文献目录中grep，可以多轮次处理"
+        "description": "用自然语言描述检索意图，LLM 规划后在本地词典中检索，在参考资料目录中grep，可以多轮次处理"
       },
       {
         "command": "ai-proofread.referencePrep.openView",
@@ -796,7 +796,7 @@
           "default": 500,
           "minimum": 50,
           "maximum": 5000,
-          "description": "grep 扫描参考文献文件数上限。"
+          "description": "grep 扫描参考资料文件数上限。"
         },
         "ai-proofread.referencePrep.scope.dictCountThreshold": {
           "order": 37.8,
@@ -808,7 +808,7 @@
           "order": 37.81,
           "type": "number",
           "default": 100,
-          "description": "参考文献文件数超过此值时启用 LLM 目录预筛。"
+          "description": "参考资料文件数超过此值时启用 LLM 目录预筛。"
         },
         "ai-proofread.referencePrep.scope.dirDepthThreshold": {
           "order": 37.82,
@@ -1275,7 +1275,7 @@
           "order": 55,
           "type": "string",
           "default": "${workspaceFolder}/references",
-          "description": "引文核对：参考文献根路径，默认${workspaceFolder}/references，支持绝对路径"
+          "description": "引文核对：参考资料根路径，默认${workspaceFolder}/references，支持绝对路径"
         },
         "ai-proofread.citation.normalizeIgnorePunctuation": {
           "order": 56,

@@ -39,7 +39,7 @@ export const REFERENCE_SOURCE_OPTIONS: Array<{
     stub?: boolean;
 }> = [
     { id: 'dict', label: '本地词典', description: 'MDict 本地词典查词' },
-    { id: 'grep_md', label: '参考文献 grep', description: '在 references 目录 md/txt 中字面检索' },
+    { id: 'grep_md', label: '参考资料 grep', description: '在 references 目录 md/txt 中字面检索' },
     { id: 'bm25', label: 'BM25/FTS', description: '需先建立引文索引；语义关键词检索' },
     { id: 'vector', label: '轻量向量', description: '字符 n-gram 相似度；懒构建向量索引' },
     {
@@ -69,6 +69,7 @@ export interface ReferencePrepSessionParams {
     freshProcess?: boolean;
     continuation?: boolean;
     maxRoundsOverride?: number;
+    recordId?: string;
     onProcessUpdated?: (proc: ReferencePrepProcessFileV020) => void;
 }
 
@@ -96,6 +97,7 @@ export async function runReferencePrepSession(
         freshProcess: params.freshProcess ?? true,
         continuation: params.continuation,
         maxRoundsOverride: params.maxRoundsOverride,
+        recordId: params.recordId,
         onProgress: params.onProgress,
         onEvent: params.onEvent,
         token: params.token,

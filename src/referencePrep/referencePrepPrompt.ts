@@ -16,9 +16,9 @@ export function buildReferencePrepSystemPrompt(params: {
     const targetKind = params.targetKind ?? 'manuscript';
     const targetIntro =
         targetKind === 'search_intent'
-            ? '用户给出检索意图描述（说明希望在词典与参考文献中查找什么内容）、已检索到的 corpus 摘要，以及可用/禁用的资料来源。'
+            ? '用户给出检索意图描述（说明希望在词典与参考资料中查找什么内容）、已检索到的 corpus 摘要，以及可用/禁用的资料来源。'
             : targetKind === 'citation_selection'
-              ? '用户给出书稿中选中的一段引文（citation_selection），需在词典与参考文献中检索可佐证或相关的原文出处；另附 corpus 摘要与可用/禁用的资料来源。'
+              ? '用户给出书稿中选中的一段引文（citation_selection），需在词典与参考资料中检索可佐证或相关的原文出处；另附 corpus 摘要与可用/禁用的资料来源。'
               : '用户给出 target 文本、已检索到的 corpus 摘要，以及可用/禁用的资料来源。';
     return [
         '你是一位资深的文字编辑，负责为书稿核查准备参考资料。' + targetIntro,
@@ -45,7 +45,7 @@ export function buildReferencePrepSystemPrompt(params: {
         '- enabled 含 dict 时可为专名/术语填 dict；含 grep_md/bm25/vector 时可填文献检索。',
         '- enabled 含 wikipedia 时可为专名/史实/百科事实填 wikipedia 块（非 grep）。',
         '- enabled 含 web 时可为需外网核实的事实填 web 块。',
-        '- 词条不要带书名号；patterns 宜短、可命中参考文献。',
+        '- 词条不要带书名号；patterns 宜短、可命中参考资料。',
         params.continuation
             ? [
                   '',

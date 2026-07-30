@@ -61,6 +61,7 @@ export interface PrepForSelectionParams {
     freshProcess?: boolean;
     continuation?: boolean;
     maxRoundsOverride?: number;
+    recordId?: string;
     onProgress?: (msg: string) => void;
     onEvent?: PrepEventListener;
     token?: vscode.CancellationToken;
@@ -204,6 +205,7 @@ export class ReferencePrepCommandHandler {
             freshProcess: params.freshProcess ?? true,
             continuation: params.continuation,
             maxRoundsOverride: params.maxRoundsOverride,
+            recordId: params.recordId,
             onProgress: params.onProgress,
             onEvent: params.onEvent,
             token: params.token,
@@ -275,6 +277,7 @@ export class ReferencePrepCommandHandler {
                         freshProcess: cont.freshProcess,
                         continuation: cont.continuation,
                         maxRoundsOverride: cont.maxRoundsOverride,
+                        recordId: cont.recordId,
                         onProgress: (m) => _p.report({ message: m }),
                         onEvent: options?.onEvent,
                         token,

@@ -42,7 +42,7 @@ export async function runSingleSourceSearch(
 ): Promise<void> {
     if (options.sources.includes('web') && !isWebSearchConfigured()) {
         vscode.window.showWarningMessage(
-            'Web 搜索尚未配置适配器。请在设置中等待后续版本，或改用词典 / 参考文献 / 维基百科。'
+            'Web 搜索尚未配置适配器。请在设置中等待后续版本，或改用词典 / 参考资料 / 维基百科。'
         );
         return;
     }
@@ -87,6 +87,7 @@ export async function runSingleSourceSearch(
     let freshProcess = true;
     let continuation = false;
     let maxRoundsOverride: number | undefined;
+    let recordId: string | undefined;
 
     if (!options.skipContinuation) {
         const cont = await pickReferencePrepContinuation({
@@ -100,6 +101,7 @@ export async function runSingleSourceSearch(
         freshProcess = cont.freshProcess;
         continuation = cont.continuation;
         maxRoundsOverride = cont.maxRoundsOverride;
+        recordId = cont.recordId;
         if (cont.targetOverride) runTarget = cont.targetOverride;
     }
 
@@ -121,6 +123,7 @@ export async function runSingleSourceSearch(
                     freshProcess,
                     continuation,
                     maxRoundsOverride,
+                    recordId,
                     onProgress: (m) => progress.report({ message: m }),
                     onEvent: options.onEvent,
                     token,
@@ -167,7 +170,7 @@ export class SearchCommandHandler {
     ): Promise<void> {
         return runSingleSourceSearch(editor, context, this.resultsProvider, {
             sources: ['grep_md'],
-            title: '参考文献 grep 检索',
+            title: '参考资料 grep 检索',
             allowInputBox: true,
             targetKind: 'search_intent',
         });
@@ -179,7 +182,7 @@ export class SearchCommandHandler {
     ): Promise<void> {
         return runSingleSourceSearch(editor, context, this.resultsProvider, {
             sources: ['bm25'],
-            title: '参考文献 BM25 检索',
+            title: '参考资料 BM25 检索',
             allowInputBox: true,
             targetKind: 'search_intent',
         });
@@ -191,7 +194,7 @@ export class SearchCommandHandler {
     ): Promise<void> {
         return runSingleSourceSearch(editor, context, this.resultsProvider, {
             sources: ['vector'],
-            title: '参考文献向量检索',
+            title: '参考资料向量检索',
             allowInputBox: true,
             targetKind: 'search_intent',
         });

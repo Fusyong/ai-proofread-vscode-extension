@@ -35,7 +35,7 @@ import { setReferenceHitVisible } from './sidebarViewVisibility';
 const PANEL_ID = 'ai-proofread.referencePrepConsole';
 const PANEL_TITLE = 'References search panel';
 /** 递增以在扩展更新后强制刷新已打开面板的 HTML（避免旧界面缺导出提示条）。 */
-const WEBVIEW_HTML_REVISION = 6;
+const WEBVIEW_HTML_REVISION = 8;
 
 export class ReferencePrepWebview {
     private panel: vscode.WebviewPanel | undefined;
@@ -471,7 +471,6 @@ export class ReferencePrepWebview {
     private async runQuickSearchCommand(commandId?: string): Promise<void> {
         if (!commandId || typeof commandId !== 'string') return;
         const allowed = new Set([
-            'ai-proofread.prepareReferencesSelection',
             'ai-proofread.llmGrepSearchReferences',
             'ai-proofread.search.dictPrep',
             'ai-proofread.search.refsGrep',
@@ -784,13 +783,11 @@ select, textarea {
 <div class="panel-footer-commands">
   <p class="header-commands-hint">常用检索命令（作用于当前编辑器选区/文档；Ctrl+Shift+P 可查全部）</p>
   <div class="header-actions">
-    <button type="button" class="link-button" data-cmd="ai-proofread.prepareReferencesSelection" title="Prepare References for Selection">准备选段参考资料</button>
-    <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.llmGrepSearchReferences" title="LLM-Enhanced Grep Search">LLM 增强检索</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.llmGrepSearchReferences" title="LLM-Enhanced Grep Search">LLM检索参考资料库</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.dictPrep" title="Search with Local Dictionary">词典</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.dictPrep" title="Search with Local Dictionary">LLM查词典</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsGrep" title="Search References with Grep">Grep</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsGrep" title="Search References with Grep">LLM Grep</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="Search References with BM25">BM25</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
@@ -800,7 +797,7 @@ select, textarea {
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.search.web" title="Search the Web">Web</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.queryLocalDictSelection" title="Look Up Selection in Local Dictionary">按选文查词典</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.queryLocalDictSelection" title="Look Up Selection in Local Dictionary">直接查词典</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInPDF" title="search selection in PDF">PDF 搜索</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
@@ -808,7 +805,7 @@ select, textarea {
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInAncientbooks" title="search selection in Ancientbooks">中华经典古籍库</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInReferences" title="search selection in References">References 搜索</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInReferences" title="search selection in References">搜索参考资料库</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.citation.verifySelection" title="Verify Selected Citation">核对选中引文</button>
     <span class="cmd-sep" aria-hidden="true">|</span>

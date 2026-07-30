@@ -3,7 +3,9 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import {
     getReferencePrepProcessPath,
+    listProcessRecords,
     loadProcessFile,
+    loadProcessRecord,
 } from './processFile';
 import {
     summarizeSession,
@@ -35,19 +37,44 @@ export interface ContinuationPickResult {
     anchorPath: string;
     maxRoundsOverride?: number;
     targetOverride?: string;
+    recordId?: string;
+}
+
+function sessionHasWork(proc: ReferencePrepProcessFileV020): boolean {
+    return proc.corpus.length > 0 || proc.rounds.length > 0;
 }
 
 export function loadSessionAtAnchor(anchorPath: string): ReferencePrepSessionEntry | null {
     const proc = loadProcessFile(anchorPath);
-    if (!proc || (proc.corpus.length === 0 && proc.rounds.length === 0)) {
+    if (!proc || !sessionHasWork(proc)) {
         return null;
     }
     return summarizeSession(anchorPath, proc);
 }
 
+/** 同一文档内所有有内容的选区记录 */
+export function loadSessionsAtAnchor(anchorPath: string): ReferencePrepSessionEntry[] {
+    return listProcessRecords(anchorPath)
+        .filter(sessionHasWork)
+        .map((proc) => summarizeSession(anchorPath, proc));
+}
+
 export function loadRecentSessions(context: vscode.ExtensionContext): ReferencePrepSessionEntry[] {
     const raw = context.workspaceState.get<ReferencePrepSessionEntry[]>(KEY_RECENT_SESSIONS, []);
-    return raw.filter((e) => e.anchorPath && fs.existsSync(getReferencePrepProcessPath(e.anchorPath)));
+    return raw.filter((e) => {
+        if (!e.anchorPath || !fs.existsSync(getReferencePrepProcessPath(e.anchorPath))) return false;
+        if (e.recordId) {
+            return !!loadProcessRecord(e.anchorPath, e.recordId);
+        }
+        return true;
+    });
+}
+
+function sameSession(a: ReferencePrepSessionEntry, b: ReferencePrepSessionEntry): boolean {
+    if (path.normalize(a.anchorPath) !== path.normalize(b.anchorPath)) return false;
+    if (a.recordId && b.recordId) return a.recordId === b.recordId;
+    if (a.recordId || b.recordId) return false;
+    return targetsMatch(a.userInput ?? a.targetPreview, b.userInput ?? b.targetPreview ?? '');
 }
 
 export async function recordRecentSession(
@@ -56,7 +83,7 @@ export async function recordRecentSession(
     proc: ReferencePrepProcessFileV020
 ): Promise<void> {
     const entry = summarizeSession(anchorPath, proc);
-    const prev = loadRecentSessions(context).filter((e) => e.anchorPath !== anchorPath);
+    const prev = loadRecentSessions(context).filter((e) => !sameSession(e, entry));
     const next = [entry, ...prev].slice(0, MAX_RECENT);
     await context.workspaceState.update(KEY_RECENT_SESSIONS, next);
 }
@@ -74,8 +101,10 @@ function formatSessionDescription(entry: ReferencePrepSessionEntry): string {
 }
 
 type PickItem = vscode.QuickPickItem & {
-    kind: 'continue_current' | 'fresh_current' | 'continue_other';
+    kind: 'continue_record' | 'fresh_selection' | 'continue_other';
     anchorPath: string;
+    recordId?: string;
+    storedTarget?: string;
 };
 
 export async function confirmTargetMismatch(): Promise<boolean> {
@@ -99,12 +128,16 @@ export async function pickReferencePrepContinuation(params: {
     target: string;
     title?: string;
 }): Promise<ContinuationPickResult | undefined> {
-    const currentSession = loadSessionAtAnchor(params.anchorPath);
+    const localSessions = loadSessionsAtAnchor(params.anchorPath);
+    const matching = localSessions.find((e) =>
+        targetsMatch(e.userInput ?? e.targetPreview, params.target)
+    );
+    const otherLocal = localSessions.filter((e) => e !== matching);
     const recentOthers = loadRecentSessions(params.context).filter(
         (e) => path.normalize(e.anchorPath) !== path.normalize(params.anchorPath)
     );
 
-    if (!currentSession && recentOthers.length === 0) {
+    if (localSessions.length === 0 && recentOthers.length === 0) {
         return {
             freshProcess: true,
             continuation: false,
@@ -114,70 +147,79 @@ export async function pickReferencePrepContinuation(params: {
 
     const items: PickItem[] = [];
 
-    if (currentSession) {
+    if (matching) {
         items.push({
-            label: '$(history) 继续上次',
-            description: formatSessionDescription(currentSession),
-            detail: '在已有资料上追加 1 轮规划与检索',
-            kind: 'continue_current',
+            label: '$(history) 继续本选区',
+            description: formatSessionDescription(matching),
+            detail: '在本选区已有资料上追加 1 轮规划与检索',
+            kind: 'continue_record',
             anchorPath: params.anchorPath,
+            recordId: matching.recordId,
+            storedTarget: matching.userInput ?? matching.targetPreview,
         });
         items.push({
-            label: '$(add) 重新开始',
-            description: '清空 corpus，从头准备',
-            kind: 'fresh_current',
+            label: '$(add) 重新准备本选区',
+            description: '清空本选区 corpus，其它选区记录保留',
+            kind: 'fresh_selection',
+            anchorPath: params.anchorPath,
+            recordId: matching.recordId,
+        });
+    } else {
+        items.push({
+            label: '$(add) 为当前选区新建记录',
+            description: '与同文档其它选区的检索记录相互独立',
+            kind: 'fresh_selection',
             anchorPath: params.anchorPath,
         });
     }
 
-    for (const entry of recentOthers.slice(0, 8)) {
+    for (const entry of otherLocal.slice(0, 6)) {
+        items.push({
+            label: `$(file) 继续同文档选区`,
+            description: formatSessionDescription(entry),
+            detail: (entry.targetPreview ?? '').replace(/\s+/g, ' ').trim().slice(0, 80),
+            kind: 'continue_record',
+            anchorPath: params.anchorPath,
+            recordId: entry.recordId,
+            storedTarget: entry.userInput ?? entry.targetPreview,
+        });
+    }
+
+    for (const entry of recentOthers.slice(0, 6)) {
         items.push({
             label: `$(folder) ${formatSessionLabel(entry)}`,
             description: formatSessionDescription(entry),
             detail: entry.anchorPath,
             kind: 'continue_other',
             anchorPath: entry.anchorPath,
+            recordId: entry.recordId,
+            storedTarget: entry.userInput ?? entry.targetPreview,
         });
-    }
-
-    if (!currentSession) {
-        items.unshift({
-            label: '$(add) 全新开始（当前文档）',
-            description: '不沿用最近工作，为当前锚点新建过程',
-            kind: 'fresh_current',
-            anchorPath: params.anchorPath,
-        });
-    }
-
-    if (items.length === 0) {
-        return {
-            freshProcess: true,
-            continuation: false,
-            anchorPath: params.anchorPath,
-        };
     }
 
     const picked = await vscode.window.showQuickPick(items, {
         title: params.title ?? '参考资料准备',
-        placeHolder: currentSession
-            ? '可继续上次工作，或重新开始'
-            : '选择要继续的最近工作，或取消后将对当前文档全新开始',
+        placeHolder: matching
+            ? '可继续本选区，或新建/切换其它选区记录'
+            : '当前选区尚无记录；可新建，或继续同文档其它选区',
         ignoreFocusOut: true,
     });
     if (!picked) return undefined;
 
-    if (picked.kind === 'fresh_current') {
+    if (picked.kind === 'fresh_selection') {
         return {
             freshProcess: true,
             continuation: false,
             anchorPath: params.anchorPath,
+            recordId: matching && picked.recordId === matching.recordId ? picked.recordId : undefined,
         };
     }
 
-    const continueAnchor = picked.anchorPath;
-    const proc = loadProcessFile(continueAnchor);
-    const storedTarget = proc?.userInput ?? proc?.targetPreview;
-    const useStoredTarget = picked.kind === 'continue_other' && storedTarget?.trim();
+    const storedTarget = picked.storedTarget;
+    const useStoredTarget = !!storedTarget?.trim() && (
+        picked.kind === 'continue_other' ||
+        picked.kind === 'continue_record' && !targetsMatch(storedTarget, params.target)
+    );
 
     if (!useStoredTarget && !targetsMatch(storedTarget, params.target)) {
         const ok = await confirmTargetMismatch();
@@ -187,13 +229,17 @@ export async function pickReferencePrepContinuation(params: {
     return {
         freshProcess: false,
         continuation: true,
-        anchorPath: continueAnchor,
+        anchorPath: picked.anchorPath,
+        recordId: picked.recordId,
         maxRoundsOverride: 1,
         targetOverride: useStoredTarget ? storedTarget : undefined,
     };
 }
 
-type ExistingRefPickItem = vscode.QuickPickItem & { anchorPath: string };
+type ExistingRefPickItem = vscode.QuickPickItem & {
+    anchorPath: string;
+    recordId?: string;
+};
 
 /** 选用已有过程文件中的 mergedReference 做校对（不重新检索） */
 export async function pickExistingReferenceForProofread(params: {
@@ -203,30 +249,37 @@ export async function pickExistingReferenceForProofread(params: {
 }): Promise<ExistingReferencePickResult | undefined> {
     const items: ExistingRefPickItem[] = [];
     const normCurrent = path.normalize(params.anchorPath);
+    const seen = new Set<string>();
 
-    const currentProc = loadProcessFile(params.anchorPath);
-    if (currentProc) {
-        const ref = getMergedReferenceFromProcess(currentProc);
-        const active = currentProc.corpus.filter((h) => h.status === 'active').length;
-        if (ref.trim() && active > 0) {
-            const session = summarizeSession(params.anchorPath, currentProc);
-            items.push({
-                label: '$(file) 当前文档',
-                description: formatSessionDescription(session),
-                detail: params.anchorPath,
-                anchorPath: params.anchorPath,
-            });
-        }
+    const pushProc = (anchor: string, proc: ReferencePrepProcessFileV020, label: string) => {
+        const ref = getMergedReferenceFromProcess(proc);
+        const active = proc.corpus.filter((h) => h.status === 'active').length;
+        if (!ref.trim() || active <= 0 || !proc.id) return;
+        const key = `${path.normalize(anchor)}::${proc.id}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const session = summarizeSession(anchor, proc);
+        items.push({
+            label,
+            description: formatSessionDescription(session),
+            detail: (session.targetPreview ?? '').replace(/\s+/g, ' ').trim().slice(0, 100) || anchor,
+            anchorPath: anchor,
+            recordId: proc.id,
+        });
+    };
+
+    for (const proc of listProcessRecords(params.anchorPath)) {
+        pushProc(params.anchorPath, proc, '$(file) 当前文档选区');
     }
 
     for (const entry of loadRecentSessions(params.context)) {
         if (path.normalize(entry.anchorPath) === normCurrent || entry.activeHits <= 0) continue;
-        items.push({
-            label: `$(folder) ${formatSessionLabel(entry)}`,
-            description: formatSessionDescription(entry),
-            detail: entry.anchorPath,
-            anchorPath: entry.anchorPath,
-        });
+        const proc = entry.recordId
+            ? loadProcessRecord(entry.anchorPath, entry.recordId)
+            : loadProcessFile(entry.anchorPath);
+        if (proc) {
+            pushProc(entry.anchorPath, proc, `$(folder) ${formatSessionLabel(entry)}`);
+        }
     }
 
     if (items.length === 0) {
@@ -242,13 +295,15 @@ export async function pickExistingReferenceForProofread(params: {
     } else {
         picked = await vscode.window.showQuickPick(items, {
             title: '用已有参考资料验证',
-            placeHolder: '选择要使用的参考资料会话',
+            placeHolder: '选择要使用的参考资料会话（同文档可有多条选区记录）',
             ignoreFocusOut: true,
         });
     }
     if (!picked) return undefined;
 
-    const proc = loadProcessFile(picked.anchorPath);
+    const proc = picked.recordId
+        ? loadProcessRecord(picked.anchorPath, picked.recordId)
+        : loadProcessFile(picked.anchorPath);
     if (!proc) {
         vscode.window.showErrorMessage('过程文件已不存在或无法读取。');
         return undefined;

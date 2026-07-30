@@ -12,7 +12,7 @@ export type GrepSearchRunParams = Omit<ReferencePrepSessionParams, 'targetKind' 
 export type GrepSearchRunResult = ReferencePrepSessionResult;
 
 /**
- * LLM 增强参考文献检索：共用 referencePrep 全流程，规划提示词为 search_intent。
+ * LLM 增强参考资料检索：共用 referencePrep 全流程，规划提示词为 search_intent。
  */
 export async function runLlmGrepSearch(params: GrepSearchRunParams): Promise<GrepSearchRunResult> {
     return runReferencePrepSession({

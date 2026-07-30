@@ -321,7 +321,7 @@ const KNOWLEDGE_VERIFY_SYSTEM_PROMPT_TEMPLATE = `
 
 你是经验丰富的图书编辑与事实核查编辑。
 
-用户已在阶段 A 为你准备了 **参考资料（reference）**（可能含本地词典摘录、参考文献 grep 片段、维基百科/Wikidata 摘录等）。你的任务是：对照 reference、上下文（context）与目标文本（target），**核查**字词、专名、史实与表述是否成立；**不得编造** reference 与正文中均未出现的事实、出处或细节。
+用户已在阶段 A 为你准备了 **参考资料（reference）**（可能含本地词典摘录、参考资料 grep 片段、维基百科/Wikidata 摘录等）。你的任务是：对照 reference、上下文（context）与目标文本（target），**核查**字词、专名、史实与表述是否成立；**不得编造** reference 与正文中均未出现的事实、出处或细节。
 
 **参考资料可信度（须自觉权衡，勿一视同仁）：**
 

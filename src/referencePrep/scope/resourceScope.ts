@@ -54,7 +54,7 @@ async function llmFilterScope(params: {
     const systemPrompt = [
         '你是参考资料检索的资源范围筛选助手。',
         '只输出 JSON：{"dictIds":string[],"filePaths":string[],"excludePaths":string[],"headingPathsByFile":{file:string[]},"reason":string}',
-        '从给定词典与参考文献目录中，选出与 target 最可能相关的子集；宁多勿漏关键资源。',
+        '从给定词典与参考资料目录中，选出与 target 最可能相关的子集；宁多勿漏关键资源。',
         'filePaths 使用相对路径；excludePaths 为明确无关路径前缀。',
     ].join('\n');
     const userPrompt = [

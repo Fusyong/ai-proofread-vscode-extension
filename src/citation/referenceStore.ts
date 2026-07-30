@@ -1,5 +1,5 @@
 /**
- * 参考文献存储：扫描、分句、归一化、SQLite 索引
+ * 参考资料存储：扫描、分句、归一化、SQLite 索引
  * 计划见 docs/citation-verification-plan.md 阶段 1
  * 换行符：读入文件后统一用 normalizeLineEndings 再分句。
  */
@@ -137,7 +137,7 @@ function getSqlJs(distDir: string): Promise<SqlJsStatic> {
 }
 
 /**
- * 解析参考文献根路径（支持 ${workspaceFolder}）
+ * 解析参考资料根路径（支持 ${workspaceFolder}）
  */
 export function resolveReferencesPath(configPath: string): string {
     if (!configPath || !configPath.trim()) return '';
@@ -211,7 +211,7 @@ export class ReferenceStore {
     private async ensureDb(): Promise<SqlJsDatabase> {
         const wantPath = this.getDbPath();
         if (!wantPath) {
-            throw new Error('请先配置「引文核对：参考文献根路径」并执行「重建引文索引」。');
+            throw new Error('请先配置「引文核对：参考资料根路径」并执行「重建引文索引」。');
         }
         if (this.db && this.dbPath !== wantPath) {
             this.db.close();
@@ -318,7 +318,7 @@ export class ReferenceStore {
         const refPathRaw = config.get<string>('referencesPath', '');
         const refRoot = resolveReferencesPath(refPathRaw);
         if (!refRoot || !fs.existsSync(refRoot)) {
-            throw new Error(`参考文献路径无效或不存在: ${refPathRaw}`);
+            throw new Error(`参考资料路径无效或不存在: ${refPathRaw}`);
         }
 
         const db = await this.ensureDb();
@@ -537,7 +537,7 @@ export class ReferenceStore {
         return rows;
     }
 
-    /** 获取参考文献根路径（已解析） */
+    /** 获取参考资料根路径（已解析） */
     getReferencesRoot(): string {
         const config = vscode.workspace.getConfiguration('ai-proofread.citation');
         return resolveReferencesPath(config.get<string>('referencesPath', ''));

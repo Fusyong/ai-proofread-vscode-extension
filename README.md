@@ -121,7 +121,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 本扩展每次调用大语言模型时能提交三种文本：**要处理的目标文本（target，必须）、参考资料（reference，可选）、上下文（context，可选）**。比如以一篇文章中的一部分作为target，那么整篇就可以作为context，而在处理中有参考价值的资料，如相关词条，就可以作为reference。
 
-假设你校对一本书，切分后得到包含300个target的JSON文件。那么可以准备相同数量、一一对应的上下文和参考文献，切分成包含相同数量target的JSON文件。然后使用合并命令，将上下文文本中的target作为context合并，将参考文本中的target作为reference合并。
+假设你校对一本书，切分后得到包含300个target的JSON文件。那么可以准备相同数量、一一对应的上下文和参考资料，切分成包含相同数量target的JSON文件。然后使用合并命令，将上下文文本中的target作为context合并，将参考文本中的target作为reference合并。
 
 也可以选择**任意 Markdown 文件**作为来源，让每个 JSON 项都合并一次该文件（常用于统一下发同一段体裁说明、用词规范等参考全文）。
 
@@ -135,7 +135,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 组织校对语境是一个看起来有些麻烦，但非常有效的工作。比如校对练习册，有必要把练习和答案拼成语境（拼在一个target中更能节省费用）。而对一首古诗的解释如果不可靠，可以用一篇可靠的作为reference。包含人物的内容，则可以用词典中的任务条目作为reference。
 
-命令`prepare references for JSON file`，或校对面板「准备参考资料」按钮，可通过本地词典、参考文献等为 JSON 片段准备参考文本。选段检索与勾选导出请用 **检索面板**（见下）。
+命令`prepare references for JSON file`，或校对面板「准备参考资料」按钮，可通过本地词典、参考资料等为 JSON 片段准备参考文本。选段检索与勾选导出请用 **检索面板**（见下）。
 
 #### 3.1.5 检索面板与统一参考资料准备
 
@@ -277,7 +277,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ####  3.2.4. 对文档选段进行知识核查（实验功能）
 
-命令： `knowledge verify selection (prepare references and proofread)`。流程基于“带记忆地校对选段”，先运行 referencePrep（参考资料准备）工作流，从本地词典、本地参考文献库检索文中相关知识；可选勾选 **维基百科（API）** 作百科事实参考，然后使用提示词「知识核查（full）」进行校对；可以选择是否使用编辑记忆。 **会消耗比一般校对多得多的 token！**
+命令： `knowledge verify selection (prepare references and proofread)`。流程基于“带记忆地校对选段”，先运行 referencePrep（参考资料准备）工作流，从本地词典、本地参考资料库检索文中相关知识；可选勾选 **维基百科（API）** 作百科事实参考，然后使用提示词「知识核查（full）」进行校对；可以选择是否使用编辑记忆。 **会消耗比一般校对多得多的 token！**
 
 如果要对JSON进行批处理，可以先通过命令`prepare references for JSON file`，或“准备参考资料”按钮，JSON中的所有文本片段准备好参考文本，然后使用提示词“知识核查（full）”进行校对。
 
@@ -416,7 +416,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 3. **段落整理**：前面说到`format paragraphs`命令，可以在段末加空行，即整理成符合Markdown格式的段落；还可以删除符合Markdown格式但不符合一般习惯的段内分行。基于文档行长众数来计算，因而适合整体较长，并且以长段落为主的文档；短小、段落零碎时准确率会比较低。
 4. **搜索选中文本**（优先在 **检索面板** 底部快捷栏）
     * **从md反查PDF**：`Search Selection In PDF`（需 [SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)；建议 `ReuseInstance = true`）
-    * **在参考文献库中搜索**：`search selection in References`
+    * **在参考资料库中搜索**：`search selection in References`
     * **连线搜索[中华经典古籍库](https://jingdian.ancientbooks.cn)**：`search selection in Ancientbooks (jingdian)`
     * **连线搜索[识典古籍](https://www.shidianguji.com/)**：`search selection in Shidianguji`
     * **按选文作词条查本地词典**：精确整词查 MDX；查段落、多词请用检索面板「开始准备」或 `knowledge verify selection`
@@ -546,7 +546,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 ### v1.11.0
 
-- 特性：增加知识核查智能体工作流，复用了原来的词典查询功能，增加本地参考文献库grep（暂时没有集成互联网查询服务）
+- 特性：增加知识核查智能体工作流，复用了原来的词典查询功能，增加本地参考资料库grep（暂时没有集成互联网查询服务）
 - 特性：增加模型配置treeview；优化treeview UI
 - 特性：集成pdftotext.exe，Windows用户不需要额外安装
 

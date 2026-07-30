@@ -22,7 +22,7 @@
 | `Open Reference Search Panel` | Webview：配置多源、执行、展示规划过程与命中 | — | — |
 | `open reference prep results` | 打开 TreeView | — | — |
 
-**正式资料来源**：本地词典、本地参考文献（grep / BM25 / 向量）、维基百科、Web（适配器待配置）。  
+**正式资料来源**：本地词典、本地参考资料（grep / BM25 / 向量）、维基百科、Web（适配器待配置）。  
 **便捷工具（不进入 corpus）**：同名 PDF 搜索、识典古籍、中华经典古籍库。
 
 **全文引文核对**（`verify citations`）仍走引文索引 + 相似度匹配 + **Citation** 树，与上表不同。
@@ -35,7 +35,7 @@
 
 - `{basename}.referenceprep.json` — **v0.2.0**：轮次、结构化 `corpus`、`resourceScope`、`indexVersions`
 - `{basename}.referenceprep.log` — 运行日志
-- `{workspace}/.proofread/reference-catalog.json` — 参考文献目录缓存
+- `{workspace}/.proofread/reference-catalog.json` — 参考资料目录缓存
 - `{workspace}/.proofread/reference-vectors.json` — 轻量向量索引（字符 n-gram）
 - `{workspace}/.proofread/wiki-cache.json` — 维基百科/Wikidata 响应缓存（启用 wikipedia 来源时）
 - `{workspace}/.proofread/retrieval-cache.json` — **项目级检索命中缓存**（dict/grep/bm25/vector/wikipedia 等通道查询结果；默认开启，TTL 可配）

@@ -850,7 +850,7 @@ export class WebviewManager {
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('showSplitDiff')">比较前后差异</button>
                     <button class="action-button" onclick="handleAction('mergeContext')">合并 JSON</button>
-                    <button class="action-button" onclick="handleAction('referencePrepJson')" title="多轮检索词典与参考文献，写入 reference">准备参考资料</button>
+                    <button class="action-button" onclick="handleAction('referencePrepJson')" title="多轮检索词典与参考资料，写入 reference">准备参考资料</button>
                     <button class="action-button" onclick="handleAction('proofreadJson')">LLM 校对 JSON</button>
                 </div>
             </div>

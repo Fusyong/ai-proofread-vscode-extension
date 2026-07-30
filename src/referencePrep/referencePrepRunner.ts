@@ -78,6 +78,8 @@ export interface ReferencePrepRunParams {
     continuation?: boolean;
     /** 续跑时覆盖 maxRounds（默认 1） */
     maxRoundsOverride?: number;
+    /** 指定过程文件中的选区记录（优先于按文本匹配） */
+    recordId?: string;
 }
 
 function resolvePlanSystemPrompt(
@@ -153,7 +155,11 @@ export async function runReferencePrepForTarget(
             sourceJsonPath: params.sourceJsonPath,
             targetPreview: params.target.slice(0, 200),
             userInput: params.target,
+            recordId: params.recordId,
         });
+        // 始终与本次目标对齐（避免旧 targetPreview 残留）
+        proc.targetPreview = params.target.slice(0, 200);
+        proc.userInput = params.target;
         if (params.freshProcess) {
             proc.corpus = [];
             proc.rounds = [];

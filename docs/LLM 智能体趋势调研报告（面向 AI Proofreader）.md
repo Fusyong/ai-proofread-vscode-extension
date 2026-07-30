@@ -104,7 +104,7 @@ Integrations (Obsidian / Hindsight Memory / Calendar / Chrome)
 
 ### 与本项目的天然对应
 
-Work Buddy 的 Obsidian vault ≈ 本项目的 Markdown 参考文献库 + 工作区文档  
+Work Buddy 的 Obsidian vault ≈ 本项目的 Markdown 参考资料库 + 工作区文档  
 Work Buddy 的 embedding 服务 ≈ 本项目的 BM25 + 轻量向量索引  
 Work Buddy 的 Hindsight Memory ≈ 本项目的 `editorial-memory.json`
 
