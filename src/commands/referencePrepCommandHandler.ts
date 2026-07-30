@@ -64,7 +64,7 @@ export interface PrepForSelectionParams {
     onProgress?: (msg: string) => void;
     onEvent?: PrepEventListener;
     token?: vscode.CancellationToken;
-    /** 是否打开 mergedReference 预览 */
+    /** 是否打开 mergedReference 未保存预览（默认否；结果见侧栏/检索面板） */
     openMergedPreview?: boolean;
     showInformationMessage?: boolean;
 }
@@ -211,7 +211,7 @@ export class ReferencePrepCommandHandler {
         });
         await this.showResultsTree(params.anchorPath, process);
 
-        if (params.openMergedPreview !== false && mergedReference) {
+        if (params.openMergedPreview === true && mergedReference) {
             const doc = await vscode.workspace.openTextDocument({
                 content: mergedReference,
                 language: 'markdown',
@@ -221,7 +221,7 @@ export class ReferencePrepCommandHandler {
         if (params.showInformationMessage !== false) {
             vscode.window.showInformationMessage(
                 mergedReference
-                    ? '参考资料已准备完成（已打开预览）。'
+                    ? '参考资料已准备完成（见侧栏「资料检索」；可在检索面板勾选导出）。'
                     : '参考资料准备完成，未检索到命中。'
             );
         }

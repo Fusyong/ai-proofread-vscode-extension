@@ -22,6 +22,7 @@ export interface SingleSourceSearchOptions {
     allowInputBox?: boolean;
     inputPrompt?: string;
     inputPlaceholder?: string;
+    /** @deprecated 不再打开未保存合并预览 */
     openMergedBeside?: boolean;
     onEvent?: PrepEventListener;
     /** 跳过强度 QuickPick，使用固定强度 */
@@ -134,7 +135,7 @@ export async function runSingleSourceSearch(
             anchorPath: runAnchor,
             process,
             mergedReference,
-            openMergedBeside: options.openMergedBeside ?? true,
+            openMergedBeside: options.openMergedBeside ?? false,
             informationMessage: mergedReference
                 ? `检索完成：${hits.length} 条命中，${roundCount} 轮（关键词：${patternSummary}）`
                 : `检索完成，未命中（${roundCount} 轮；关键词：${patternSummary}）`,

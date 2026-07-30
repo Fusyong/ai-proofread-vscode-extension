@@ -76,12 +76,14 @@ export async function executeReferencePrepPlan(params: {
                 catalogSnapshotId: params.catalogSnapshotId,
                 roundId: params.roundId,
                 priority: q.priority,
+                existingReference: reference,
                 produce: async () => {
                     const { hits: produced, lookupsUsed } = await executeDictQuery({
                         query: q,
                         dictBlock,
                         context: params.context,
-                        existingReference: reference,
+                        // 不在此按 existingReference 过滤，避免把「已有资料导致的空结果」写入缓存
+                        existingReference: '',
                         priority: q.priority,
                         lookupsBudget: params.lookupsBudget,
                     });
@@ -117,11 +119,12 @@ export async function executeReferencePrepPlan(params: {
                 catalogSnapshotId: params.catalogSnapshotId,
                 roundId: params.roundId,
                 priority: q.priority,
+                existingReference: reference,
                 produce: async () => {
                     const { hits: produced } = await executeWikipediaQuery({
                         query: q,
                         wikiBlock,
-                        existingReference: reference,
+                        existingReference: '',
                         priority: q.priority,
                         strength: params.strength,
                         roundId: params.roundId,
@@ -149,13 +152,14 @@ export async function executeReferencePrepPlan(params: {
                     catalogSnapshotId: params.catalogSnapshotId,
                     roundId: params.roundId,
                     priority: q.priority,
+                    existingReference: reference,
                     produce: async () => {
                         const webBudget = { used: 0, max: 10 };
                         const { hits: produced } = await executeWebQuery({
                             query: q,
                             webBlock,
                             priority: q.priority,
-                            existingReference: reference,
+                            existingReference: '',
                             roundId: params.roundId,
                             requestsBudget: webBudget,
                         });
@@ -195,13 +199,14 @@ export async function executeReferencePrepPlan(params: {
                     catalogSnapshotId: params.catalogSnapshotId,
                     roundId: params.roundId,
                     priority: q.priority,
+                    existingReference: reference,
                     produce: () =>
                         executeGrepQuery({
                             query: q,
                             grepBlock,
                             priority: q.priority,
                             strength: params.strength,
-                            existingReference: reference,
+                            existingReference: '',
                             scope: params.scope,
                             referencesRoot: refRoot,
                             roundId: params.roundId,
@@ -218,12 +223,13 @@ export async function executeReferencePrepPlan(params: {
                     catalogSnapshotId: params.catalogSnapshotId,
                     roundId: params.roundId,
                     priority: q.priority,
+                    existingReference: reference,
                     produce: () =>
                         executeBm25Query({
                             query: q,
                             grepBlock,
                             priority: q.priority,
-                            existingReference: reference,
+                            existingReference: '',
                             context: params.context,
                             referencesRoot: refRoot,
                             scope: params.scope,
@@ -241,12 +247,13 @@ export async function executeReferencePrepPlan(params: {
                     catalogSnapshotId: params.catalogSnapshotId,
                     roundId: params.roundId,
                     priority: q.priority,
+                    existingReference: reference,
                     produce: () =>
                         executeVectorQuery({
                             query: q,
                             grepBlock,
                             priority: q.priority,
-                            existingReference: reference,
+                            existingReference: '',
                             context: params.context,
                             referencesRoot: refRoot,
                             scope: params.scope,

@@ -329,7 +329,7 @@ export class CitationCommandHandler {
                 anchorPath: runAnchor,
                 process,
                 mergedReference,
-                openMergedBeside: true,
+                openMergedBeside: false,
                 informationMessage: mergedReference
                     ? `引文核对完成：${hits.length} 条命中，${process.rounds.length} 轮（关键词：${patternSummary}）`
                     : `引文核对完成，未命中（${process.rounds.length} 轮；关键词：${patternSummary}）`,

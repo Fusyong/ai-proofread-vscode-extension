@@ -678,23 +678,15 @@ export class WebviewManager {
                 case 'splitIntoSentences':
                 case 'segmentFile':
                 case 'diffItWithAnotherFile':
-                case 'queryLocalDictSelection':
-                case 'searchSelectionInPDF':
-                case 'searchSelectionInShidianguji':
-                case 'searchSelectionInAncientbooks':
-                case 'searchSelectionInReferences':
                 case 'duplicateScanDocument':
+                case 'duplicateScanSelection':
                 case 'numberingCheck': {
                     const cmdMap: Record<string, string> = {
                         splitIntoSentences: 'ai-proofread.splitIntoSentences',
                         segmentFile: 'ai-proofread.segmentFile',
                         diffItWithAnotherFile: 'ai-proofread.diffItWithAnotherFile',
-                        queryLocalDictSelection: 'ai-proofread.queryLocalDictSelection',
-                        searchSelectionInPDF: 'ai-proofread.searchSelectionInPDF',
-                        searchSelectionInShidianguji: 'ai-proofread.searchSelectionInShidianguji',
-                        searchSelectionInAncientbooks: 'ai-proofread.searchSelectionInAncientbooks',
-                        searchSelectionInReferences: 'ai-proofread.searchSelectionInReferences',
                         duplicateScanDocument: 'ai-proofread.duplicate.scanDocument',
+                        duplicateScanSelection: 'ai-proofread.duplicate.scanSelection',
                         numberingCheck: 'ai-proofread.numbering.check'
                     };
                     await runWithWorkingEditor(cmdMap[command]);
@@ -932,10 +924,6 @@ export class WebviewManager {
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('proofreadSelectionWithMemory')" title="AI Proofreader: proofread selection with memory">校对选中（带编辑记忆）</button>
                 ${groupSep}
-                <button type="button" class="link-button" onclick="handleAction('citationOpenView')" title="AI Proofreader: verify citations">核对全文引文</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('citationRebuildIndex')" title="AI Proofreader: build citation reference index">建立引文索引</button>
-                ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('checkWords')" title="AI Proofreader: check words">字词检查</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('manageCustomTables')" title="AI Proofreader: manage custom tables">管理自定义替换表</button>
@@ -943,18 +931,10 @@ export class WebviewManager {
                 <button type="button" class="link-button" onclick="handleAction('numberingCheck')" title="AI Proofreader: check numbering hierarchy">标题序号检查</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('duplicateScanDocument')" title="AI Proofreader: scan duplicate sentences in document">重复句扫描</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('duplicateScanSelection')" title="AI Proofreader: scan duplicate sentences in selection">重复句扫描（选区）</button>
                 ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('diffItWithAnotherFile')" title="AI Proofreader: diff it with another file">diff 与另一文件</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('queryLocalDictSelection')" title="AI Proofreader: exact local dictionary lookup for selection (whole selection as headword)">按选文作词条查词典</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('searchSelectionInPDF')" title="AI Proofreader: search selection in PDF">在 PDF 中搜索选中文本</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('searchSelectionInShidianguji')" title="AI Proofreader: search selection in Shidianguji">在识典古籍中搜索选中文本</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('searchSelectionInAncientbooks')" title="AI Proofreader: search selection in Ancientbooks (jingdian)">在中华经典古籍库中搜索选中文本</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('searchSelectionInReferences')" title="AI Proofreader: search selection in References">在 References 中搜索选中文本</button>
                 ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('managePrompts')" title="AI Proofreader: manage prompts">管理提示词</button>
                 ${sep}

@@ -73,7 +73,7 @@ export class GrepSearchCommandHandler {
                 anchorPath: runAnchor,
                 process,
                 mergedReference,
-                openMergedBeside: true,
+                openMergedBeside: false,
                 informationMessage: mergedReference
                     ? `检索完成：${hits.length} 条命中，${roundCount} 轮（关键词：${patternSummary}）`
                     : `检索完成，未命中（${roundCount} 轮；关键词：${patternSummary}）`,

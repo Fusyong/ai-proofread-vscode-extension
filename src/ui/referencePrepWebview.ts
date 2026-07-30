@@ -33,9 +33,9 @@ import type { ProofreadCommandHandler } from '../commands/proofreadCommandHandle
 import { setReferenceHitVisible } from './sidebarViewVisibility';
 
 const PANEL_ID = 'ai-proofread.referencePrepConsole';
-const PANEL_TITLE = '参考资料检索';
+const PANEL_TITLE = 'References searching panel';
 /** 递增以在扩展更新后强制刷新已打开面板的 HTML（避免旧界面缺导出提示条）。 */
-const WEBVIEW_HTML_REVISION = 4;
+const WEBVIEW_HTML_REVISION = 6;
 
 export class ReferencePrepWebview {
     private panel: vscode.WebviewPanel | undefined;
@@ -408,6 +408,7 @@ export class ReferencePrepWebview {
 
     private async handleMessage(msg: {
         command?: string;
+        commandId?: string;
         enabledSources?: ReferenceSourceId[];
         strength?: ReferencePrepStrength;
         targetMode?: 'selection' | 'json';
@@ -458,9 +459,42 @@ export class ReferencePrepWebview {
             case 'run':
                 await this.runPrep(msg);
                 break;
+            case 'runCommand':
+                await this.runQuickSearchCommand(msg.commandId);
+                break;
             default:
                 break;
         }
+    }
+
+    /** 常用检索命令：先聚焦文稿编辑器，再执行（与校对面板快捷栏一致） */
+    private async runQuickSearchCommand(commandId?: string): Promise<void> {
+        if (!commandId || typeof commandId !== 'string') return;
+        const allowed = new Set([
+            'ai-proofread.prepareReferencesSelection',
+            'ai-proofread.llmGrepSearchReferences',
+            'ai-proofread.search.dictPrep',
+            'ai-proofread.search.refsGrep',
+            'ai-proofread.search.refsBm25',
+            'ai-proofread.search.refsVector',
+            'ai-proofread.search.wikipedia',
+            'ai-proofread.search.web',
+            'ai-proofread.queryLocalDictSelection',
+            'ai-proofread.searchSelectionInPDF',
+            'ai-proofread.searchSelectionInShidianguji',
+            'ai-proofread.searchSelectionInAncientbooks',
+            'ai-proofread.searchSelectionInReferences',
+            'ai-proofread.citation.verifySelection',
+            'ai-proofread.citation.openView',
+            'ai-proofread.citation.rebuildIndex',
+            'ai-proofread.referencePrep.clearRetrievalCache',
+        ]);
+        if (!allowed.has(commandId)) {
+            vscode.window.showWarningMessage(`未允许的命令：${commandId}`);
+            return;
+        }
+        await focusWorkingTextEditor();
+        await vscode.commands.executeCommand(commandId);
     }
 
     private findHit(hitId?: string): CorpusHit | undefined {
@@ -556,7 +590,7 @@ export class ReferencePrepWebview {
                     freshProcess: true,
                     onEvent,
                     token,
-                    openMergedPreview: true,
+                    openMergedPreview: false,
                     showInformationMessage: true,
                 });
             }
@@ -659,6 +693,44 @@ select, textarea {
   color: var(--vscode-foreground);
 }
 .warn { color: var(--vscode-errorForeground); }
+.panel-footer-commands {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--vscode-widget-border);
+}
+.header-commands-hint {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  margin: 0 0 6px;
+}
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 0;
+  line-height: 1.5;
+}
+.link-button {
+  background: none;
+  border: none;
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 1px 2px;
+  text-decoration: underline;
+  white-space: normal;
+  text-align: left;
+  max-width: 100%;
+}
+.link-button:hover { color: var(--vscode-textLink-activeForeground); }
+.cmd-sep {
+  color: var(--vscode-descriptionForeground);
+  margin: 0 4px;
+  user-select: none;
+  font-size: 12px;
+}
+.cmd-sep--between-groups { margin: 0 8px; opacity: 0.7; }
 </style>
 </head>
 <body>
@@ -708,6 +780,45 @@ select, textarea {
 </div>
 <div class="export-done" id="exportDone" style="display:none" role="status"></div>
 <ul id="hits"></ul>
+
+<div class="panel-footer-commands">
+  <p class="header-commands-hint">常用检索命令（作用于当前编辑器选区/文档；Ctrl+Shift+P 可查全部）</p>
+  <div class="header-actions">
+    <button type="button" class="link-button" data-cmd="ai-proofread.prepareReferencesSelection" title="Prepare References for Selection">准备选段参考资料</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.llmGrepSearchReferences" title="LLM-Enhanced Grep Search">LLM 增强检索</button>
+    <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.dictPrep" title="Search with Local Dictionary">词典</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsGrep" title="Search References with Grep">Grep</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="Search References with BM25">BM25</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsVector" title="Search References with Vector">向量</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.wikipedia" title="Search Wikipedia">维基</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.web" title="Search the Web">Web</button>
+    <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.queryLocalDictSelection" title="Look Up Selection in Local Dictionary">按选文查词典</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInPDF" title="search selection in PDF">PDF 搜索</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInShidianguji" title="search selection in Shidianguji">识典古籍</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInAncientbooks" title="search selection in Ancientbooks">中华经典古籍库</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInReferences" title="search selection in References">References 搜索</button>
+    <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.citation.verifySelection" title="Verify Selected Citation">核对选中引文</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.citation.openView" title="Verify Citations">核对全文引文</button>
+    <span class="cmd-sep" aria-hidden="true">|</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.citation.rebuildIndex" title="Build Citation Reference Index">建立引文索引</button>
+    <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.referencePrep.clearRetrievalCache" title="Clear Project Retrieval Cache">清除检索缓存</button>
+  </div>
+</div>
 
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
@@ -904,6 +1015,11 @@ document.getElementById('btnExportMd').onclick = () => postExport('exportSelecte
 document.getElementById('btnProofreadWithMd').onclick = () => postExport('proofreadSelectionWithExportedMd');
 document.getElementById('btnExportJson').onclick = () => postExport('exportSelectedJson');
 document.getElementById('btnMergeJson').onclick = () => postExport('mergeSelectedIntoJson');
+document.querySelectorAll('.panel-footer-commands [data-cmd]').forEach((el) => {
+  el.addEventListener('click', () => {
+    vscode.postMessage({ command: 'runCommand', commandId: el.getAttribute('data-cmd') });
+  });
+});
 updateExportBarMode();
 
 window.addEventListener('message', (ev) => {

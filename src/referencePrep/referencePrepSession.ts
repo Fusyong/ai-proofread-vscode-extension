@@ -148,21 +148,12 @@ export async function presentReferencePrepSessionResult(params: {
     process: ReferencePrepProcessFileV020;
     mergedReference: string;
     informationMessage: string;
+    /** @deprecated 不再自动打开未保存预览；保留参数以免破坏调用方 */
     openMergedBeside?: boolean;
 }): Promise<void> {
     if (params.resultsProvider) {
         await setReferenceHitVisible(true);
         params.resultsProvider.refresh(params.process, params.anchorPath);
-    }
-    if (params.mergedReference.trim()) {
-        const doc = await vscode.workspace.openTextDocument({
-            content: params.mergedReference,
-            language: 'markdown',
-        });
-        await vscode.window.showTextDocument(doc, {
-            preview: true,
-            viewColumn: params.openMergedBeside ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active,
-        });
     }
     vscode.window.showInformationMessage(params.informationMessage);
 }
