@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { targetsMatch } from './continuationLogic';
 import type {
+    ReferencePrepOrigin,
     ReferencePrepProcessFile,
     ReferencePrepProcessFileV020,
     ReferencePrepProcessFileV030,
@@ -34,6 +35,26 @@ export function getLegacyDictPrepProcessPath(jsonFilePath: string): string {
     return siblingPath(jsonFilePath, '.dictprep', '.json');
 }
 
+/** 缺省 prepOrigin：按锚点扩展名推断（兼容旧过程文件） */
+export function inferPrepOrigin(
+    record: { prepOrigin?: ReferencePrepOrigin },
+    anchorPath: string
+): ReferencePrepOrigin {
+    if (record.prepOrigin === 'selection' || record.prepOrigin === 'json_item') {
+        return record.prepOrigin;
+    }
+    return anchorPath.toLowerCase().endsWith('.json') ? 'json_item' : 'selection';
+}
+
+export function originMatches(
+    record: { prepOrigin?: ReferencePrepOrigin },
+    anchorPath: string,
+    want?: ReferencePrepOrigin
+): boolean {
+    if (!want) return true;
+    return inferPrepOrigin(record, anchorPath) === want;
+}
+
 function readRawProcessFile(anchorPath: string): ReferencePrepProcessFile | null {
     const processPath = getReferencePrepProcessPath(anchorPath);
     if (!fs.existsSync(processPath)) return null;
@@ -62,16 +83,22 @@ function getActiveRecord(doc: ReferencePrepProcessFileV030): ReferencePrepRecord
     return doc.records.find((r) => r.id === doc.activeRecordId) ?? doc.records[0] ?? null;
 }
 
-/** 列出文档内全部选区记录（工作态） */
-export function listProcessRecords(anchorPath: string): ReferencePrepProcessFileV020[] {
+/** 列出文档内选区记录（可按 prepOrigin 过滤） */
+export function listProcessRecords(
+    anchorPath: string,
+    opts?: { origin?: ReferencePrepOrigin }
+): ReferencePrepProcessFileV020[] {
     const doc = loadDocumentFile(anchorPath);
     if (!doc) return [];
-    return doc.records.map((r) => workingProcessFromRecord(r, doc.sourceJsonPath));
+    return doc.records
+        .filter((r) => originMatches(r, anchorPath, opts?.origin))
+        .map((r) => workingProcessFromRecord(r, doc.sourceJsonPath));
 }
 
 /**
  * 按选区文本查找已有记录；找不到则新建一条（不立即落盘，待 saveProcessFile）。
  * 同一锚点、不同选区 → 多条独立 records，共用一个 .referenceprep.json。
+ * MD 选段与 JSON 条目通过 prepOrigin 隔离，不会互相匹配。
  */
 export function loadOrCreateProcessFile(params: {
     anchorPath: string;
@@ -82,20 +109,36 @@ export function loadOrCreateProcessFile(params: {
     userInput?: string;
     /** 指定续跑某条记录（优先于文本匹配） */
     recordId?: string;
+    prepOrigin?: ReferencePrepOrigin;
+    jsonItemIndex?: number;
 }): ReferencePrepProcessFileV020 {
     const doc = loadDocumentFile(params.anchorPath);
     const preview =
         params.targetPreview ??
         (params.userInput ? params.userInput.slice(0, 200) : undefined);
+    const wantOrigin = params.prepOrigin;
 
     if (doc) {
         let existing: ReferencePrepRecord | undefined;
         if (params.recordId) {
             existing = doc.records.find((r) => r.id === params.recordId);
         }
+        if (
+            !existing &&
+            wantOrigin === 'json_item' &&
+            typeof params.jsonItemIndex === 'number'
+        ) {
+            existing = doc.records.find(
+                (r) =>
+                    originMatches(r, params.anchorPath, 'json_item') &&
+                    r.jsonItemIndex === params.jsonItemIndex
+            );
+        }
         if (!existing && params.userInput) {
-            existing = doc.records.find((r) =>
-                targetsMatch(r.userInput ?? r.targetPreview, params.userInput!)
+            existing = doc.records.find(
+                (r) =>
+                    originMatches(r, params.anchorPath, wantOrigin) &&
+                    targetsMatch(r.userInput ?? r.targetPreview, params.userInput!)
             );
         }
         if (existing) {
@@ -106,6 +149,9 @@ export function loadOrCreateProcessFile(params: {
                     userInput: params.userInput ?? existing.userInput,
                     enabledSources: params.enabledSources,
                     strength: params.strength,
+                    prepOrigin: wantOrigin ?? existing.prepOrigin ?? inferPrepOrigin(existing, params.anchorPath),
+                    jsonItemIndex:
+                        params.jsonItemIndex ?? existing.jsonItemIndex,
                 },
                 params.sourceJsonPath ?? doc.sourceJsonPath
             );
@@ -122,6 +168,8 @@ export function loadOrCreateProcessFile(params: {
         strength: params.strength,
         rounds: [],
         corpus: [],
+        prepOrigin: wantOrigin,
+        jsonItemIndex: params.jsonItemIndex,
     };
 }
 
@@ -176,6 +224,14 @@ export function setActiveProcessRecord(anchorPath: string, recordId: string): bo
     doc.activeRecordId = recordId;
     saveDocumentFile(anchorPath, doc);
     return true;
+}
+
+/** 稳定 record 键：有 id 用 id，否则用下标占位（与面板分组 hitId 前缀一致） */
+export function processRecordKey(
+    record: { id?: string },
+    index: number
+): string {
+    return record.id || `rec${index}`;
 }
 
 export function appendProcessLog(anchorPath: string, line: string): void {

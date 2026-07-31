@@ -14,7 +14,7 @@
 | 命令 | 共用流程 | 规划提示词（targetKind） | 是否校对 |
 |------|----------|--------------------------|----------|
 | `prepare references for selection` | 预筛 → 规划 → 检索 → 精排 → TreeView / 检索控制台 | `manuscript` | 否 |
-| `prepare references for JSON file` / 校对面板 **准备参考资料** | 同上（批量） | `manuscript` | 可选 |
+| `prepare references for JSON file` / 校对面板 **准备参考资料** | 同上（批量） | `manuscript` | 否 |
 | `knowledge verify selection` | 调用选段准备 → 可选校对；或用已有资料校对 | `manuscript` | 可选 |
 | `LLM-enhanced grep search` | 同上 | `search_intent` | 否 |
 | `verify selected citation` | 同上 | `citation_selection` | 否 |
@@ -33,12 +33,20 @@
 
 ## 过程文件
 
-- `{basename}.referenceprep.json` — **v0.2.0**：轮次、结构化 `corpus`、`resourceScope`、`indexVersions`
+- `{basename}.referenceprep.json` — **v0.3.0**：一文一文件，内含多条选区/`target` 记录（`records[]` + `activeRecordId`）；单条展示时兼容由 v0.2 升级
 - `{basename}.referenceprep.log` — 运行日志
 - `{workspace}/.proofread/reference-catalog.json` — 参考资料目录缓存
 - `{workspace}/.proofread/reference-vectors.json` — 轻量向量索引（字符 n-gram）
 - `{workspace}/.proofread/wiki-cache.json` — 维基百科/Wikidata 响应缓存（启用 wikipedia 来源时）
-- `{workspace}/.proofread/retrieval-cache.json` — **项目级检索命中缓存**（dict/grep/bm25/vector/wikipedia 等通道查询结果；默认开启，TTL 可配）
+- `{workspace}/.proofread/retrieval-cache.json` — **项目级检索命中缓存**（dict/grep/bm25/vector/wikipedia；**v2**：`hitStore` 按 digest 共享正文，`entries` 只存引用；可读 v1 并写回 v2；TTL / maxEntries 可配）
+
+### 检索面板与过程文件
+
+- **MD 选段** 与 **JSON 条目** 相互独立：过程记录带 `prepOrigin`（`selection` / `json_item`）；选段不可在 JSON 文件上运行，也不可把选段结果合并进 JSON
+- **重放过程文件**：按锚点类型只列出对应来源的记录；多条时可选择一条，或不选（Esc）分组展示全部（MD 称「选区」，JSON 称「条目」）
+- **选段准备**：与命令面板一致，可续跑本选区 / 新建 / 切换同文档其它选区
+- **JSON 批量**：每条 `target` 独立 `json_item` 记录；结束后面板按条目分组；合并可选「按 target 写入对应条目」
+- 导出：选段结果 → md / 校对选段；JSON 结果 → json / 合并到源 JSON（由「当前结果来源」决定按钮，而非仅目标下拉）
 
 ## 配置（节选）
 

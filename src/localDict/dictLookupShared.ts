@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { convertOpencc } from '../opencc';
 import type { ResolvedLocalDictConfigItem } from './dictConfig';
 import type { LookupMode } from './mdictClient';
+import { sanitizeDictControlChars } from './htmlToText';
 
 export function sanitizeLookupTerm(term: string): string {
     const s = String(term ?? '').trim();
@@ -28,7 +29,7 @@ export function buildOpenccAltTerms(term: string): string[] {
 }
 
 export function limitCleanText(s: string, maxChars: number): string {
-    const text = String(s ?? '');
+    const text = sanitizeDictControlChars(String(s ?? '')).trim();
     if (!text || !maxChars || maxChars <= 0 || text.length <= maxChars) return text;
     return text.slice(0, maxChars) + '\n\n[...已截断...]';
 }

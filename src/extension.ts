@@ -129,7 +129,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const { provider: referencePrepResultsProvider } = registerReferencePrepResultsView(context);
     const referencePrepHandler = new ReferencePrepCommandHandler(
         webviewManager,
-        proofreadHandler,
         referencePrepResultsProvider
     );
     const localDictQueryHandler = new LocalDictQueryCommandHandler();
@@ -179,9 +178,6 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     webviewManager.setMergeCallback((jsonFilePath: string) => {
         return utilityHandler.handleMergeTwoFilesByPath(jsonFilePath);
-    });
-    webviewManager.setReferencePrepJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
-        return referencePrepHandler.handlePrepareReferencesJson(jsonFilePath, ctx);
     });
 
     // 注册所有命令
@@ -457,10 +453,10 @@ export async function activate(context: vscode.ExtensionContext) {
             await openCorpusHitInEditor(hit, refRoot);
         }),
         vscode.commands.registerCommand('ai-proofread.referencePrep.pruneHit', async (node?: ReferencePrepTreeNode) => {
-            if (node?.kind === 'hit') referencePrepResultsProvider.pruneHit(node.hit);
+            if (node?.kind === 'hit') referencePrepResultsProvider.pruneHit(node.hit, node.process);
         }),
         vscode.commands.registerCommand('ai-proofread.referencePrep.restoreHit', async (node?: ReferencePrepTreeNode) => {
-            if (node?.kind === 'hit') referencePrepResultsProvider.restoreHit(node.hit);
+            if (node?.kind === 'hit') referencePrepResultsProvider.restoreHit(node.hit, node.process);
         }),
         vscode.commands.registerCommand('ai-proofread.referencePrep.copyBlock', async (node?: ReferencePrepTreeNode) => {
             if (node?.kind === 'hit' && node.hit.referenceBlock) {

@@ -535,9 +535,10 @@ export class WebviewManager {
                         vscode.window.showWarningMessage('请先完成切分，或未找到 JSON 文件。');
                         break;
                     }
-                    if ((this as any).referencePrepJsonCallback) {
-                        await (this as any).referencePrepJsonCallback(jsonPath, context);
-                    }
+                    const outputUri = vscode.Uri.file(jsonPath);
+                    const splitDoc = await vscode.workspace.openTextDocument(outputUri);
+                    await vscode.window.showTextDocument(splitDoc, { viewColumn: vscode.ViewColumn.Beside });
+                    await vscode.commands.executeCommand('ai-proofread.referencePrep.openConsole');
                     break;
                 }
                 case 'showReferencePrepJson': {
@@ -735,12 +736,6 @@ export class WebviewManager {
         (this as any).mergeCallback = callback;
     }
 
-    public setReferencePrepJsonCallback(
-        callback: (jsonFilePath: string, context: vscode.ExtensionContext) => Promise<void>
-    ): void {
-        (this as any).referencePrepJsonCallback = callback;
-    }
-
     /**
      * 获取当前面板
      */
@@ -850,7 +845,7 @@ export class WebviewManager {
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('showSplitDiff')">比较前后差异</button>
                     <button class="action-button" onclick="handleAction('mergeContext')">合并 JSON</button>
-                    <button class="action-button" onclick="handleAction('referencePrepJson')" title="多轮检索词典与参考资料，写入 reference">准备参考资料</button>
+                    <button class="action-button" onclick="handleAction('referencePrepJson')" title="打开切分 JSON 并打开检索面板">准备参考资料</button>
                     <button class="action-button" onclick="handleAction('proofreadJson')">LLM 校对 JSON</button>
                 </div>
             </div>
@@ -1048,7 +1043,7 @@ export class WebviewManager {
                 <div class="section-actions">
                     ${splitResult.originalFilePath && splitResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitDiff\')">比较前后差异</button>' : ''}
                     ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'mergeContext\')">合并 JSON</button>' : ''}
-                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'referencePrepJson\')" title="多轮检索并写入 reference">准备参考资料</button>' : ''}
+                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'referencePrepJson\')" title="打开切分 JSON 并打开检索面板">准备参考资料</button>' : ''}
                     ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'proofreadJson\')">LLM 校对 JSON</button>' : ''}
                 </div>
             </div>

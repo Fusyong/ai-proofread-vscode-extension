@@ -135,7 +135,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 组织校对语境是一个看起来有些麻烦，但非常有效的工作。比如校对练习册，有必要把练习和答案拼成语境（拼在一个target中更能节省费用）。而对一首古诗的解释如果不可靠，可以用一篇可靠的作为reference。包含人物的内容，则可以用词典中的任务条目作为reference。
 
-命令`prepare references for JSON file`，或校对面板「准备参考资料」按钮，可通过本地词典、参考资料等为 JSON 片段准备参考文本。选段检索与勾选导出请用 **检索面板**（见下）。
+命令`prepare references for JSON file`，或校对面板「准备参考资料」按钮，可为 JSON 片段准备参考文本（只检索、不自动校对）。选段检索与勾选导出/合并请用 **检索面板**（见下）；准备完成后另用校对命令做知识核查。
 
 #### 3.1.5 检索面板与统一参考资料准备
 
@@ -200,8 +200,11 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 - 核对选中引文：`AI Proofreader: verify selected citation`（选中引文片段；**同一套** referencePrep，规划提示词为 `citation_selection`；结果在 **资料检索** 树，不校对。全文批量核对仍用 `verify citations` + **引文核查** 树）
 - JSON：校对面板 **准备参考资料**，或命令 `prepare references for JSON file`
 - 结果查看：侧栏 **资料检索**（overview 可开关；命令 `open reference prep results`）；可打开文件跳转、复制块、手动 prune；检索面板内勾选导出
-- **续跑**：「仅准备」、LLM grep、核对选中引文 若已有过程文件，可选择继续上次（追加 1 轮）或重新开始；「准备并验证」始终全新开始
-- 过程文件：`文档.referenceprep.json`（v0.2 结构化 corpus）、`文档.referenceprep.log`（详见 `docs/knowledge-verify-plan.md`）
+- **续跑**：「仅准备」、LLM grep、核对选中引文、**检索面板 Markdown 选段** 若已有过程文件，可选择继续上次（追加 1 轮）或重新开始；「准备并验证」始终全新开始
+- 过程文件：`文档.referenceprep.json`（**v0.3** 一文多记录，含 `prepOrigin`：`selection` / `json_item`）、`文档.referenceprep.log`（详见 `docs/knowledge-verify-plan.md`）
+- **检索面板**：Markdown 选段与 JSON 条目检索严格分离（选段结果不可合并进 JSON；JSON 结果不做选段校对）
+- **重放**：按锚点只重放对应来源记录；多条时可点选，或不选（Esc）分组展示
+- **合并到源 JSON**：仅 JSON 条目结果可用；可按 target 写入对应条目，或覆盖/追加全部条目
 - 运行前可勾选资料来源（词典 / grep / BM25 / 向量 / **维基百科**）；强度（轻量 / 标准 / 深入）控制轮次与查询上限
 - **维基百科资料来源**（默认不勾选）：只读访问 MediaWiki + Wikidata；串行限速（默认 30 次/分钟）、会话 HTTP 预算、工作区缓存 `.proofread/wiki-cache.json`；TreeView 命中项可在浏览器打开条目 URL。配置见 `ai-proofread.referencePrep.wikipedia.*`
 - BM25 需先 **建立引文索引**；向量索引首次使用时懒构建
@@ -281,7 +284,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 命令： `knowledge verify selection (prepare references and proofread)`。流程基于“带记忆地校对选段”，先运行 referencePrep（参考资料准备）工作流，从本地词典、本地参考资料库检索文中相关知识；可选勾选 **维基百科（API）** 作百科事实参考，然后使用提示词「知识核查（full）」进行校对；可以选择是否使用编辑记忆。 **会消耗比一般校对多得多的 token！**
 
-如果要对JSON进行批处理，可以先通过命令`prepare references for JSON file`，或“准备参考资料”按钮，JSON中的所有文本片段准备好参考文本，然后使用提示词“知识核查（full）”进行校对。
+如果要对JSON进行批处理，可先通过命令`prepare references for JSON file`，或校对面板「准备参考资料」/检索面板对当前 JSON 跑准备（只检索，不自动校对）；在检索面板勾选命中并合并到源 JSON 后，再用提示词「知识核查（full）」等执行校对。
 
 ### 3.3. 比较（diff）校对前后的文件差异
 

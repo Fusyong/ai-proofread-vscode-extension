@@ -4,7 +4,7 @@ import type {
     ReferencePrepProcessFileV020,
 } from './schema';
 
-export type PrepPhaseName = 'scope' | 'plan' | 'execute' | 'rerank' | 'done' | 'json_item';
+export type PrepPhaseName = 'scope' | 'plan' | 'execute' | 'rerank' | 'done' | 'json_item' | 'replay';
 
 export type PrepEvent =
     | { type: 'phase'; name: PrepPhaseName; message?: string; round?: number }

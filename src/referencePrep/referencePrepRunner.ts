@@ -22,6 +22,7 @@ import {
 } from './config';
 import type {
     ReferencePrepIntent,
+    ReferencePrepOrigin,
     ReferencePrepProcessFileV020,
     ReferencePrepStrength,
     ReferenceSourceId,
@@ -81,6 +82,9 @@ export interface ReferencePrepRunParams {
     maxRoundsOverride?: number;
     /** 指定过程文件中的选区记录（优先于按文本匹配） */
     recordId?: string;
+    /** MD 选段 vs JSON 条目 */
+    prepOrigin?: ReferencePrepOrigin;
+    jsonItemIndex?: number;
 }
 
 function resolvePlanSystemPrompt(
@@ -157,10 +161,16 @@ export async function runReferencePrepForTarget(
             targetPreview: params.target.slice(0, 200),
             userInput: params.target,
             recordId: params.recordId,
+            prepOrigin: params.prepOrigin ?? (params.sourceJsonPath ? 'json_item' : 'selection'),
+            jsonItemIndex: params.jsonItemIndex,
         });
         // 始终与本次目标对齐（避免旧 targetPreview 残留）
         proc.targetPreview = params.target.slice(0, 200);
         proc.userInput = params.target;
+        proc.prepOrigin = params.prepOrigin ?? proc.prepOrigin ?? (params.sourceJsonPath ? 'json_item' : 'selection');
+        if (typeof params.jsonItemIndex === 'number') {
+            proc.jsonItemIndex = params.jsonItemIndex;
+        }
         if (params.freshProcess) {
             proc.corpus = [];
             proc.rounds = [];
@@ -438,6 +448,8 @@ export async function runReferencePrepForJsonFile(
             strength: params.strength,
             intents: params.intents,
             sourceJsonPath: params.jsonFilePath,
+            prepOrigin: 'json_item',
+            jsonItemIndex: idx,
             freshProcess: true,
             onProgress: params.onProgress,
             onEvent: params.onEvent,

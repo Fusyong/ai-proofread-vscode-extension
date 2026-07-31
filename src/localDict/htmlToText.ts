@@ -1,3 +1,13 @@
+/**
+ * 去掉 MDX/词典释义中常见的 NUL 等 C0 控制字符（保留 \\t \\n）。
+ * js-mdict 等返回的 definition 末尾常带 \\u0000。
+ */
+export function sanitizeDictControlChars(text: string): string {
+    return String(text ?? '')
+        .replace(/\u0000/g, '')
+        .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+}
+
 export function stripHtmlToText(html: string): string {
     const s = String(html ?? '');
     if (!s) return s;
@@ -31,6 +41,6 @@ export function stripHtmlToText(html: string): string {
         .join('\n');
     out = out.replace(/\n{3,}/g, '\n\n');
 
-    return out.trim();
+    return sanitizeDictControlChars(out).trim();
 }
 

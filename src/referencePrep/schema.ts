@@ -151,6 +151,9 @@ export interface IndexVersions {
     catalogSnapshotId?: string;
 }
 
+/** 过程记录来源：MD 随意选段 vs JSON 切分条目（二者不可混用） */
+export type ReferencePrepOrigin = 'selection' | 'json_item';
+
 export interface ReferencePrepProcessFileV010 {
     version: '0.1.0';
     sourceJsonPath?: string;
@@ -174,6 +177,10 @@ export interface ReferencePrepProcessFileV020 extends Omit<ReferencePrepProcessF
     resourceScope?: ResourceScope;
     catalogSnapshotId?: string;
     indexVersions?: IndexVersions;
+    /** MD 选段 vs JSON 条目；缺省时由锚点扩展名推断 */
+    prepOrigin?: ReferencePrepOrigin;
+    /** JSON 批量时的条目下标（0-based） */
+    jsonItemIndex?: number;
 }
 
 /** 同一锚点文档内的一条选区检索记录 */
@@ -193,6 +200,8 @@ export interface ReferencePrepRecord {
     resourceScope?: ResourceScope;
     catalogSnapshotId?: string;
     indexVersions?: IndexVersions;
+    prepOrigin?: ReferencePrepOrigin;
+    jsonItemIndex?: number;
 }
 
 /**
@@ -266,6 +275,8 @@ export function workingProcessFromRecord(
         resourceScope: record.resourceScope,
         catalogSnapshotId: record.catalogSnapshotId,
         indexVersions: record.indexVersions,
+        prepOrigin: record.prepOrigin,
+        jsonItemIndex: record.jsonItemIndex,
     };
 }
 
@@ -284,6 +295,8 @@ export function recordFromWorkingProcess(proc: ReferencePrepProcessFileV020): Re
         resourceScope: proc.resourceScope,
         catalogSnapshotId: proc.catalogSnapshotId,
         indexVersions: proc.indexVersions,
+        prepOrigin: proc.prepOrigin,
+        jsonItemIndex: proc.jsonItemIndex,
     };
 }
 

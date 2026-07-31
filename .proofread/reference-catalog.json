@@ -1,34 +1,7 @@
 {
-  "snapshotId": "cat-1785305817666",
-  "referencesRoot": "D:\\ah21\\ai-proofread\\demo\\example\\example2\\",
-  "builtAt": "2026-07-29T06:16:57.666Z",
-  "files": [
-    {
-      "relPath": "your_markdown_context.md",
-      "mtimeMs": 1785227133815.955,
-      "size": 4058,
-      "headingCount": 1
-    },
-    {
-      "relPath": "your_markdown_proofread.md",
-      "mtimeMs": 1785227133815.955,
-      "size": 2704,
-      "headingCount": 0
-    },
-    {
-      "relPath": "your_markdown_reference.md",
-      "mtimeMs": 1785227133815.955,
-      "size": 2708,
-      "headingCount": 1
-    },
-    {
-      "relPath": "your_markdown.md",
-      "mtimeMs": 1785227133815.955,
-      "size": 2713,
-      "headingCount": 0
-    }
-  ],
-  "dirSummary": {
-    ".": 4
-  }
+  "snapshotId": "cat-1785458821373",
+  "referencesRoot": "d:\\ah21\\ai-proofread-vscode-extension\\references",
+  "builtAt": "2026-07-31T00:47:01.373Z",
+  "files": [],
+  "dirSummary": {}
 }

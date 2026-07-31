@@ -7,6 +7,12 @@
 
 import type { CorpusHit } from './schema';
 
+export interface HitExportGroup {
+    /** 选区 / JSON 条目 target 文本 */
+    target: string;
+    hits: CorpusHit[];
+}
+
 /** 去掉 ai-proofread 机器标记注释，保留正文供模型阅读 */
 export function cleanBlockForLlm(block: string): string {
     return String(block ?? '')
@@ -66,4 +72,45 @@ export function formatSelectedHitsAsJsonDocument(hits: CorpusHit[]): {
     reference: string;
 } {
     return { reference: formatSelectedHitsAsMarkdown(hits) };
+}
+
+/**
+ * 多选区导出 Markdown：各组加 ## target 标题；仅一组时不加标题（与旧行为一致）。
+ */
+export function formatGroupedHitsAsMarkdown(groups: HitExportGroup[]): string {
+    const nonempty = groups
+        .map((g) => ({
+            target: (g.target ?? '').replace(/\s+/g, ' ').trim(),
+            body: formatSelectedHitsAsMarkdown(g.hits),
+        }))
+        .filter((g) => g.body);
+    if (nonempty.length === 0) return '';
+    if (nonempty.length === 1) return nonempty[0].body;
+    return nonempty
+        .map((g, i) => {
+            const title = (g.target || `选区 ${i + 1}`).slice(0, 80);
+            return `## ${title}\n\n${g.body}`;
+        })
+        .join('\n\n');
+}
+
+/**
+ * 多选区导出 JSON：多组时为 `[{ target, reference }, …]`；单组仍为 `{ reference }`。
+ */
+export function formatGroupedHitsAsJsonDocument(
+    groups: HitExportGroup[]
+): { reference: string } | Array<{ target: string; reference: string }> {
+    const nonempty = groups
+        .map((g) => ({
+            target: (g.target ?? '').replace(/\s+/g, ' ').trim(),
+            reference: formatSelectedHitsAsReferenceField(g.hits),
+        }))
+        .filter((g) => g.reference.trim());
+    if (nonempty.length <= 1) {
+        return { reference: nonempty[0]?.reference ?? '' };
+    }
+    return nonempty.map((g, i) => ({
+        target: g.target || `选区 ${i + 1}`,
+        reference: g.reference,
+    }));
 }

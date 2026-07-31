@@ -20,13 +20,13 @@ import {
     pickExistingReferenceForProofread,
     pickReferencePrepContinuation,
 } from '../referencePrep/continuation';
+import { listProcessRecords } from '../referencePrep/processFile';
 import {
     REFERENCE_PREP_STRENGTH_OPTIONS,
     REFERENCE_SOURCE_OPTIONS,
 } from '../referencePrep/referencePrepSession';
 import type { PrepEventListener } from '../referencePrep/prepEvents';
 import { WebviewManager } from '../ui/webviewManager';
-import type { ProofreadCommandHandler } from './proofreadCommandHandler';
 
 type KnowledgeVerifyMode = 'prep_and_proofread' | 'prep_only' | 'proofread_existing';
 
@@ -75,7 +75,6 @@ export class ReferencePrepCommandHandler {
 
     constructor(
         private webviewManager: WebviewManager,
-        private proofreadHandler?: ProofreadCommandHandler,
         private resultsProvider?: ReferencePrepResultsProvider
     ) {}
 
@@ -151,43 +150,6 @@ export class ReferencePrepCommandHandler {
         return { enabledSources, strength: strengthPick.value };
     }
 
-    /** JSON 批量准备等：资料来源 + 强度 + 是否接着校对 */
-    async pickRunOptions(context: vscode.ExtensionContext): Promise<
-        | {
-              enabledSources: ReferenceSourceId[];
-              strength: ReferencePrepStrength;
-              runProofread: boolean;
-              proofreadPromptName?: string;
-          }
-        | undefined
-    > {
-        const prep = await this.pickPrepSourcesAndStrength(context);
-        if (!prep) return undefined;
-
-        const actionPick = await vscode.window.showQuickPick(
-            [
-                { label: '准备参考资料并校对', value: 'prep_and_proofread' as const },
-                { label: '仅准备参考资料', value: 'prep' as const },
-            ],
-            { title: '下一步', ignoreFocusOut: true }
-        );
-        if (!actionPick) return undefined;
-
-        const runProofread = actionPick.value === 'prep_and_proofread';
-        let proofreadPromptName: string | undefined;
-        if (runProofread) {
-            proofreadPromptName = await pickProofreadPromptForKnowledgeVerify(context);
-            if (!proofreadPromptName) return undefined;
-        }
-
-        return {
-            enabledSources: prep.enabledSources,
-            strength: prep.strength,
-            runProofread,
-            proofreadPromptName,
-        };
-    }
-
     /**
      * 选段准备参考资料（与 prepareReferencesJson 对称）。
      * 知识核查、Webview、命令面板共用。
@@ -202,6 +164,7 @@ export class ReferencePrepCommandHandler {
             enabledSources: params.enabledSources,
             strength: params.strength,
             targetKind: 'manuscript',
+            prepOrigin: 'selection',
             freshProcess: params.freshProcess ?? true,
             continuation: params.continuation,
             maxRoundsOverride: params.maxRoundsOverride,
@@ -236,6 +199,12 @@ export class ReferencePrepCommandHandler {
         context: vscode.ExtensionContext,
         options?: { onEvent?: PrepEventListener; skipPicks?: boolean; enabledSources?: ReferenceSourceId[]; strength?: ReferencePrepStrength }
     ): Promise<void> {
+        if (editor.document.languageId === 'json') {
+            vscode.window.showErrorMessage(
+                'JSON 文件请使用「当前 JSON 文件」模式或「准备参考资料（JSON）」；选段模式仅用于 Markdown 等文稿。'
+            );
+            return;
+        }
         const selectedText = editor.document.getText(editor.selection);
         if (!selectedText.trim()) {
             vscode.window.showErrorMessage('请先选择要准备参考资料的文本。');
@@ -481,7 +450,10 @@ export class ReferencePrepCommandHandler {
         vscode.window.showInformationMessage(`校对完成 | ${promptDisplayName}`);
     }
 
-    /** JSON：准备参考资料（校对面板） */
+    /**
+     * JSON：准备参考资料（与检索面板一致：只检索准备，不自动校对）。
+     * 校对请另用校对命令；命中勾选导出/合并请在检索面板完成。
+     */
     async handlePrepareReferencesJson(
         jsonFilePath: string,
         context: vscode.ExtensionContext,
@@ -490,24 +462,18 @@ export class ReferencePrepCommandHandler {
             skipPicks?: boolean;
             enabledSources?: ReferenceSourceId[];
             strength?: ReferencePrepStrength;
-            runProofread?: boolean;
             token?: vscode.CancellationToken;
             skipExistingReference?: boolean;
         }
     ): Promise<void> {
         let enabledSources = options?.enabledSources;
         let strength = options?.strength;
-        let runProofread = options?.runProofread ?? false;
 
         if (!options?.skipPicks || !enabledSources || !strength) {
-            const opts = await this.pickRunOptions(context);
-            if (!opts) return;
-            enabledSources = opts.enabledSources;
-            strength = opts.strength;
-            runProofread = opts.runProofread;
-            if (opts.runProofread && opts.proofreadPromptName) {
-                /* prompt already picked in pickRunOptions */
-            }
+            const prep = await this.pickPrepSourcesAndStrength(context);
+            if (!prep) return;
+            enabledSources = prep.enabledSources;
+            strength = prep.strength;
         }
 
         try {
@@ -517,6 +483,7 @@ export class ReferencePrepCommandHandler {
                 throw new Error('JSON 格式不正确');
             }
 
+            let lastProcess: ReferencePrepProcessFileV020 | undefined;
             const stats = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
@@ -550,7 +517,10 @@ export class ReferencePrepCommandHandler {
                             onEvent: options?.onEvent,
                             token: linked.token,
                             onAfterJsonItem: () => {},
-                            onProcessUpdated: (proc) => this.resultsProvider?.refresh(proc, jsonFilePath),
+                            onProcessUpdated: (proc) => {
+                                lastProcess = proc;
+                                this.resultsProvider?.refresh(proc, jsonFilePath);
+                            },
                         });
                     } finally {
                         for (const d of disposables) {
@@ -561,32 +531,32 @@ export class ReferencePrepCommandHandler {
                 }
             );
 
+            if (lastProcess) {
+                const all = listProcessRecords(jsonFilePath, { origin: 'json_item' }).filter(
+                    (r) => r.corpus.length > 0 || r.rounds.length > 0
+                );
+                if (all.length > 1) {
+                    await setReferenceHitVisible(true);
+                    this.resultsProvider?.refreshRecords(all, jsonFilePath);
+                } else {
+                    await this.showResultsTree(jsonFilePath, lastProcess);
+                }
+            }
+
             const skipPart =
                 stats.skipped > 0 ? `，跳过 ${stats.skipped} 条` : '';
             if (stats.cancelled) {
                 vscode.window.showInformationMessage(
-                    `参考资料准备已中断：完成 ${stats.processed}/${stats.total} 条${skipPart}。可点「继续未完成部分」接着跑。`
+                    `参考资料准备已中断：完成 ${stats.processed}/${stats.total} 条${skipPart}。可在检索面板点「继续未完成部分」接着跑。`
                 );
             } else {
                 vscode.window.showInformationMessage(
-                    `参考资料准备完成：${stats.processed}/${stats.total} 条${skipPart}`
+                    `参考资料准备完成：${stats.processed}/${stats.total} 条${skipPart}（见侧栏「资料检索」；可在检索面板勾选导出/合并）。`
                 );
-            }
-
-            if (runProofread && !stats.cancelled) {
-                await this.runProofreadJson(jsonFilePath, context);
             }
         } catch (e) {
             ErrorUtils.showError(e, '准备参考资料失败：');
         }
-    }
-
-    private async runProofreadJson(jsonFilePath: string, context: vscode.ExtensionContext): Promise<void> {
-        if (!this.proofreadHandler) {
-            await vscode.commands.executeCommand('ai-proofread.proofreadJson', jsonFilePath, context);
-            return;
-        }
-        await this.proofreadHandler.handleProofreadJsonFile(jsonFilePath, context);
     }
 
     /** 命令面板：仅对当前 JSON 文件准备参考资料 */

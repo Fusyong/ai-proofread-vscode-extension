@@ -8,6 +8,7 @@ import {
     loadDocumentFile,
     loadOrCreateProcessFile,
     loadProcessFile,
+    processRecordKey,
     saveProcessFile,
 } from './processFile';
 import type { ReferencePrepProcessFileV020 } from './schema';
@@ -149,5 +150,39 @@ describe('processFile multi-record', () => {
         expect(disk?.records).toHaveLength(1);
         expect(disk?.records[0].targetPreview).toBe('同选区');
         expect(disk?.records[0].userInput).toBe('同选区');
+    });
+
+    it('processRecordKey prefers id then index fallback', () => {
+        expect(processRecordKey({ id: 'rec_abc' }, 0)).toBe('rec_abc');
+        expect(processRecordKey({}, 2)).toBe('rec2');
+    });
+
+    it('keeps selection and json_item records isolated by prepOrigin', () => {
+        const doc = tmpDoc('book.json');
+        const sel = loadOrCreateProcessFile({
+            anchorPath: doc,
+            enabledSources: ['dict'],
+            strength: 'light',
+            userInput: '李白',
+            targetPreview: '李白',
+            prepOrigin: 'selection',
+        });
+        saveProcessFile(doc, sel);
+
+        const item = loadOrCreateProcessFile({
+            anchorPath: doc,
+            enabledSources: ['dict'],
+            strength: 'light',
+            userInput: '李白',
+            targetPreview: '李白',
+            prepOrigin: 'json_item',
+            jsonItemIndex: 0,
+        });
+        expect(item.id).not.toBe(sel.id);
+        saveProcessFile(doc, item);
+
+        expect(listProcessRecords(doc, { origin: 'selection' })).toHaveLength(1);
+        expect(listProcessRecords(doc, { origin: 'json_item' })).toHaveLength(1);
+        expect(listProcessRecords(doc)).toHaveLength(2);
     });
 });

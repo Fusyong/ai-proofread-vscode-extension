@@ -1,6 +1,8 @@
 /**
  * 项目级检索资料缓存：按通道查询指纹缓存 CorpusHit，避免重复检索。
  * 存储于工作区 `.proofread/retrieval-cache.json`。
+ *
+ * v2：命中正文按 digest 放入共享 hitStore，entries 只存 digests 引用，避免跨查询重复存大块 referenceBlock。
  */
 
 import { createHash } from 'crypto';
@@ -11,7 +13,8 @@ import { FilePathUtils } from '../../utils';
 import type { CorpusHit, CorpusHitSource } from '../schema';
 
 const CACHE_FILENAME = 'retrieval-cache.json';
-const CACHE_VERSION = 1;
+/** 磁盘格式版本；内存仍用带完整 hits 的 entry */
+const CACHE_VERSION = 2;
 
 export interface RetrievalCacheEntry {
     fetchedAt: string;
@@ -21,10 +24,28 @@ export interface RetrievalCacheEntry {
     hits: CorpusHit[];
 }
 
-export interface RetrievalCacheFile {
-    version: number;
+/** 磁盘 v2：entries 只引用 digests */
+export interface RetrievalCacheDiskEntry {
+    fetchedAt: string;
+    source: CorpusHitSource;
+    scopeKey?: string;
+    catalogSnapshotId?: string;
+    digests: string[];
+}
+
+export interface RetrievalCacheFileV2 {
+    version: 2;
+    hitStore: Record<string, CorpusHit>;
+    entries: Record<string, RetrievalCacheDiskEntry>;
+}
+
+/** @deprecated 仅用于描述旧版磁盘格式 */
+export interface RetrievalCacheFileV1 {
+    version: 1;
     entries: Record<string, RetrievalCacheEntry>;
 }
+
+export type RetrievalCacheFile = RetrievalCacheFileV1 | RetrievalCacheFileV2;
 
 export interface RetrievalCacheConfig {
     enabled: boolean;
@@ -57,27 +78,133 @@ function isExpired(fetchedAt: string, ttlHours: number): boolean {
     return Date.now() - t > ttlHours * 3600_000;
 }
 
-function loadFile(): RetrievalCacheFile {
-    const cachePath = getCachePath();
-    if (!cachePath || !fs.existsSync(cachePath)) {
-        return { version: CACHE_VERSION, entries: {} };
-    }
-    try {
-        const parsed = JSON.parse(fs.readFileSync(cachePath, 'utf8')) as RetrievalCacheFile;
-        if (parsed.version !== CACHE_VERSION || !parsed.entries || typeof parsed.entries !== 'object') {
-            return { version: CACHE_VERSION, entries: {} };
+/** 共享存储键：优先 digest；无 digest 时用正文短哈希 */
+export function hitStoreKey(h: CorpusHit): string {
+    if (h.digest?.trim()) return h.digest.trim();
+    const body = h.referenceBlock || h.snippet || h.hitId || '';
+    return `h:${createHash('sha1').update(body).digest('hex').slice(0, 16)}`;
+}
+
+function cloneHits(hits: CorpusHit[]): CorpusHit[] {
+    return hits.map((h) => ({
+        ...h,
+        channelScores: h.channelScores ? { ...h.channelScores } : undefined,
+    }));
+}
+
+/** 入库正文：去掉 NUL，不保留易变的 roundId */
+function cloneHitForStore(h: CorpusHit): CorpusHit {
+    const scrub = (s: string | undefined) =>
+        s == null ? s : s.replace(/\u0000/g, '').replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+    const cloned = cloneHits([h])[0];
+    cloned.snippet = scrub(cloned.snippet) ?? '';
+    cloned.referenceBlock = scrub(cloned.referenceBlock) ?? '';
+    delete cloned.roundId;
+    return cloned;
+}
+
+/**
+ * 将内存 entries（含完整 hits）压成磁盘 v2（hitStore + digests）。
+ * 同 digest 只保留一份；若新正文更长则覆盖。
+ */
+export function packRetrievalCacheForDisk(
+    entries: Record<string, RetrievalCacheEntry>
+): RetrievalCacheFileV2 {
+    const hitStore: Record<string, CorpusHit> = {};
+    const diskEntries: Record<string, RetrievalCacheDiskEntry> = {};
+
+    for (const [key, entry] of Object.entries(entries)) {
+        const digests: string[] = [];
+        for (const h of entry.hits ?? []) {
+            const stored = cloneHitForStore(h);
+            const dk = hitStoreKey(stored);
+            const prev = hitStore[dk];
+            if (
+                !prev ||
+                (stored.referenceBlock?.length ?? 0) > (prev.referenceBlock?.length ?? 0)
+            ) {
+                hitStore[dk] = { ...stored, digest: stored.digest || dk.replace(/^h:/, '') };
+            }
+            digests.push(dk);
         }
-        return parsed;
+        diskEntries[key] = {
+            fetchedAt: entry.fetchedAt,
+            source: entry.source,
+            scopeKey: entry.scopeKey,
+            catalogSnapshotId: entry.catalogSnapshotId,
+            digests,
+        };
+    }
+
+    return { version: 2, hitStore, entries: diskEntries };
+}
+
+/** 从磁盘 v1/v2 展开为内存 entries（完整 hits） */
+export function unpackRetrievalCacheFromDisk(raw: unknown): Record<string, RetrievalCacheEntry> {
+    if (!raw || typeof raw !== 'object') return {};
+    const obj = raw as Record<string, unknown>;
+    const version = obj.version;
+
+    if (version === 2) {
+        const hitStore = (obj.hitStore ?? {}) as Record<string, CorpusHit>;
+        const entriesIn = (obj.entries ?? {}) as Record<string, RetrievalCacheDiskEntry>;
+        if (!entriesIn || typeof entriesIn !== 'object') return {};
+        const out: Record<string, RetrievalCacheEntry> = {};
+        for (const [key, e] of Object.entries(entriesIn)) {
+            if (!e || typeof e !== 'object') continue;
+            const digests = Array.isArray(e.digests) ? e.digests : [];
+            const hits = digests
+                .map((d) => hitStore[d])
+                .filter((h): h is CorpusHit => !!h)
+                .map((h) => cloneHits([h])[0]);
+            out[key] = {
+                fetchedAt: e.fetchedAt,
+                source: e.source,
+                scopeKey: e.scopeKey,
+                catalogSnapshotId: e.catalogSnapshotId,
+                hits,
+            };
+        }
+        return out;
+    }
+
+    if (version === 1) {
+        const entriesIn = (obj.entries ?? {}) as Record<string, RetrievalCacheEntry>;
+        if (!entriesIn || typeof entriesIn !== 'object') return {};
+        const out: Record<string, RetrievalCacheEntry> = {};
+        for (const [key, e] of Object.entries(entriesIn)) {
+            if (!e || !Array.isArray(e.hits)) continue;
+            out[key] = {
+                fetchedAt: e.fetchedAt,
+                source: e.source,
+                scopeKey: e.scopeKey,
+                catalogSnapshotId: e.catalogSnapshotId,
+                hits: cloneHits(e.hits),
+            };
+        }
+        return out;
+    }
+
+    return {};
+}
+
+function loadFileEntries(): Record<string, RetrievalCacheEntry> {
+    const cachePath = getCachePath();
+    if (!cachePath || !fs.existsSync(cachePath)) return {};
+    try {
+        const parsed = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+        return unpackRetrievalCacheFromDisk(parsed);
     } catch {
-        return { version: CACHE_VERSION, entries: {} };
+        return {};
     }
 }
 
-function saveFile(data: RetrievalCacheFile): void {
+function saveFileEntries(entries: Record<string, RetrievalCacheEntry>): void {
     const cachePath = getCachePath();
     if (!cachePath) return;
     FilePathUtils.ensureDirExists(path.dirname(cachePath));
-    fs.writeFileSync(cachePath, JSON.stringify(data, null, 2), 'utf8');
+    const packed = packRetrievalCacheForDisk(entries);
+    fs.writeFileSync(cachePath, JSON.stringify(packed, null, 2), 'utf8');
 }
 
 function pruneOldest(entries: Record<string, RetrievalCacheEntry>, maxEntries: number): void {
@@ -170,8 +297,8 @@ export function getCachedRetrievalHits(
         }
     }
 
-    const file = loadFile();
-    const entry = file.entries[key];
+    const entries = loadFileEntries();
+    const entry = entries[key];
     if (!entry) {
         stats.misses++;
         return null;
@@ -202,10 +329,10 @@ export function setCachedRetrievalHits(params: {
         hits: cloneHits(params.hits),
     };
     sessionMemory.set(params.key, entry);
-    const file = loadFile();
-    file.entries[params.key] = entry;
-    pruneOldest(file.entries, Math.max(50, params.maxEntries));
-    saveFile(file);
+    const entries = loadFileEntries();
+    entries[params.key] = entry;
+    pruneOldest(entries, Math.max(50, params.maxEntries));
+    saveFileEntries(entries);
 }
 
 export function clearRetrievalCache(): boolean {
@@ -216,10 +343,6 @@ export function clearRetrievalCache(): boolean {
         fs.unlinkSync(cachePath);
     }
     return true;
-}
-
-function cloneHits(hits: CorpusHit[]): CorpusHit[] {
-    return hits.map((h) => ({ ...h, channelScores: h.channelScores ? { ...h.channelScores } : undefined }));
 }
 
 /** 缓存命中后刷新本轮元数据 */
