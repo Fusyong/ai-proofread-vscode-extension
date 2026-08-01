@@ -31,6 +31,7 @@ Thumbs.db
 # .proofread/editorial-memory.json
 # .proofread/editorial-memory-archive.json
 # .proofread/*.bak
+.proofread/
 
 # 临时文件
 *.log
