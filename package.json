@@ -78,23 +78,18 @@
         "title": "AI Proofreader: merge two files"
       },
       {
-        "command": "ai-proofread.knowledgeVerifySelection",
-        "title": "Knowledge Verify Selection",
-        "category": "AI Proofreader Search"
-      },
-      {
         "command": "ai-proofread.prepareReferencesJson",
-        "title": "Prepare References for JSON File",
+        "title": "Prepare References for JSON File（资料准备·JSON）",
         "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.prepareReferencesSelection",
-        "title": "Prepare References for Selection",
+        "title": "Prepare References for Selection（资料准备·选段）",
         "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.referencePrep.openConsole",
-        "title": "Open Reference Search panel",
+        "title": "Open Reference Search Panel（检索面板）",
         "category": "AI Proofreader Search"
       },
       {
@@ -125,60 +120,60 @@
       },
       {
         "command": "ai-proofread.queryLocalDictSelection",
-        "title": "Look Up Selection in Local Dictionary",
+        "title": "Look Up Local Dictionary（直接查词典）",
         "category": "AI Proofreader Search",
-        "description": "把选中当作一个词条查本地词典"
+        "description": "把选中当作一个词条查本地词典（无 LLM）"
       },
       {
         "command": "ai-proofread.search.dictPrep",
-        "title": "Search with Local Dictionary (LLM Plan)",
+        "title": "Search Local Dictionary（LLM 规划）",
         "category": "AI Proofreader Search",
         "description": "仅本地词典：LLM 规划后查 MDX"
       },
       {
         "command": "ai-proofread.search.refsGrep",
-        "title": "Search References with Grep (LLM Plan)",
+        "title": "Search References with Grep（LLM 规划）",
         "category": "AI Proofreader Search",
         "description": "仅参考资料 grep"
       },
       {
         "command": "ai-proofread.search.refsBm25",
-        "title": "Search References with BM25 (LLM Plan)",
+        "title": "Search References with BM25（LLM 规划）",
         "category": "AI Proofreader Search",
-        "description": "仅参考资料 BM25（jieba）"
+        "description": "仅参考资料 BM25（jieba；需先建立引文索引）"
       },
       {
         "command": "ai-proofread.search.refsVector",
-        "title": "Search References with Vector (LLM Plan)",
+        "title": "Search References with Vector（LLM 规划）",
         "category": "AI Proofreader Search",
         "description": "仅参考资料轻量向量"
       },
       {
         "command": "ai-proofread.search.wikipedia",
-        "title": "Search Wikipedia (LLM Plan)",
+        "title": "Search Wikipedia（LLM 规划）",
         "category": "AI Proofreader Search",
         "description": "仅维基百科 API"
       },
       {
         "command": "ai-proofread.search.web",
-        "title": "Search the Web (LLM Plan)",
+        "title": "Search the Web（LLM 规划·未实现）",
         "category": "AI Proofreader Search",
-        "description": "Web 搜索（适配器未配置时提示）"
+        "description": "Web 搜索尚未实现（适配器未配置）"
       },
       {
         "command": "ai-proofread.llmGrepSearchReferences",
-        "title": "User-Directed LLM Combined Search",
+        "title": "Intent Search（意图检索）",
         "category": "AI Proofreader Search",
-        "description": "用户指令LLM综合检索：用自然语言描述检索意图，LLM 规划后默认词典+grep+BM25+向量多源检索"
+        "description": "用自然语言描述检索意图，LLM 规划后默认词典+grep+BM25+向量多源检索"
       },
       {
         "command": "ai-proofread.referencePrep.openView",
-        "title": "Open Reference Prep Results",
+        "title": "Open 资料检索 View",
         "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.referencePrep.toggleResultsView",
-        "title": "Toggle Reference Hit View",
+        "title": "Toggle 资料检索 View",
         "category": "AI Proofreader Search"
       },
       {
@@ -292,22 +287,23 @@
       },
       {
         "command": "ai-proofread.citation.openView",
-        "title": "Verify Citations",
+        "title": "Verify Citations（核对全文引文）",
         "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.citation.toggleView",
-        "title": "Toggle Citations View",
+        "title": "Toggle Citations View（引文核查）",
         "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.citation.rebuildIndex",
-        "title": "Build Citation Reference Index",
-        "category": "AI Proofreader Search"
+        "title": "Build Citation Reference Index（建立引文索引）",
+        "category": "AI Proofreader Search",
+        "description": "供核对全文引文与资料准备的 BM25 通道共用"
       },
       {
         "command": "ai-proofread.citation.verifySelection",
-        "title": "Verify Selected Citation",
+        "title": "Verify Selected Citation（核对选中引文）",
         "category": "AI Proofreader Search"
       },
       {
@@ -741,7 +737,7 @@
               "content"
             ]
           },
-          "description": "参考资料规划提示词列表（referencePrep 与 dict prep prompts 视图共用）。"
+          "description": "参考资料规划提示词列表（referencePrep 与 prompts for reference prep 视图共用）。"
         },
         "ai-proofread.referencePrep.enabledSources": {
           "order": 36,
@@ -759,7 +755,7 @@
           "default": 3,
           "minimum": 1,
           "maximum": 10,
-          "description": "（已弃用）最大轮次由命令中选择的核查强度（轻量/标准/深入）决定。"
+          "description": "（已弃用）最大轮次由命令中选择的检索强度（轻量/标准/深入）决定。"
         },
         "ai-proofread.referencePrep.continuation.maxRounds": {
           "order": 37.05,
@@ -773,7 +769,7 @@
           "order": 37.5,
           "type": "boolean",
           "default": false,
-          "description": "知识核查选段在「准备并校对」时是否注入编辑记忆。"
+          "description": "（保留配置）选段校对注入编辑记忆的开关；当前主要由带记忆校对命令控制，资料准备流程不再单独使用。"
         },
         "ai-proofread.referencePrep.grep.maxHitsPerRound": {
           "order": 37.6,
@@ -781,7 +777,7 @@
           "default": 30,
           "minimum": 1,
           "maximum": 200,
-          "description": "（已弃用）每轮 grep 命中上限由核查强度决定：轻量 12 / 标准 30 / 深入 50。"
+          "description": "（已弃用）每轮 grep 命中上限由检索强度决定：轻量 12 / 标准 30 / 深入 50。"
         },
         "ai-proofread.referencePrep.grep.maxSnippetChars": {
           "order": 37.7,
@@ -789,7 +785,7 @@
           "default": 12000,
           "minimum": 1000,
           "maximum": 100000,
-          "description": "（已弃用）grep 字符预算由核查强度决定：轻量 6000 / 标准 12000 / 深入 20000。"
+          "description": "（已弃用）grep 字符预算由检索强度决定：轻量 6000 / 标准 12000 / 深入 20000。"
         },
         "ai-proofread.referencePrep.grep.maxFiles": {
           "order": 37.75,
@@ -1002,7 +998,7 @@
           "default": 4000,
           "minimum": 500,
           "maximum": 20000,
-          "description": "单条维基导语摘录最大字符数（可被核查强度覆盖）。"
+          "description": "单条维基导语摘录最大字符数（可被检索强度覆盖）。"
         },
         "ai-proofread.modelRoutes": {
           "order": 9.5,
@@ -1487,7 +1483,7 @@
         },
         {
           "id": "ai-proofread.dictPrepPrompts",
-          "name": "prompts for dict prep ",
+          "name": "prompts for reference prep",
           "when": "aiProofread.showDictPrepPromptsView"
         },
         {
@@ -1904,11 +1900,6 @@
           "command": "ai-proofread.prepareReferencesJson",
           "group": "ai-proofread@30.5",
           "when": "resourceLangId == json"
-        },
-        {
-          "command": "ai-proofread.knowledgeVerifySelection",
-          "group": "ai-proofread@30.4",
-          "when": "editorHasSelection"
         },
         {
           "command": "ai-proofread.proofreadFile",

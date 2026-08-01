@@ -13,7 +13,7 @@ import type {
 import type { ReferencePrepTargetKind } from './referencePrepPrompt';
 import type { PrepEventListener } from './prepEvents';
 
-/** LLM 增强检索 / 核对选中引文 / 知识核查「仅准备」等共用的默认资料来源 */
+/** 资料准备 / 意图检索 / 核对选中引文等共用的默认资料来源 */
 export const DEFAULT_REFERENCE_PREP_SOURCES: ReferenceSourceId[] = [
     'dict',
     'grep_md',
@@ -81,7 +81,7 @@ export interface ReferencePrepSessionResult {
 
 /**
  * 统一的参考资料准备会话：资源预筛 → 多轮规划 → 检索 → LLM 精排。
- * 知识核查（仅准备）、LLM 增强检索、核对选中引文均经此入口，差异在 targetKind / 提示词 / 是否校对。
+ * 资料准备、意图检索、核对选中引文均经此入口，差异在 targetKind / 规划提示词。
  */
 export async function runReferencePrepSession(
     params: ReferencePrepSessionParams
@@ -137,7 +137,7 @@ export async function pickReferencePrepStrength(
         })),
         {
             title,
-            placeHolder: '控制轮次、查询数与命中预算（与知识核查相同）',
+            placeHolder: '控制轮次、查询数与命中预算',
             ignoreFocusOut: true,
         }
     );

@@ -4,7 +4,17 @@
 
 **已定技术决策**：使用 **sql.js**；首版侧栏用 **TreeView**；引文收集首版仅做 Markdown 的引号与 `>`，**预留扩展能力**（如 LaTeX、其他格式）。
 
+### 与资料准备的双路径（固定边界）
+
+| 能力 | 命令 | 机制 | 结果树 |
+|------|------|------|--------|
+| **核对选中引文** | `Verify Selected Citation（核对选中引文）` | 共用 referencePrep（`citation_selection`），多源检索 | 侧栏 **资料检索** |
+| **核对全文引文** | `Verify Citations（核对全文引文）` | 本文档所述：引文索引 + 相似度匹配 | 侧栏 **引文核查** |
+
+「建立引文索引」同时供核对全文引文与资料准备的 **BM25** 通道使用（应用层 BM25 / jieba，**非 FTS5**）。资料准备总览见 [knowledge-verify-plan.md](knowledge-verify-plan.md)。
+
 ---
+
 
 ## 一、需求与目标回顾
 

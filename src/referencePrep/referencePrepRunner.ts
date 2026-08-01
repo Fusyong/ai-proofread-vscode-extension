@@ -33,7 +33,12 @@ import {
     executeReferencePrepPlan,
     mergeCorpusDedupe,
 } from './retrieval/executor';
-import { appendProcessLog, loadOrCreateProcessFile, saveProcessFile } from './processFile';
+import {
+    appendProcessLog,
+    listProcessRecords,
+    loadOrCreateProcessFile,
+    saveProcessFile,
+} from './processFile';
 import {
     filterDictsByScope,
     resolveResourceScope,
@@ -390,6 +395,19 @@ export async function runReferencePrepForTarget(
     }
 }
 
+function hasJsonItemProcessWork(jsonFilePath: string, jsonItemIndex: number): boolean {
+    return listProcessRecords(jsonFilePath, { origin: 'json_item' }).some(
+        (r) =>
+            r.jsonItemIndex === jsonItemIndex &&
+            (r.corpus.length > 0 || r.rounds.length > 0)
+    );
+}
+
+/**
+ * 对 JSON 切分文件逐条准备参考资料。
+ * 结果只写入过程文件（`.referenceprep.json`）与侧栏；不自动改写源 JSON 的 `reference`。
+ * 需写入条目时，请在检索面板勾选后「合并选中到源 JSON」。
+ */
 export async function runReferencePrepForJsonFile(
     params: {
         jsonFilePath: string;
@@ -397,8 +415,7 @@ export async function runReferencePrepForJsonFile(
         enabledSources: ReferenceSourceId[];
         strength: ReferencePrepStrength;
         intents?: ReferencePrepIntent[];
-        mergeMode?: 'overwrite' | 'append';
-        /** 跳过已有非空 reference 的条目（断点续跑） */
+        /** 跳过过程文件中已有检索记录的条目（断点续跑） */
         skipExistingReference?: boolean;
     } & ReferencePrepProgressHooks
 ): Promise<{ processed: number; skipped: number; total: number; cancelled: boolean }> {
@@ -422,14 +439,14 @@ export async function runReferencePrepForJsonFile(
         const target = String(item.target ?? '');
         if (!target.trim()) continue;
 
-        if (params.skipExistingReference && String(item.reference ?? '').trim()) {
+        if (params.skipExistingReference && hasJsonItemProcessWork(params.jsonFilePath, idx)) {
             skipped++;
             params.onEvent?.({
                 type: 'phase',
                 name: 'json_item',
-                message: `跳过第 ${idx + 1}/${items.length} 条（已有资料）`,
+                message: `跳过第 ${idx + 1}/${items.length} 条（过程文件已有记录）`,
             });
-            params.onProgress?.(`跳过第 ${idx + 1}/${items.length} 条（已有资料）`);
+            params.onProgress?.(`跳过第 ${idx + 1}/${items.length} 条（过程文件已有记录）`);
             continue;
         }
 
@@ -440,7 +457,7 @@ export async function runReferencePrepForJsonFile(
         });
         params.onProgress?.(`准备第 ${idx + 1}/${items.length} 条…`);
 
-        const { mergedReference } = await runReferencePrepForTarget({
+        await runReferencePrepForTarget({
             target,
             anchorPath: params.jsonFilePath,
             context: params.context,
@@ -457,14 +474,6 @@ export async function runReferencePrepForJsonFile(
             onProcessUpdated: params.onProcessUpdated,
         });
 
-        if (mergedReference) {
-            if (params.mergeMode === 'append' && item.reference) {
-                item.reference = `${item.reference}\n\n${mergedReference}`;
-            } else {
-                item.reference = mergedReference;
-            }
-        }
-        fs.writeFileSync(params.jsonFilePath, JSON.stringify(items, null, 2), 'utf8');
         processed++;
         params.onAfterJsonItem?.(idx);
 

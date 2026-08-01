@@ -1,6 +1,6 @@
 # AI Proofreader 扩展命令速查与业务流程图
 
-*v1.11.4*
+*v1.12.1*
 
 > **文档定位**：本文档是**快速入口**——帮你从业务场景找到对应流程和命令。详细说明、依赖安装、最佳实践见扩展主页面或 [README](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/README.md)。
 
@@ -8,16 +8,28 @@
 
 ## 30 秒概览
 
-**四个入口**：（1）左侧活动栏 **overview**：打开**校对面板** / **检索面板**，并开关侧栏 TreeView；（2）**校对面板**集中文档准备、切分、校对、比较与字词/重文等命令；（3）**检索面板**集中参考资料多源检索、命中勾选导出与引文相关命令；（4）命令面板（Ctrl+Shift+P）输入「AI Proofreader」可查全部命令；部分命令也有**右键菜单**。
+**四个入口**：（1）左侧活动栏 **overview**：打开**校对面板** / **检索面板**，并开关侧栏 TreeView；（2）**校对面板**集中文档准备、切分、校对、比较与字词/重文等命令；（3）**检索面板**集中资料准备、命中勾选导出/合并与引文相关命令（**不做校对**）；（4）命令面板（Ctrl+Shift+P）输入「AI Proofreader」可查全部命令；部分命令也有**右键菜单**。
 
 | 能力 | 说明 |
 |------|------|
 | **文档准备** | **校对面板**：docx/PDF（可选）、整理段落、标记标题、切分等 |
-| **校对路径** | ① 选段：`proofread selection`（或 **`proofread selection with memory`**）；② 长文档：切分 →「校对 JSON 文件」；需要 reference 时可在检索面板准备/导出后指定 |
-| **资料检索** | **检索面板**：配置来源 → 多轮准备 → 侧栏「资料检索」勾选/导出 md →「参考选中校对当前选段」；单源检索与外跳工具见面板底部快捷栏 |
+| **校对路径** | ① 选段：`proofread selection`（或 **`proofread selection with memory`**）；② 长文档：切分 →「校对 JSON 文件」；需要 reference 时先在检索面板准备/导出或合并，再到校对面板指定并选用提示词 |
+| **资料准备** | **检索面板**：配置来源 → 多轮准备 → 侧栏「资料检索」勾选 → 导出 md 或合并到源 JSON；单源/意图检索与外跳工具见面板底部 |
+| **知识核查** | 预置提示词（item / full）；在**校对面板**校对时选用，不是独立命令 |
 | **结果查看** | **校对面板**「比较前后差异」「生成勘误表」；或 diff 命令 |
-| **辅助功能** | 校对面板：字词检查、重文扫描、序号等；检索面板：引文核对；**overview** 可开关侧栏视图（模型路由、提示词、字词检查、资料检索、引文核查、重文检查、标题树、段内序号、校对条目） |
+| **辅助功能** | 校对面板：字词检查、重文扫描、序号等；检索面板：核对选中/全文引文；**overview** 可开关侧栏视图 |
 | **用户扩展能力** | 自定义提示词、自定义替换表、jieba 词典、标题/序号规则，见 [第六节](#六用户扩展能力) |
+
+### 术语简表
+
+| 术语 | 含义 |
+|------|------|
+| **资料准备** | 多源检索 → 过程文件 + 侧栏「资料检索」；不自动校对；JSON 不自动写 `reference` |
+| **知识核查** | 预置校对提示词；校对面板选用 |
+| **意图检索** | 自然语言描述检索意图后多源检索 |
+| **核对选中引文** | → 侧栏「资料检索」 |
+| **核对全文引文** | → 侧栏「引文核查」（须先建立引文索引） |
+| **直接查词典** | 无 LLM，整词查 MDX |
 
 ---
 
@@ -56,7 +68,7 @@
 | 任务 | 操作（优先用 UI） |
 |------|-------------------|
 | 校对这一小段 | 选中文字 → **右键** → **proofread selection**（或 **with memory**）；或 **校对面板** 底部对应链接 |
-| 先查资料再校对 | overview → **检索面板** → 开始准备 → 勾选命中 → **参考选中校对当前选段** |
+| 先查资料再校对 | overview → **检索面板** → 开始准备 → 勾选命中 → **导出 md** → **校对面板** proofread selection（可选「知识核查」提示词 + 参考文件） |
 | 要带固定参考全文 | 选段校对时选「使用参考文件」；或 JSON **Merge Two Files** 并入 Markdown |
 
 ### 1.3 练习册（题 + 答案需一起校对）
@@ -104,8 +116,9 @@
 |--------|----------|
 | 校稿、审稿、改错 | proofread selection / proofread file |
 | 出勘误表、审校记录 | diff it with another file → 逐句对齐 |
-| 核对引文、查出处 | verify selected citation（资料检索）/ verify citations（引文核查） |
-| 查词典、查参考资料 | 检索面板；Look Up Selection / Search References* |
+| 核对引文、查出处 | 核对选中引文（资料检索）/ 核对全文引文（引文核查） |
+| 查词典、查参考资料 | 检索面板；直接查词典 / 词典·LLM规划 / 意图检索 |
+| 知识核查 | 预置提示词；先资料准备再校对面板选用 |
 | 转 Word、转 Markdown | convert docx/markdown |
 | 查错别字、异形词 | check words |
 | 检查序号、标题层级 | check numbering hierarchy |
@@ -230,7 +243,7 @@ flowchart LR
 **优先用 UI**：
 
 - **校对面板**（overview「校对面板」或 `open proofreading panel`）：文档转换/整理、切分校对、字词与序号、重文、diff、提示词与设置。
-- **检索面板**（overview「检索面板」或 `Open Reference Search Panel`）：多源准备、单源检索、外跳搜索、引文核对、清除检索缓存；命中可勾选导出 md/JSON，或「参考选中校对当前选段」。
+- **检索面板**（overview「检索面板」或 `Open Reference Search Panel（检索面板）`）：多源准备、单源/意图检索、外跳搜索、引文核对、清除检索缓存；命中可勾选导出 md/JSON 或合并到源 JSON。**校对请到校对面板。**
 - 两面板底部快捷命令**不重复**；命令面板（Ctrl+Shift+P）输入「AI Proofreader」可查全部。⭐ 表示核心/常用。
 
 | 命令 | 简短说明 |
@@ -270,15 +283,15 @@ flowchart LR
 | AI Proofreader: manage custom tables | 管理自定义替换表 |
 | AI Proofreader: check numbering hierarchy | 检查标题序号层级与段内序号 |
 | AI Proofreader: scan duplicate sentences in document / selection | 重文检查（全文 / 选区） |
-| **参考资料检索**（检索面板；命令面板搜 `AI Proofreader Search`） | |
-| Open Reference Search Panel ⭐ | 打开 **检索面板**（配置、时间线、勾选命中、导出、底部快捷命令） |
-| Prepare References for Selection / JSON File | 选段或多源批量准备 reference |
-| Knowledge Verify Selection | 选段知识核查（准备 ± 校对 / 用已有资料） |
-| Look Up Selection in Local Dictionary | 精确整词查本地 MDX（无 LLM） |
-| Search with Local Dictionary / Grep·BM25·Vector / Wikipedia / Web | 单源 LLM 规划检索 |
-| LLM-Enhanced Grep Search | 自然语言多源检索（`search_intent`） |
+| **资料准备 / 检索**（检索面板；命令面板搜 `AI Proofreader Search`） | |
+| Open Reference Search Panel（检索面板）⭐ | 打开 **检索面板**（配置、时间线、勾选命中、导出/合并；不做校对） |
+| Prepare References for Selection / JSON File（资料准备） | 选段或 JSON 批量准备；结果进过程文件；JSON **不自动写入**源文件 |
+| Look Up Local Dictionary（直接查词典） | 精确整词查本地 MDX（无 LLM） |
+| Search Local Dictionary / Grep·BM25·Vector / Wikipedia（LLM 规划） | 单源 LLM 规划检索；Web 未实现 |
+| Intent Search（意图检索） | 自然语言多源检索（`search_intent`） |
 | Search Selection in References (Find in Files) | Find in Files（即时工具，无 LLM） |
-| Verify Selected Citation / Verify Citations / Build Citation Reference Index | 引文核对（结果：资料检索树 / 引文核查树） |
+| Verify Selected Citation（核对选中引文） | 结果 → **资料检索** |
+| Verify Citations（核对全文引文） / Build Citation Reference Index | 结果 → **引文核查**；索引亦供 BM25 |
 | Clear Project Retrieval Cache | 清除 `.proofread/retrieval-cache.json` |
 | **便捷工具**（检索面板底部；`AI Proofreader Tools`） | |
 | Search Selection in PDF / Shidianguji / Ancientbooks | 外跳；不进入 reference corpus |

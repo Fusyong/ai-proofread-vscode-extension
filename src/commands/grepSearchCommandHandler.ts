@@ -21,7 +21,7 @@ export class GrepSearchCommandHandler {
             : '';
 
         const description = await vscode.window.showInputBox({
-            title: '用户指令LLM综合检索',
+            title: '意图检索',
             prompt: '描述你想在词典与参考资料中检索的内容（可含专名、主题、史实要点等）',
             placeHolder: '例如：查找关于李白生卒年与籍贯的记述',
             value: defaultDescription || undefined,
@@ -30,7 +30,7 @@ export class GrepSearchCommandHandler {
         });
         if (!description?.trim()) return;
 
-        const strength = await pickReferencePrepStrength('用户指令LLM综合检索');
+        const strength = await pickReferencePrepStrength('意图检索 · 检索强度');
         if (!strength) return;
 
         try {
@@ -39,7 +39,7 @@ export class GrepSearchCommandHandler {
                 context,
                 anchorPath,
                 target: description.trim(),
-                title: '用户指令LLM综合检索',
+                title: '意图检索',
             });
             if (!cont) return;
 

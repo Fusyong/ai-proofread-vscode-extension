@@ -1,25 +1,12 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import * as vscode from 'vscode';
-import { ConfigManager, ErrorUtils, FilePathUtils } from '../utils';
-import { resolveModelRoute } from '../modelRoutes/modelRouteResolver';
-import { proofreadSelection } from '../proofreader';
-import { getPromptDisplayName } from '../promptManager';
-import { showSelectionProofreadDiffWithApply } from '../differ';
-import { runEditorialMemoryAfterAccept } from '../editorialMemory/service';
-import {
-    pickProofreadPromptForKnowledgeVerify,
-    withTemporaryProofreadPrompt,
-} from '../proofreadPromptPick';
+import { ErrorUtils } from '../utils';
 import type { ReferencePrepProcessFileV020, ReferencePrepStrength, ReferenceSourceId } from '../referencePrep/schema';
 import { getDefaultEnabledSources, runReferencePrepForJsonFile, runReferencePrepForTarget } from '../referencePrep/referencePrepRunner';
 import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
 import { setReferenceHitVisible } from '../ui/sidebarViewVisibility';
 import { loadReferencePrepLastRun, saveReferencePrepLastRun } from '../referencePrep/runPreferences';
-import {
-    pickExistingReferenceForProofread,
-    pickReferencePrepContinuation,
-} from '../referencePrep/continuation';
+import { pickReferencePrepContinuation } from '../referencePrep/continuation';
 import { listProcessRecords } from '../referencePrep/processFile';
 import {
     REFERENCE_PREP_STRENGTH_OPTIONS,
@@ -27,30 +14,6 @@ import {
 } from '../referencePrep/referencePrepSession';
 import type { PrepEventListener } from '../referencePrep/prepEvents';
 import { WebviewManager } from '../ui/webviewManager';
-
-type KnowledgeVerifyMode = 'prep_and_proofread' | 'prep_only' | 'proofread_existing';
-
-const KNOWLEDGE_VERIFY_MODE_OPTIONS: Array<{
-    label: string;
-    description: string;
-    value: KnowledgeVerifyMode;
-}> = [
-    {
-        label: '准备参考资料并验证',
-        description: '检索词典与文献后，用知识核查提示词校对选段',
-        value: 'prep_and_proofread',
-    },
-    {
-        label: '仅准备参考资料',
-        description: '只运行 referencePrep，生成 mergedReference，不校对',
-        value: 'prep_only',
-    },
-    {
-        label: '用已有参考资料验证',
-        description: '使用当前文档或最近会话中已准备的 reference 直接校对',
-        value: 'proofread_existing',
-    },
-];
 
 export interface PrepForSelectionParams {
     target: string;
@@ -71,10 +34,8 @@ export interface PrepForSelectionParams {
 }
 
 export class ReferencePrepCommandHandler {
-    private configManager = ConfigManager.getInstance();
-
     constructor(
-        private webviewManager: WebviewManager,
+        _webviewManager: WebviewManager,
         private resultsProvider?: ReferencePrepResultsProvider
     ) {}
 
@@ -135,7 +96,7 @@ export class ReferencePrepCommandHandler {
                 picked: o.value === last.strength,
             })),
             {
-                title: '核查强度',
+                title: '检索强度',
                 placeHolder: `上次：${REFERENCE_PREP_STRENGTH_OPTIONS.find((s) => s.value === last.strength)?.label ?? '标准'}`,
                 ignoreFocusOut: true,
             }
@@ -152,7 +113,7 @@ export class ReferencePrepCommandHandler {
 
     /**
      * 选段准备参考资料（与 prepareReferencesJson 对称）。
-     * 知识核查、Webview、命令面板共用。
+     * 检索面板、命令面板共用。
      */
     async runPrepForSelection(
         params: PrepForSelectionParams
@@ -257,202 +218,9 @@ export class ReferencePrepCommandHandler {
         }
     }
 
-    private async pickKnowledgeVerifyMode(): Promise<KnowledgeVerifyMode | undefined> {
-        const picked = await vscode.window.showQuickPick(
-            KNOWLEDGE_VERIFY_MODE_OPTIONS.map((o) => ({
-                label: o.label,
-                description: o.description,
-                value: o.value,
-            })),
-            {
-                title: '知识核查',
-                placeHolder: '选择要执行的操作',
-                ignoreFocusOut: true,
-            }
-        );
-        return picked?.value;
-    }
-
-    /** 选段：知识核查 = 准备 + 可选校对 */
-    async handleKnowledgeVerifySelection(
-        editor: vscode.TextEditor,
-        context: vscode.ExtensionContext
-    ): Promise<void> {
-        const selectedText = editor.document.getText(editor.selection);
-        if (!selectedText.trim()) {
-            vscode.window.showErrorMessage('请先选择要核查的文本。');
-            return;
-        }
-
-        const mode = await this.pickKnowledgeVerifyMode();
-        if (!mode) return;
-
-        const anchorPath = editor.document.uri.fsPath;
-
-        if (mode === 'proofread_existing') {
-            try {
-                const existing = await pickExistingReferenceForProofread({
-                    context,
-                    anchorPath,
-                    selectedText,
-                });
-                if (!existing) return;
-
-                const promptStorageName = await pickProofreadPromptForKnowledgeVerify(context);
-                if (!promptStorageName) return;
-
-                await this.showResultsTree(existing.anchorPath, existing.process);
-
-                await withTemporaryProofreadPrompt(context, promptStorageName, () =>
-                    this.runProofreadSelectionWithInlineReference(
-                        editor,
-                        context,
-                        existing.mergedReference,
-                        getPromptDisplayName(promptStorageName)
-                    )
-                );
-            } catch (e) {
-                ErrorUtils.showError(e, '知识核查失败：');
-            }
-            return;
-        }
-
-        if (mode === 'prep_only') {
-            await this.handlePrepareReferencesSelection(editor, context);
-            return;
-        }
-
-        // prep_and_proofread
-        const prep = await this.pickPrepSourcesAndStrength(context);
-        if (!prep) return;
-
-        const proofreadPromptName = await pickProofreadPromptForKnowledgeVerify(context);
-        if (!proofreadPromptName) return;
-
-        try {
-            const { mergedReference } = await vscode.window.withProgress(
-                {
-                    location: vscode.ProgressLocation.Notification,
-                    title: '参考资料准备',
-                    cancellable: true,
-                },
-                async (_p, token) =>
-                    this.runPrepForSelection({
-                        target: selectedText,
-                        anchorPath,
-                        context,
-                        enabledSources: prep.enabledSources,
-                        strength: prep.strength,
-                        freshProcess: true,
-                        onProgress: (m) => _p.report({ message: m }),
-                        token,
-                        openMergedPreview: false,
-                        showInformationMessage: false,
-                    })
-            );
-
-            await withTemporaryProofreadPrompt(context, proofreadPromptName, () =>
-                this.runProofreadSelectionWithInlineReference(
-                    editor,
-                    context,
-                    mergedReference,
-                    getPromptDisplayName(proofreadPromptName)
-                )
-            );
-        } catch (e) {
-            ErrorUtils.showError(e, '知识核查失败：');
-        }
-    }
-
-    private async runProofreadSelectionWithInlineReference(
-        editor: vscode.TextEditor,
-        context: vscode.ExtensionContext,
-        inlineReference: string,
-        promptDisplayName: string
-    ): Promise<void> {
-        const useMemory = vscode.workspace
-            .getConfiguration('ai-proofread')
-            .get<boolean>('referencePrep.useEditorialMemory', false);
-
-        const { platform, model } = resolveModelRoute('proofread');
-        const userTemperature = this.configManager.getTemperature();
-
-        const range = new vscode.Range(editor.selection.start, editor.selection.end);
-        const sel = new vscode.Selection(range.start, range.end);
-
-        const originalText = editor.document.getText(range);
-        const fileExt = path.extname(editor.document.fileName);
-        let itemChanges: Array<{ original: string; corrected: string }> | undefined;
-
-        const result = await proofreadSelection(
-            editor,
-            sel,
-            platform,
-            model,
-            undefined,
-            undefined,
-            userTemperature,
-            context,
-            undefined,
-            undefined,
-            undefined,
-            '',
-            undefined,
-            (items) => {
-                itemChanges = items
-                    .filter((i) => i.corrected != null)
-                    .map((i) => ({ original: i.original, corrected: i.corrected! }));
-            },
-            undefined,
-            useMemory,
-            inlineReference
-        );
-
-        if (!result) {
-            vscode.window.showErrorMessage('校对失败，请重试。');
-            return;
-        }
-
-        const logFilePath = FilePathUtils.getFilePath(editor.document.uri.fsPath, '.proofread', '.log');
-        fs.appendFileSync(
-            logFilePath,
-            `\n${'='.repeat(50)}\nKnowledge verify + proofread\nPrompt: ${promptDisplayName}\nReference: inline prepared\nResult:\n\n${result}\n${'='.repeat(50)}\n\n`,
-            'utf8'
-        );
-
-        const diffRes = await showSelectionProofreadDiffWithApply(
-            context,
-            editor.document,
-            range,
-            originalText,
-            result,
-            fileExt
-        );
-        if (diffRes.applied && useMemory) {
-            try {
-                await runEditorialMemoryAfterAccept({
-                    documentUri: editor.document.uri,
-                    fullText: editor.document.getText(),
-                    selectionStartLine: range.start.line,
-                    selectionRangeLabel: `L${range.start.line + 1}–L${range.end.line + 1}`,
-                    originalSelected: originalText,
-                    finalSelected: diffRes.finalText,
-                    modelOutput: result,
-                    platform,
-                    model,
-                    items: itemChanges,
-                    editorialMemoryForceEnabled: true,
-                });
-            } catch {
-                /* 记忆更新失败不阻断 */
-            }
-        }
-        vscode.window.showInformationMessage(`校对完成 | ${promptDisplayName}`);
-    }
-
     /**
-     * JSON：准备参考资料（与检索面板一致：只检索准备，不自动校对）。
-     * 校对请另用校对命令；命中勾选导出/合并请在检索面板完成。
+     * JSON：准备参考资料（只写过程文件，不自动写入源 JSON 的 reference）。
+     * 校对请另用校对面板；命中勾选导出/合并请在检索面板完成。
      */
     async handlePrepareReferencesJson(
         jsonFilePath: string,
@@ -488,7 +256,7 @@ export class ReferencePrepCommandHandler {
                 {
                     location: vscode.ProgressLocation.Notification,
                     title: options?.skipExistingReference
-                        ? '继续准备参考资料（跳过已有）'
+                        ? '继续准备参考资料（跳过已有过程）'
                         : '批量准备参考资料',
                     cancellable: true,
                 },
@@ -551,7 +319,7 @@ export class ReferencePrepCommandHandler {
                 );
             } else {
                 vscode.window.showInformationMessage(
-                    `参考资料准备完成：${stats.processed}/${stats.total} 条${skipPart}（见侧栏「资料检索」；可在检索面板勾选导出/合并）。`
+                    `参考资料准备完成：${stats.processed}/${stats.total} 条${skipPart}（见侧栏「资料检索」；需写入条目时请在检索面板勾选后合并到源 JSON）。`
                 );
             }
         } catch (e) {

@@ -18,7 +18,6 @@ import {
     setActiveProcessRecord,
 } from '../referencePrep/processFile';
 import { pickReferencePrepContinuation } from '../referencePrep/continuation';
-import { targetsMatch } from '../referencePrep/continuationLogic';
 import type { PrepEvent } from '../referencePrep/prepEvents';
 import type {
     CorpusHit,
@@ -39,13 +38,12 @@ import {
 } from '../referencePrep/exportSelectedHits';
 import { getWorkingTextEditor, focusWorkingTextEditor } from './lastActiveTextEditor';
 import { FilePathUtils } from '../utils';
-import type { ProofreadCommandHandler } from '../commands/proofreadCommandHandler';
 import { setReferenceHitVisible } from './sidebarViewVisibility';
 
 const PANEL_ID = 'ai-proofread.referencePrepConsole';
 const PANEL_TITLE = 'References search panel';
 /** 递增以在扩展更新后强制刷新已打开面板的 HTML（避免旧界面缺导出提示条）。 */
-const WEBVIEW_HTML_REVISION = 13;
+const WEBVIEW_HTML_REVISION = 14;
 
 export class ReferencePrepWebview {
     private panel: vscode.WebviewPanel | undefined;
@@ -63,8 +61,7 @@ export class ReferencePrepWebview {
     constructor(
         private context: vscode.ExtensionContext,
         private prepHandler: ReferencePrepCommandHandler,
-        private resultsProvider?: ReferencePrepResultsProvider,
-        private proofreadHandler?: ProofreadCommandHandler
+        private resultsProvider?: ReferencePrepResultsProvider
     ) {
         this.corpusSyncDisposable = this.resultsProvider?.onDidChangeCorpus((e) => {
             if (!this.panel) return;
@@ -489,87 +486,6 @@ export class ReferencePrepWebview {
         }
     }
 
-    /**
-     * 导出勾选命中为 md，并以该文件为参考文件调用 Proofread selection（其余交互不变）。
-     */
-    private async proofreadSelectionWithExportedMd(hitIds?: string[]): Promise<void> {
-        if (this.lastPrepOrigin === 'json') {
-            vscode.window.showWarningMessage(
-                '当前结果来自 JSON 条目检索，请用「合并选中到源 JSON」写回条目；选段校对仅用于 Markdown 选段资料。'
-            );
-            return;
-        }
-        if (!this.proofreadHandler) {
-            vscode.window.showErrorMessage('校对模块未就绪，无法启动选段校对。');
-            return;
-        }
-        const groups = this.resolveSelectedHitGroups(hitIds);
-        const prepared = this.prepareSelectedMdExport(hitIds);
-        if (!prepared) return;
-        if (prepared.kind !== 'file') {
-            vscode.window.showWarningMessage('请先打开文稿，以便将参考资料保存为 md 并用于校对。');
-            return;
-        }
-
-        this.post({ type: 'exportDone', message: prepared.tip + '；开始校对选段…' });
-        this.panel?.reveal(this.panel.viewColumn ?? vscode.ViewColumn.Beside, true);
-
-        const editor = await focusWorkingTextEditor();
-        if (!editor) {
-            vscode.window.showWarningMessage('请先打开并选中要校对的文稿选段。');
-            return;
-        }
-        if (editor.selection.isEmpty) {
-            vscode.window.showWarningMessage('请先在文稿中选中要校对的文本。');
-            return;
-        }
-
-        const selection = editor.document.getText(editor.selection).trim();
-        const targets = [
-            ...new Set(
-                groups
-                    .map((g) => this.normalizeTargetText(g.target))
-                    .filter(Boolean)
-            ),
-        ];
-        if (targets.length > 1) {
-            const pick = await vscode.window.showQuickPick(
-                [
-                    {
-                        label: '仍用这些资料校对当前选段',
-                        description: `勾选了 ${targets.length} 个不同 target 的资料`,
-                    },
-                    { label: '取消', description: '返回重新勾选' },
-                ],
-                {
-                    title: '资料来自多个 target',
-                    ignoreFocusOut: true,
-                }
-            );
-            if (pick?.label !== '仍用这些资料校对当前选段') return;
-        } else if (targets.length === 1 && !targetsMatch(targets[0], selection)) {
-            const preview = targets[0].slice(0, 48) + (targets[0].length > 48 ? '…' : '');
-            const pick = await vscode.window.showQuickPick(
-                [
-                    {
-                        label: '仍用此资料校对',
-                        description: `资料 target：${preview}`,
-                    },
-                    { label: '取消', description: '请先选中与资料对应的文稿选段' },
-                ],
-                {
-                    title: '当前选区与资料 target 不一致',
-                    ignoreFocusOut: true,
-                }
-            );
-            if (pick?.label !== '仍用此资料校对') return;
-        }
-
-        await this.proofreadHandler.handleProofreadSelectionCommand(editor, this.context, {
-            presetReferenceFile: prepared.uri,
-        });
-    }
-
     private async exportSelectedAsJson(hitIds?: string[]): Promise<void> {
         if (this.lastPrepOrigin === 'selection') {
             vscode.window.showWarningMessage(
@@ -813,9 +729,6 @@ export class ReferencePrepWebview {
                 break;
             case 'exportSelectedMd':
                 await this.exportSelectedAsMd(msg.hitIds);
-                break;
-            case 'proofreadSelectionWithExportedMd':
-                await this.proofreadSelectionWithExportedMd(msg.hitIds);
                 break;
             case 'exportSelectedJson':
                 await this.exportSelectedAsJson(msg.hitIds);
@@ -1295,7 +1208,7 @@ body.mode-json .btn-json-only { display: inline-block; }
 <h2>配置</h2>
 <div class="row" id="sources"></div>
 <div class="row">
-  <label>强度
+  <label>检索强度
     <select id="strength">
       <option value="light">轻量</option>
       <option value="standard" selected>标准</option>
@@ -1313,6 +1226,9 @@ body.mode-json .btn-json-only { display: inline-block; }
   <span class="status" id="resultOriginHint"></span>
 </div>
 <div class="row">
+  <span class="status">核对选中引文 → 侧栏「资料检索」；核对全文引文 → 先建立引文索引 → 侧栏「引文核查」。引文索引亦供 BM25 资料准备使用。校对请到校对面板。</span>
+</div>
+<div class="row">
   <textarea class="preview" id="selectionPreview" readonly placeholder="选区预览…"></textarea>
 </div>
 <div class="row">
@@ -1320,7 +1236,7 @@ body.mode-json .btn-json-only { display: inline-block; }
 </div>
 <div class="row">
   <button id="btnRun">开始准备</button>
-  <button class="secondary btn-json-only" id="btnResume" title="跳过已有 reference 的条目，只处理未完成项">继续未完成部分</button>
+  <button class="secondary btn-json-only" id="btnResume" title="跳过过程文件中已有检索记录的条目，只处理未完成项">继续未完成部分</button>
   <button class="secondary" id="btnCancel" disabled>取消</button>
   <button class="secondary" id="btnReplay">重放过程文件</button>
   <button class="secondary" id="btnRefresh">刷新状态</button>
@@ -1335,7 +1251,6 @@ body.mode-json .btn-json-only { display: inline-block; }
   <button type="button" class="secondary" id="btnSelectAll">全选</button>
   <button type="button" class="secondary" id="btnSelectNone">全不选</button>
   <button type="button" class="mode-only for-selection" id="btnExportMd">导出选中为 md</button>
-  <button type="button" class="mode-only for-selection" id="btnProofreadWithMd" title="导出选中为 md，并以该文件为参考调用 Proofread selection">参考选中校对当前选段</button>
   <button type="button" class="mode-only for-json" id="btnExportJson">导出选中为 JSON</button>
   <button type="button" class="mode-only for-json" id="btnMergeJson">合并选中到源 JSON</button>
   <span class="status" id="selectedCount"></span>
@@ -1346,22 +1261,22 @@ body.mode-json .btn-json-only { display: inline-block; }
 <div class="panel-footer-commands">
   <p class="header-commands-hint">常用检索命令（作用于当前编辑器选区/文档；Ctrl+Shift+P 可查全部）</p>
   <div class="header-actions">
-    <span class="cmd-group-label">LLM检索精排：</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.dictPrep" title="仅本地词典（规划+精排）">查词典</button>
+    <span class="cmd-group-label">单源检索：</span>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.dictPrep" title="仅本地词典（LLM 规划+精排）">词典·LLM规划</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.search.refsGrep" title="仅参考资料 grep（规划+精排）">Grep</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="仅 BM25（规划+精排）">BM25</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="仅 BM25（规划+精排；需先建立引文索引）">BM25</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.search.refsVector" title="仅轻量向量（规划+精排）">向量</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.search.wikipedia" title="仅维基百科（规划+精排）">查维基</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.web" title="仅 Web 搜索（规划+精排）">Web</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.web" title="Web 搜索尚未实现" disabled style="opacity:0.5;cursor:not-allowed;text-decoration:none;">Web（未实现）</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.llmGrepSearchReferences" title="用自然语言描述检索意图，LLM 规划后多源检索（默认词典+grep+BM25+向量）">用户指令LLM综合检索</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.llmGrepSearchReferences" title="用自然语言描述检索意图，LLM 规划后多源检索（默认词典+grep+BM25+向量）">意图检索</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.queryLocalDictSelection" title="Look Up Selection in Local Dictionary">查词典</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.queryLocalDictSelection" title="整词查本地 MDX，无 LLM">直接查词典</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInPDF" title="search selection in PDF">从md反查PDF</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
@@ -1375,7 +1290,7 @@ body.mode-json .btn-json-only { display: inline-block; }
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.citation.openView" title="Verify Citations">核对全文引文</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.citation.rebuildIndex" title="Build Citation Reference Index">建立引文索引</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.citation.rebuildIndex" title="供核对全文引文与资料准备 BM25 共用">建立引文索引</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.referencePrep.clearRetrievalCache" title="Clear Project Retrieval Cache">清除检索缓存</button>
   </div>
@@ -1438,15 +1353,15 @@ function setRunning(running) {
 }
 
 function updateExportBarMode() {
-  // 导出/合并/校对随「结果来源」；无结果时跟随目标下拉预览
+  // 导出/合并随「结果来源」；无结果时跟随目标下拉预览
   const displayMode = resultOrigin || (targetModeEl.value === 'json' ? 'json' : 'selection');
   exportBar.className = 'export-bar mode-' + displayMode;
   document.body.classList.toggle('mode-json', targetModeEl.value === 'json');
   if (resultOriginHintEl) {
     if (resultOrigin === 'selection') {
-      resultOriginHintEl.textContent = '当前结果：Markdown 选段（可导出 md / 校对选段）';
+      resultOriginHintEl.textContent = '当前结果：Markdown 选段（可导出 md；校对请到校对面板）';
     } else if (resultOrigin === 'json') {
-      resultOriginHintEl.textContent = '当前结果：JSON 条目（可导出 JSON / 按条目合并）';
+      resultOriginHintEl.textContent = '当前结果：JSON 条目（可导出 JSON / 勾选后合并到源 JSON；不自动写入）';
     } else {
       resultOriginHintEl.textContent = '选段与 JSON 检索相互独立，请勿混用结果。';
     }
@@ -1631,7 +1546,6 @@ document.getElementById('btnSelectNone').onclick = () => {
   updateSelectedCount();
 };
 document.getElementById('btnExportMd').onclick = () => postExport('exportSelectedMd');
-document.getElementById('btnProofreadWithMd').onclick = () => postExport('proofreadSelectionWithExportedMd');
 document.getElementById('btnExportJson').onclick = () => postExport('exportSelectedJson');
 document.getElementById('btnMergeJson').onclick = () => postExport('mergeSelectedIntoJson');
 document.querySelectorAll('.panel-footer-commands [data-cmd]').forEach((el) => {
@@ -1708,10 +1622,9 @@ vscode.postMessage({ command: 'ready' });
 export function registerReferencePrepConsole(
     context: vscode.ExtensionContext,
     prepHandler: ReferencePrepCommandHandler,
-    resultsProvider?: ReferencePrepResultsProvider,
-    proofreadHandler?: ProofreadCommandHandler
+    resultsProvider?: ReferencePrepResultsProvider
 ): ReferencePrepWebview {
-    const webview = new ReferencePrepWebview(context, prepHandler, resultsProvider, proofreadHandler);
+    const webview = new ReferencePrepWebview(context, prepHandler, resultsProvider);
     context.subscriptions.push(
         vscode.commands.registerCommand('ai-proofread.referencePrep.openConsole', () => {
             webview.open();

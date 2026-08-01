@@ -134,7 +134,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const localDictQueryHandler = new LocalDictQueryCommandHandler();
     const grepSearchHandler = new GrepSearchCommandHandler(referencePrepResultsProvider);
     const searchHandler = new SearchCommandHandler(referencePrepResultsProvider);
-    registerReferencePrepConsole(context, referencePrepHandler, referencePrepResultsProvider, proofreadHandler);
+    registerReferencePrepConsole(context, referencePrepHandler, referencePrepResultsProvider);
     const { provider: citationTreeProvider, treeView: citationTreeView } = registerCitationView(context);
     const citationHandler = new CitationCommandHandler(
         context,
@@ -363,15 +363,6 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await utilityHandler.handleMergeTwoFilesCommand(editor);
-        }),
-
-        vscode.commands.registerCommand('ai-proofread.knowledgeVerifySelection', async () => {
-            const editor = vscode.window.activeTextEditor;
-            if (!editor) {
-                vscode.window.showInformationMessage('No active editor!');
-                return;
-            }
-            await referencePrepHandler.handleKnowledgeVerifySelection(editor, context);
         }),
 
         vscode.commands.registerCommand('ai-proofread.prepareReferencesSelection', async () => {

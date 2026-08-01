@@ -55,7 +55,7 @@ function cfg() {
     return vscode.workspace.getConfiguration('ai-proofread');
 }
 
-/** 核查强度预设；轮次、查询数、grep 预算等均以 strength 为准（非全局设置覆盖）。 */
+/** 检索强度预设；轮次、查询数、grep 预算等均以 strength 为准（非全局设置覆盖）。 */
 export function getStrengthPreset(strength: ReferencePrepStrength): StrengthPreset {
     return getStrengthPresetValues(strength);
 }

@@ -12,7 +12,6 @@ import {
     targetsMatch,
     type ReferencePrepSessionEntry,
 } from './continuationLogic';
-import { buildMergedReference } from './retrieval/executor';
 import type { ReferencePrepProcessFileV020 } from './schema';
 
 export type { ReferencePrepSessionEntry } from './continuationLogic';
@@ -20,16 +19,6 @@ export { targetsMatch, summarizeSession } from './continuationLogic';
 
 const KEY_RECENT_SESSIONS = 'ai-proofread.referencePrep.recentSessions';
 const MAX_RECENT = 10;
-
-export interface ExistingReferencePickResult {
-    anchorPath: string;
-    mergedReference: string;
-    process: ReferencePrepProcessFileV020;
-}
-
-export function getMergedReferenceFromProcess(proc: ReferencePrepProcessFileV020): string {
-    return proc.mergedReference?.trim() || buildMergedReference(proc.corpus);
-}
 
 export interface ContinuationPickResult {
     freshProcess: boolean;
@@ -236,98 +225,3 @@ export async function pickReferencePrepContinuation(params: {
     };
 }
 
-type ExistingRefPickItem = vscode.QuickPickItem & {
-    anchorPath: string;
-    recordId?: string;
-};
-
-/** 选用已有过程文件中的 mergedReference 做校对（不重新检索） */
-export async function pickExistingReferenceForProofread(params: {
-    context: vscode.ExtensionContext;
-    anchorPath: string;
-    selectedText: string;
-}): Promise<ExistingReferencePickResult | undefined> {
-    const items: ExistingRefPickItem[] = [];
-    const normCurrent = path.normalize(params.anchorPath);
-    const seen = new Set<string>();
-
-    const pushProc = (anchor: string, proc: ReferencePrepProcessFileV020, label: string) => {
-        const ref = getMergedReferenceFromProcess(proc);
-        const active = proc.corpus.filter((h) => h.status === 'active').length;
-        if (!ref.trim() || active <= 0 || !proc.id) return;
-        const key = `${path.normalize(anchor)}::${proc.id}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        const session = summarizeSession(anchor, proc);
-        items.push({
-            label,
-            description: formatSessionDescription(session),
-            detail: (session.targetPreview ?? '').replace(/\s+/g, ' ').trim().slice(0, 100) || anchor,
-            anchorPath: anchor,
-            recordId: proc.id,
-        });
-    };
-
-    for (const proc of listProcessRecords(params.anchorPath)) {
-        pushProc(params.anchorPath, proc, '$(file) 当前文档选区');
-    }
-
-    for (const entry of loadRecentSessions(params.context)) {
-        if (path.normalize(entry.anchorPath) === normCurrent || entry.activeHits <= 0) continue;
-        const proc = entry.recordId
-            ? loadProcessRecord(entry.anchorPath, entry.recordId)
-            : loadProcessFile(entry.anchorPath);
-        if (proc) {
-            pushProc(entry.anchorPath, proc, `$(folder) ${formatSessionLabel(entry)}`);
-        }
-    }
-
-    if (items.length === 0) {
-        vscode.window.showErrorMessage(
-            '未找到已准备的参考资料。请先执行「仅准备参考资料」或「准备参考资料并验证」。'
-        );
-        return undefined;
-    }
-
-    let picked: ExistingRefPickItem | undefined;
-    if (items.length === 1) {
-        picked = items[0];
-    } else {
-        picked = await vscode.window.showQuickPick(items, {
-            title: '用已有参考资料验证',
-            placeHolder: '选择要使用的参考资料会话（同文档可有多条选区记录）',
-            ignoreFocusOut: true,
-        });
-    }
-    if (!picked) return undefined;
-
-    const proc = picked.recordId
-        ? loadProcessRecord(picked.anchorPath, picked.recordId)
-        : loadProcessFile(picked.anchorPath);
-    if (!proc) {
-        vscode.window.showErrorMessage('过程文件已不存在或无法读取。');
-        return undefined;
-    }
-    const mergedReference = getMergedReferenceFromProcess(proc);
-    if (!mergedReference.trim()) {
-        vscode.window.showErrorMessage('所选会话没有可用参考资料。');
-        return undefined;
-    }
-
-    const storedTarget = proc.userInput ?? proc.targetPreview;
-    if (!targetsMatch(storedTarget, params.selectedText)) {
-        const mismatchPick = await vscode.window.showQuickPick(
-            [
-                { label: '仍用此资料校对', description: '选区与准备时不一致，reference 可能不完全匹配' },
-                { label: '取消', description: '返回重新选择' },
-            ],
-            {
-                title: '选区与准备时不一致',
-                ignoreFocusOut: true,
-            }
-        );
-        if (mismatchPick?.label !== '仍用此资料校对') return undefined;
-    }
-
-    return { anchorPath: picked.anchorPath, mergedReference, process: proc };
-}
