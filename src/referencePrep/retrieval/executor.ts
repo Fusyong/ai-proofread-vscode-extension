@@ -19,6 +19,9 @@ import { fuseChannelHits } from './fusion';
 import { filterDictsByScope } from '../scope/resourceScope';
 import { resolveLocalDictConfigs } from '../../localDict/dictConfig';
 import { buildScopeCacheKey, withRetrievalCache } from './retrievalCache';
+import type { ReferencePrepRunControls } from '../runControls';
+import { defaultControlsForStrength } from '../runControls';
+import { capCandidateHitsPerQuery } from './softSelect';
 
 export async function executeReferencePrepPlan(params: {
     plan: ReferencePrepPlan;
@@ -32,7 +35,9 @@ export async function executeReferencePrepPlan(params: {
     scope?: ResourceScope;
     roundId?: string;
     catalogSnapshotId?: string;
+    controls?: ReferencePrepRunControls;
 }): Promise<CorpusHit[]> {
+    const controls = params.controls ?? defaultControlsForStrength(params.strength);
     const config = vscode.workspace.getConfiguration('ai-proofread');
     const refPathRaw = config.get<string>('citation.referencesPath', '${workspaceFolder}/references');
     const refRoot = resolveReferencesPath(refPathRaw);
@@ -57,13 +62,11 @@ export async function executeReferencePrepPlan(params: {
             const scopedDicts = params.scope
                 ? filterDictsByScope(resolveLocalDictConfigs(), params.scope)
                 : resolveLocalDictConfigs();
-            if (q.dict.dictId && params.scope && !params.scope.dictIds.includes(q.dict.dictId)) {
-                q = {
-                    ...q,
-                    dict: { ...q.dict, dictId: scopedDicts[0]?.id ?? q.dict.dictId },
-                };
+            let dictBlock = q.dict;
+            if (dictBlock.dictId && params.scope && !params.scope.dictIds.includes(dictBlock.dictId)) {
+                dictBlock = { ...dictBlock, dictId: scopedDicts[0]?.id ?? dictBlock.dictId };
+                q = { ...q, dict: dictBlock };
             }
-            const dictBlock = q.dict;
             const { hits } = await withRetrievalCache({
                 source: 'dict',
                 keyParts: {
@@ -86,12 +89,14 @@ export async function executeReferencePrepPlan(params: {
                         existingReference: '',
                         priority: q.priority,
                         lookupsBudget: params.lookupsBudget,
+                        target: params.target,
+                        controls,
                     });
                     params.lookupsBudget.used += lookupsUsed;
                     for (const h of produced) {
                         h.llmPriority = q.priority;
                         h.roundId = params.roundId;
-                        if (dictBlock.dictId) h.dictId = dictBlock.dictId;
+                        // 保留实际命中词典 id（勿一律覆盖为首选 dictId）
                     }
                     return produced;
                 },
@@ -129,6 +134,8 @@ export async function executeReferencePrepPlan(params: {
                         strength: params.strength,
                         roundId: params.roundId,
                         requestsBudget: params.wikiRequestsBudget!,
+                        defaultLang: controls.wikiDefaultLang,
+                        fallbackLang: controls.wikiFallbackLang,
                     });
                     return produced;
                 },
@@ -281,7 +288,8 @@ export async function executeReferencePrepPlan(params: {
         }
 
         const fused = fuseChannelHits(queryHits, params.target);
-        for (const h of fused) {
+        const capped = capCandidateHitsPerQuery(fused, controls.maxCandidateHitsPerQuery);
+        for (const h of capped) {
             channelHits.push(h);
             if (h.kind !== 'navigation_hint') {
                 reference = reference ? `${reference}\n\n${h.referenceBlock}` : h.referenceBlock;

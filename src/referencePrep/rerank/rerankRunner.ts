@@ -8,6 +8,10 @@ import {
 } from './rerankPrompt';
 import { assignRefTags } from '../retrieval/fusion';
 
+/**
+ * LLM 精排：写 score/reason；drop 仅压低分并记原因，不从结果剔除（供软勾选）。
+ * mergeGroups 中的重复项仍标记 pruned（去重）。
+ */
 export async function runLlmRerank(params: {
     target: string;
     hits: CorpusHit[];
@@ -53,9 +57,24 @@ export async function runLlmRerank(params: {
         if (dec?.reason && cfg.includeReason) {
             h.rerankReason = dec.reason;
         }
-        if (dropTags.has(tag) || mergeDrop.has(tag)) {
+        if (mergeDrop.has(tag)) {
             h.status = 'pruned';
-            h.pruneReason = dec?.reason ?? '精排丢弃';
+            h.pruneReason = dec?.reason ?? '精排合并去重';
+            h.suggestedForExport = false;
+        } else if (dropTags.has(tag)) {
+            // 软丢弃：保留 active，压低分，不默认勾选
+            h.status = 'active';
+            if (h.rerankScore == null) {
+                h.rerankScore = 0;
+                h.finalScore = 0;
+                h.aggregatedValue = 0;
+            } else {
+                h.rerankScore = Math.min(h.rerankScore, 0.15);
+                h.finalScore = h.rerankScore;
+                h.aggregatedValue = h.rerankScore;
+            }
+            h.suggestedForExport = false;
+            if (!h.rerankReason) h.rerankReason = dec?.reason ?? '精排建议丢弃';
         }
     }
 
@@ -67,15 +86,11 @@ export async function runLlmRerank(params: {
             if (dropHit) {
                 dropHit.status = 'pruned';
                 dropHit.pruneReason = g.reason ?? '精排合并去重';
+                dropHit.suggestedForExport = false;
             }
         }
     }
 
-    const prunedTags = new Set(candidates.filter((h) => h.status === 'pruned').map((h) => h.refTag ?? h.hitId));
-    const kept = params.hits.filter((h) => {
-        const tag = h.refTag ?? h.hitId;
-        if (candidates.includes(h)) return !prunedTags.has(tag);
-        return h.status === 'active';
-    });
-    return kept;
+    // 全部返回（含低分 active），由 softSelect 决定默认勾选
+    return params.hits;
 }

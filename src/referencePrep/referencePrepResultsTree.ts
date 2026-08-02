@@ -63,20 +63,35 @@ export function getRoundHitCount(process: ReferencePrepProcessFileV020, roundInd
     return qIds.reduce((n, qid) => n + getHitsForRoundQuery(process, roundIndex, qid).length, 0);
 }
 
-/** 该轮下至少有 1 条命中的 queryId（保持 plan 顺序） */
-export function getQueryIdsWithHits(process: ReferencePrepProcessFileV020, round: ReferencePrepRound, roundIndex: number): string[] {
+/** 该轮 plan 中全部 queryId（保持顺序，含 0 命中） */
+export function getAllQueryIds(round: ReferencePrepRound): string[] {
     const seen = new Set<string>();
     const ordered: string[] = [];
     for (const q of round.plan.queries) {
         if (seen.has(q.queryId)) continue;
         seen.add(q.queryId);
-        if (getHitsForRoundQuery(process, roundIndex, q.queryId).length > 0) {
-            ordered.push(q.queryId);
-        }
+        ordered.push(q.queryId);
     }
     return ordered;
 }
 
+/** 该轮下至少有 1 条命中的 queryId（保持 plan 顺序） */
+export function getQueryIdsWithHits(process: ReferencePrepProcessFileV020, round: ReferencePrepRound, roundIndex: number): string[] {
+    return getAllQueryIds(round).filter(
+        (queryId) => getHitsForRoundQuery(process, roundIndex, queryId).length > 0
+    );
+}
+
 export function roundHasVisibleHits(process: ReferencePrepProcessFileV020, roundIndex: number): boolean {
     return getRoundHitCount(process, roundIndex) > 0;
+}
+
+/** 该轮有规划 query（即使 0 命中也在侧栏展示） */
+export function roundHasVisiblePlan(process: ReferencePrepProcessFileV020, roundIndex: number): boolean {
+    const round = process.rounds[roundIndex];
+    return Boolean(round && getAllQueryIds(round).length > 0);
+}
+
+export function queryNodeContextValue(hitCount: number): string {
+    return hitCount > 0 ? 'referencePrepQueryWithHits' : 'referencePrepQueryEmpty';
 }

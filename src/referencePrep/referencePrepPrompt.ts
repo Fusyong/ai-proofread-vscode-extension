@@ -1,7 +1,14 @@
 import type { ResolvedLocalDictConfigItem } from '../localDict/dictConfig';
-import type { ReferencePrepIntent, ReferencePrepPlan, ReferenceSourceId, RetrievalUnit } from './schema';
+import type {
+    ReferencePrepIntent,
+    ReferencePrepPlan,
+    ReferenceSourceId,
+    RetrievalUnit,
+    WikipediaLang,
+} from './schema';
 import type { CorpusHit } from './schema';
 import type { ResourceScope } from './schema';
+import { isWikipediaLang } from './runControls';
 
 export function buildReferencePrepSystemPrompt(params: {
     enabledSources: ReferenceSourceId[];
@@ -29,13 +36,17 @@ export function buildReferencePrepSystemPrompt(params: {
         '3) queries 长度不超过 ' + params.maxQueries + '；sufficient 为 true 时表示资料已够，本轮 queries 可为空数组。',
         '4) 每个 query 含：queryId, intent, priority(0~1), 以及按来源填写的 dict、grep、wikipedia 或 web 块（勿写 source 字段）。',
         '5) intent 必须是以下之一：' + intentList,
-        '6) dict 块：dictId（从 dicts 选，不确定用 null）, candidates(1~3 个词条), 可选 why。',
+        '6) dict 块：dictId（从 dicts 选一个首选词典，不确定用 null）, candidates(1~3 个词条), 可选 why。',
+        '   每个含 dict 的 query 应指定一个首选 dictId；系统会再查其余词典作后备。',
+        '   选型参考：中文人名/地名/机构等专名优先辞海类百科词典；古汉语字词优先古汉语词典；外语词优先对应语言词典。',
+        '   结合 edition（版本新旧）与 whenToUse 选型；edition 标「版本未填」时仍可按 name/tags 判断。',
         '7) grep 块：patterns(1~4 个关键词/短语), 可选 contextLines(默认 2), unit, scopePaths, searchPhrases。',
         '   unit 取值：line_context | sentence | md_paragraph | heading_section | file_outline。',
         '   entity_name/word_usage 倾向 sentence；general_fact 倾向 md_paragraph；探索性可用 line_context。',
         '   searchPhrases 供 BM25/向量检索（可与 patterns 相同或更宽）。',
-        '8) wikipedia 块：searchTerms(1~3) 或 titles(1~3 已知条目名), 可选 lang(zh|en), includeWikidata(boolean), why。',
+        '8) wikipedia 块：searchTerms(1~3) 或 titles(1~3 已知条目名), 可选 lang(zh|en|ja|fr|de|ru), includeWikidata(boolean), why。',
         '   entity_name/general_fact 优先填 wikipedia；勿把百科检索写成 grep.patterns。',
+        '   引文/专名若明显为某语原文，lang 优先该语言；中文语境事实默认 zh；需对照原文时可另建 en（或对应语）query。',
         '9) web 块（仅当 enabled 含 web）：searchTerms(1~3)、可选 why；用于通用网页搜索（非维基、非本地文献）。',
         '10) prune：列出应丢弃的 hitId（与 corpus 摘要对应）。',
         '',
@@ -77,7 +88,19 @@ export function buildReferencePrepUserPrompt(params: {
         .map((d) => {
             const tags = (d.tags ?? []).slice(0, 6).join(', ');
             const whenToUse = (d.whenToUse ?? '').replace(/\s+/g, ' ').trim();
-            return '- id=' + d.id + '; name=' + d.name + '; tags=[' + tags + ']; whenToUse=' + whenToUse;
+            const edition = (d.edition ?? '').replace(/\s+/g, ' ').trim() || '版本未填';
+            return (
+                '- id=' +
+                d.id +
+                '; name=' +
+                d.name +
+                '; edition=' +
+                edition +
+                '; tags=[' +
+                tags +
+                ']; whenToUse=' +
+                whenToUse
+            );
         })
         .join('\n');
 
@@ -228,7 +251,7 @@ export function parseReferencePrepPlan(raw: string, allowedIntents: ReferencePre
                 ? x.wikipedia.titles.map((s: unknown) => (typeof s === 'string' ? s.trim() : '')).filter(Boolean)
                 : [];
             const langRaw = x.wikipedia.lang;
-            const lang = langRaw === 'en' || langRaw === 'zh' ? langRaw : undefined;
+            const lang = isWikipediaLang(langRaw) ? (langRaw as WikipediaLang) : undefined;
             if (searchTerms.length > 0 || titles.length > 0) {
                 q.wikipedia = {
                     searchTerms: searchTerms.slice(0, 3),

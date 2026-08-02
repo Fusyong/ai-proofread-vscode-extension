@@ -668,6 +668,11 @@
                 "type": "string",
                 "default": "",
                 "description": "一句话说明何时使用该词典（供大语言模型参考）"
+              },
+              "edition": {
+                "type": "string",
+                "default": "",
+                "description": "版本/出版时间（强烈建议填写，供规划选型与精排判断词典适用性，如：2020年修订 / 第七版）"
               }
             },
             "required": [
@@ -676,7 +681,7 @@
               "mdxPath"
             ]
           },
-          "description": "本地 MDict 词典配置（MDX）。用于“本地词典参考准备”流程的词典路由与查询。"
+          "description": "本地 MDict 词典配置（MDX）。用于“本地词典参考准备”流程的词典路由与查询。请为每本词典填写 edition（版本/出版时间）。"
         },
         "ai-proofread.dictPrep.maxPointsPerItem": {
           "order": 31,
@@ -888,14 +893,14 @@
         "ai-proofread.referencePrep.wikipedia.defaultLang": {
           "order": 37.981,
           "type": "string",
-          "enum": ["zh", "en"],
+          "enum": ["zh", "en", "ja", "fr", "de", "ru"],
           "default": "zh",
           "description": "维基百科检索首选语言。"
         },
         "ai-proofread.referencePrep.wikipedia.fallbackLang": {
           "order": 37.982,
           "type": "string",
-          "enum": ["zh", "en"],
+          "enum": ["zh", "en", "ja", "fr", "de", "ru"],
           "default": "en",
           "description": "首选语言无结果时的备选语言。"
         },

@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
     canOpenHitInEditor,
     formatReferencePrepIntent,
+    getAllQueryIds,
     getHitsForRoundQuery,
     getQueryIdsWithHits,
+    queryNodeContextValue,
     referencePrepHitContextValue,
     roundHasVisibleHits,
+    roundHasVisiblePlan,
 } from './referencePrepResultsTree';
 import type { ReferencePrepProcessFileV020 } from './schema';
 
@@ -90,8 +93,12 @@ describe('referencePrepResultsTree', () => {
         expect(getHitsForRoundQuery(p, 0, 'q2')).toHaveLength(1);
         expect(getHitsForRoundQuery(p, 1, 'q2')).toHaveLength(0);
         expect(getQueryIdsWithHits(p, p.rounds[1], 1)).toEqual([]);
+        expect(getAllQueryIds(p.rounds[1])).toEqual(['q2']);
         expect(roundHasVisibleHits(p, 0)).toBe(true);
         expect(roundHasVisibleHits(p, 1)).toBe(false);
+        expect(roundHasVisiblePlan(p, 1)).toBe(true);
+        expect(queryNodeContextValue(0)).toBe('referencePrepQueryEmpty');
+        expect(queryNodeContextValue(2)).toBe('referencePrepQueryWithHits');
     });
 
     it('strict roundId match when hit has roundId', () => {
@@ -127,6 +134,8 @@ describe('referencePrepResultsTree', () => {
         });
         expect(getHitsForRoundQuery(p, 0, 'q2')).toHaveLength(0);
         expect(getQueryIdsWithHits(p, p.rounds[0], 0)).toEqual([]);
+        expect(getAllQueryIds(p.rounds[0])).toEqual(['q2']);
         expect(getQueryIdsWithHits(p, p.rounds[1], 1)).toEqual(['q2']);
+        expect(roundHasVisiblePlan(p, 0)).toBe(true);
     });
 });

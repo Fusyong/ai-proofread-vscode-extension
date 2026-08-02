@@ -28,6 +28,8 @@ export interface PrepForSelectionParams {
     onProgress?: (msg: string) => void;
     onEvent?: PrepEventListener;
     token?: vscode.CancellationToken;
+    controls?: import('../referencePrep/runControls').ReferencePrepRunControls;
+    requestPlanReview?: import('../referencePrep/referencePrepRunner').ReferencePrepProgressHooks['requestPlanReview'];
     /** 是否打开 mergedReference 未保存预览（默认否；结果见侧栏/检索面板） */
     openMergedPreview?: boolean;
     showInformationMessage?: boolean;
@@ -130,9 +132,11 @@ export class ReferencePrepCommandHandler {
             continuation: params.continuation,
             maxRoundsOverride: params.maxRoundsOverride,
             recordId: params.recordId,
+            controls: params.controls,
             onProgress: params.onProgress,
             onEvent: params.onEvent,
             token: params.token,
+            requestPlanReview: params.requestPlanReview,
             onProcessUpdated: (proc) => this.resultsProvider?.refresh(proc, params.anchorPath),
         });
         await this.showResultsTree(params.anchorPath, process);
@@ -232,6 +236,8 @@ export class ReferencePrepCommandHandler {
             strength?: ReferencePrepStrength;
             token?: vscode.CancellationToken;
             skipExistingReference?: boolean;
+            controls?: import('../referencePrep/runControls').ReferencePrepRunControls;
+            requestPlanReview?: import('../referencePrep/referencePrepRunner').ReferencePrepProgressHooks['requestPlanReview'];
         }
     ): Promise<void> {
         let enabledSources = options?.enabledSources;
@@ -281,9 +287,11 @@ export class ReferencePrepCommandHandler {
                             enabledSources: enabledSources!,
                             strength: strength!,
                             skipExistingReference: options?.skipExistingReference,
+                            controls: options?.controls,
                             onProgress: (m) => _p.report({ message: m }),
                             onEvent: options?.onEvent,
                             token: linked.token,
+                            requestPlanReview: options?.requestPlanReview,
                             onAfterJsonItem: () => {},
                             onProcessUpdated: (proc) => {
                                 lastProcess = proc;

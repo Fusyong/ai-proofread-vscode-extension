@@ -7,11 +7,12 @@ import {
     canOpenHitInEditor,
     canOpenHitInBrowser,
     formatReferencePrepIntent,
+    getAllQueryIds,
     getHitsForRoundQuery,
-    getQueryIdsWithHits,
     getRoundHitCount,
+    queryNodeContextValue,
     referencePrepHitContextValue,
-    roundHasVisibleHits,
+    roundHasVisiblePlan,
 } from './referencePrepResultsTree';
 
 export type ReferencePrepRecordNode = {
@@ -120,18 +121,19 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
         if (element.kind === 'round') {
             const r = element.round;
             const hitCount = getRoundHitCount(element.process, element.roundIndex);
+            const planCount = getAllQueryIds(r).length;
             const item = new vscode.TreeItem(
                 `轮次 ${element.roundIndex + 1}`,
-                hitCount > 0
+                planCount > 0
                     ? vscode.TreeItemCollapsibleState.Expanded
                     : vscode.TreeItemCollapsibleState.None
             );
             const rid = element.process.id ?? 'x';
             item.id = `rp-round:${rid}:${element.roundIndex}`;
-            item.description = `${hitCount} 命中`;
+            item.description = `${hitCount} 命中 · ${planCount} 规划`;
             item.tooltip = [
                 r.startedAt + (r.finishedAt ? ` → ${r.finishedAt}` : ''),
-                `规划 ${r.queryCount} 个查询，corpus ${hitCount} 条`,
+                `规划 ${planCount} 个查询，corpus ${hitCount} 条`,
             ].join('\n');
             return item;
         }
@@ -146,7 +148,15 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
             const rid = element.process.id ?? 'x';
             item.id = `rp-query:${rid}:${element.roundIndex}:${element.queryId}`;
             item.description = `${formatReferencePrepIntent(element.intent)} · ${hits.length} 条`;
-            item.tooltip = `intent: ${element.intent}`;
+            item.tooltip =
+                hits.length > 0
+                    ? `intent: ${element.intent}`
+                    : `intent: ${element.intent}\n（规划了但无命中）`;
+            item.contextValue = queryNodeContextValue(hits.length);
+            item.iconPath =
+                hits.length > 0
+                    ? new vscode.ThemeIcon('search')
+                    : new vscode.ThemeIcon('warning');
             return item;
         }
         const h = element.hit;
@@ -198,7 +208,7 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
                 roundIndex,
                 process,
             }))
-            .filter(({ roundIndex }) => roundHasVisibleHits(process, roundIndex));
+            .filter(({ roundIndex }) => roundHasVisiblePlan(process, roundIndex));
     }
 
     getChildren(element?: ReferencePrepTreeNode): ReferencePrepTreeNode[] {
@@ -217,7 +227,7 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
             return this.roundsFor(element.process);
         }
         if (element.kind === 'round') {
-            const queryIds = getQueryIdsWithHits(element.process, element.round, element.roundIndex);
+            const queryIds = getAllQueryIds(element.round);
             return queryIds.map((queryId) => {
                 const q = element.round.plan.queries.find((x) => x.queryId === queryId)!;
                 return {

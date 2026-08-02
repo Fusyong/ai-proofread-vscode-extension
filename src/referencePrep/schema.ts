@@ -22,7 +22,7 @@ export type CorpusHitKind = 'evidence' | 'navigation_hint';
 
 export type CorpusHitSource = 'dict' | 'grep_md' | 'bm25' | 'vector' | 'wikipedia' | 'web';
 
-export type WikipediaLang = 'zh' | 'en';
+export type WikipediaLang = 'zh' | 'en' | 'ja' | 'fr' | 'de' | 'ru';
 
 export interface ReferencePrepDictQuery {
     dictId: string | null;
@@ -107,6 +107,8 @@ export interface CorpusHit {
     fileMtimeMs?: number;
     pruneReason?: string;
     rerankReason?: string;
+    /** 精排后建议默认勾选导出（软筛选） */
+    suggestedForExport?: boolean;
     roundId?: string;
     suggestedScope?: SuggestedScope;
     channelScores?: Partial<Record<CorpusHitSource, number>>;

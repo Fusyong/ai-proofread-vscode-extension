@@ -8,8 +8,15 @@ import * as vscode from 'vscode';
 import type { ReferencePrepCommandHandler } from '../commands/referencePrepCommandHandler';
 import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
 import { loadReferencePrepLastRun, saveReferencePrepLastRun } from '../referencePrep/runPreferences';
+import {
+    clampControls,
+    defaultControlsForStrength,
+    WIKIPEDIA_LANGS,
+    type ReferencePrepRunControls,
+} from '../referencePrep/runControls';
 import { getDefaultEnabledSources } from '../referencePrep/referencePrepRunner';
 import { REFERENCE_SOURCE_OPTIONS } from '../referencePrep/referencePrepSession';
+import type { ReferencePrepPlan } from '../referencePrep/schema';
 import {
     inferPrepOrigin,
     listProcessRecords,
@@ -43,7 +50,7 @@ import { setReferenceHitVisible } from './sidebarViewVisibility';
 const PANEL_ID = 'ai-proofread.referencePrepConsole';
 const PANEL_TITLE = 'References search panel';
 /** 递增以在扩展更新后强制刷新已打开面板的 HTML（避免旧界面缺导出提示条）。 */
-const WEBVIEW_HTML_REVISION = 14;
+const WEBVIEW_HTML_REVISION = 15;
 
 export class ReferencePrepWebview {
     private panel: vscode.WebviewPanel | undefined;
@@ -57,6 +64,9 @@ export class ReferencePrepWebview {
     private panelListeners: vscode.Disposable[] = [];
     private appliedHtmlRevision = 0;
     private corpusSyncDisposable: vscode.Disposable | undefined;
+    private planReviewResolver:
+        | ((result: { action: 'confirm' | 'skip' | 'cancel'; plan?: ReferencePrepPlan }) => void)
+        | undefined;
 
     constructor(
         private context: vscode.ExtensionContext,
@@ -220,6 +230,11 @@ export class ReferencePrepWebview {
         const editor = getWorkingTextEditor();
         const selection = editor?.document.getText(editor.selection)?.trim() ?? '';
         const isJson = editor?.document.languageId === 'json';
+        const strengthPresets: Record<string, ReferencePrepRunControls> = {
+            light: defaultControlsForStrength('light'),
+            standard: defaultControlsForStrength('standard'),
+            thorough: defaultControlsForStrength('thorough'),
+        };
         this.post({
             type: 'state',
             sources: REFERENCE_SOURCE_OPTIONS.map((o) => ({
@@ -228,6 +243,9 @@ export class ReferencePrepWebview {
             })),
             enabledSources,
             strength: last.strength,
+            controls: last.controls,
+            strengthPresets,
+            wikiLangs: WIKIPEDIA_LANGS,
             hasSelection: Boolean(selection),
             selectionPreview: selection.slice(0, 200),
             isJson,
@@ -282,6 +300,19 @@ export class ReferencePrepWebview {
 
     private postProcess(process: ReferencePrepProcessFileV020, anchorPath: string): void {
         const hits = sortHitsForLlm(process.corpus).map((h) => this.serializeHit(h));
+        const emptyQueries: Array<{ roundIndex: number; queryId: string; intent: string }> = [];
+        process.rounds.forEach((r, roundIndex) => {
+            for (const q of r.plan.queries) {
+                const n = process.corpus.filter(
+                    (h) =>
+                        h.queryId === q.queryId &&
+                        (!h.roundId || !r.roundId || h.roundId === r.roundId)
+                ).length;
+                if (n === 0) {
+                    emptyQueries.push({ roundIndex, queryId: q.queryId, intent: q.intent });
+                }
+            }
+        });
         this.post({
             type: 'process',
             anchorPath,
@@ -293,6 +324,7 @@ export class ReferencePrepWebview {
                 plan: r.plan,
                 wikiRequestsUsed: r.wikiRequestsUsed,
             })),
+            emptyQueries,
             hits,
             mergedReference: process.mergedReference ?? '',
             enabledSources: process.enabledSources,
@@ -359,8 +391,12 @@ export class ReferencePrepWebview {
             canOpenBrowser: canOpenHitInBrowser(h),
             /** 导出正文的字符数（与导出洗净规则一致） */
             charCount: exportText.length,
-            /** 默认勾选：active 且非导航提示 */
-            defaultChecked: h.status === 'active' && h.kind !== 'navigation_hint',
+            suggestedForExport: h.suggestedForExport,
+            /** 默认勾选：软筛选建议导出；旧数据无标记时保持 active 即勾选 */
+            defaultChecked:
+                h.status === 'active' &&
+                h.kind !== 'navigation_hint' &&
+                h.suggestedForExport !== false,
         };
     }
 
@@ -695,6 +731,10 @@ export class ReferencePrepWebview {
         hitId?: string;
         hitIds?: string[];
         anchorPath?: string;
+        controls?: Partial<ReferencePrepRunControls>;
+        action?: 'confirm' | 'skip' | 'cancel';
+        plan?: ReferencePrepPlan;
+        disabledQueryIds?: string[];
     }): Promise<void> {
         switch (msg.command) {
             case 'ready':
@@ -705,7 +745,33 @@ export class ReferencePrepWebview {
                 break;
             case 'cancel':
                 this.cancelSource?.cancel();
+                if (this.planReviewResolver) {
+                    const r = this.planReviewResolver;
+                    this.planReviewResolver = undefined;
+                    r({ action: 'cancel' });
+                }
                 break;
+            case 'planConfirm': {
+                const resolver = this.planReviewResolver;
+                this.planReviewResolver = undefined;
+                if (!resolver) break;
+                const action =
+                    msg.action === 'skip' ? 'skip' : msg.action === 'cancel' ? 'cancel' : 'confirm';
+                if (action === 'cancel' || action === 'skip') {
+                    resolver({ action });
+                    break;
+                }
+                let plan = msg.plan;
+                if (plan && Array.isArray(msg.disabledQueryIds) && msg.disabledQueryIds.length) {
+                    const disabled = new Set(msg.disabledQueryIds);
+                    plan = {
+                        ...plan,
+                        queries: plan.queries.filter((q) => !disabled.has(q.queryId)),
+                    };
+                }
+                resolver({ action: 'confirm', plan });
+                break;
+            }
             case 'run':
                 await this.runPrep(msg);
                 break;
@@ -945,11 +1011,27 @@ export class ReferencePrepWebview {
         this.postEvent({ type: 'phase', name: 'done', message: '已从过程文件重放' });
     }
 
+    private requestPlanReviewFromPanel(args: {
+        round: number;
+        plan: ReferencePrepPlan;
+    }): Promise<{ action: 'confirm' | 'skip' | 'cancel'; plan?: ReferencePrepPlan }> {
+        return new Promise((resolve) => {
+            this.planReviewResolver = resolve;
+            this.post({
+                type: 'planReviewUi',
+                round: args.round,
+                plan: args.plan,
+                awaitConfirm: true,
+            });
+        });
+    }
+
     private async runPrep(msg: {
         enabledSources?: ReferenceSourceId[];
         strength?: ReferencePrepStrength;
         targetMode?: 'selection' | 'json';
         resume?: boolean;
+        controls?: Partial<ReferencePrepRunControls>;
     }): Promise<void> {
         const enabledSources = (msg.enabledSources ?? []).filter((s) => s !== 'web' || isWebSearchConfigured());
         if (!enabledSources.length) {
@@ -957,7 +1039,8 @@ export class ReferencePrepWebview {
             return;
         }
         const strength = msg.strength ?? 'standard';
-        await saveReferencePrepLastRun(this.context, { enabledSources, strength });
+        const controls = clampControls(msg.controls, strength);
+        await saveReferencePrepLastRun(this.context, { enabledSources, strength, controls });
         await this.prepHandler.maybeShowWikipediaNotice(this.context, enabledSources);
 
         const editor = getWorkingTextEditor();
@@ -990,9 +1073,11 @@ export class ReferencePrepWebview {
                     skipPicks: true,
                     enabledSources,
                     strength,
+                    controls,
                     onEvent,
                     token,
                     skipExistingReference: !!msg.resume,
+                    requestPlanReview: (args) => this.requestPlanReviewFromPanel(args),
                 });
                 const records = listProcessRecords(jsonPath, { origin: 'json_item' }).filter(
                     (r) => r.corpus.length > 0 || r.rounds.length > 0
@@ -1027,12 +1112,14 @@ export class ReferencePrepWebview {
                     context: this.context,
                     enabledSources,
                     strength,
+                    controls,
                     freshProcess: cont.freshProcess,
                     continuation: cont.continuation,
                     maxRoundsOverride: cont.maxRoundsOverride,
                     recordId: cont.recordId,
                     onEvent,
                     token,
+                    requestPlanReview: (args) => this.requestPlanReviewFromPanel(args),
                     openMergedPreview: false,
                     showInformationMessage: true,
                 });
@@ -1041,6 +1128,11 @@ export class ReferencePrepWebview {
             const message = e instanceof Error ? e.message : String(e);
             this.postEvent({ type: 'error', message });
         } finally {
+            if (this.planReviewResolver) {
+                const r = this.planReviewResolver;
+                this.planReviewResolver = undefined;
+                r({ action: 'cancel' });
+            }
             this.post({ type: 'running', running: false });
             this.cancelSource = undefined;
         }
@@ -1202,6 +1294,68 @@ body.mode-json .btn-json-only { display: inline-block; }
   white-space: nowrap;
   user-select: none;
 }
+.controls-box {
+  border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.35));
+  padding: 8px 10px;
+  margin: 6px 0 10px;
+  font-size: 12px;
+}
+.controls-box summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.controls-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: flex-end;
+}
+.controls-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+.controls-grid input[type=number], .controls-grid select {
+  min-width: 72px;
+  max-width: 100px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  padding: 2px 4px;
+}
+.controls-grid label.inline-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  min-width: auto;
+}
+#planPanel {
+  display: none;
+  border: 1px solid var(--vscode-focusBorder, rgba(128,128,128,0.4));
+  padding: 8px 10px;
+  margin: 8px 0 12px;
+  background: var(--vscode-editor-inactiveSelectionBackground, transparent);
+}
+#planPanel.visible { display: block; }
+#planPanel h3 { margin: 0 0 6px; font-size: 13px; }
+#planList { list-style: none; padding: 0; margin: 0 0 8px; }
+#planList li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.25));
+  font-size: 12px;
+}
+#planList .q-meta { color: var(--vscode-descriptionForeground); font-size: 11px; }
+#planActions { display: flex; gap: 8px; flex-wrap: wrap; }
+.empty-query-note {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+  font-size: 11px;
+}
 </style>
 </head>
 <body>
@@ -1221,7 +1375,46 @@ body.mode-json .btn-json-only { display: inline-block; }
       <option value="json">当前 JSON 文件</option>
     </select>
   </label>
+  <button type="button" class="secondary" id="btnResetControls" title="按当前强度重置检索控制">按强度重置</button>
 </div>
+<details class="controls-box" id="controlsBox" open>
+  <summary>检索控制</summary>
+  <div class="controls-grid">
+    <label title="精排后默认勾选的最低相关分">勾选最低分
+      <input type="number" id="ctlMinScore" min="0" max="1" step="0.05" />
+    </label>
+    <label title="每个查询默认勾选条数上限">勾选条数/查询
+      <input type="number" id="ctlMaxSelected" min="1" max="50" step="1" />
+    </label>
+    <label title="每个查询默认勾选总字符上限">勾选字符/查询
+      <input type="number" id="ctlMaxChars" min="500" max="100000" step="500" />
+    </label>
+    <label title="每个查询入库候选上限（宽于勾选条数）">候选池/查询
+      <input type="number" id="ctlMaxCandidates" min="1" max="100" step="1" />
+    </label>
+    <label title="首选词典保留条目数">词典首选
+      <input type="number" id="ctlDictPrimary" min="1" max="30" step="1" />
+    </label>
+    <label title="后备词典按相关性加选">词典相关加选
+      <input type="number" id="ctlDictRel" min="0" max="30" step="1" />
+    </label>
+    <label title="后备词典按长度加选">词典长度加选
+      <input type="number" id="ctlDictLen" min="0" max="30" step="1" />
+    </label>
+    <label title="维基首选语言">维基首选
+      <select id="ctlWikiDefault"></select>
+    </label>
+    <label title="维基备选语言">维基备选
+      <select id="ctlWikiFallback"></select>
+    </label>
+    <label class="inline-check" title="开启后每轮规划需确认再执行">
+      <input type="checkbox" id="ctlRequirePlan" />规划后确认
+    </label>
+    <label class="inline-check" title="锁定后切换强度不覆盖自定义值">
+      <input type="checkbox" id="ctlLocked" />锁定自定义
+    </label>
+  </div>
+</details>
 <div class="row">
   <span class="status" id="resultOriginHint"></span>
 </div>
@@ -1246,7 +1439,20 @@ body.mode-json .btn-json-only { display: inline-block; }
 <h2>过程</h2>
 <div id="timeline"><div class="tl-item"><span class="tag">就绪</span>选择来源后点击「开始准备」</div></div>
 
+<div id="planPanel">
+  <h3 id="planPanelTitle">本轮规划</h3>
+  <ul id="planList"></ul>
+  <div id="planActions" style="display:none">
+    <button type="button" id="btnPlanConfirm">确认并执行</button>
+    <button type="button" class="secondary" id="btnPlanSkip">跳过本轮</button>
+    <button type="button" class="secondary" id="btnPlanCancel">取消</button>
+  </div>
+  <pre id="planJson" style="display:none;max-height:160px;overflow:auto;font-size:11px;white-space:pre-wrap;"></pre>
+  <button type="button" class="secondary" id="btnTogglePlanJson" style="margin-top:4px">展开 JSON</button>
+</div>
+
 <h2>结果</h2>
+<div class="row"><span class="status" id="suggestHint"></span></div>
 <div class="export-bar mode-selection" id="exportBar">
   <button type="button" class="secondary" id="btnSelectAll">全选</button>
   <button type="button" class="secondary" id="btnSelectNone">全不选</button>
@@ -1313,11 +1519,115 @@ const runStatus = document.getElementById('runStatus');
 const btnRun = document.getElementById('btnRun');
 const btnResume = document.getElementById('btnResume');
 const btnCancel = document.getElementById('btnCancel');
+const planPanel = document.getElementById('planPanel');
+const planList = document.getElementById('planList');
+const planActions = document.getElementById('planActions');
+const planJsonEl = document.getElementById('planJson');
+const suggestHintEl = document.getElementById('suggestHint');
 
 /** @type {Map<string, boolean>} */
 const checkedByHitId = new Map();
 /** @type {'selection'|'json'|null} 当前命中结果来源（与目标下拉解耦） */
 let resultOrigin = null;
+/** @type {Record<string, any>} */
+let strengthPresets = {};
+/** @type {any} */
+let pendingPlan = null;
+let pendingPlanRound = 0;
+
+function readControlsFromUi() {
+  return {
+    minSelectScore: Number(document.getElementById('ctlMinScore').value),
+    maxSelectedPerQuery: Number(document.getElementById('ctlMaxSelected').value),
+    maxSelectedCharsPerQuery: Number(document.getElementById('ctlMaxChars').value),
+    maxCandidateHitsPerQuery: Number(document.getElementById('ctlMaxCandidates').value),
+    maxEntriesPrimary: Number(document.getElementById('ctlDictPrimary').value),
+    maxEntriesRelevance: Number(document.getElementById('ctlDictRel').value),
+    maxEntriesLength: Number(document.getElementById('ctlDictLen').value),
+    requirePlanConfirm: document.getElementById('ctlRequirePlan').checked,
+    wikiDefaultLang: document.getElementById('ctlWikiDefault').value,
+    wikiFallbackLang: document.getElementById('ctlWikiFallback').value,
+    controlsLocked: document.getElementById('ctlLocked').checked
+  };
+}
+
+function applyControlsToUi(c) {
+  if (!c) return;
+  document.getElementById('ctlMinScore').value = c.minSelectScore;
+  document.getElementById('ctlMaxSelected').value = c.maxSelectedPerQuery;
+  document.getElementById('ctlMaxChars').value = c.maxSelectedCharsPerQuery;
+  document.getElementById('ctlMaxCandidates').value = c.maxCandidateHitsPerQuery;
+  document.getElementById('ctlDictPrimary').value = c.maxEntriesPrimary;
+  document.getElementById('ctlDictRel').value = c.maxEntriesRelevance;
+  document.getElementById('ctlDictLen').value = c.maxEntriesLength;
+  document.getElementById('ctlRequirePlan').checked = !!c.requirePlanConfirm;
+  document.getElementById('ctlLocked').checked = !!c.controlsLocked;
+  if (c.wikiDefaultLang) document.getElementById('ctlWikiDefault').value = c.wikiDefaultLang;
+  if (c.wikiFallbackLang) document.getElementById('ctlWikiFallback').value = c.wikiFallbackLang;
+}
+
+function fillWikiLangSelects(langs) {
+  for (const id of ['ctlWikiDefault', 'ctlWikiFallback']) {
+    const el = document.getElementById(id);
+    const cur = el.value;
+    el.innerHTML = '';
+    for (const lang of (langs || ['zh', 'en'])) {
+      const opt = document.createElement('option');
+      opt.value = lang;
+      opt.textContent = lang;
+      el.appendChild(opt);
+    }
+    if (cur) el.value = cur;
+  }
+}
+
+function summarizeQuery(q) {
+  const parts = [];
+  if (q.dict) parts.push('dict:' + (q.dict.dictId || '?') + ' [' + (q.dict.candidates || []).join('/') + ']');
+  if (q.grep) parts.push('grep:' + (q.grep.patterns || []).slice(0, 3).join('/'));
+  if (q.wikipedia) {
+    const terms = (q.wikipedia.searchTerms || q.wikipedia.titles || []).slice(0, 3).join('/');
+    parts.push('wiki:' + (q.wikipedia.lang || '') + ' ' + terms);
+  }
+  if (q.web) parts.push('web:' + (q.web.searchTerms || []).slice(0, 2).join('/'));
+  return parts.join(' · ') || '(无来源块)';
+}
+
+function renderPlanPanel(plan, round, awaitConfirm) {
+  pendingPlan = plan;
+  pendingPlanRound = round;
+  planPanel.classList.add('visible');
+  document.getElementById('planPanelTitle').textContent =
+    '本轮规划 · 第 ' + (round + 1) + ' 轮' + (awaitConfirm ? '（待确认）' : '');
+  planList.innerHTML = '';
+  const queries = (plan && plan.queries) || [];
+  if (!queries.length) {
+    planList.innerHTML = '<li>（本轮无查询）' + (plan && plan.sufficient ? ' · sufficient' : '') + '</li>';
+  }
+  for (const q of queries) {
+    const li = document.createElement('li');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'plan-q-check';
+    cb.value = q.queryId;
+    cb.checked = true;
+    cb.disabled = !awaitConfirm;
+    const body = document.createElement('div');
+    body.innerHTML =
+      '<div><strong>' + esc(q.queryId) + '</strong> · ' + esc(q.intent) +
+      ' · p=' + Number(q.priority || 0).toFixed(2) + '</div>' +
+      '<div class="q-meta">' + esc(summarizeQuery(q)) + '</div>';
+    li.appendChild(cb);
+    li.appendChild(body);
+    planList.appendChild(li);
+  }
+  planJsonEl.textContent = JSON.stringify(plan, null, 2);
+  planActions.style.display = awaitConfirm ? 'flex' : 'none';
+}
+
+function hidePlanReviewActions() {
+  planActions.style.display = 'none';
+}
 
 function showExportDone(message) {
   const text = message || '导出完成';
@@ -1428,7 +1738,7 @@ function renderHits(hits, groups, groupKind) {
 
   function appendHit(h) {
     if (!checkedByHitId.has(h.hitId)) {
-      checkedByHitId.set(h.hitId, h.defaultChecked !== false);
+      checkedByHitId.set(h.hitId, h.defaultChecked === true);
     }
     const li = document.createElement('li');
     if (h.status === 'pruned') li.className = 'pruned';
@@ -1438,7 +1748,7 @@ function renderHits(hits, groups, groupKind) {
     cb.className = 'hit-check';
     cb.value = h.hitId;
     cb.dataset.chars = String(h.charCount || 0);
-    cb.checked = checkedByHitId.get(h.hitId) !== false;
+    cb.checked = checkedByHitId.get(h.hitId) === true;
     cb.addEventListener('change', () => {
       checkedByHitId.set(h.hitId, cb.checked);
       updateSelectedCount();
@@ -1454,6 +1764,7 @@ function renderHits(hits, groups, groupKind) {
       (h.file ? ' · ' + esc(h.file) + (h.line != null ? ':' + h.line : '') : '') +
       (h.pageTitle ? ' · ' + esc(h.pageTitle) : '') +
       (h.finalScore != null ? ' · score ' + Number(h.finalScore).toFixed(2) : '') +
+      (h.suggestedForExport === false ? ' · 未建议勾选' : '') +
       (h.status === 'pruned' ? ' · pruned' : '') + '</div>' +
       '<div>' + esc(h.snippet) + '</div>';
     const actions = document.createElement('div');
@@ -1496,6 +1807,12 @@ function renderHits(hits, groups, groupKind) {
   } else {
     for (const h of flat) appendHit(h);
   }
+  const suggested = flat.filter(h => h.defaultChecked === true).length;
+  if (suggestHintEl) {
+    suggestHintEl.textContent = flat.length
+      ? ('建议勾选 ' + suggested + ' / ' + flat.length + '（可按检索控制门槛调整）')
+      : '';
+  }
   updateSelectedCount();
 }
 
@@ -1508,7 +1825,8 @@ btnRun.onclick = () => {
     command: 'run',
     enabledSources: getEnabledSources(),
     strength: strengthEl.value,
-    targetMode: targetModeEl.value
+    targetMode: targetModeEl.value,
+    controls: readControlsFromUi()
   });
 };
 if (btnResume) {
@@ -1518,10 +1836,36 @@ if (btnResume) {
       enabledSources: getEnabledSources(),
       strength: strengthEl.value,
       targetMode: 'json',
-      resume: true
+      resume: true,
+      controls: readControlsFromUi()
     });
   };
 }
+document.getElementById('btnResetControls').onclick = () => {
+  const p = strengthPresets[strengthEl.value];
+  if (p) applyControlsToUi({ ...p, controlsLocked: document.getElementById('ctlLocked').checked });
+};
+strengthEl.addEventListener('change', () => {
+  if (document.getElementById('ctlLocked').checked) return;
+  const p = strengthPresets[strengthEl.value];
+  if (p) applyControlsToUi({ ...p, controlsLocked: false });
+});
+document.getElementById('btnTogglePlanJson').onclick = () => {
+  planJsonEl.style.display = planJsonEl.style.display === 'none' ? 'block' : 'none';
+};
+function postPlanAction(action) {
+  const disabled = Array.from(planList.querySelectorAll('input.plan-q-check:not(:checked)')).map(el => el.value);
+  hidePlanReviewActions();
+  vscode.postMessage({
+    command: 'planConfirm',
+    action: action,
+    plan: pendingPlan,
+    disabledQueryIds: disabled
+  });
+}
+document.getElementById('btnPlanConfirm').onclick = () => postPlanAction('confirm');
+document.getElementById('btnPlanSkip').onclick = () => postPlanAction('skip');
+document.getElementById('btnPlanCancel').onclick = () => postPlanAction('cancel');
 document.querySelectorAll('.panel-footer-commands [data-action="panelRun"]').forEach((el) => {
   el.addEventListener('click', () => btnRun.click());
 });
@@ -1560,6 +1904,9 @@ window.addEventListener('message', (ev) => {
   if (msg.type === 'state') {
     renderSources(msg.sources || [], msg.enabledSources || []);
     if (msg.strength) strengthEl.value = msg.strength;
+    if (msg.strengthPresets) strengthPresets = msg.strengthPresets;
+    fillWikiLangSelects(msg.wikiLangs);
+    if (msg.controls) applyControlsToUi(msg.controls);
     previewEl.value = msg.selectionPreview || (msg.hasSelection ? '' : '（无选区 — 请先在文稿中选中文本，再点「刷新状态」或「开始准备」）');
     targetDocEl.textContent = msg.documentLabel
       ? ('目标：' + msg.documentLabel)
@@ -1571,10 +1918,13 @@ window.addEventListener('message', (ev) => {
     updateExportBarMode();
   } else if (msg.type === 'clearTimeline') {
     clearTimeline();
+    planPanel.classList.remove('visible');
+    hidePlanReviewActions();
   } else if (msg.type === 'clearHits') {
     checkedByHitId.clear();
     hitsEl.innerHTML = '';
     resultOrigin = null;
+    if (suggestHintEl) suggestHintEl.textContent = '';
     updateSelectedCount();
     updateExportBarMode();
     if (exportDoneEl) {
@@ -1586,11 +1936,21 @@ window.addEventListener('message', (ev) => {
     updateExportBarMode();
   } else if (msg.type === 'running') {
     setRunning(!!msg.running);
+  } else if (msg.type === 'planReviewUi') {
+    renderPlanPanel(msg.plan, msg.round || 0, !!msg.awaitConfirm);
+    appendTimeline('plan_review', msg.awaitConfirm ? '等待确认规划' : '已更新规划面板');
   } else if (msg.type === 'event') {
     const e = msg.event;
     if (e.type === 'phase') appendTimeline(e.name, e.message || '');
-    else if (e.type === 'plan') appendTimeline('plan R' + (e.round + 1), JSON.stringify(e.plan, null, 2));
-    else if (e.type === 'query') appendTimeline('query', e.queryId + ' ' + JSON.stringify(e.detail));
+    else if (e.type === 'plan') {
+      appendTimeline('plan R' + (e.round + 1), (e.plan.queries || []).length + ' 个查询');
+      renderPlanPanel(e.plan, e.round || 0, false);
+    }
+    else if (e.type === 'planReview') {
+      renderPlanPanel(e.plan, e.round || 0, !!e.awaitConfirm);
+      appendTimeline('plan_review', e.awaitConfirm ? '待确认' : '已展示');
+    }
+    else if (e.type === 'query') appendTimeline('query', e.queryId + ' ' + summarizeQuery(e.detail || {}));
     else if (e.type === 'hits') appendTimeline('hits', '本轮 +' + e.added + '（累计约 ' + e.total + '）');
     else if (e.type === 'error') appendTimeline('error', e.message);
     else if (e.type === 'cancelled') {
@@ -1598,6 +1958,7 @@ window.addEventListener('message', (ev) => {
         ? '已取消（可点「继续未完成部分」接着跑）'
         : '已取消（可重放过程文件，或再次开始并选择续跑）';
       appendTimeline('cancelled', tip);
+      hidePlanReviewActions();
     }
   } else if (msg.type === 'process') {
     // 新结果到来时按 defaultChecked 重置勾选
@@ -1607,6 +1968,19 @@ window.addEventListener('message', (ev) => {
       exportDoneEl.textContent = '';
     }
     renderHits(msg.hits || [], msg.groups, msg.groupKind);
+    const emptyQs = msg.emptyQueries || [];
+    if (emptyQs.length && suggestHintEl) {
+      const tip = emptyQs.slice(0, 6).map(q => q.queryId + '(' + q.intent + ')').join('、');
+      suggestHintEl.textContent =
+        (suggestHintEl.textContent ? suggestHintEl.textContent + ' · ' : '') +
+        '无命中规划 ' + emptyQs.length + ' 个：' + tip + (emptyQs.length > 6 ? '…' : '');
+    }
+    if (msg.rounds && msg.rounds.length) {
+      const lastRound = msg.rounds[msg.rounds.length - 1];
+      if (lastRound && lastRound.plan) {
+        renderPlanPanel(lastRound.plan, msg.rounds.length - 1, false);
+      }
+    }
   } else if (msg.type === 'exportDone') {
     showExportDone(msg.message);
   }

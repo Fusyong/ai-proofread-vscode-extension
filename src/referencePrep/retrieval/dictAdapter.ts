@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
-import { pickDefaultDictId, resolveLocalDictConfigs, type ResolvedLocalDictConfigItem } from '../../localDict/dictConfig';
+import { pickDefaultDictId, resolveLocalDictConfigs } from '../../localDict/dictConfig';
 import { MdictClient, type LookupMode } from '../../localDict/mdictClient';
 import { stripHtmlToText } from '../../localDict/htmlToText';
+import { cleanDictDefinition } from '../../localDict/dictCleaners';
 import {
     buildDedupKeyLegacy,
     buildDictTryList,
@@ -14,6 +15,11 @@ import {
 } from '../../localDict/dictLookupShared';
 import type { ReferencePrepDictQuery, ReferencePrepPlanQuery, CorpusHit } from '../schema';
 import { getDictPrepConfigKeys } from '../config';
+import type { ReferencePrepRunControls } from '../runControls';
+import { defaultControlsForStrength } from '../runControls';
+import { relevanceToTarget, selectDictEntries, type DictEntryPick } from './dictSelect';
+
+export { selectDictEntries } from './dictSelect';
 
 let hitCounter = 0;
 function nextHitId(): string {
@@ -32,28 +38,24 @@ export async function executeDictQuery(params: {
     existingReference: string;
     priority: number;
     lookupsBudget: { used: number; max: number };
+    target?: string;
+    controls?: ReferencePrepRunControls;
 }): Promise<{ hits: CorpusHit[]; lookupsUsed: number }> {
     const { maxDefinitionChars, cacheEnabled, cacheTtlHours } = getDictPrepConfigKeys();
+    const controls = params.controls ?? defaultControlsForStrength('standard');
     const dicts = resolveLocalDictConfigs();
     const defaultDictId = pickDefaultDictId(dicts);
     const mode: LookupMode = 'exact';
     const client = MdictClient.getInstance(params.context);
     const candidates = params.dictBlock.candidates.slice(0, 3);
-    const preferredDictId = params.dictBlock.dictId;
+    const preferredDictId = params.dictBlock.dictId ?? defaultDictId ?? null;
     const dictTryList = buildDictTryList(dicts, preferredDictId, defaultDictId);
+    const target = params.target ?? candidates.join(' ');
 
-    const groups = new Map<
-        string,
-        {
-            dictName: string;
-            matchedKey: string;
-            entries: Map<string, { cleaned: string; digest: string; block: string }>;
-            groupLen: number;
-        }
-    >();
+    const entries: DictEntryPick[] = [];
+    const seenDigest = new Set<string>();
 
     let lookupsUsed = 0;
-    const MAX_ENTRIES_PER_GROUP = 6;
 
     for (const dict of dictTryList) {
         if (params.lookupsBudget.used + lookupsUsed >= params.lookupsBudget.max) break;
@@ -80,8 +82,15 @@ export async function executeDictQuery(params: {
                 if (rawHits.length === 0) return 0;
 
                 for (const h of rawHits) {
-                    const cleaned = limitCleanText(stripHtmlToText(h.definition), maxDefinitionChars);
+                    const stripped = stripHtmlToText(h.definition);
+                    const cleanedRaw = cleanDictDefinition({
+                        text: stripped,
+                        dictId: h.dictId,
+                        tags: dict.tags,
+                    });
+                    const cleaned = limitCleanText(cleanedRaw, maxDefinitionChars);
                     const digest = digestSha1(`${h.matchedKey}\n${cleaned}`);
+                    if (seenDigest.has(digest)) continue;
                     const beginTag = buildLocalDictEntryBeginTag(digest);
                     const legacyKey = buildDedupKeyLegacy(dict.id, term, mode);
                     const header = `【本地词典】${h.dictName}｜${h.matchedKey}`;
@@ -93,28 +102,22 @@ export async function executeDictQuery(params: {
                     ) {
                         continue;
                     }
-                    const groupKey = `${h.dictId}::${h.matchedKey}`;
-                    let g = groups.get(groupKey);
-                    if (!g) {
-                        g = {
-                            dictName: h.dictName,
-                            matchedKey: h.matchedKey,
-                            entries: new Map(),
-                            groupLen: 0,
-                        };
-                        groups.set(groupKey, g);
-                    }
-                    g.groupLen = Math.max(g.groupLen, cleaned.length);
+                    seenDigest.add(digest);
                     const block = formatDictReferenceBlock({
                         dictName: h.dictName,
                         matchedKey: h.matchedKey,
                         definition: cleaned,
                         digest,
                     });
-                    const prev = g.entries.get(digest);
-                    if (!prev || cleaned.length > prev.cleaned.length) {
-                        g.entries.set(digest, { cleaned, digest, block });
-                    }
+                    entries.push({
+                        dictId: h.dictId,
+                        dictName: h.dictName,
+                        matchedKey: h.matchedKey,
+                        cleaned,
+                        digest,
+                        block,
+                        relevance: relevanceToTarget(target, h.matchedKey, cleaned, candidates),
+                    });
                 }
                 return rawHits.length;
             };
@@ -128,13 +131,7 @@ export async function executeDictQuery(params: {
         }
     }
 
-    const bestGroup = [...groups.values()].sort((a, b) => b.groupLen - a.groupLen)[0];
-    if (!bestGroup) return { hits: [], lookupsUsed };
-
-    const picked = [...bestGroup.entries.values()]
-        .sort((a, b) => b.cleaned.length - a.cleaned.length)
-        .slice(0, MAX_ENTRIES_PER_GROUP);
-
+    const picked = selectDictEntries(entries, preferredDictId, controls);
     const hits: CorpusHit[] = picked.map((one) => ({
         hitId: nextHitId(),
         source: 'dict',
@@ -142,14 +139,14 @@ export async function executeDictQuery(params: {
         baseValue: params.priority,
         aggregatedValue: params.priority,
         llmPriority: params.priority,
-        finalScore: params.priority,
+        finalScore: Math.max(params.priority * 0.5, one.relevance),
         snippet: one.cleaned.slice(0, 400),
         digest: one.digest,
         referenceBlock: one.block,
         status: 'active',
         kind: 'evidence' as const,
-        matchedKey: bestGroup.matchedKey,
-        dictId: params.dictBlock.dictId ?? undefined,
+        matchedKey: one.matchedKey,
+        dictId: one.dictId,
     }));
 
     return { hits, lookupsUsed };

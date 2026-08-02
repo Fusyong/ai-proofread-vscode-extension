@@ -9,6 +9,8 @@ export interface LocalDictConfigItem {
     tags?: string[];
     priority?: number;
     whenToUse?: string;
+    /** 版本/出版时间（供规划与精排参考，建议填写） */
+    edition?: string;
 }
 
 export interface ResolvedLocalDictConfigItem extends LocalDictConfigItem {
@@ -32,6 +34,7 @@ export function resolveLocalDictConfigs(): ResolvedLocalDictConfigItem[] {
             tags: d.tags ?? [],
             priority: typeof d.priority === 'number' ? d.priority : 100,
             whenToUse: d.whenToUse ?? '',
+            edition: typeof d.edition === 'string' ? d.edition.trim() : '',
         });
     }
     return resolved;

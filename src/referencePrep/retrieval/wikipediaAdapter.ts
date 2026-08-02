@@ -16,7 +16,7 @@ function nextHitId(): string {
 }
 
 function resolveLang(queryLang: WikipediaLang | undefined, globalDefault: WikipediaLang): WikipediaLang {
-    if (queryLang === 'zh' || queryLang === 'en') return queryLang;
+    if (queryLang) return queryLang;
     return globalDefault;
 }
 
@@ -32,11 +32,15 @@ export async function executeWikipediaQuery(params: {
     strength: ReferencePrepStrength;
     roundId?: string;
     requestsBudget: { used: number; max: number };
+    defaultLang?: WikipediaLang;
+    fallbackLang?: WikipediaLang;
 }): Promise<{ hits: CorpusHit[]; requestsUsed: number }> {
     const globalConfig = getWikipediaConfig();
     const preset = getStrengthPreset(params.strength);
     const maxExtractChars = Math.min(globalConfig.maxExtractChars, preset.wikipediaMaxExtractChars);
     const maxHits = preset.wikipediaMaxHitsPerRound;
+    const defaultLang = params.defaultLang ?? globalConfig.defaultLang;
+    const fallbackLang = params.fallbackLang ?? globalConfig.fallbackLang;
 
     const client = getWikimediaClient();
     // 以 runner 侧 requestsBudget 为准；先按剩余额度重置客户端预算，
@@ -47,7 +51,7 @@ export async function executeWikipediaQuery(params: {
     }
     client.resetSessionBudget(budgetMax);
 
-    const lang = resolveLang(params.wikiBlock.lang, globalConfig.defaultLang);
+    const lang = resolveLang(params.wikiBlock.lang, defaultLang);
     const includeWikidata =
         params.wikiBlock.includeWikidata !== false && globalConfig.includeWikidata;
 
@@ -66,10 +70,10 @@ export async function executeWikipediaQuery(params: {
         if (title) titlesToFetch.push(title);
     }
 
-    if (titlesToFetch.length === 0 && searchTerms.length > 0 && globalConfig.fallbackLang !== lang) {
+    if (titlesToFetch.length === 0 && searchTerms.length > 0 && fallbackLang !== lang) {
         for (const term of searchTerms) {
             if (client.isBudgetExhausted() || client.isPaused()) break;
-            const title = await client.searchTitle(globalConfig.fallbackLang, term);
+            const title = await client.searchTitle(fallbackLang, term);
             if (title) titlesToFetch.push(title);
         }
     }
@@ -84,8 +88,8 @@ export async function executeWikipediaQuery(params: {
     const fetchLang = lang;
     let pages = await client.fetchPages(fetchLang, uniqueTitles);
 
-    if (pages.length === 0 && globalConfig.fallbackLang !== lang) {
-        pages = await client.fetchPages(globalConfig.fallbackLang, uniqueTitles);
+    if (pages.length === 0 && fallbackLang !== lang) {
+        pages = await client.fetchPages(fallbackLang, uniqueTitles);
     }
 
     const hits: CorpusHit[] = [];

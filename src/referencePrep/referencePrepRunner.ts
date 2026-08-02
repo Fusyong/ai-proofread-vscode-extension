@@ -53,6 +53,12 @@ import {
     resetRetrievalCacheStats,
 } from './retrieval/retrievalCache';
 import { bridgePrepEventToProgress, type PrepEventListener } from './prepEvents';
+import {
+    clampControls,
+    defaultControlsForStrength,
+    type ReferencePrepRunControls,
+} from './runControls';
+import { applySoftSelectToHits } from './retrieval/softSelect';
 
 const ALL_INTENTS: ReferencePrepIntent[] = [
     'entity_name',
@@ -69,6 +75,14 @@ export interface ReferencePrepProgressHooks {
     token?: vscode.CancellationToken;
     onAfterJsonItem?: (itemIndex: number) => void;
     onProcessUpdated?: (proc: ReferencePrepProcessFileV020) => void;
+    /**
+     * 规划审阅闸门：当 controls.requirePlanConfirm 时，runner 在此等待用户确认。
+     * 返回 Promise，resolve 后继续执行（可带回修改后的 plan）。
+     */
+    requestPlanReview?: (args: {
+        round: number;
+        plan: import('./schema').ReferencePrepPlan;
+    }) => Promise<{ action: 'confirm' | 'skip' | 'cancel'; plan?: import('./schema').ReferencePrepPlan }>;
 }
 
 export interface ReferencePrepRunParams {
@@ -90,6 +104,8 @@ export interface ReferencePrepRunParams {
     /** MD 选段 vs JSON 条目 */
     prepOrigin?: ReferencePrepOrigin;
     jsonItemIndex?: number;
+    /** 面板可调控制参数（覆盖 strength 默认） */
+    controls?: Partial<ReferencePrepRunControls>;
 }
 
 function resolvePlanSystemPrompt(
@@ -149,6 +165,10 @@ export async function runReferencePrepForTarget(
         }
 
         const preset = getStrengthPreset(params.strength);
+        const controls = clampControls(
+            params.controls ?? defaultControlsForStrength(params.strength),
+            params.strength
+        );
         const scopeCfg = getScopeConfig();
         const maxRounds = params.continuation
             ? (params.maxRoundsOverride ??
@@ -275,9 +295,45 @@ export async function runReferencePrepForTarget(
                 userPrompt,
                 disableThinking,
             });
-            const plan = parseReferencePrepPlan(raw, intents);
+            let plan = parseReferencePrepPlan(raw, intents);
             plan.queries = plan.queries.slice(0, preset.maxQueriesPerRound);
             emit?.({ type: 'plan', round, plan });
+            emit?.({
+                type: 'planReview',
+                round,
+                plan,
+                awaitConfirm: Boolean(controls.requirePlanConfirm && params.requestPlanReview),
+            });
+
+            if (controls.requirePlanConfirm && params.requestPlanReview) {
+                emit?.({
+                    type: 'phase',
+                    name: 'plan_review',
+                    round,
+                    message: `等待确认第 ${round + 1} 轮规划…`,
+                });
+                const review = await params.requestPlanReview({ round, plan });
+                if (review.action === 'cancel' || params.token?.isCancellationRequested) {
+                    emit?.({ type: 'cancelled' });
+                    break;
+                }
+                if (review.action === 'skip') {
+                    appendProcessLog(params.anchorPath, `Round ${round + 1} plan skipped by user`);
+                    const skipEntry: import('./schema').ReferencePrepRound = {
+                        roundId: `r-${Date.now()}`,
+                        startedAt: new Date().toISOString(),
+                        finishedAt: new Date().toISOString(),
+                        plan,
+                        queryCount: plan.queries.length,
+                    };
+                    proc.rounds.push(skipEntry);
+                    break;
+                }
+                if (review.plan) {
+                    plan = review.plan;
+                    plan.queries = plan.queries.slice(0, preset.maxQueriesPerRound);
+                }
+            }
 
             const roundId = `r-${Date.now()}`;
             const roundEntry: import('./schema').ReferencePrepRound = {
@@ -291,6 +347,7 @@ export async function runReferencePrepForTarget(
                 roundEntry.finishedAt = new Date().toISOString();
                 proc.rounds.push(roundEntry);
                 applyPruneToCorpus(proc.corpus, plan, preset.valuePruneThreshold);
+                applySoftSelectToHits(proc.corpus, controls);
                 break;
             }
             if (plan.sufficient && plan.queries.length === 0 && params.continuation) {
@@ -322,6 +379,7 @@ export async function runReferencePrepForTarget(
                 scope: resourceScope,
                 roundId,
                 catalogSnapshotId: catalog?.snapshotId,
+                controls,
             });
             roundIncomingTotal += incoming.length;
             emit?.({
@@ -346,9 +404,11 @@ export async function runReferencePrepForTarget(
                 message: `精排 ${incoming.length} 条候选…`,
             });
             const reranked = await runLlmRerank({ target: params.target, hits: incoming });
+            applySoftSelectToHits(reranked, controls);
 
             mergeCorpusDedupe(proc.corpus, reranked);
             applyPruneToCorpus(proc.corpus, plan, preset.valuePruneThreshold);
+            applySoftSelectToHits(proc.corpus, controls);
             mergedReference = buildMergedReference(proc.corpus);
 
             roundEntry.finishedAt = new Date().toISOString();
@@ -417,6 +477,7 @@ export async function runReferencePrepForJsonFile(
         intents?: ReferencePrepIntent[];
         /** 跳过过程文件中已有检索记录的条目（断点续跑） */
         skipExistingReference?: boolean;
+        controls?: Partial<ReferencePrepRunControls>;
     } & ReferencePrepProgressHooks
 ): Promise<{ processed: number; skipped: number; total: number; cancelled: boolean }> {
     const raw = fs.readFileSync(params.jsonFilePath, 'utf8');
@@ -468,9 +529,11 @@ export async function runReferencePrepForJsonFile(
             prepOrigin: 'json_item',
             jsonItemIndex: idx,
             freshProcess: true,
+            controls: params.controls,
             onProgress: params.onProgress,
             onEvent: params.onEvent,
             token: params.token,
+            requestPlanReview: params.requestPlanReview,
             onProcessUpdated: params.onProcessUpdated,
         });
 

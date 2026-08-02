@@ -40,12 +40,12 @@ export const REFERENCE_SOURCE_OPTIONS: Array<{
 }> = [
     { id: 'dict', label: '本地词典', description: 'MDict 本地词典查词' },
     { id: 'grep_md', label: '参考资料 grep', description: '在 references 目录 md/txt 中字面检索' },
-    { id: 'bm25', label: 'BM25', description: '需先建立引文索引；jieba 分词关键词检索' },
-    { id: 'vector', label: '轻量向量', description: '字符 n-gram 相似度；懒构建向量索引' },
+    { id: 'bm25', label: '参考资料 BM25', description: '需先建立引文索引；jieba 分词关键词检索' },
+    { id: 'vector', label: '参考资料轻量向量', description: '字符 n-gram 相似度；懒构建向量索引' },
     {
         id: 'wikipedia',
         label: '维基百科（API）',
-        description: '只读访问 zh/en 维基与 Wikidata；遵守速率限制',
+        description: '只读访问多语言维基与 Wikidata；遵守速率限制',
     },
     {
         id: 'web',
@@ -71,6 +71,8 @@ export interface ReferencePrepSessionParams {
     maxRoundsOverride?: number;
     recordId?: string;
     onProcessUpdated?: (proc: ReferencePrepProcessFileV020) => void;
+    controls?: import('./runControls').ReferencePrepRunControls;
+    requestPlanReview?: import('./referencePrepRunner').ReferencePrepProgressHooks['requestPlanReview'];
 }
 
 export interface ReferencePrepSessionResult {
@@ -98,10 +100,12 @@ export async function runReferencePrepSession(
         continuation: params.continuation,
         maxRoundsOverride: params.maxRoundsOverride,
         recordId: params.recordId,
+        controls: params.controls,
         onProgress: params.onProgress,
         onEvent: params.onEvent,
         token: params.token,
         onProcessUpdated: params.onProcessUpdated,
+        requestPlanReview: params.requestPlanReview,
     });
     const hits = process.corpus.filter((h) => h.status === 'active');
     return { mergedReference, process, hits };

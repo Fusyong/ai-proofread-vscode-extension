@@ -50,7 +50,8 @@ export function buildDictPrepUserPrompt(params: {
         .map((d) => {
             const tags = (d.tags ?? []).slice(0, 6).join(', ');
             const whenToUse = (d.whenToUse ?? '').replace(/\s+/g, ' ').trim();
-            return `- id=${d.id}; name=${d.name}; tags=[${tags}]; priority=${d.priority ?? 100}; whenToUse=${whenToUse}`;
+            const edition = (d.edition ?? '').replace(/\s+/g, ' ').trim() || '版本未填';
+            return `- id=${d.id}; name=${d.name}; edition=${edition}; tags=[${tags}]; priority=${d.priority ?? 100}; whenToUse=${whenToUse}`;
         })
         .join('\n');
 
