@@ -1419,9 +1419,6 @@ body.mode-json .btn-json-only { display: inline-block; }
   <span class="status" id="resultOriginHint"></span>
 </div>
 <div class="row">
-  <span class="status">核对选中引文 → 侧栏「资料检索」；核对全文引文 → 先建立引文索引 → 侧栏「引文核查」。引文索引亦供 BM25 资料准备使用。校对请到校对面板。</span>
-</div>
-<div class="row">
   <textarea class="preview" id="selectionPreview" readonly placeholder="选区预览…"></textarea>
 </div>
 <div class="row">

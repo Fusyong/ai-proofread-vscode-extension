@@ -21,6 +21,7 @@ import { resolveLocalDictConfigs } from '../../localDict/dictConfig';
 import { buildScopeCacheKey, withRetrievalCache } from './retrievalCache';
 import type { ReferencePrepRunControls } from '../runControls';
 import { defaultControlsForStrength } from '../runControls';
+import { sanitizeCorpusChannelHit } from './grepNoise';
 import { capCandidateHitsPerQuery } from './softSelect';
 
 export async function executeReferencePrepPlan(params: {
@@ -327,9 +328,19 @@ export function mergeCorpusDedupe(corpus: CorpusHit[], incoming: CorpusHit[]): v
     }
 }
 
+/**
+ * 合并导出正文：优先 suggestedForExport；
+ * 若尚无软勾选标记（旧过程文件），回退为全部 active。
+ * 导出前再剥一遍文献通道的朗诵时间戳/目录残片。
+ */
 export function buildMergedReference(corpus: CorpusHit[]): string {
-    return corpus
-        .filter((h) => h.status === 'active' && h.kind !== 'navigation_hint')
+    const usable = corpus.filter((h) => h.status === 'active' && h.kind !== 'navigation_hint');
+    const hasSuggestFlags = usable.some((h) => h.suggestedForExport === true);
+    const picked = hasSuggestFlags
+        ? usable.filter((h) => h.suggestedForExport === true)
+        : usable;
+    return picked
+        .filter((h) => sanitizeCorpusChannelHit(h))
         .sort((a, b) => (b.finalScore ?? b.aggregatedValue) - (a.finalScore ?? a.aggregatedValue))
         .map((h) => h.referenceBlock)
         .join('\n\n');

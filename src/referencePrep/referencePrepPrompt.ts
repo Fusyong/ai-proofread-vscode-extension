@@ -2,6 +2,7 @@ import type { ResolvedLocalDictConfigItem } from '../localDict/dictConfig';
 import type {
     ReferencePrepIntent,
     ReferencePrepPlan,
+    ReferencePrepRound,
     ReferenceSourceId,
     RetrievalUnit,
     WikipediaLang,
@@ -9,6 +10,29 @@ import type {
 import type { CorpusHit } from './schema';
 import type { ResourceScope } from './schema';
 import { isWikipediaLang } from './runControls';
+
+/** 多轮避重 / sufficient 规则；自定义提示词也会拼接此段，避免整替丢失 */
+export function buildReferencePrepMultiRoundAddendum(continuation?: boolean): string {
+    const base = [
+        '多轮规划（必须遵守）：',
+        '- 用户会提供 prior_plans（此前各轮已规划的 query）与 corpus_summary（已命中摘要）。',
+        '- 禁止重复 prior_plans 中已出现的主题：同一专名/术语换别名、换 patterns 排列、微调 wiki 词均视为重复，勿再生成。',
+        '- 第 2 轮及以后：只补真正缺口；若无新缺口，设 sufficient=true 且 queries=[]。',
+        '- 若 corpus 已有与 target 义项匹配的高相关 dict 或 wikipedia（见 coverage/snippet），对 entity_name 核查通常已足够，应 sufficient=true，勿再刷同一人名。',
+        '- 同名多义须按 target 语境选型；勿为匹配义项再查一遍「确认用」变体 query。',
+        '- 词条不要带书名号；dict.candidates 只写词头，勿加括号附注。',
+        '- 勿把检索 scopePaths 锁到与当前义项明显不符的目录。',
+    ];
+    if (continuation) {
+        base.push(
+            '',
+            '续跑模式：',
+            '- corpus 中已有用户认可的资料；须追加真正缺口的 queries，勿空转 sufficient。',
+            '- 可 prune 无关 hitId；仍须避开 prior_plans 已查主题。'
+        );
+    }
+    return base.join('\n');
+}
 
 export function buildReferencePrepSystemPrompt(params: {
     enabledSources: ReferenceSourceId[];
@@ -23,10 +47,10 @@ export function buildReferencePrepSystemPrompt(params: {
     const targetKind = params.targetKind ?? 'manuscript';
     const targetIntro =
         targetKind === 'search_intent'
-            ? '用户给出检索意图描述（说明希望在词典与参考资料中查找什么内容）、已检索到的 corpus 摘要，以及可用/禁用的资料来源。'
+            ? '用户给出检索意图描述（说明希望在词典与参考资料中查找什么内容）、已检索到的 corpus 摘要、此前规划 prior_plans，以及可用/禁用的资料来源。'
             : targetKind === 'citation_selection'
-              ? '用户给出书稿中选中的一段引文（citation_selection），需在词典与参考资料中检索可佐证或相关的原文出处；另附 corpus 摘要与可用/禁用的资料来源。'
-              : '用户给出 target 文本、已检索到的 corpus 摘要，以及可用/禁用的资料来源。';
+              ? '用户给出书稿中选中的一段引文（citation_selection），需在词典与参考资料中检索可佐证或相关的原文出处；另附 corpus 摘要、prior_plans 与可用/禁用的资料来源。'
+              : '用户给出 target 文本、已检索到的 corpus 摘要、此前规划 prior_plans，以及可用/禁用的资料来源。';
     return [
         '你是一位资深的文字编辑，负责为书稿核查准备参考资料。' + targetIntro,
         '',
@@ -44,8 +68,9 @@ export function buildReferencePrepSystemPrompt(params: {
         '   unit 取值：line_context | sentence | md_paragraph | heading_section | file_outline。',
         '   entity_name/word_usage 倾向 sentence；general_fact 倾向 md_paragraph；探索性可用 line_context。',
         '   searchPhrases 供 BM25/向量检索（可与 patterns 相同或更宽）。',
-        '8) wikipedia 块：searchTerms(1~3) 或 titles(1~3 已知条目名), 可选 lang(zh|en|ja|fr|de|ru), includeWikidata(boolean), why。',
-        '   entity_name/general_fact 优先填 wikipedia；勿把百科检索写成 grep.patterns。',
+        '8) wikipedia 块（仅当 enabled 含 wikipedia）：searchTerms(1~3) 或 titles(1~3 已知条目名), 可选 lang(zh|en|ja|fr|de|ru), includeWikidata(boolean), why。',
+        '   勿默认用维基做实体核查；本地 dict/文献已够时不要为 entity_name 强开 wikipedia。',
+        '   仅在本地资料不足、且确需百科事实时再填 wikipedia；勿把百科检索写成 grep.patterns。',
         '   引文/专名若明显为某语原文，lang 优先该语言；中文语境事实默认 zh；需对照原文时可另建 en（或对应语）query。',
         '9) web 块（仅当 enabled 含 web）：searchTerms(1~3)、可选 why；用于通用网页搜索（非维基、非本地文献）。',
         '10) prune：列出应丢弃的 hitId（与 corpus 摘要对应）。',
@@ -55,17 +80,10 @@ export function buildReferencePrepSystemPrompt(params: {
         '- disabled 来源禁止为其生成 query。',
         '- enabled 含 dict 时可为专名/术语填 dict；含 grep_md/bm25/vector 时必须填 grep 块（patterns/searchPhrases）做文献检索，勿只写 dict。',
         '- 仅启用 bm25/vector/grep_md 时：专名、地名、斋号等写入 grep.patterns 与 searchPhrases。',
-        '- enabled 含 wikipedia 时可为专名/史实/百科事实填 wikipedia 块（非 grep）。',
+        '- enabled 含 wikipedia 时可为专名/史实/百科事实填 wikipedia 块（非 grep）；未启用则勿写 wikipedia。',
         '- enabled 含 web 时可为需外网核实的事实填 web 块。',
-        '- 词条不要带书名号；patterns 宜短、可命中参考资料。',
-        params.continuation
-            ? [
-                  '',
-                  '续跑模式（重要）：',
-                  '- corpus 中已有用户认可的资料；本轮须追加 queries 以补充缺口，勿因 sufficient 而返回空 queries。',
-                  '- 可 prune 无关 hitId；优先检索尚未覆盖的疑点。',
-              ].join('\n')
-            : '',
+        '',
+        buildReferencePrepMultiRoundAddendum(params.continuation),
         disLines ? '\n' + disLines : '',
     ].join('\n');
 }
@@ -83,6 +101,8 @@ export function buildReferencePrepUserPrompt(params: {
     scope?: ResourceScope;
     navigationHints?: string;
     continuation?: boolean;
+    /** 此前各轮规划摘要（第 2 轮起避重用） */
+    priorPlansSummary?: string;
 }): string {
     const dictLines = params.dicts
         .map((d) => {
@@ -132,6 +152,13 @@ export function buildReferencePrepUserPrompt(params: {
         ...(params.catalogSummary ? ['catalog:', params.catalogSummary, ''] : []),
         ...scopeBlock,
         ...(params.navigationHints ? ['navigation_hints:', params.navigationHints, ''] : []),
+        ...(params.priorPlansSummary
+            ? [
+                  'prior_plans（此前已规划，禁止同主题变体重复）:',
+                  params.priorPlansSummary,
+                  '',
+              ]
+            : []),
         'corpus_summary:',
         params.corpusSummary || '(尚无)',
         '',
@@ -139,13 +166,89 @@ export function buildReferencePrepUserPrompt(params: {
     ].join('\n');
 }
 
+function summarizeQueryOneLine(q: {
+    queryId: string;
+    intent: string;
+    dict?: { dictId?: string | null; candidates?: string[] };
+    grep?: { patterns?: string[]; searchPhrases?: string[] };
+    wikipedia?: { searchTerms?: string[]; titles?: string[]; lang?: string };
+    web?: { searchTerms?: string[] };
+}): string {
+    const parts: string[] = [`${q.queryId} intent=${q.intent}`];
+    if (q.dict?.candidates?.length) {
+        parts.push(`dict=${q.dict.dictId ?? '?'}[${q.dict.candidates.join('/')}]`);
+    }
+    if (q.grep?.patterns?.length || q.grep?.searchPhrases?.length) {
+        const g = [...(q.grep.patterns ?? []), ...(q.grep.searchPhrases ?? [])].slice(0, 4);
+        parts.push(`grep=[${g.join('/')}]`);
+    }
+    if (q.wikipedia) {
+        const w = [...(q.wikipedia.searchTerms ?? []), ...(q.wikipedia.titles ?? [])].slice(0, 3);
+        parts.push(`wiki=${q.wikipedia.lang ?? ''}[${w.join('/')}]`);
+    }
+    if (q.web?.searchTerms?.length) {
+        parts.push(`web=[${q.web.searchTerms.slice(0, 3).join('/')}]`);
+    }
+    return '- ' + parts.join(' ');
+}
+
+/** 压缩此前各轮规划，供后续轮避重 */
+export function buildPriorPlansSummary(rounds: ReferencePrepRound[]): string {
+    if (!rounds.length) return '';
+    return rounds
+        .map((r, i) => {
+            const header = `round ${i + 1} sufficient=${r.plan.sufficient === true} queries=${r.plan.queries.length}`;
+            if (r.plan.queries.length === 0) return header + '\n  (无 query)';
+            const lines = r.plan.queries.map((q) => '  ' + summarizeQueryOneLine(q).replace(/^- /, ''));
+            return [header, ...lines].join('\n');
+        })
+        .join('\n');
+}
+
+/** 覆盖面摘要：来源计数 + 高分 dict/wiki 要点 */
+export function buildCorpusCoverageSummary(corpus: CorpusHit[]): string {
+    const active = corpus.filter((h) => h.status === 'active');
+    if (active.length === 0) return '';
+    const suggested = active.filter((h) => h.suggestedForExport === true);
+    const bySrc: Record<string, number> = {};
+    for (const h of active) {
+        bySrc[h.source] = (bySrc[h.source] ?? 0) + 1;
+    }
+    const srcLine = Object.entries(bySrc)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(' ');
+    const covered: string[] = [];
+    for (const h of active
+        .filter((x) => x.source === 'dict' || x.source === 'wikipedia')
+        .sort(
+            (a, b) =>
+                (b.rerankScore ?? b.finalScore ?? b.aggregatedValue) -
+                (a.rerankScore ?? a.finalScore ?? a.aggregatedValue)
+        )
+        .slice(0, 6)) {
+        const score = (h.rerankScore ?? h.finalScore ?? h.aggregatedValue).toFixed(2);
+        const label =
+            h.source === 'wikipedia'
+                ? `wiki:${h.pageTitle ?? h.snippet.slice(0, 40)}`
+                : `dict:${h.dictId ?? 'dict'}:${h.snippet.slice(0, 50).replace(/\s+/g, ' ')}`;
+        covered.push(
+            `${label} score=${score}${h.suggestedForExport === true ? ' suggested' : ''}`
+        );
+    }
+    return [
+        `coverage: active=${active.length} suggested=${suggested.length} ${srcLine}`,
+        covered.length ? 'covered_entities:\n  ' + covered.join('\n  ') : 'covered_entities: (无 dict/wiki)',
+    ].join('\n');
+}
+
 export function buildCorpusSummary(corpus: CorpusHit[], maxItems = 24): string {
-    const active = corpus
-        .filter((h) => h.status === 'active')
+    const activeAll = corpus.filter((h) => h.status === 'active');
+    if (activeAll.length === 0) return '';
+    const coverage = buildCorpusCoverageSummary(corpus);
+    const active = [...activeAll]
         .sort((a, b) => (b.finalScore ?? b.aggregatedValue) - (a.finalScore ?? a.aggregatedValue))
         .slice(0, maxItems);
-    if (active.length === 0) return '';
-    return active
+    const hits = active
         .map(
             (h) =>
                 'hitId=' +
@@ -154,12 +257,14 @@ export function buildCorpusSummary(corpus: CorpusHit[], maxItems = 24): string {
                     h.source +
                     ' value=' +
                     (h.finalScore ?? h.aggregatedValue).toFixed(2) +
+                    (h.suggestedForExport === true ? ' suggested=1' : '') +
                     ' digest=' +
                     h.digest +
                     ' snippet=' +
                     h.snippet.slice(0, 120).replace(/\s+/g, ' ')
         )
         .join('\n');
+    return coverage ? coverage + '\n' + hits : hits;
 }
 
 function extractJsonObject(raw: string): string {

@@ -7,6 +7,8 @@ import { summarizeCatalogForPrompt } from './catalog/catalogBuilder';
 import {
     buildCorpusSummary,
     buildNavigationHints,
+    buildPriorPlansSummary,
+    buildReferencePrepMultiRoundAddendum,
     buildReferencePrepSystemPrompt,
     buildReferencePrepUserPrompt,
     parseReferencePrepPlan,
@@ -59,6 +61,8 @@ import {
     type ReferencePrepRunControls,
 } from './runControls';
 import { applySoftSelectToHits } from './retrieval/softSelect';
+import { filterDuplicatePlanQueries } from './planDedupe';
+import type { ReferencePrepIntent } from './schema';
 
 const ALL_INTENTS: ReferencePrepIntent[] = [
     'entity_name',
@@ -117,11 +121,7 @@ function resolvePlanSystemPrompt(
     targetKind?: ReferencePrepTargetKind,
     continuation?: boolean
 ): string {
-    const custom = resolveDictPrepStylePrompt(context);
-    if (custom) {
-        return custom;
-    }
-    return buildReferencePrepSystemPrompt({
+    const builtIn = buildReferencePrepSystemPrompt({
         enabledSources: enabled,
         disabledSources: disabled,
         maxQueries,
@@ -129,6 +129,10 @@ function resolvePlanSystemPrompt(
         targetKind,
         continuation,
     });
+    const custom = resolveDictPrepStylePrompt(context);
+    if (!custom) return builtIn;
+    // 自定义提示词附加多轮避重段，避免整替丢失 sufficient / prior_plans 规则
+    return [custom.trim(), '', buildReferencePrepMultiRoundAddendum(continuation)].join('\n');
 }
 
 function resolveDictPrepStylePrompt(context: vscode.ExtensionContext): string | null {
@@ -258,6 +262,7 @@ export async function runReferencePrepForTarget(
 
             const corpusSummary = buildCorpusSummary(proc.corpus);
             const navigationHints = buildNavigationHints(proc.corpus);
+            const priorPlansSummary = buildPriorPlansSummary(proc.rounds);
             const systemPrompt = resolvePlanSystemPrompt(
                 params.context,
                 params.enabledSources,
@@ -278,6 +283,7 @@ export async function runReferencePrepForTarget(
                 scope: resourceScope,
                 navigationHints,
                 continuation: params.continuation,
+                priorPlansSummary: priorPlansSummary || undefined,
             });
 
             emit?.({
@@ -297,6 +303,26 @@ export async function runReferencePrepForTarget(
             });
             let plan = parseReferencePrepPlan(raw, intents);
             plan.queries = plan.queries.slice(0, preset.maxQueriesPerRound);
+            const deduped = filterDuplicatePlanQueries(plan, proc.rounds);
+            plan = deduped.plan;
+            if (deduped.removed > 0) {
+                appendProcessLog(
+                    params.anchorPath,
+                    `Round ${round + 1}: dropped ${deduped.removed} duplicate queries vs prior rounds`
+                );
+            }
+            // 无新 query：有一定命中，或已有高相关 dict/wiki → 视为足够
+            if (plan.queries.length === 0 && !params.continuation) {
+                const active = proc.corpus.filter((h) => h.status === 'active');
+                const strongEntity = active.some(
+                    (h) =>
+                        (h.source === 'dict' || h.source === 'wikipedia') &&
+                        (h.rerankScore ?? h.finalScore ?? h.aggregatedValue) >= 0.75
+                );
+                if (active.length >= 3 || strongEntity) {
+                    plan = { ...plan, sufficient: true };
+                }
+            }
             emit?.({ type: 'plan', round, plan });
             emit?.({
                 type: 'planReview',
@@ -347,7 +373,16 @@ export async function runReferencePrepForTarget(
                 roundEntry.finishedAt = new Date().toISOString();
                 proc.rounds.push(roundEntry);
                 applyPruneToCorpus(proc.corpus, plan, preset.valuePruneThreshold);
-                applySoftSelectToHits(proc.corpus, controls);
+                const intentByQuery = new Map<string, ReferencePrepIntent>();
+                for (const r of proc.rounds) {
+                    for (const q of r.plan.queries) {
+                        intentByQuery.set(q.queryId, q.intent);
+                    }
+                }
+                applySoftSelectToHits(proc.corpus, controls, {
+                    target: params.target,
+                    intentByQuery,
+                });
                 break;
             }
             if (plan.sufficient && plan.queries.length === 0 && params.continuation) {
@@ -404,11 +439,26 @@ export async function runReferencePrepForTarget(
                 message: `精排 ${incoming.length} 条候选…`,
             });
             const reranked = await runLlmRerank({ target: params.target, hits: incoming });
-            applySoftSelectToHits(reranked, controls);
+            const intentByQuery = new Map<string, ReferencePrepIntent>(
+                plan.queries.map((q) => [q.queryId, q.intent])
+            );
+            applySoftSelectToHits(reranked, controls, {
+                target: params.target,
+                intentByQuery,
+            });
 
             mergeCorpusDedupe(proc.corpus, reranked);
             applyPruneToCorpus(proc.corpus, plan, preset.valuePruneThreshold);
-            applySoftSelectToHits(proc.corpus, controls);
+            const corpusIntentByQuery = new Map<string, ReferencePrepIntent>();
+            for (const r of [...proc.rounds, { plan } as { plan: typeof plan }]) {
+                for (const q of r.plan.queries) {
+                    corpusIntentByQuery.set(q.queryId, q.intent);
+                }
+            }
+            applySoftSelectToHits(proc.corpus, controls, {
+                target: params.target,
+                intentByQuery: corpusIntentByQuery,
+            });
             mergedReference = buildMergedReference(proc.corpus);
 
             roundEntry.finishedAt = new Date().toISOString();

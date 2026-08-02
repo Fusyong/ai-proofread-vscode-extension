@@ -12,6 +12,22 @@ export function sanitizeLookupTerm(term: string): string {
         .replace(/\s+([\p{Script=Han}])/gu, '$1');
 }
 
+/**
+ * 词典 exact 查词用：去掉「（义项说明）」等括号附注，避免查空。
+ * 例：李白（革命烈士）→ 李白
+ */
+export function normalizeDictCandidate(term: string): string {
+    let s = sanitizeLookupTerm(term);
+    if (!s) return s;
+    s = s
+        .replace(/（[^）]*）/g, '')
+        .replace(/\([^)]*\)/g, '')
+        .replace(/\[[^\]]*\]/g, '')
+        .replace(/【[^】]*】/g, '')
+        .trim();
+    return sanitizeLookupTerm(s);
+}
+
 export function buildOpenccAltTerms(term: string): string[] {
     const base = sanitizeLookupTerm(term);
     if (!base) return [];

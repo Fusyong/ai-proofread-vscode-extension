@@ -10,6 +10,7 @@ import { getStrengthPreset } from '../config';
 import type { CorpusHit, ReferencePrepGrepQuery, ReferencePrepStrength, RetrievalUnit } from '../schema';
 import type { ResourceScope } from '../schema';
 import { isFileInScope } from '../scope/resourceScope';
+import { normalizeRelPath, sanitizeGrepSnippetForExport } from './grepNoise';
 
 let grepHitCounter = 0;
 
@@ -87,16 +88,29 @@ export function retrieveGrepHits(params: {
                 contextLines: q.contextLines ?? 2,
             });
 
-            const snippet = expanded?.snippet ?? m.snippet;
+            const rawSnippet = expanded?.snippet ?? m.snippet;
             const startLine = expanded?.startLine ?? m.startLine;
             const endLine = expanded?.endLine ?? m.endLine;
-
+            const rel = normalizeRelPath(m.file);
+            const snippet = sanitizeGrepSnippetForExport(rawSnippet, expanded?.headingPath);
+            if (!snippet) continue;
             if (totalChars + snippet.length > preset.grepMaxSnippetChars) break;
 
-            const digest = digestSha1(`${m.file}:${startLine}\n${snippet}`);
+            const digest = digestSha1(`${rel}:${startLine}\n${snippet}`);
             const beginTag = `<!-- ai-proofread:grepHit begin sha1=${digest} -->`;
             if (existingReference.includes(beginTag)) continue;
             if (hits.some((h) => h.digest === digest)) continue;
+            // 路径分隔符变体去重
+            if (
+                hits.some(
+                    (h) =>
+                        normalizeRelPath(h.relPath ?? h.file ?? '') === rel &&
+                        (h.startLine ?? h.line) === startLine &&
+                        (h.endLine ?? h.line) === endLine
+                )
+            ) {
+                continue;
+            }
 
             const kind =
                 unit === 'file_outline' || expanded?.isHeadingOnly ? 'navigation_hint' : 'evidence';
@@ -104,7 +118,7 @@ export function retrieveGrepHits(params: {
             const rgCommand = buildRgCommand(fullPath, rgPattern, true);
 
             const block = formatGrepReferenceBlock({
-                file: m.file,
+                file: rel,
                 line: startLine,
                 snippet,
                 digest,
@@ -117,8 +131,8 @@ export function retrieveGrepHits(params: {
                 baseValue: q.priority,
                 aggregatedValue: m.aggregatedValue,
                 llmPriority: q.priority,
-                file: m.file,
-                relPath: m.file,
+                file: rel,
+                relPath: rel,
                 line: startLine,
                 startLine,
                 endLine,

@@ -11,8 +11,10 @@ import {
     digestSha1,
     formatDictReferenceBlock,
     limitCleanText,
+    normalizeDictCandidate,
     sanitizeLookupTerm,
 } from '../../localDict/dictLookupShared';
+import { senseFitScore } from './senseFit';
 import type { ReferencePrepDictQuery, ReferencePrepPlanQuery, CorpusHit } from '../schema';
 import { getDictPrepConfigKeys } from '../config';
 import type { ReferencePrepRunControls } from '../runControls';
@@ -47,10 +49,21 @@ export async function executeDictQuery(params: {
     const defaultDictId = pickDefaultDictId(dicts);
     const mode: LookupMode = 'exact';
     const client = MdictClient.getInstance(params.context);
-    const candidates = params.dictBlock.candidates.slice(0, 3);
+    const rawCandidates = params.dictBlock.candidates.slice(0, 3);
+    const candidates = [
+        ...new Set(
+            rawCandidates
+                .flatMap((c) => {
+                    const full = sanitizeLookupTerm(c);
+                    const bare = normalizeDictCandidate(c);
+                    return bare && bare !== full ? [bare, full] : [bare || full];
+                })
+                .filter(Boolean)
+        ),
+    ].slice(0, 4);
     const preferredDictId = params.dictBlock.dictId ?? defaultDictId ?? null;
     const dictTryList = buildDictTryList(dicts, preferredDictId, defaultDictId);
-    const target = params.target ?? candidates.join(' ');
+    const target = params.target ?? rawCandidates.join(' ');
 
     const entries: DictEntryPick[] = [];
     const seenDigest = new Set<string>();
@@ -61,7 +74,7 @@ export async function executeDictQuery(params: {
         if (params.lookupsBudget.used + lookupsUsed >= params.lookupsBudget.max) break;
         for (const c of candidates) {
             if (params.lookupsBudget.used + lookupsUsed >= params.lookupsBudget.max) break;
-            const baseTerm = sanitizeLookupTerm(c);
+            const baseTerm = normalizeDictCandidate(c) || sanitizeLookupTerm(c);
             if (!baseTerm) continue;
 
             const execLookup = async (term: string): Promise<number> => {
@@ -109,6 +122,8 @@ export async function executeDictQuery(params: {
                         definition: cleaned,
                         digest,
                     });
+                    const lit = relevanceToTarget(target, h.matchedKey, cleaned, rawCandidates);
+                    const sense = senseFitScore(target, `${h.matchedKey}\n${cleaned}`);
                     entries.push({
                         dictId: h.dictId,
                         dictName: h.dictName,
@@ -116,7 +131,7 @@ export async function executeDictQuery(params: {
                         cleaned,
                         digest,
                         block,
-                        relevance: relevanceToTarget(target, h.matchedKey, cleaned, candidates),
+                        relevance: Math.max(0, Math.min(1, lit * 0.55 + sense * 0.45)),
                     });
                 }
                 return rawHits.length;

@@ -1,10 +1,13 @@
 import type { CorpusHit, CorpusHitSource } from '../schema';
 import { unitKey } from '../grep/unitExpander';
 import { capHitsPerFile, dedupeHitsByOverlap, scoreAndSortHits } from './scoring';
+import { normalizeRelPath } from './grepNoise';
 
 export function fuseChannelHits(hits: CorpusHit[], target: string): CorpusHit[] {
     const byUnit = new Map<string, CorpusHit>();
     for (const h of hits) {
+        if (h.relPath) h.relPath = normalizeRelPath(h.relPath);
+        if (h.file) h.file = normalizeRelPath(h.file);
         const key =
             h.source === 'wikipedia' || h.source === 'web'
                 ? `${h.source}:${h.pageUrl ?? h.digest}`

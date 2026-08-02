@@ -25,4 +25,11 @@ describe('dictCleaners', () => {
         });
         expect(t2).toBe('词条正文');
     });
+
+    it('strips audio unsupported message for cihai7', () => {
+        const raw = '李白 您的浏览器不支持 audio 标签\n李　白（701—762）\n唐诗人。';
+        const t = cleanDictDefinition({ text: raw, dictId: 'cihai7' });
+        expect(t).not.toMatch(/audio/i);
+        expect(t).toContain('唐诗人');
+    });
 });

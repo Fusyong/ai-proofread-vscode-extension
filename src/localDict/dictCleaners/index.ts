@@ -24,10 +24,16 @@ export function cleanGenericMdxNoise(text: string): string {
     return out;
 }
 
-/** 辞海类：去掉参见导航残留与「参见」重复块首尾空白 */
+/** 辞海类：去掉 audio 残片、参见导航残留 */
 export function cleanCihaiStyle(text: string): string {
     let out = cleanGenericMdxNoise(text);
+    out = out.replace(/您的浏览器不支持\s*audio\s*标签/gi, '');
+    out = out.replace(/<\/?audio\b[^>]*>/gi, '');
+    out = out.replace(/\baudio\s*标签\b/gi, '');
+    // 重复的「李　白（701—762）」类标题行只留首行附近一次即可：压缩连续重复行
+    out = out.replace(/^(李\s*白[^\n]*)\n\1\n/gm, '$1\n');
     out = out.replace(/^[【\[]参见[】\]][^\n]*\n+/gm, '');
+    out = out.replace(/[ \t]+\n/g, '\n');
     out = out.replace(/\n{3,}/g, '\n\n').trim();
     return out;
 }
@@ -35,6 +41,7 @@ export function cleanCihaiStyle(text: string): string {
 const BY_ID: Record<string, DictCleaner> = {
     cihai: cleanCihaiStyle,
     'cihai-7': cleanCihaiStyle,
+    cihai7: cleanCihaiStyle,
     ci_hai: cleanCihaiStyle,
 };
 
