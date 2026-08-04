@@ -113,7 +113,13 @@ export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Prom
             currentRoundsPromptMaxChars: PATCH_PROMPT_CURRENT_ROUNDS_MAX_CHARS,
         });
         const memRoute = resolveModelRoute('editorialMemory');
-        const patch = await runMemoryPatchLlm(memRoute.platform, memRoute.model, user);
+        const patch = await runMemoryPatchLlm(
+            memRoute.platform,
+            memRoute.model,
+            user,
+            0.25,
+            memRoute.disableThinking
+        );
         const applied =
             patch != null
                 ? applyGlobalOpsAndPushCurrentRound({

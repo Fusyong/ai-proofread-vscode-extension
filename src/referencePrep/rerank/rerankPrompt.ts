@@ -1,4 +1,5 @@
 import type { CorpusHit } from '../schema';
+import { resolveLocalDictConfigs } from '../../localDict/dictConfig';
 
 export function buildRerankSystemPrompt(includeReason: boolean): string {
     const reasonRule = includeReason
@@ -9,17 +10,28 @@ export function buildRerankSystemPrompt(includeReason: boolean): string {
         '只输出 JSON：{"decisions":[{"refTag":string,"action":"keep"|"drop","score":0~1,"reason"?:string}],"mergeGroups":[{"keep":string,"drop":string[],"reason"?:string}]}',
         reasonRule,
         'navigation_hint（仅标题/目录）通常 drop；语义重复的在 mergeGroups 中合并。',
+        '对 source=dict 的候选：结合 dictName/edition/whenToUse 判断该词典对当前查询是否适用；不适用则 drop（系统仍保留条目供用户手选，但会降低默认勾选）。',
+        'score 表示与 target 核查的相关度（0~1）。',
     ].join('\n');
 }
 
 export function buildRerankUserPrompt(target: string, hits: CorpusHit[]): string {
+    const dicts = resolveLocalDictConfigs();
+    const dictMeta = new Map(dicts.map((d) => [d.id, d]));
     const lines = hits.map((h) => {
         const tag = h.refTag ?? h.hitId;
+        const d = h.dictId ? dictMeta.get(h.dictId) : undefined;
         const meta = [
             `source=${h.source}`,
             `score=${(h.finalScore ?? h.aggregatedValue).toFixed(2)}`,
             h.headingPath ? `heading=${h.headingPath}` : '',
             h.kind ? `kind=${h.kind}` : '',
+            h.dictId ? `dictId=${h.dictId}` : '',
+            d?.name ? `dictName=${d.name}` : '',
+            d?.edition ? `edition=${d.edition}` : h.dictId ? 'edition=版本未填' : '',
+            d?.whenToUse ? `whenToUse=${d.whenToUse}` : '',
+            h.wikiLang ? `wikiLang=${h.wikiLang}` : '',
+            h.pageTitle ? `pageTitle=${h.pageTitle}` : '',
         ]
             .filter(Boolean)
             .join(' ');
@@ -57,7 +69,7 @@ export function parseRerankResult(raw: string): RerankResult {
               .filter((d: unknown) => d && typeof d === 'object')
               .map((d: { refTag?: string; action?: string; score?: number; reason?: string }) => ({
                   refTag: String(d.refTag ?? ''),
-                  action: d.action === 'drop' ? 'drop' as const : 'keep' as const,
+                  action: d.action === 'drop' ? ('drop' as const) : ('keep' as const),
                   score: typeof d.score === 'number' ? d.score : undefined,
                   reason: typeof d.reason === 'string' ? d.reason : undefined,
               }))

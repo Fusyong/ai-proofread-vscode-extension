@@ -2,6 +2,8 @@ import type { ReferencePrepProcessFileV020 } from './schema';
 
 export interface ReferencePrepSessionEntry {
     anchorPath: string;
+    /** 过程文件内选区记录 id */
+    recordId?: string;
     targetPreview?: string;
     userInput?: string;
     updatedAt: string;
@@ -25,6 +27,7 @@ export function summarizeSession(
     const activeHits = proc.corpus.filter((h) => h.status === 'active').length;
     return {
         anchorPath,
+        recordId: proc.id,
         targetPreview: proc.targetPreview ?? proc.userInput?.slice(0, 200),
         userInput: proc.userInput,
         updatedAt:

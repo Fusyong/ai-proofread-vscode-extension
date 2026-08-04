@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const configStore: Record<string, unknown> = {
     'proofread.platform': 'deepseek',
     'proofread.models.deepseek': 'deepseek-v4-flash',
+    'proofread.disableThinking': true,
     modelRoutes: {},
 };
 
@@ -20,15 +21,18 @@ vi.mock('vscode', () => ({
 
 import {
     getEffectiveInheritFrom,
+    hasRouteThinkingOverride,
     isRouteInherited,
     resolveModelRoute,
     resolveProofreadModel,
+    setRouteDisableThinking,
 } from './modelRouteResolver';
 
 describe('modelRouteResolver', () => {
     beforeEach(() => {
         configStore['proofread.platform'] = 'deepseek';
         configStore['proofread.models.deepseek'] = 'deepseek-v4-flash';
+        configStore['proofread.disableThinking'] = true;
         configStore.modelRoutes = {};
     });
 
@@ -36,6 +40,8 @@ describe('modelRouteResolver', () => {
         const r = resolveProofreadModel();
         expect(r.platform).toBe('deepseek');
         expect(r.model).toBe('deepseek-v4-flash');
+        expect(r.disableThinking).toBe(true);
+        expect(r.thinkingOverridden).toBe(false);
     });
 
     it('referencePrep inherits proofread by default', () => {
@@ -44,6 +50,8 @@ describe('modelRouteResolver', () => {
         expect(r.inherited).toBe(true);
         expect(r.inheritedFrom).toBe('proofread');
         expect(r.platform).toBe('deepseek');
+        expect(r.disableThinking).toBe(true);
+        expect(r.thinkingOverridden).toBe(false);
     });
 
     it('referencePrepRerank inherits referencePrep by default', () => {
@@ -53,6 +61,7 @@ describe('modelRouteResolver', () => {
         expect(r.inherited).toBe(true);
         expect(r.inheritedFrom).toBe('referencePrep');
         expect(r.model).toBe('deepseek-v4-flash');
+        expect(r.disableThinking).toBe(true);
     });
 
     it('referencePrepScope inherits referencePrep by default', () => {
@@ -83,5 +92,67 @@ describe('modelRouteResolver', () => {
         const rerank = resolveModelRoute('referencePrepRerank');
         expect(rerank.inheritedFrom).toBe('proofread');
         expect(rerank.model).toBe('deepseek-v4-flash');
+    });
+
+    it('inherits disableThinking from proofread root', () => {
+        configStore['proofread.disableThinking'] = false;
+        const prep = resolveModelRoute('referencePrep');
+        expect(prep.disableThinking).toBe(false);
+        const rerank = resolveModelRoute('referencePrepRerank');
+        expect(rerank.disableThinking).toBe(false);
+    });
+
+    it('allows thinking override while still inheriting platform/model', () => {
+        configStore.modelRoutes = {
+            referencePrep: { disableThinking: false },
+        };
+        expect(isRouteInherited('referencePrep')).toBe(true);
+        expect(hasRouteThinkingOverride('referencePrep')).toBe(true);
+        const prep = resolveModelRoute('referencePrep');
+        expect(prep.inherited).toBe(true);
+        expect(prep.platform).toBe('deepseek');
+        expect(prep.disableThinking).toBe(false);
+        expect(prep.thinkingOverridden).toBe(true);
+    });
+
+    it('thinking override chains: rerank follows prep override', () => {
+        configStore.modelRoutes = {
+            referencePrep: { disableThinking: false },
+        };
+        const rerank = resolveModelRoute('referencePrepRerank');
+        expect(rerank.disableThinking).toBe(false);
+        expect(rerank.thinkingOverridden).toBe(false);
+    });
+
+    it('rerank can override thinking independently of prep', () => {
+        configStore.modelRoutes = {
+            referencePrep: { disableThinking: false },
+            referencePrepRerank: { disableThinking: true },
+        };
+        const rerank = resolveModelRoute('referencePrepRerank');
+        expect(rerank.disableThinking).toBe(true);
+        expect(rerank.thinkingOverridden).toBe(true);
+        expect(rerank.model).toBe('deepseek-v4-flash');
+    });
+
+    it('setRouteDisableThinking clears override', async () => {
+        await setRouteDisableThinking('referencePrep', false);
+        expect(hasRouteThinkingOverride('referencePrep')).toBe(true);
+        expect(resolveModelRoute('referencePrep').disableThinking).toBe(false);
+
+        await setRouteDisableThinking('referencePrep', undefined);
+        expect(hasRouteThinkingOverride('referencePrep')).toBe(false);
+        expect(resolveModelRoute('referencePrep').disableThinking).toBe(true);
+    });
+
+    it('independent platform/model falls back thinking to proofread root', () => {
+        configStore['proofread.disableThinking'] = false;
+        configStore.modelRoutes = {
+            referencePrep: { inherit: false, platform: 'aliyun', model: 'qwen3-max' },
+        };
+        const prep = resolveModelRoute('referencePrep');
+        expect(prep.inherited).toBe(false);
+        expect(prep.disableThinking).toBe(false);
+        expect(prep.thinkingOverridden).toBe(false);
     });
 });

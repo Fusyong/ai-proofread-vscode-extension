@@ -7,6 +7,7 @@ export async function generateReferencePrepPlanJson(params: {
     model: string;
     systemPrompt: string;
     userPrompt: string;
+    disableThinking?: boolean;
 }): Promise<string> {
     return llmGenerateJson({
         logTag: 'referencePrepLlm',
@@ -14,5 +15,6 @@ export async function generateReferencePrepPlanJson(params: {
         model: params.model,
         systemPrompt: params.systemPrompt,
         userPrompt: params.userPrompt,
+        disableThinking: params.disableThinking,
     });
 }

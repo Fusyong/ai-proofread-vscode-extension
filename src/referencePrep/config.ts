@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { resolveModelRoute } from '../modelRoutes/modelRouteResolver';
-import type { ReferencePrepStrength, ReferenceSourceId } from './schema';
+import type { ReferencePrepStrength, ReferenceSourceId, WikipediaLang } from './schema';
 import { getStrengthPresetValues, type StrengthPreset } from './strengthPresets';
+import { isWikipediaLang } from './runControls';
 
 export type { StrengthPreset } from './strengthPresets';
 
@@ -36,8 +37,8 @@ export interface VectorConfig {
 
 export interface WikipediaConfig {
     userAgentContactUrl: string;
-    defaultLang: 'zh' | 'en';
-    fallbackLang: 'zh' | 'en';
+    defaultLang: WikipediaLang;
+    fallbackLang: WikipediaLang;
     includeWikidata: boolean;
     requestsPerMinute: number;
     minIntervalMs: number;
@@ -55,7 +56,7 @@ function cfg() {
     return vscode.workspace.getConfiguration('ai-proofread');
 }
 
-/** 核查强度预设；轮次、查询数、grep 预算等均以 strength 为准（非全局设置覆盖）。 */
+/** 检索强度预设；轮次、查询数、grep 预算等均以 strength 为准（非全局设置覆盖）。 */
 export function getStrengthPreset(strength: ReferencePrepStrength): StrengthPreset {
     return getStrengthPresetValues(strength);
 }
@@ -68,23 +69,29 @@ export function getDefaultEnabledSources(): ReferenceSourceId[] {
     return out.length > 0 ? out : ['dict', 'grep_md'];
 }
 
-function requireModel(routeId: Parameters<typeof resolveModelRoute>[0]): { platform: string; model: string } {
-    const { platform, model } = resolveModelRoute(routeId);
+export interface ReferencePrepLlmConfig {
+    platform: string;
+    model: string;
+    disableThinking: boolean;
+}
+
+function requireModel(routeId: Parameters<typeof resolveModelRoute>[0]): ReferencePrepLlmConfig {
+    const { platform, model, disableThinking } = resolveModelRoute(routeId);
     if (!model) {
         throw new Error('未配置模型：ai-proofread.proofread.models.' + platform);
     }
-    return { platform, model };
+    return { platform, model, disableThinking };
 }
 
-export function getReferencePrepLlmConfig(): { platform: string; model: string } {
+export function getReferencePrepLlmConfig(): ReferencePrepLlmConfig {
     return requireModel('referencePrep');
 }
 
-export function getReferencePrepScopeLlmConfig(): { platform: string; model: string } {
+export function getReferencePrepScopeLlmConfig(): ReferencePrepLlmConfig {
     return requireModel('referencePrepScope');
 }
 
-export function getReferencePrepRerankLlmConfig(): { platform: string; model: string } {
+export function getReferencePrepRerankLlmConfig(): ReferencePrepLlmConfig {
     return requireModel('referencePrepRerank');
 }
 
@@ -161,8 +168,14 @@ export function getWikipediaConfig(): WikipediaConfig {
             'referencePrep.wikipedia.userAgentContactUrl',
             DEFAULT_WIKI_CONTACT_URL
         ),
-        defaultLang: config.get<'zh' | 'en'>('referencePrep.wikipedia.defaultLang', 'zh'),
-        fallbackLang: config.get<'zh' | 'en'>('referencePrep.wikipedia.fallbackLang', 'en'),
+        defaultLang: (() => {
+            const v = config.get<string>('referencePrep.wikipedia.defaultLang', 'zh');
+            return isWikipediaLang(v) ? v : 'zh';
+        })(),
+        fallbackLang: (() => {
+            const v = config.get<string>('referencePrep.wikipedia.fallbackLang', 'en');
+            return isWikipediaLang(v) ? v : 'en';
+        })(),
         includeWikidata: config.get<boolean>('referencePrep.wikipedia.includeWikidata', true),
         requestsPerMinute: config.get<number>('referencePrep.wikipedia.rateLimit.requestsPerMinute', 30),
         minIntervalMs: config.get<number>('referencePrep.wikipedia.rateLimit.minIntervalMs', 200),

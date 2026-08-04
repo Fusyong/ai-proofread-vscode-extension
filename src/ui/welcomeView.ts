@@ -22,42 +22,54 @@ function getHtml(): string {
             font-family: var(--vscode-font-family);
             font-size: var(--vscode-font-size);
             color: var(--vscode-foreground);
-            padding: 12px 8px;
-            line-height: 1.5;
+            padding: 8px 6px;
+            line-height: 1.35;
             box-sizing: border-box;
         }
         .btn-primary {
             display: block;
             width: 100%;
-            margin-bottom: 8px;
-            padding: 8px 12px;
+            margin-bottom: 4px;
+            padding: 4px 8px;
+            min-height: 26px;
             text-align: left;
             cursor: pointer;
             border: 1px solid var(--vscode-button-border, transparent);
-            border-radius: 4px;
+            border-radius: 3px;
             background: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
             font: inherit;
+            line-height: 1.3;
         }
         .btn-primary:hover {
             background: var(--vscode-button-hoverBackground);
         }
+        .btn-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            margin-bottom: 4px;
+        }
+        .btn-row .btn-primary {
+            margin-bottom: 0;
+            text-align: left;
+        }
         .action-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 8px;
+            gap: 4px;
+            margin-bottom: 4px;
         }
         .cell {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 8px;
-            min-height: 36px;
-            padding: 8px 10px;
+            gap: 4px;
+            min-height: 26px;
+            padding: 3px 8px;
             box-sizing: border-box;
             border: 1px solid var(--vscode-widget-border);
-            border-radius: 4px;
+            border-radius: 3px;
             background: var(--vscode-sideBar-background);
             min-width: 0;
         }
@@ -68,6 +80,7 @@ function getHtml(): string {
             font: inherit;
             color: inherit;
             text-align: left;
+            line-height: 1.3;
         }
         .cell-action:hover {
             background: var(--vscode-list-hoverBackground);
@@ -82,53 +95,80 @@ function getHtml(): string {
             user-select: none;
         }
         .hint {
-            margin-top: 16px;
-            padding-top: 12px;
+            margin-top: 10px;
+            padding-top: 8px;
             border-top: 1px solid var(--vscode-widget-border);
             font-size: 12px;
             color: var(--vscode-descriptionForeground);
         }
         .hint ol {
-            margin: 8px 0 0 0;
-            padding-left: 20px;
+            margin: 4px 0 0 0;
+            padding-left: 18px;
         }
         .hint li {
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
     </style>
 </head>
 <body>
-    <button type="button" class="btn-primary" data-action="openPanel">打开校对面板</button>
+    <div class="btn-row">
+        <button type="button" class="btn-primary" data-action="openPanel" title="打开校对面板">校对面板</button>
+        <button type="button" class="btn-primary" data-action="openSearchConsole" title="打开参考资料检索控制台">检索面板</button>
+    </div>
     <div class="action-grid">
         <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="modelRoutes" title="显示或隐藏模型路由 TreeView">
             <span class="cell-label">模型路由</span>
         </button>
         <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="prompts" title="显示或隐藏提示词相关 TreeView">
-            <span class="cell-label">管理提示词</span>
+            <span class="cell-label">提示词</span>
         </button>
     </div>
     <div class="action-grid">
         <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="wordCheck" title="显示或隐藏字词检查相关 TreeView">
             <span class="cell-label">字词检查</span>
         </button>
-        <button type="button" class="cell cell-action" data-action="openSettings">
-            <span class="cell-label">打开设置</span>
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="referenceHit" title="显示或隐藏资料检索命中 TreeView">
+            <span class="cell-label">资料检索</span>
         </button>
     </div>
     <div class="action-grid">
-        <button type="button" class="cell cell-action" data-action="showExtension">
-            <span class="cell-label">查看说明文档</span>
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="citations" title="显示或隐藏引文核查 TreeView">
+            <span class="cell-label">引文核查</span>
         </button>
-        <button type="button" class="cell cell-action" data-action="openCheatsheet">
-            <span class="cell-label">命令速查与业务流程图</span>
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="duplicates" title="显示或隐藏重文检查 TreeView">
+            <span class="cell-label">重文检查</span>
+        </button>
+    </div>
+    <div class="action-grid">
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="numbering" title="显示或隐藏标题树 TreeView">
+            <span class="cell-label">标题树</span>
+        </button>
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="numberingSegments" title="显示或隐藏段内序号 TreeView">
+            <span class="cell-label">段内序号</span>
+        </button>
+    </div>
+    <div class="action-grid">
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="proofreadItems" title="显示或隐藏校对条目 TreeView">
+            <span class="cell-label">校对条目</span>
+        </button>
+        <button type="button" class="cell cell-action" data-action="openSettings" title="打开扩展设置">
+            <span class="cell-label">设置</span>
+        </button>
+    </div>
+    <div class="action-grid">
+        <button type="button" class="cell cell-action" data-action="showExtension" title="查看说明文档">
+            <span class="cell-label">说明文档</span>
+        </button>
+        <button type="button" class="cell cell-action" data-action="openCheatsheet" title="命令速查与业务流程图">
+            <span class="cell-label">命令速查…</span>
         </button>
     </div>
     <div class="hint">
         可通过三种方式使用本扩展：
         <ol>
-            <li>打开校对面板 (open Proofreading panel)，使用按钮</li>
-            <li>打开命令面板 (Ctrl+Shift+P)，输入 AI Proofreader … 筛查命令并使用</li>
-            <li>在编辑窗口使用鼠标右键菜单，使用 AI Proofreader 开头的选项</li>
+            <li>打开校对面板 / 搜索面板，使用按钮</li>
+            <li>打开命令面板 (Ctrl+Shift+P)，输入 AI Proofreader … 筛查检索命令</li>
+            <li>在编辑窗口使用鼠标右键菜单</li>
         </ol>
     </div>
     <script>
@@ -174,14 +214,25 @@ export function registerWelcomeView(context: vscode.ExtensionContext): void {
                     case 'openPanel':
                         await vscode.commands.executeCommand('ai-proofread.openProofreadingPanel');
                         break;
+                    case 'openSearchConsole':
+                        await vscode.commands.executeCommand('ai-proofread.referencePrep.openConsole');
+                        break;
                     case 'toggleSidebar': {
                         const key = message.key;
-                        if (key === 'modelRoutes') {
-                            await vscode.commands.executeCommand('ai-proofread.modelRoutes.toggleView');
-                        } else if (key === 'prompts') {
-                            await vscode.commands.executeCommand('ai-proofread.prompts.toggleViews');
-                        } else if (key === 'wordCheck') {
-                            await vscode.commands.executeCommand('ai-proofread.wordCheck.toggleViews');
+                        const cmdByKey: Record<string, string> = {
+                            modelRoutes: 'ai-proofread.modelRoutes.toggleView',
+                            prompts: 'ai-proofread.prompts.toggleViews',
+                            wordCheck: 'ai-proofread.wordCheck.toggleViews',
+                            referenceHit: 'ai-proofread.referencePrep.toggleResultsView',
+                            citations: 'ai-proofread.citation.toggleView',
+                            duplicates: 'ai-proofread.duplicate.toggleView',
+                            numbering: 'ai-proofread.numbering.toggleView',
+                            numberingSegments: 'ai-proofread.numberingSegments.toggleView',
+                            proofreadItems: 'ai-proofread.proofreadItems.toggleView',
+                        };
+                        const cmd = key ? cmdByKey[key] : undefined;
+                        if (cmd) {
+                            await vscode.commands.executeCommand(cmd);
                         }
                         break;
                     }

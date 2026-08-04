@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { FilePathUtils } from '../../utils';
 import { ReferenceStore } from '../../citation/referenceStore';
+import { relPathEqualsOrUnder } from '../../citation/pathNormalize';
 import type { RefSentenceRow } from '../../citation/referenceStore';
 
 const VECTOR_FILENAME = 'reference-vectors.json';
@@ -134,10 +135,12 @@ export async function searchVector(
     if (!index) return [];
 
     const { vec, norm } = queryVector(query);
-    const scopeSet = scopePaths?.length ? new Set(scopePaths) : null;
-
     const scored = index.entries
-        .filter((e) => !scopeSet || [...scopeSet].some((p) => e.file_path === p || e.file_path.startsWith(p + '/')))
+        .filter(
+            (e) =>
+                !scopePaths?.length ||
+                scopePaths.some((p) => relPathEqualsOrUnder(e.file_path, p))
+        )
         .map((e) => ({ row: e, score: cosineSimilarity(vec, norm, e.vec, e.norm) }))
         .filter((x) => x.score >= minScore)
         .sort((a, b) => b.score - a.score)

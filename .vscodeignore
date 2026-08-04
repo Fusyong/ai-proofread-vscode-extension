@@ -4,6 +4,10 @@ src/**
 docs/**
 .gitignore
 .parcel-cache
+# 工作区运行时缓存（检索/维基等），绝不能打进扩展包
+.proofread/**
+# 用户文献根下的引文索引 DB，非扩展自带资源
+references/**
 node_modules/**
 !node_modules/@vscode/**
 dist/sql-wasm.[0-9a-f]*.js

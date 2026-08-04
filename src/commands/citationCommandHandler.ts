@@ -69,7 +69,7 @@ export class CitationCommandHandler {
     }
 
     /**
-     * 在当前窗口打开「在文件中查找」，搜索选中文本，并尽量将范围限定在参考文献根目录（ai-proofread.citation.referencesPath）。
+     * 在当前窗口打开「在文件中查找」，搜索选中文本，并尽量将范围限定在参考资料根目录（ai-proofread.citation.referencesPath）。
      */
     async handleSearchSelectionInReferencesCommand(editor: vscode.TextEditor): Promise<void> {
         const raw = editor.document.getText(editor.selection);
@@ -92,12 +92,12 @@ export class CitationCommandHandler {
         const root = refStore.getReferencesRoot();
         if (!root) {
             vscode.window.showWarningMessage(
-                '请先在设置中配置「引文核对：参考文献根路径」（ai-proofread.citation.referencesPath），如 test/references'
+                '请先在设置中配置「引文核对：参考资料根路径」（ai-proofread.citation.referencesPath），如 test/references'
             );
             return;
         }
         if (!fs.existsSync(root)) {
-            vscode.window.showErrorMessage(`参考文献路径不存在: ${root}`);
+            vscode.window.showErrorMessage(`参考资料路径不存在: ${root}`);
             return;
         }
 
@@ -123,7 +123,7 @@ export class CitationCommandHandler {
             await vscode.commands.executeCommand('workbench.action.findInFiles', args);
             if (usedAbsoluteOutsideWorkspace) {
                 vscode.window.showInformationMessage(
-                    '参考文献目录在工作区外，已把绝对路径填入「要包含的文件」。若无结果，可将该目录加入工作区后再搜。'
+                    '参考资料目录在工作区外，已把绝对路径填入「要包含的文件」。若无结果，可将该目录加入工作区后再搜。'
                 );
             }
             if (truncated) {
@@ -139,11 +139,11 @@ export class CitationCommandHandler {
         const refStore = ReferenceStore.getInstance(this.context);
         const root = refStore.getReferencesRoot();
         if (!root) {
-            vscode.window.showWarningMessage('请先在设置中配置「引文核对：参考文献根路径」（ai-proofread.citation.referencesPath），如 test/references');
+            vscode.window.showWarningMessage('请先在设置中配置「引文核对：参考资料根路径」（ai-proofread.citation.referencesPath），如 test/references');
             return;
         }
         if (!fs.existsSync(root)) {
-            vscode.window.showErrorMessage(`参考文献路径不存在: ${root}`);
+            vscode.window.showErrorMessage(`参考资料路径不存在: ${root}`);
             return;
         }
 
@@ -189,7 +189,7 @@ export class CitationCommandHandler {
         const refStore = ReferenceStore.getInstance(this.context);
         const root = refStore.getReferencesRoot();
         if (!root || !fs.existsSync(root)) {
-            vscode.window.showWarningMessage('请先在设置中配置并确保「引文核对：参考文献根路径」存在，然后执行「重建引文索引」。');
+            vscode.window.showWarningMessage('请先在设置中配置并确保「引文核对：参考资料根路径」存在，然后执行「重建引文索引」。');
             if (this.citationTreeProvider) {
                 this.citationTreeProvider.refresh([], null);
                 this.updateCitationViewTitle(0);
@@ -318,6 +318,7 @@ export class CitationCommandHandler {
                         freshProcess: cont.freshProcess,
                         continuation: cont.continuation,
                         maxRoundsOverride: cont.maxRoundsOverride,
+                        recordId: cont.recordId,
                         onProgress: (m) => progress.report({ message: m }),
                         token,
                     })
@@ -329,7 +330,7 @@ export class CitationCommandHandler {
                 anchorPath: runAnchor,
                 process,
                 mergedReference,
-                openMergedBeside: true,
+                openMergedBeside: false,
                 informationMessage: mergedReference
                     ? `引文核对完成：${hits.length} 条命中，${process.rounds.length} 轮（关键词：${patternSummary}）`
                     : `引文核对完成，未命中（${process.rounds.length} 轮；关键词：${patternSummary}）`,
@@ -372,7 +373,7 @@ export class CitationCommandHandler {
         const refStore = ReferenceStore.getInstance(this.context);
         const root = refStore.getReferencesRoot();
         if (!root) {
-            vscode.window.showWarningMessage('未配置参考文献根路径，无法定位 PDF。');
+            vscode.window.showWarningMessage('未配置参考资料根路径，无法定位 PDF。');
             return;
         }
         const refPath = path.isAbsolute(data.refFilePath)

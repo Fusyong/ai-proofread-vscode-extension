@@ -1,18 +1,32 @@
-import type { CorpusHit, ReferencePrepProcessFileV020, ReferencePrepRound } from './schema';
+import type { CorpusHit, ReferencePrepIntent, ReferencePrepProcessFileV020, ReferencePrepRound } from './schema';
+
+/** 查询意图英文枚举 → 侧栏展示用中文（entity_name 等是合法 intent，不是实体名） */
+export function formatReferencePrepIntent(intent: string): string {
+    const map: Record<ReferencePrepIntent, string> = {
+        entity_name: '专名',
+        term_norm: '术语',
+        citation: '引文',
+        general_fact: '通识',
+        word_usage: '用法',
+    };
+    return map[intent as ReferencePrepIntent] ?? intent;
+}
 
 /** 词典命中无文献路径，不宜「打开命中位置」 */
 export function canOpenHitInEditor(hit: CorpusHit): boolean {
-    if (hit.source === 'dict' || hit.source === 'wikipedia') return false;
+    if (hit.source === 'dict' || hit.source === 'wikipedia' || hit.source === 'web') return false;
     const rel = (hit.relPath ?? hit.file)?.trim();
     return Boolean(rel);
 }
 
 export function canOpenHitInBrowser(hit: CorpusHit): boolean {
-    return hit.source === 'wikipedia' && Boolean(hit.pageUrl?.trim());
+    return (
+        (hit.source === 'wikipedia' || hit.source === 'web') && Boolean(hit.pageUrl?.trim())
+    );
 }
 
 export function referencePrepHitContextValue(hit: CorpusHit): string {
-    if (hit.source === 'wikipedia') {
+    if (hit.source === 'wikipedia' || hit.source === 'web') {
         return hit.status === 'pruned' ? 'referencePrepHitPrunedWeb' : 'referencePrepHitActiveWeb';
     }
     const openable = canOpenHitInEditor(hit);
@@ -49,20 +63,35 @@ export function getRoundHitCount(process: ReferencePrepProcessFileV020, roundInd
     return qIds.reduce((n, qid) => n + getHitsForRoundQuery(process, roundIndex, qid).length, 0);
 }
 
-/** 该轮下至少有 1 条命中的 queryId（保持 plan 顺序） */
-export function getQueryIdsWithHits(process: ReferencePrepProcessFileV020, round: ReferencePrepRound, roundIndex: number): string[] {
+/** 该轮 plan 中全部 queryId（保持顺序，含 0 命中） */
+export function getAllQueryIds(round: ReferencePrepRound): string[] {
     const seen = new Set<string>();
     const ordered: string[] = [];
     for (const q of round.plan.queries) {
         if (seen.has(q.queryId)) continue;
         seen.add(q.queryId);
-        if (getHitsForRoundQuery(process, roundIndex, q.queryId).length > 0) {
-            ordered.push(q.queryId);
-        }
+        ordered.push(q.queryId);
     }
     return ordered;
 }
 
+/** 该轮下至少有 1 条命中的 queryId（保持 plan 顺序） */
+export function getQueryIdsWithHits(process: ReferencePrepProcessFileV020, round: ReferencePrepRound, roundIndex: number): string[] {
+    return getAllQueryIds(round).filter(
+        (queryId) => getHitsForRoundQuery(process, roundIndex, queryId).length > 0
+    );
+}
+
 export function roundHasVisibleHits(process: ReferencePrepProcessFileV020, roundIndex: number): boolean {
     return getRoundHitCount(process, roundIndex) > 0;
+}
+
+/** 该轮有规划 query（即使 0 命中也在侧栏展示） */
+export function roundHasVisiblePlan(process: ReferencePrepProcessFileV020, roundIndex: number): boolean {
+    const round = process.rounds[roundIndex];
+    return Boolean(round && getAllQueryIds(round).length > 0);
+}
+
+export function queryNodeContextValue(hitCount: number): string {
+    return hitCount > 0 ? 'referencePrepQueryWithHits' : 'referencePrepQueryEmpty';
 }

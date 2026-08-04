@@ -14,6 +14,8 @@ import { generateHtmlReport } from '../alignmentReportGenerator';
 import { getJiebaWasm } from '../jiebaLoader';
 import { collectWordErrors, formatWordErrors, parseDelimitersFromConfig } from '../wordErrorCollector';
 import { proofreadJsonPathToSegmentsJsonPath, segmentsJsonPathToSplitMarkdownPath } from '../proofreadSplitLayout';
+import { focusWorkingTextEditor } from './lastActiveTextEditor';
+import { setProofreadItemsVisible } from './sidebarViewVisibility';
 
 // 接口定义
 /** 配套文档检测结果 */
@@ -349,6 +351,16 @@ export class WebviewManager {
     public async handleWebviewMessage(message: any, panel: vscode.WebviewPanel, context: vscode.ExtensionContext): Promise<void> {
         const { command, data } = message;
 
+        /** 依赖当前编辑器/选区的命令：先把最近活动编辑器重新激活，避免 Webview 获焦后 activeTextEditor 为空 */
+        const runWithWorkingEditor = async (cmd: string): Promise<void> => {
+            const ed = await focusWorkingTextEditor();
+            if (!ed) {
+                vscode.window.showWarningMessage('请先打开目标文档，再使用此按钮（焦点可留在校对面板上）。');
+                return;
+            }
+            await vscode.commands.executeCommand(cmd);
+        };
+
         try {
             switch (command) {
                 case 'showMainFile': {
@@ -405,8 +417,7 @@ export class WebviewManager {
                 }
                 case 'formatParagraphs':
                 case 'markTitlesFromToc': {
-                    // 头部按钮：使用当前编辑窗口文件
-                    await vscode.commands.executeCommand(
+                    await runWithWorkingEditor(
                         command === 'formatParagraphs' ? 'ai-proofread.formatParagraphs' : 'ai-proofread.markTitlesFromToc'
                     );
                     break;
@@ -427,10 +438,10 @@ export class WebviewManager {
                     break;
                 }
                 case 'proofreadSelection':
-                    await vscode.commands.executeCommand('ai-proofread.proofreadSelection');
+                    await runWithWorkingEditor('ai-proofread.proofreadSelection');
                     break;
                 case 'proofreadSelectionWithMemory':
-                    await vscode.commands.executeCommand('ai-proofread.proofreadSelectionWithMemory');
+                    await runWithWorkingEditor('ai-proofread.proofreadSelectionWithMemory');
                     break;
                 case 'convertDocxToMarkdown':
                     await vscode.commands.executeCommand('ai-proofread.convertDocxToMarkdown');
@@ -524,9 +535,10 @@ export class WebviewManager {
                         vscode.window.showWarningMessage('请先完成切分，或未找到 JSON 文件。');
                         break;
                     }
-                    if ((this as any).referencePrepJsonCallback) {
-                        await (this as any).referencePrepJsonCallback(jsonPath, context);
-                    }
+                    const outputUri = vscode.Uri.file(jsonPath);
+                    const splitDoc = await vscode.workspace.openTextDocument(outputUri);
+                    await vscode.window.showTextDocument(splitDoc, { viewColumn: vscode.ViewColumn.Beside });
+                    await vscode.commands.executeCommand('ai-proofread.referencePrep.openConsole');
                     break;
                 }
                 case 'showReferencePrepJson': {
@@ -650,47 +662,35 @@ export class WebviewManager {
                     break;
                 }
                 case 'convertMarkdownToDocx': {
-                    // 头部按钮：使用当前编辑窗口文件
-                    await vscode.commands.executeCommand('ai-proofread.convertMarkdownToDocx');
+                    await runWithWorkingEditor('ai-proofread.convertMarkdownToDocx');
                     break;
                 }
                 case 'convertQuotes': {
-                    // 头部按钮：使用当前编辑窗口文件
-                    await vscode.commands.executeCommand('ai-proofread.convertQuotes');
+                    await runWithWorkingEditor('ai-proofread.convertQuotes');
                     break;
                 }
                 case 'citationOpenView':
                     await vscode.commands.executeCommand('ai-proofread.citation.openView');
                     break;
                 case 'checkWords': {
-                    // 头部按钮：使用当前编辑窗口文件
-                    await vscode.commands.executeCommand('ai-proofread.checkWords');
+                    await runWithWorkingEditor('ai-proofread.checkWords');
                     break;
                 }
                 case 'splitIntoSentences':
                 case 'segmentFile':
                 case 'diffItWithAnotherFile':
-                case 'queryLocalDictSelection':
-                case 'searchSelectionInPDF':
-                case 'searchSelectionInShidianguji':
-                case 'searchSelectionInAncientbooks':
-                case 'searchSelectionInReferences':
                 case 'duplicateScanDocument':
+                case 'duplicateScanSelection':
                 case 'numberingCheck': {
-                    // 头部按钮：使用当前编辑窗口文件
                     const cmdMap: Record<string, string> = {
                         splitIntoSentences: 'ai-proofread.splitIntoSentences',
                         segmentFile: 'ai-proofread.segmentFile',
                         diffItWithAnotherFile: 'ai-proofread.diffItWithAnotherFile',
-                        queryLocalDictSelection: 'ai-proofread.queryLocalDictSelection',
-                        searchSelectionInPDF: 'ai-proofread.searchSelectionInPDF',
-                        searchSelectionInShidianguji: 'ai-proofread.searchSelectionInShidianguji',
-                        searchSelectionInAncientbooks: 'ai-proofread.searchSelectionInAncientbooks',
-                        searchSelectionInReferences: 'ai-proofread.searchSelectionInReferences',
                         duplicateScanDocument: 'ai-proofread.duplicate.scanDocument',
+                        duplicateScanSelection: 'ai-proofread.duplicate.scanSelection',
                         numberingCheck: 'ai-proofread.numbering.check'
                     };
-                    await vscode.commands.executeCommand(cmdMap[command]);
+                    await runWithWorkingEditor(cmdMap[command]);
                     break;
                 }
                 case 'citationRebuildIndex':
@@ -708,7 +708,7 @@ export class WebviewManager {
                         const doc = await vscode.workspace.openTextDocument(mdUri);
                         await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
                     }
-                    await vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', true);
+                    await setProofreadItemsVisible(true);
                     await new Promise((r) => setTimeout(r, 50));
                     await vscode.commands.executeCommand('ai-proofread.proofreadItems.focus');
                     break;
@@ -734,12 +734,6 @@ export class WebviewManager {
     /** 设置合并 JSON的回调（按 JSON 路径） */
     public setMergeCallback(callback: (jsonFilePath: string, context: vscode.ExtensionContext) => Promise<void>): void {
         (this as any).mergeCallback = callback;
-    }
-
-    public setReferencePrepJsonCallback(
-        callback: (jsonFilePath: string, context: vscode.ExtensionContext) => Promise<void>
-    ): void {
-        (this as any).referencePrepJsonCallback = callback;
     }
 
     /**
@@ -851,7 +845,7 @@ export class WebviewManager {
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('showSplitDiff')">比较前后差异</button>
                     <button class="action-button" onclick="handleAction('mergeContext')">合并 JSON</button>
-                    <button class="action-button" onclick="handleAction('referencePrepJson')" title="多轮检索词典与参考文献，写入 reference">准备参考资料</button>
+                    <button class="action-button" onclick="handleAction('referencePrepJson')" title="打开切分 JSON 并打开检索面板">准备参考资料</button>
                     <button class="action-button" onclick="handleAction('proofreadJson')">LLM 校对 JSON</button>
                 </div>
             </div>
@@ -925,10 +919,6 @@ export class WebviewManager {
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('proofreadSelectionWithMemory')" title="AI Proofreader: proofread selection with memory">校对选中（带编辑记忆）</button>
                 ${groupSep}
-                <button type="button" class="link-button" onclick="handleAction('citationOpenView')" title="AI Proofreader: verify citations">核对全文引文</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('citationRebuildIndex')" title="AI Proofreader: build citation reference index">建立引文索引</button>
-                ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('checkWords')" title="AI Proofreader: check words">字词检查</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('manageCustomTables')" title="AI Proofreader: manage custom tables">管理自定义替换表</button>
@@ -936,18 +926,10 @@ export class WebviewManager {
                 <button type="button" class="link-button" onclick="handleAction('numberingCheck')" title="AI Proofreader: check numbering hierarchy">标题序号检查</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('duplicateScanDocument')" title="AI Proofreader: scan duplicate sentences in document">重复句扫描</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('duplicateScanSelection')" title="AI Proofreader: scan duplicate sentences in selection">重复句扫描（选区）</button>
                 ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('diffItWithAnotherFile')" title="AI Proofreader: diff it with another file">diff 与另一文件</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('queryLocalDictSelection')" title="AI Proofreader: exact local dictionary lookup for selection (whole selection as headword)">按选文作词条查词典</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('searchSelectionInPDF')" title="AI Proofreader: search selection in PDF">在 PDF 中搜索选中文本</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('searchSelectionInShidianguji')" title="AI Proofreader: search selection in Shidianguji">在识典古籍中搜索选中文本</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('searchSelectionInAncientbooks')" title="AI Proofreader: search selection in Ancientbooks (jingdian)">在中华经典古籍库中搜索选中文本</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('searchSelectionInReferences')" title="AI Proofreader: search selection in References">在 References 中搜索选中文本</button>
                 ${groupSep}
                 <button type="button" class="link-button" onclick="handleAction('managePrompts')" title="AI Proofreader: manage prompts">管理提示词</button>
                 ${sep}
@@ -1061,7 +1043,7 @@ export class WebviewManager {
                 <div class="section-actions">
                     ${splitResult.originalFilePath && splitResult.markdownFilePath ? '<button class="action-button" onclick="handleAction(\'showSplitDiff\')">比较前后差异</button>' : ''}
                     ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'mergeContext\')">合并 JSON</button>' : ''}
-                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'referencePrepJson\')" title="多轮检索并写入 reference">准备参考资料</button>' : ''}
+                    ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'referencePrepJson\')" title="打开切分 JSON 并打开检索面板">准备参考资料</button>' : ''}
                     ${splitResult.jsonFilePath ? '<button class="action-button" onclick="handleAction(\'proofreadJson\')">LLM 校对 JSON</button>' : ''}
                 </div>
             </div>

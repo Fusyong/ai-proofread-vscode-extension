@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.11.4",
+  "version": "1.12.3",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -78,12 +78,19 @@
         "title": "AI Proofreader: merge two files"
       },
       {
-        "command": "ai-proofread.knowledgeVerifySelection",
-        "title": "AI Proofreader: knowledge verify selection"
+        "command": "ai-proofread.prepareReferencesJson",
+        "title": "Prepare References for JSON File（资料准备·JSON）",
+        "category": "AI Proofreader Search"
       },
       {
-        "command": "ai-proofread.prepareReferencesJson",
-        "title": "AI Proofreader: prepare references for JSON file"
+        "command": "ai-proofread.prepareReferencesSelection",
+        "title": "Prepare References for Selection（资料准备·选段）",
+        "category": "AI Proofreader Search"
+      },
+      {
+        "command": "ai-proofread.referencePrep.openConsole",
+        "title": "Open Reference Search Panel（检索面板）",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.modelRoutes.openView",
@@ -113,17 +120,66 @@
       },
       {
         "command": "ai-proofread.queryLocalDictSelection",
-        "title": "AI Proofreader: look up whole selection as headword in the local dictionary",
-        "description": "把选中当作一个词条查本地词典"
+        "title": "Look Up Local Dictionary（直接查词典）",
+        "category": "AI Proofreader Search",
+        "description": "把选中当作一个词条查本地词典（无 LLM）"
+      },
+      {
+        "command": "ai-proofread.search.dictPrep",
+        "title": "Search Local Dictionary（LLM 规划）",
+        "category": "AI Proofreader Search",
+        "description": "仅本地词典：LLM 规划后查 MDX"
+      },
+      {
+        "command": "ai-proofread.search.refsGrep",
+        "title": "Search References with Grep（LLM 规划）",
+        "category": "AI Proofreader Search",
+        "description": "仅参考资料 grep"
+      },
+      {
+        "command": "ai-proofread.search.refsBm25",
+        "title": "Search References with BM25（LLM 规划）",
+        "category": "AI Proofreader Search",
+        "description": "仅参考资料 BM25（jieba；需先建立引文索引）"
+      },
+      {
+        "command": "ai-proofread.search.refsVector",
+        "title": "Search References with Vector（LLM 规划）",
+        "category": "AI Proofreader Search",
+        "description": "仅参考资料轻量向量"
+      },
+      {
+        "command": "ai-proofread.search.wikipedia",
+        "title": "Search Wikipedia（LLM 规划）",
+        "category": "AI Proofreader Search",
+        "description": "仅维基百科 API"
+      },
+      {
+        "command": "ai-proofread.search.web",
+        "title": "Search the Web（LLM 规划·未实现）",
+        "category": "AI Proofreader Search",
+        "description": "Web 搜索尚未实现（适配器未配置）"
       },
       {
         "command": "ai-proofread.llmGrepSearchReferences",
-        "title": "AI Proofreader: LLM-enhanced grep search",
-        "description": "用自然语言描述检索意图，LLM 规划后在本地词典中检索，在参考文献目录中grep，可以多轮次处理"
+        "title": "Intent Search（意图检索）",
+        "category": "AI Proofreader Search",
+        "description": "用自然语言描述检索意图，LLM 规划后默认词典+grep+BM25+向量多源检索"
       },
       {
         "command": "ai-proofread.referencePrep.openView",
-        "title": "AI Proofreader: open reference prep results"
+        "title": "Open 资料检索 View",
+        "category": "AI Proofreader Search"
+      },
+      {
+        "command": "ai-proofread.referencePrep.toggleResultsView",
+        "title": "Toggle 资料检索 View",
+        "category": "AI Proofreader Search"
+      },
+      {
+        "command": "ai-proofread.referencePrep.clearRetrievalCache",
+        "title": "Clear Project Retrieval Cache",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.referencePrep.openHit",
@@ -163,19 +219,23 @@
       },
       {
         "command": "ai-proofread.searchSelectionInPDF",
-        "title": "AI Proofreader: search selection in PDF"
+        "title": "Search Selection in PDF",
+        "category": "AI Proofreader Tools"
       },
       {
         "command": "ai-proofread.searchSelectionInShidianguji",
-        "title": "AI Proofreader: search selection in Shidianguji"
+        "title": "Search Selection in Shidianguji",
+        "category": "AI Proofreader Tools"
       },
       {
         "command": "ai-proofread.searchSelectionInAncientbooks",
-        "title": "AI Proofreader: search selection in Ancientbooks (jingdian)"
+        "title": "Search Selection in Ancientbooks",
+        "category": "AI Proofreader Tools"
       },
       {
         "command": "ai-proofread.searchSelectionInReferences",
-        "title": "AI Proofreader: search selection in References"
+        "title": "Search Selection in References (Find in Files)",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.convertDocxToMarkdown",
@@ -235,23 +295,33 @@
       },
       {
         "command": "ai-proofread.citation.openView",
-        "title": "AI Proofreader: verify citations"
+        "title": "Verify Citations（核对全文引文）",
+        "category": "AI Proofreader Search"
+      },
+      {
+        "command": "ai-proofread.citation.toggleView",
+        "title": "Toggle Citations View（引文核查）",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.citation.rebuildIndex",
-        "title": "AI Proofreader: build citation reference index"
+        "title": "Build Citation Reference Index（建立引文索引）",
+        "category": "AI Proofreader Search",
+        "description": "供核对全文引文与资料准备的 BM25 通道共用"
       },
       {
         "command": "ai-proofread.citation.verifySelection",
-        "title": "AI Proofreader: verify selected citation"
+        "title": "Verify Selected Citation（核对选中引文）",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.citation.showDiff",
-        "title": "diff citations vs references"
+        "title": "Diff Citations vs References"
       },
       {
         "command": "ai-proofread.citation.searchInPdf",
-        "title": "search citation in PDF"
+        "title": "Search Citation in PDF",
+        "category": "AI Proofreader Tools"
       },
       {
         "command": "ai-proofread.duplicate.scanDocument",
@@ -260,6 +330,11 @@
       {
         "command": "ai-proofread.duplicate.scanSelection",
         "title": "AI Proofreader: scan duplicate sentences in selection"
+      },
+      {
+        "command": "ai-proofread.duplicate.toggleView",
+        "title": "Toggle Duplicates View",
+        "category": "AI Proofreader Search"
       },
       {
         "command": "ai-proofread.wordCheck.openViews",
@@ -349,6 +424,16 @@
         "title": "AI Proofreader: check numbering hierarchy"
       },
       {
+        "command": "ai-proofread.numbering.toggleView",
+        "title": "Toggle Numbering (Title Tree) View",
+        "category": "AI Proofreader"
+      },
+      {
+        "command": "ai-proofread.numberingSegments.toggleView",
+        "title": "Toggle Numbering Segments View",
+        "category": "AI Proofreader"
+      },
+      {
         "command": "ai-proofread.numbering.reveal",
         "title": "定位到文档"
       },
@@ -391,6 +476,11 @@
       {
         "command": "ai-proofread.showProofreadItemsTree",
         "title": "AI Proofreader: show proofread items tree"
+      },
+      {
+        "command": "ai-proofread.proofreadItems.toggleView",
+        "title": "Toggle Proofread Items View",
+        "category": "AI Proofreader"
       },
       {
         "command": "ai-proofread.proofreadItems.setSort",
@@ -489,7 +579,8 @@
           "order": 20,
           "type": "boolean",
           "default": true,
-          "description": "禁用思考模式：阿里云百炼（OpenAI 兼容）发送 `enable_thinking: false`；DeepSeek v4 发送 `thinking: disabled`；一般校对建议保持关闭。Google Gemini 2.5 用思考预算；在 Gemini 2.5 Pro 上无法完全停用思考"
+          "description": "校对管线默认禁用思考模式（快模式）。子管线可在侧栏「模型路由」中单独覆盖。阿里云百炼发送 enable_thinking；DeepSeek 发送 thinking enabled/disabled；Gemini 用 thinkingBudget。一般校对建议保持关闭。",
+          "markdownDescription": "校对管线默认禁用思考（快模式）。其他管线（参考资料规划/预筛/精排、编辑记忆）可在侧栏 **模型路由** 中单独开启或关闭，并会提示收益与负担。一般校对建议保持关闭。"
         },
         "ai-proofread.proofread.retryAttempts": {
           "order": 21,
@@ -585,6 +676,11 @@
                 "type": "string",
                 "default": "",
                 "description": "一句话说明何时使用该词典（供大语言模型参考）"
+              },
+              "edition": {
+                "type": "string",
+                "default": "",
+                "description": "版本/出版时间（强烈建议填写，供规划选型与精排判断词典适用性，如：2020年修订 / 第七版）"
               }
             },
             "required": [
@@ -593,7 +689,7 @@
               "mdxPath"
             ]
           },
-          "description": "本地 MDict 词典配置（MDX）。用于“本地词典参考准备”流程的词典路由与查询。"
+          "description": "本地 MDict 词典配置（MDX）。用于“本地词典参考准备”流程的词典路由与查询。请为每本词典填写 edition（版本/出版时间）。"
         },
         "ai-proofread.dictPrep.maxPointsPerItem": {
           "order": 31,
@@ -654,7 +750,7 @@
               "content"
             ]
           },
-          "description": "参考资料规划提示词列表（referencePrep 与 dict prep prompts 视图共用）。"
+          "description": "参考资料规划提示词列表（referencePrep 与 prompts for reference prep 视图共用）。"
         },
         "ai-proofread.referencePrep.enabledSources": {
           "order": 36,
@@ -672,7 +768,7 @@
           "default": 3,
           "minimum": 1,
           "maximum": 10,
-          "description": "（已弃用）最大轮次由命令中选择的核查强度（轻量/标准/深入）决定。"
+          "description": "（已弃用）最大轮次由命令中选择的检索强度（轻量/标准/深入）决定。"
         },
         "ai-proofread.referencePrep.continuation.maxRounds": {
           "order": 37.05,
@@ -686,7 +782,7 @@
           "order": 37.5,
           "type": "boolean",
           "default": false,
-          "description": "知识核查选段在「准备并校对」时是否注入编辑记忆。"
+          "description": "（保留配置）选段校对注入编辑记忆的开关；当前主要由带记忆校对命令控制，资料准备流程不再单独使用。"
         },
         "ai-proofread.referencePrep.grep.maxHitsPerRound": {
           "order": 37.6,
@@ -694,7 +790,7 @@
           "default": 30,
           "minimum": 1,
           "maximum": 200,
-          "description": "（已弃用）每轮 grep 命中上限由核查强度决定：轻量 12 / 标准 30 / 深入 50。"
+          "description": "（已弃用）每轮 grep 命中上限由检索强度决定：轻量 12 / 标准 30 / 深入 50。"
         },
         "ai-proofread.referencePrep.grep.maxSnippetChars": {
           "order": 37.7,
@@ -702,7 +798,7 @@
           "default": 12000,
           "minimum": 1000,
           "maximum": 100000,
-          "description": "（已弃用）grep 字符预算由核查强度决定：轻量 6000 / 标准 12000 / 深入 20000。"
+          "description": "（已弃用）grep 字符预算由检索强度决定：轻量 6000 / 标准 12000 / 深入 20000。"
         },
         "ai-proofread.referencePrep.grep.maxFiles": {
           "order": 37.75,
@@ -710,7 +806,7 @@
           "default": 500,
           "minimum": 50,
           "maximum": 5000,
-          "description": "grep 扫描参考文献文件数上限。"
+          "description": "grep 扫描参考资料文件数上限。"
         },
         "ai-proofread.referencePrep.scope.dictCountThreshold": {
           "order": 37.8,
@@ -722,7 +818,7 @@
           "order": 37.81,
           "type": "number",
           "default": 100,
-          "description": "参考文献文件数超过此值时启用 LLM 目录预筛。"
+          "description": "参考资料文件数超过此值时启用 LLM 目录预筛。"
         },
         "ai-proofread.referencePrep.scope.dirDepthThreshold": {
           "order": 37.82,
@@ -805,14 +901,14 @@
         "ai-proofread.referencePrep.wikipedia.defaultLang": {
           "order": 37.981,
           "type": "string",
-          "enum": ["zh", "en"],
+          "enum": ["zh", "en", "ja", "fr", "de", "ru"],
           "default": "zh",
           "description": "维基百科检索首选语言。"
         },
         "ai-proofread.referencePrep.wikipedia.fallbackLang": {
           "order": 37.982,
           "type": "string",
-          "enum": ["zh", "en"],
+          "enum": ["zh", "en", "ja", "fr", "de", "ru"],
           "default": "en",
           "description": "首选语言无结果时的备选语言。"
         },
@@ -889,27 +985,51 @@
           "minimum": 0,
           "description": "Wikidata 实体缓存 TTL（小时）。"
         },
+        "ai-proofread.referencePrep.retrievalCache.enabled": {
+          "order": 37.98935,
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用项目级检索命中缓存（.proofread/retrieval-cache.json），相同查询可跳过重复检索。"
+        },
+        "ai-proofread.referencePrep.retrievalCache.ttlHours": {
+          "order": 37.98936,
+          "type": "number",
+          "default": 168,
+          "minimum": 0,
+          "description": "检索命中缓存 TTL（小时，0 为永不过期）。grep/BM25/向量在文献目录快照变化时会提前失效。"
+        },
+        "ai-proofread.referencePrep.retrievalCache.maxEntries": {
+          "order": 37.98937,
+          "type": "number",
+          "default": 800,
+          "minimum": 50,
+          "description": "检索命中缓存最大条目数；超出时淘汰最旧条目。"
+        },
         "ai-proofread.referencePrep.wikipedia.maxExtractChars": {
           "order": 37.9894,
           "type": "number",
           "default": 4000,
           "minimum": 500,
           "maximum": 20000,
-          "description": "单条维基导语摘录最大字符数（可被核查强度覆盖）。"
+          "description": "单条维基导语摘录最大字符数（可被检索强度覆盖）。"
         },
         "ai-proofread.modelRoutes": {
           "order": 9.5,
           "type": "object",
           "default": {},
-          "description": "各功能 LLM 路由覆盖。键为 referencePrep | referencePrepScope | referencePrepRerank | editorialMemory。inherit 为 true 时跟随上级（见 inheritFrom）。",
-          "markdownDescription": "各功能 LLM 路由覆盖（侧栏顺序：预筛 → 规划 → 精排）。\n\n- **referencePrep**（参考资料规划）：默认跟随校对\n- **referencePrepScope**（预筛）、**referencePrepRerank**（精排）：默认跟随 **referencePrep**；`inheritFrom` 可选 `proofread` 或 `referencePrep`\n- **editorialMemory**：默认跟随校对\n\n示例：`{ \"referencePrepRerank\": { \"inherit\": true, \"inheritFrom\": \"referencePrep\" } }`",
+          "description": "各功能 LLM 路由覆盖。键为 referencePrep | referencePrepScope | referencePrepRerank | editorialMemory。可设 inherit、inheritFrom、platform、model、disableThinking。",
+          "markdownDescription": "各功能 LLM 路由覆盖（侧栏顺序：预筛 → 规划 → 精排）。\n\n- **referencePrep**（参考资料规划）：默认跟随校对\n- **referencePrepScope**（预筛）、**referencePrepRerank**（精排）：默认跟随 **referencePrep**；`inheritFrom` 可选 `proofread` 或 `referencePrep`\n- **editorialMemory**：默认跟随校对\n- **disableThinking**：可选；本管线是否禁用思考。可在跟随平台/模型的同时单独覆盖思考；未设置则跟随上级（最终落到 `proofread.disableThinking`，默认关思考）\n\n示例：`{ \"referencePrep\": { \"disableThinking\": false }, \"referencePrepRerank\": { \"inherit\": true, \"inheritFrom\": \"referencePrep\" } }`",
           "additionalProperties": {
             "type": "object",
             "properties": {
               "inherit": { "type": "boolean" },
               "inheritFrom": { "type": "string", "enum": ["proofread", "referencePrep"] },
               "platform": { "type": "string", "enum": ["aliyun", "deepseek", "google", "ollama"] },
-              "model": { "type": "string" }
+              "model": { "type": "string" },
+              "disableThinking": {
+                "type": "boolean",
+                "description": "本管线是否禁用思考。未设置则跟随上级 / 校对根开关。"
+              }
             }
           }
         },
@@ -1169,7 +1289,7 @@
           "order": 55,
           "type": "string",
           "default": "${workspaceFolder}/references",
-          "description": "引文核对：参考文献根路径，默认${workspaceFolder}/references，支持绝对路径"
+          "description": "引文核对：参考资料根路径，默认${workspaceFolder}/references，支持绝对路径"
         },
         "ai-proofread.citation.normalizeIgnorePunctuation": {
           "order": 56,
@@ -1376,7 +1496,7 @@
         },
         {
           "id": "ai-proofread.dictPrepPrompts",
-          "name": "prompts for dict prep ",
+          "name": "prompts for reference prep",
           "when": "aiProofread.showDictPrepPromptsView"
         },
         {
@@ -1401,12 +1521,12 @@
         },
         {
           "id": "ai-proofread.citation",
-          "name": "citations",
+          "name": "引文核查",
           "when": "aiProofread.showCitationView"
         },
         {
           "id": "ai-proofread.duplicate",
-          "name": "duplicates",
+          "name": "重文检查",
           "when": "aiProofread.showDuplicateView"
         },
         {
@@ -1426,7 +1546,7 @@
         },
         {
           "id": "ai-proofread.referencePrepResults",
-          "name": "reference hit",
+          "name": "资料检索",
           "when": "aiProofread.showReferencePrepResultsView"
         }
       ]
@@ -1671,28 +1791,68 @@
         },
         {
           "command": "ai-proofread.searchSelectionInPDF",
-          "group": "ai-proofread@12",
+          "group": "ai-proofread-tools@12",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.searchSelectionInShidianguji",
-          "group": "ai-proofread@12.1",
+          "group": "ai-proofread-tools@12.1",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.searchSelectionInAncientbooks",
-          "group": "ai-proofread@12.2",
+          "group": "ai-proofread-tools@12.2",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.searchSelectionInReferences",
-          "group": "ai-proofread@12.3",
+          "group": "ai-proofread-refs@12.0",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.search.refsGrep",
+          "group": "ai-proofread-refs@12.1",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.search.refsBm25",
+          "group": "ai-proofread-refs@12.2",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.search.refsVector",
+          "group": "ai-proofread-refs@12.3",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
           "command": "ai-proofread.citation.verifySelection",
-          "group": "ai-proofread@12",
+          "group": "ai-proofread-refs@12.4",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.queryLocalDictSelection",
+          "group": "ai-proofread-dict@13.0",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "ai-proofread.search.dictPrep",
+          "group": "ai-proofread-dict@13.1",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "ai-proofread.search.wikipedia",
+          "group": "ai-proofread-web@14.0",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "ai-proofread.prepareReferencesSelection",
+          "group": "ai-proofread-prep@15.0",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.referencePrep.openConsole",
+          "group": "ai-proofread-prep@15.1",
+          "when": "editorTextFocus"
         },
         {
           "command": "ai-proofread.duplicate.scanDocument",
@@ -1708,11 +1868,6 @@
           "command": "ai-proofread.splitIntoSentences",
           "group": "ai-proofread@13",
           "when": "editorTextFocus && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
-        },
-        {
-          "command": "ai-proofread.queryLocalDictSelection",
-          "group": "ai-proofread@13.1",
-          "when": "editorHasSelection"
         },
         {
           "command": "ai-proofread.convertQuotes",
@@ -1768,11 +1923,6 @@
           "command": "ai-proofread.prepareReferencesJson",
           "group": "ai-proofread@30.5",
           "when": "resourceLangId == json"
-        },
-        {
-          "command": "ai-proofread.knowledgeVerifySelection",
-          "group": "ai-proofread@30.4",
-          "when": "editorHasSelection"
         },
         {
           "command": "ai-proofread.proofreadFile",

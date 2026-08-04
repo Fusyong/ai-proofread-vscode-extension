@@ -8,6 +8,7 @@ import type { CorpusHit, ReferencePrepGrepQuery, ReferencePrepPlanQuery } from '
 import { getBm25TopK } from '../config';
 import type { ResourceScope } from '../schema';
 import { isFileInScope } from '../scope/resourceScope';
+import { normalizeRelPath, sanitizeGrepSnippetForExport } from './grepNoise';
 
 let hitCounter = 0;
 export function resetBm25HitCounter(): void {
@@ -58,16 +59,19 @@ export async function executeBm25Query(params: {
                 unit,
                 contextLines: params.grepBlock.contextLines ?? 2,
             });
-            const snippet = expanded?.snippet ?? row.content;
+            const rawSnippet = expanded?.snippet ?? row.content;
             const startLine = expanded?.startLine ?? row.start_line ?? 1;
             const endLine = expanded?.endLine ?? row.end_line ?? startLine;
-            const digest = digestSha1(`${row.file_path}:${startLine}\n${snippet}`);
+            const snippet = sanitizeGrepSnippetForExport(rawSnippet, expanded?.headingPath);
+            if (!snippet) continue;
+            const rel = normalizeRelPath(row.file_path);
+            const digest = digestSha1(`${rel}:${startLine}\n${snippet}`);
             const beginTag = `<!-- ai-proofread:grepHit begin sha1=${digest} -->`;
             if (existingReference.includes(beginTag)) continue;
 
             const kind = expanded?.isHeadingOnly ? 'navigation_hint' : 'evidence';
             const block = formatGrepReferenceBlock({
-                file: row.file_path,
+                file: rel,
                 line: startLine,
                 snippet,
                 digest,
@@ -86,8 +90,8 @@ export async function executeBm25Query(params: {
                 status: 'active',
                 kind,
                 unit,
-                relPath: row.file_path,
-                file: row.file_path,
+                relPath: rel,
+                file: rel,
                 line: startLine,
                 startLine,
                 endLine,

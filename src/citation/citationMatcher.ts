@@ -18,7 +18,7 @@ export interface BlockMatchCandidate {
     refFragment: RefSentenceRow[];
     /** 整体平均相似度 */
     score: number;
-    /** 文献文件路径（相对参考文献根） */
+    /** 文献文件路径（相对参考资料根） */
     file_path: string;
 }
 

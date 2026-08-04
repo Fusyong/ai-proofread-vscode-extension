@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { FilePathUtils } from '../utils';
 import { runReferencePrepForTarget } from './referencePrepRunner';
 import type { ReferencePrepResultsProvider } from './referencePrepResultsView';
+import { setReferenceHitVisible } from '../ui/sidebarViewVisibility';
 import type {
     CorpusHit,
     ReferencePrepProcessFileV020,
@@ -10,8 +11,9 @@ import type {
     ReferenceSourceId,
 } from './schema';
 import type { ReferencePrepTargetKind } from './referencePrepPrompt';
+import type { PrepEventListener } from './prepEvents';
 
-/** LLM 增强检索 / 核对选中引文 / 知识核查「仅准备」等共用的默认资料来源 */
+/** 资料准备 / 意图检索 / 核对选中引文等共用的默认资料来源 */
 export const DEFAULT_REFERENCE_PREP_SOURCES: ReferenceSourceId[] = [
     'dict',
     'grep_md',
@@ -29,6 +31,30 @@ export const REFERENCE_PREP_STRENGTH_OPTIONS: Array<{
     { label: '深入', description: '5 轮，更多查询', value: 'thorough' },
 ];
 
+export const REFERENCE_SOURCE_OPTIONS: Array<{
+    id: ReferenceSourceId;
+    label: string;
+    description: string;
+    /** Web 尚未落地时在 UI 中灰显 */
+    stub?: boolean;
+}> = [
+    { id: 'dict', label: '本地词典', description: 'MDict 本地词典查词' },
+    { id: 'grep_md', label: '参考资料 grep', description: '在 references 目录 md/txt 中字面检索' },
+    { id: 'bm25', label: '参考资料 BM25', description: '需先建立引文索引；jieba 分词关键词检索' },
+    { id: 'vector', label: '参考资料轻量向量', description: '字符 n-gram 相似度；懒构建向量索引' },
+    {
+        id: 'wikipedia',
+        label: '维基百科（API）',
+        description: '只读访问多语言维基与 Wikidata；遵守速率限制',
+    },
+    {
+        id: 'web',
+        label: 'Web 搜索',
+        description: '通用网页搜索（尚未配置适配器）',
+        stub: true,
+    },
+];
+
 export interface ReferencePrepSessionParams {
     target: string;
     targetKind: ReferencePrepTargetKind;
@@ -38,10 +64,15 @@ export interface ReferencePrepSessionParams {
     enabledSources?: ReferenceSourceId[];
     intents?: import('./schema').ReferencePrepIntent[];
     onProgress?: (msg: string) => void;
+    onEvent?: PrepEventListener;
     token?: vscode.CancellationToken;
     freshProcess?: boolean;
     continuation?: boolean;
     maxRoundsOverride?: number;
+    recordId?: string;
+    onProcessUpdated?: (proc: ReferencePrepProcessFileV020) => void;
+    controls?: import('./runControls').ReferencePrepRunControls;
+    requestPlanReview?: import('./referencePrepRunner').ReferencePrepProgressHooks['requestPlanReview'];
 }
 
 export interface ReferencePrepSessionResult {
@@ -52,7 +83,7 @@ export interface ReferencePrepSessionResult {
 
 /**
  * 统一的参考资料准备会话：资源预筛 → 多轮规划 → 检索 → LLM 精排。
- * 知识核查（仅准备）、LLM 增强检索、核对选中引文均经此入口，差异在 targetKind / 提示词 / 是否校对。
+ * 资料准备、意图检索、核对选中引文均经此入口，差异在 targetKind / 规划提示词。
  */
 export async function runReferencePrepSession(
     params: ReferencePrepSessionParams
@@ -68,8 +99,13 @@ export async function runReferencePrepSession(
         freshProcess: params.freshProcess ?? true,
         continuation: params.continuation,
         maxRoundsOverride: params.maxRoundsOverride,
+        recordId: params.recordId,
+        controls: params.controls,
         onProgress: params.onProgress,
+        onEvent: params.onEvent,
         token: params.token,
+        onProcessUpdated: params.onProcessUpdated,
+        requestPlanReview: params.requestPlanReview,
     });
     const hits = process.corpus.filter((h) => h.status === 'active');
     return { mergedReference, process, hits };
@@ -105,7 +141,7 @@ export async function pickReferencePrepStrength(
         })),
         {
             title,
-            placeHolder: '控制轮次、查询数与命中预算（与知识核查相同）',
+            placeHolder: '控制轮次、查询数与命中预算',
             ignoreFocusOut: true,
         }
     );
@@ -118,21 +154,12 @@ export async function presentReferencePrepSessionResult(params: {
     process: ReferencePrepProcessFileV020;
     mergedReference: string;
     informationMessage: string;
+    /** @deprecated 不再自动打开未保存预览；保留参数以免破坏调用方 */
     openMergedBeside?: boolean;
 }): Promise<void> {
     if (params.resultsProvider) {
-        await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', true);
+        await setReferenceHitVisible(true);
         params.resultsProvider.refresh(params.process, params.anchorPath);
-    }
-    if (params.mergedReference.trim()) {
-        const doc = await vscode.workspace.openTextDocument({
-            content: params.mergedReference,
-            language: 'markdown',
-        });
-        await vscode.window.showTextDocument(doc, {
-            preview: true,
-            viewColumn: params.openMergedBeside ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active,
-        });
     }
     vscode.window.showInformationMessage(params.informationMessage);
 }

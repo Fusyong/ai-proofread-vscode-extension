@@ -21,8 +21,8 @@ export class GrepSearchCommandHandler {
             : '';
 
         const description = await vscode.window.showInputBox({
-            title: 'LLM 增强参考文献检索',
-            prompt: '描述你想在词典与参考文献中检索的内容（可含专名、主题、史实要点等）',
+            title: '意图检索',
+            prompt: '描述你想在词典与参考资料中检索的内容（可含专名、主题、史实要点等）',
             placeHolder: '例如：查找关于李白生卒年与籍贯的记述',
             value: defaultDescription || undefined,
             ignoreFocusOut: true,
@@ -30,7 +30,7 @@ export class GrepSearchCommandHandler {
         });
         if (!description?.trim()) return;
 
-        const strength = await pickReferencePrepStrength('LLM 增强参考文献检索');
+        const strength = await pickReferencePrepStrength('意图检索 · 检索强度');
         if (!strength) return;
 
         try {
@@ -39,7 +39,7 @@ export class GrepSearchCommandHandler {
                 context,
                 anchorPath,
                 target: description.trim(),
-                title: 'LLM 增强参考文献检索',
+                title: '意图检索',
             });
             if (!cont) return;
 
@@ -61,6 +61,7 @@ export class GrepSearchCommandHandler {
                         freshProcess: cont.freshProcess,
                         continuation: cont.continuation,
                         maxRoundsOverride: cont.maxRoundsOverride,
+                        recordId: cont.recordId,
                         onProgress: (m) => progress.report({ message: m }),
                         token,
                     })
@@ -73,13 +74,13 @@ export class GrepSearchCommandHandler {
                 anchorPath: runAnchor,
                 process,
                 mergedReference,
-                openMergedBeside: true,
+                openMergedBeside: false,
                 informationMessage: mergedReference
                     ? `检索完成：${hits.length} 条命中，${roundCount} 轮（关键词：${patternSummary}）`
                     : `检索完成，未命中（${roundCount} 轮；关键词：${patternSummary}）`,
             });
         } catch (e) {
-            ErrorUtils.showError(e, '参考文献检索失败：');
+            ErrorUtils.showError(e, '参考资料检索失败：');
         }
     }
 }

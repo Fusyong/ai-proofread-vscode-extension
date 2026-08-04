@@ -47,6 +47,30 @@ describe('WikiRateLimiter', () => {
         expect(calls).toBe(1);
     });
 
+    it('resetSessionBudget allows a new session after exhaustion', async () => {
+        const limiter = WikiRateLimiter.getInstance({
+            requestsPerMinute: 100,
+            minIntervalMs: 0,
+            maxRetries: 0,
+        });
+        limiter.resetSessionBudget(1);
+        expect(
+            await limiter.schedule(async () => ({ result: 'a', status: 200, durationMs: 0 }))
+        ).toBe('a');
+        expect(limiter.isBudgetExhausted()).toBe(true);
+        expect(
+            await limiter.schedule(async () => ({ result: 'blocked', status: 200, durationMs: 0 }))
+        ).toBeNull();
+
+        // 模拟下一条 JSON target：重置会话预算后应可再次请求
+        limiter.resetSessionBudget(2);
+        expect(limiter.isBudgetExhausted()).toBe(false);
+        expect(
+            await limiter.schedule(async () => ({ result: 'b', status: 200, durationMs: 0 }))
+        ).toBe('b');
+        expect(limiter.getBudget()).toEqual({ used: 1, max: 2 });
+    });
+
     it('retries on 429 then succeeds', async () => {
         const limiter = WikiRateLimiter.getInstance({
             requestsPerMinute: 100,
