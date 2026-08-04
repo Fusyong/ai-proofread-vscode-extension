@@ -11,6 +11,7 @@ import { searchSelectionInPDF } from '../pdfSearcher';
 import { searchSelectionInShidianguji } from '../shidiangujiSearch';
 import { searchSelectionInAncientbooks } from '../ancientbooksSearch';
 import { convertQuotes } from '../quoteConverter';
+import { fullToHalfPunctuation, halfToFullPunctuation } from '../punctuationConverter';
 import { formatParagraphs } from '../paragraphDetector';
 import {
     DEFAULT_DELETE_INLINE_WHITESPACE_OPTIONS,
@@ -382,6 +383,68 @@ export class UtilityCommandHandler {
             vscode.window.showInformationMessage('引号转换完成！');
         } catch (error) {
             ErrorUtils.showError(error, '转换引号时出错：');
+        }
+    }
+
+    /**
+     * 半角标点转全角标点（,;:!? → ，；：！？）
+     */
+    public async handleHalfToFullPunctuationCommand(editor: vscode.TextEditor): Promise<void> {
+        await this.replaceEditorText(
+            editor,
+            halfToFullPunctuation,
+            '半角标点已转为全角！',
+            '半角标点转全角时出错：'
+        );
+    }
+
+    /**
+     * 全角标点转半角标点（，；：！？ → ,;:!?）
+     */
+    public async handleFullToHalfPunctuationCommand(editor: vscode.TextEditor): Promise<void> {
+        await this.replaceEditorText(
+            editor,
+            fullToHalfPunctuation,
+            '全角标点已转为半角！',
+            '全角标点转半角时出错：'
+        );
+    }
+
+    /**
+     * 将选区或全文经 transform 后写回编辑器
+     */
+    private async replaceEditorText(
+        editor: vscode.TextEditor,
+        transform: (text: string) => string,
+        successMessage: string,
+        errorPrefix: string
+    ): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor!');
+            return;
+        }
+
+        try {
+            const document = editor.document;
+            const selection = editor.selection;
+            const text = selection.isEmpty ? document.getText() : document.getText(selection);
+            const convertedText = transform(text);
+
+            await editor.edit(editBuilder => {
+                if (selection.isEmpty) {
+                    const fullRange = new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(document.getText().length)
+                    );
+                    editBuilder.replace(fullRange, convertedText);
+                } else {
+                    editBuilder.replace(selection, convertedText);
+                }
+            });
+
+            vscode.window.showInformationMessage(successMessage);
+        } catch (error) {
+            ErrorUtils.showError(error, errorPrefix);
         }
     }
 

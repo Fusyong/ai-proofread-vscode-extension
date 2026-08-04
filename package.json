@@ -194,6 +194,14 @@
         "title": "AI Proofreader: convert quotes to Chinese"
       },
       {
+        "command": "ai-proofread.halfToFullPunctuation",
+        "title": "AI Proofreader: half-width punctuation to full-width"
+      },
+      {
+        "command": "ai-proofread.fullToHalfPunctuation",
+        "title": "AI Proofreader: full-width punctuation to half-width"
+      },
+      {
         "command": "ai-proofread.formatParagraphs",
         "title": "AI Proofreader: format paragraphs"
       },
@@ -1708,6 +1716,16 @@
         },
         {
           "command": "ai-proofread.convertQuotes",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
+          "command": "ai-proofread.halfToFullPunctuation",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
+          "command": "ai-proofread.fullToHalfPunctuation",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
         },

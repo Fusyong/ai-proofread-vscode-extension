@@ -477,6 +477,26 @@ export async function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleConvertQuotesCommand(editor);
         }),
 
+        // 注册半角标点转全角命令
+        vscode.commands.registerCommand('ai-proofread.halfToFullPunctuation', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleHalfToFullPunctuationCommand(editor);
+        }),
+
+        // 注册全角标点转半角命令
+        vscode.commands.registerCommand('ai-proofread.fullToHalfPunctuation', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleFullToHalfPunctuationCommand(editor);
+        }),
+
         // 注册段落整理命令
         vscode.commands.registerCommand('ai-proofread.formatParagraphs', async () => {
             const editor = vscode.window.activeTextEditor;
