@@ -8,10 +8,6 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 Additionally, you can set your own prompts for other text processing scenarios, such as translation, annotation, and creating exercises; you can also customize replacement tables and checklists, run batch regex find-and-replace, or use them as prompts only. 
 
-!!! caution 
-    因DeepSeek V3最终版本（0324）以后的校对效果不理想，默认平台已经由DeepSeek改成阿里云百炼。只有DeepSeek账号的用户须手动改回DeepSeek（也可用阿里云百炼平台deepseek-v3作为替代）。
-    DeepSeek 平台默认支持 deepseek-v4-flash，如果你改为deepseek-v4-pro，还需要**关注价格变动并测试效果**；旧版 deepseek-chat 在 2026/07/24 前仍可用
-
 ## 1. 安装和必要配置
 
 **本文档仅以Windows系统为例**
@@ -485,8 +481,8 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 **推荐模型组合**（DeepSeek 示例，可按平台替换）：
 
-- **校对**：`deepseek-v4-pro`（质量优先）；日常建议关闭思考
-- **参考资料规划**：`deepseek-v4-flash` 或 `qwen3-max`（多轮 JSON 规划，成本适中）；复杂书稿可单独开思考
+- **校对**：`qwen3.8-max`（质量优先）；日常建议关闭思考
+- **参考资料规划**：`deepseek-v4-flash` （多轮 JSON 规划，成本适中）；复杂书稿可单独开思考
 - **预筛 / 精排**：跟随参考资料规划，建议保持关思考
 - **编辑记忆合并**：跟随校对；需要时再开思考
 

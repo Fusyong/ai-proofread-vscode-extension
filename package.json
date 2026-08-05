@@ -536,8 +536,8 @@
         "ai-proofread.proofread.models.aliyun": {
           "order": 12,
           "type": "string",
-          "default": "qwen3.7-max",
-          "description": "阿里云百炼平台模型,如: qwen3.7-max, qwen3.7-plus, qwen3.6-flash, deepseek-v3"
+          "default": "qwen3.8-max",
+          "description": "阿里云百炼平台模型,如: qwen3.8-max, qwen3.7-plus, qwen3.6-flash, deepseek-v3"
         },
         "ai-proofread.apiKeys.deepseek": {
           "order": 13,
