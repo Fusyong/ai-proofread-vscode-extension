@@ -12,6 +12,10 @@ import { searchSelectionInShidianguji } from '../shidiangujiSearch';
 import { searchSelectionInAncientbooks } from '../ancientbooksSearch';
 import { convertQuotes } from '../quoteConverter';
 import { fullToHalfPunctuation, halfToFullPunctuation } from '../punctuationConverter';
+import {
+    replaceFounderCircledNumbers,
+    type FounderCircledFormat,
+} from '../founderCircledNumbers';
 import { formatParagraphs } from '../paragraphDetector';
 import {
     DEFAULT_DELETE_INLINE_WHITESPACE_OPTIONS,
@@ -396,6 +400,76 @@ export class UtilityCommandHandler {
             '半角标点已转为全角！',
             '半角标点转全角时出错：'
         );
+    }
+
+    /**
+     * 方正书版带圈序号 → Unicode 带圈符号或方头扩注序号 [n]
+     */
+    public async handleReplaceFounderCircledNumbersCommand(
+        editor: vscode.TextEditor
+    ): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor!');
+            return;
+        }
+
+        try {
+            const formatPick = await vscode.window.showQuickPick(
+                [
+                    {
+                        label: 'Unicode 带圈符号',
+                        description: '①–㊿；大于 50 用 [n]',
+                        value: 'unicode' as FounderCircledFormat,
+                    },
+                    {
+                        label: '方头扩注序号',
+                        description: '一律替换为 [1]、[2]…',
+                        value: 'bracket' as FounderCircledFormat,
+                    },
+                ],
+                {
+                    placeHolder: '选择替换格式',
+                    ignoreFocusOut: true,
+                }
+            );
+            if (!formatPick) {
+                return;
+            }
+
+            const document = editor.document;
+            const selection = editor.selection;
+            const text = selection.isEmpty ? document.getText() : document.getText(selection);
+            const { text: convertedText, replacedCount, strippedArtifactCount } =
+                replaceFounderCircledNumbers(text, { format: formatPick.value });
+
+            if (replacedCount === 0 && strippedArtifactCount === 0) {
+                vscode.window.showInformationMessage('未发现方正书版带圈序号或版面杂质。');
+                return;
+            }
+
+            await editor.edit((editBuilder) => {
+                if (selection.isEmpty) {
+                    const fullRange = new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(document.getText().length)
+                    );
+                    editBuilder.replace(fullRange, convertedText);
+                } else {
+                    editBuilder.replace(selection, convertedText);
+                }
+            });
+
+            const parts: string[] = [];
+            if (replacedCount > 0) {
+                parts.push(`替换 ${replacedCount} 处序号`);
+            }
+            if (strippedArtifactCount > 0) {
+                parts.push(`清除 ${strippedArtifactCount} 处版面杂质`);
+            }
+            vscode.window.showInformationMessage(`方正带圈序号处理完成：${parts.join('，')}。`);
+        } catch (error) {
+            ErrorUtils.showError(error, '替换方正带圈序号时出错：');
+        }
     }
 
     /**

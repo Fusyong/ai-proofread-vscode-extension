@@ -669,6 +669,10 @@ export class WebviewManager {
                     await runWithWorkingEditor('ai-proofread.convertQuotes');
                     break;
                 }
+                case 'replaceFounderCircledNumbers': {
+                    await runWithWorkingEditor('ai-proofread.replaceFounderCircledNumbers');
+                    break;
+                }
                 case 'citationOpenView':
                     await vscode.commands.executeCommand('ai-proofread.citation.openView');
                     break;
@@ -910,6 +914,8 @@ export class WebviewManager {
                 <button type="button" class="link-button" onclick="handleAction('markTitlesFromToc')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('convertQuotes')" title="AI Proofreader: convert quotes to Chinese">半角引号转全角</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('replaceFounderCircledNumbers')" title="AI Proofreader: replace Founder circled numbers">方正带圈序号替换</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('splitIntoSentences')" title="AI Proofreader: split into sentences">切分为句子</button>
                 ${sep}

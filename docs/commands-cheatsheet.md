@@ -257,6 +257,7 @@ flowchart LR
 | AI Proofreader: mark titles from table of contents | 根据目录表（Markdown 列表）在文档中标记标题 |
 | AI Proofreader: check numbering hierarchy | 检查带序号的标题，也可用于标记这些标题 |
 | AI Proofreader: convert quotes to Chinese | 半角引号转全角（可设为校对后自动执行） |
+| AI Proofreader: replace Founder circled numbers | 方正书版 PDF 带圈序号 → Unicode ①… 或方头扩注序号 [1]；并清除常见版面杂质 |
 | AI Proofreader: half-width punctuation to full-width | 半角标点转全角（,;:!? → ，；：！？） |
 | AI Proofreader: full-width punctuation to half-width | 全角标点转半角（，；：！？ → ,;:!?） |
 | **文档切分与语境合并** | |

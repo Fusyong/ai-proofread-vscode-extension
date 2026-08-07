@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.4",
+  "version": "1.12.5",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -252,6 +252,10 @@
       {
         "command": "ai-proofread.convertQuotes",
         "title": "AI Proofreader: convert quotes to Chinese"
+      },
+      {
+        "command": "ai-proofread.replaceFounderCircledNumbers",
+        "title": "AI Proofreader: replace Founder circled numbers"
       },
       {
         "command": "ai-proofread.halfToFullPunctuation",
