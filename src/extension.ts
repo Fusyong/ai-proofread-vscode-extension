@@ -578,6 +578,16 @@ export async function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleMarkTitlesFromTocCommand(editor);
         }),
 
+        // 注册对齐标题命令
+        vscode.commands.registerCommand('ai-proofread.alignHeadings', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleAlignHeadingsCommand(editor, context);
+        }),
+
         // 注册分词命令
         vscode.commands.registerCommand('ai-proofread.segmentFile', async () => {
             const editor = vscode.window.activeTextEditor;

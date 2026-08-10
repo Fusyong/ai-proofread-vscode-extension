@@ -416,14 +416,20 @@ export class WebviewManager {
                     break;
                 }
                 case 'formatParagraphs':
-                case 'markTitlesFromToc': {
-                    await runWithWorkingEditor(
-                        command === 'formatParagraphs' ? 'ai-proofread.formatParagraphs' : 'ai-proofread.markTitlesFromToc'
-                    );
+                case 'markTitlesFromToc':
+                case 'alignHeadings': {
+                    const cmd =
+                        command === 'formatParagraphs'
+                            ? 'ai-proofread.formatParagraphs'
+                            : command === 'markTitlesFromToc'
+                              ? 'ai-proofread.markTitlesFromToc'
+                              : 'ai-proofread.alignHeadings';
+                    await runWithWorkingEditor(cmd);
                     break;
                 }
                 case 'formatParagraphsUseMainFile':
-                case 'markTitlesFromTocUseMainFile': {
+                case 'markTitlesFromTocUseMainFile':
+                case 'alignHeadingsUseMainFile': {
                     // 主文件板块：使用主文件
                     const mainPath = this.mainFilePath ?? this.getMainFilePath();
                     if (!mainPath) {
@@ -433,7 +439,11 @@ export class WebviewManager {
                     const doc = await vscode.workspace.openTextDocument(mainPath);
                     await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
                     await vscode.commands.executeCommand(
-                        command === 'formatParagraphsUseMainFile' ? 'ai-proofread.formatParagraphs' : 'ai-proofread.markTitlesFromToc'
+                        command === 'formatParagraphsUseMainFile'
+                            ? 'ai-proofread.formatParagraphs'
+                            : command === 'markTitlesFromTocUseMainFile'
+                              ? 'ai-proofread.markTitlesFromToc'
+                              : 'ai-proofread.alignHeadings'
                     );
                     break;
                 }
@@ -823,6 +833,7 @@ export class WebviewManager {
                     <button class="action-button" onclick="handleAction('selectMainFile')">更换主文件</button>
                     <button class="action-button" onclick="handleAction('formatParagraphsUseMainFile')" title="AI Proofreader: format paragraphs">整理段落</button>
                     <button class="action-button" onclick="handleAction('markTitlesFromTocUseMainFile')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
+                    <button class="action-button" onclick="handleAction('alignHeadingsUseMainFile')" title="AI Proofreader: align headings">对齐标题</button>
                     <button class="action-button" onclick="handleAction('splitDocument')" title="AI Proofreader: split file">${hasJson ? '重新切分' : '切分文档'}</button>
                 </div>
             </div>
@@ -912,6 +923,8 @@ export class WebviewManager {
                 <button type="button" class="link-button" onclick="handleAction('formatParagraphs')" title="AI Proofreader: format paragraphs">整理段落</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('markTitlesFromToc')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('alignHeadings')" title="AI Proofreader: align headings">对齐标题</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('convertQuotes')" title="AI Proofreader: convert quotes to Chinese">半角引号转全角</button>
                 ${sep}
@@ -1129,6 +1142,7 @@ export class WebviewManager {
                     <button class="action-button" onclick="handleAction('selectMainFile')">更换主文件</button>
                     <button class="action-button" onclick="handleAction('formatParagraphsUseMainFile')" title="AI Proofreader: format paragraphs">整理段落</button>
                     <button class="action-button" onclick="handleAction('markTitlesFromTocUseMainFile')" title="AI Proofreader: mark titles from table of contents">根据目录标记标题</button>
+                    <button class="action-button" onclick="handleAction('alignHeadingsUseMainFile')" title="AI Proofreader: align headings">对齐标题</button>
                     <button class="action-button" onclick="handleAction('splitDocument')" title="AI Proofreader: split file">${hasJson ? '重新切分' : '切分文档'}</button>
                 </div>
             </div>

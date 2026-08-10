@@ -25,6 +25,16 @@ import {
 import { showDiff } from '../differ';
 import { ErrorUtils, FilePathUtils, normalizeLineEndings } from '../utils';
 import { parseToc, markTitles, TocItem } from '../titleMarker';
+import {
+    alignHeadings,
+    diagnoseHeadingMismatch,
+    parseHeadingLevels,
+    type HeadingAlignFixHint,
+    type HeadingAlignMismatch,
+    type HeadingAlignMode,
+} from '../headingAligner';
+
+const ALIGN_HEADINGS_LAST_LEVELS_KEY = 'ai-proofread.alignHeadings.lastLevels';
 
 export class UtilityCommandHandler {
     /**
@@ -985,6 +995,232 @@ export class UtilityCommandHandler {
 
         fs.writeFileSync(outputPath, csvContent, 'utf8');
         vscode.window.showInformationMessage(`字频统计已保存至：${path.basename(outputPath)}`);
+    }
+
+    /**
+     * 对齐并排两个 Markdown 窗口中指定级别的标题。
+     * 默认：当前窗口 + 右侧窗口；无右侧则用左侧；否则提示先并排打开两个 md。
+     * 一旦对不齐：在两窗口内跳到差异处，用户处理后可再次运行本命令。
+     */
+    public async handleAlignHeadingsCommand(
+        editor: vscode.TextEditor,
+        context: vscode.ExtensionContext
+    ): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor!');
+            return;
+        }
+
+        try {
+            const pair = this.resolveSideBySideMarkdownPair(editor);
+            if (!pair) {
+                vscode.window.showWarningMessage(
+                    '请并排打开两个 Markdown 窗口后再运行「对齐标题」（默认比较当前窗口与右侧，无右侧则与左侧比较）。'
+                );
+                return;
+            }
+            const { primary, secondary } = pair;
+
+            const lastLevels =
+                context.globalState.get<string>(ALIGN_HEADINGS_LAST_LEVELS_KEY)?.trim() || '1';
+            const levelInput = await vscode.window.showInputBox({
+                prompt: '请输入要对齐的标题级别（1–6），多个用逗号分隔',
+                placeHolder: '例如：1，2，4',
+                value: lastLevels,
+                ignoreFocusOut: true,
+                validateInput: (value) => {
+                    const parsed = parseHeadingLevels(value);
+                    return 'error' in parsed ? parsed.error : null;
+                },
+            });
+            if (levelInput === undefined) {
+                return;
+            }
+            const parsedLevels = parseHeadingLevels(levelInput);
+            if ('error' in parsedLevels) {
+                vscode.window.showWarningMessage(parsedLevels.error);
+                return;
+            }
+            const levels = parsedLevels.levels;
+            const levelsKey = levels.join('，');
+            await context.globalState.update(ALIGN_HEADINGS_LAST_LEVELS_KEY, levelsKey);
+
+            const modePick = await vscode.window.showQuickPick(
+                [
+                    {
+                        label: '有序号则只比较序号，否则比较全文（默认）',
+                        description: '两侧都有前部序号时只比序号；否则去空白后比全文',
+                        value: 'serialOrFullText' as HeadingAlignMode,
+                    },
+                    {
+                        label: '比较全文',
+                        description: '去空白后标题全文须一致',
+                        value: 'fullText' as HeadingAlignMode,
+                    },
+                ],
+                {
+                    placeHolder: '选择标题比较方式',
+                    ignoreFocusOut: true,
+                }
+            );
+            if (!modePick) {
+                return;
+            }
+            const mode = modePick.value;
+
+            const leftText = primary.document.getText();
+            const rightText = secondary.document.getText();
+            const leftName = path.basename(primary.document.fileName) || primary.document.uri.toString();
+            const rightName = path.basename(secondary.document.fileName) || secondary.document.uri.toString();
+            const levelsLabel = levels.join('，');
+
+            const result = alignHeadings(leftText, rightText, levels, mode);
+            if (result.mismatch) {
+                this.revealHeadingMismatchInEditors(primary, secondary, result.mismatch);
+                const hint = diagnoseHeadingMismatch(
+                    result.left,
+                    result.right,
+                    result.mismatch,
+                    mode
+                );
+                const detail = this.formatHeadingMismatchMessage(
+                    leftName,
+                    rightName,
+                    levelsLabel,
+                    result.mismatch,
+                    result.left.length,
+                    result.right.length,
+                    hint
+                );
+                vscode.window.showWarningMessage(detail);
+                return;
+            }
+
+            vscode.window.showInformationMessage(
+                `标题已对齐：${leftName} 与 ${rightName}（级别 ${levelsLabel}，共 ${result.left.length} 个，按位置顺序）一致。`
+            );
+        } catch (error) {
+            ErrorUtils.showError(error, '对齐标题时出错：');
+        }
+    }
+
+    /** 当前窗口 + 右侧 md；无右侧则左侧 md；找不到则 undefined */
+    private resolveSideBySideMarkdownPair(
+        active: vscode.TextEditor
+    ): { primary: vscode.TextEditor; secondary: vscode.TextEditor } | undefined {
+        if (!this.isMarkdownEditor(active)) {
+            return undefined;
+        }
+        const activeCol = active.viewColumn;
+        if (activeCol === undefined) {
+            return undefined;
+        }
+
+        const others = vscode.window.visibleTextEditors.filter(
+            (e) =>
+                e !== active &&
+                e.viewColumn !== undefined &&
+                e.viewColumn !== activeCol &&
+                this.isMarkdownEditor(e)
+        );
+
+        const right = others
+            .filter((e) => (e.viewColumn as number) > (activeCol as number))
+            .sort((a, b) => (a.viewColumn as number) - (b.viewColumn as number))[0];
+        if (right) {
+            return { primary: active, secondary: right };
+        }
+
+        const left = others
+            .filter((e) => (e.viewColumn as number) < (activeCol as number))
+            .sort((a, b) => (b.viewColumn as number) - (a.viewColumn as number))[0];
+        if (left) {
+            return { primary: active, secondary: left };
+        }
+
+        return undefined;
+    }
+
+    private isMarkdownEditor(editor: vscode.TextEditor): boolean {
+        if (editor.document.languageId === 'markdown') {
+            return true;
+        }
+        const name = editor.document.fileName || editor.document.uri.fsPath || '';
+        return /\.md$/i.test(name);
+    }
+
+    private formatHeadingMismatchMessage(
+        leftName: string,
+        rightName: string,
+        levelsLabel: string,
+        mismatch: HeadingAlignMismatch,
+        leftCount: number,
+        rightCount: number,
+        hint: HeadingAlignFixHint
+    ): string {
+        const ord = mismatch.index + 1;
+        const clip = (s: string, n = 36) => (s.length > n ? `${s.slice(0, n)}…` : s);
+        const fmt = (name: string, h?: { line: number; level: number; text: string }) =>
+            h ? `${name} L${h.line}（${h.level}级）${clip(h.text)}` : `${name}（无）`;
+
+        const sideLabel =
+            hint.preferSide === 'left'
+                ? `当前窗口「${leftName}」`
+                : hint.preferSide === 'right'
+                  ? `对侧窗口「${rightName}」`
+                  : `两侧（当前「${leftName}」/ 对侧「${rightName}」）`;
+        const dirLabel =
+            hint.direction === 'here' ? '本处' : hint.direction === 'up' ? '往上' : '往下';
+
+        let spot: string;
+        switch (mismatch.reason) {
+            case 'missingLeft':
+                spot = `第 ${ord} 项：当前侧已无标题；对侧为 ${fmt(rightName, mismatch.right)}`;
+                break;
+            case 'missingRight':
+                spot = `第 ${ord} 项：对侧已无标题；当前侧为 ${fmt(leftName, mismatch.left)}`;
+                break;
+            case 'level':
+                spot =
+                    `第 ${ord} 项级别不同：\n` +
+                    `· ${fmt(leftName, mismatch.left)}\n` +
+                    `· ${fmt(rightName, mismatch.right)}`;
+                break;
+            default:
+                spot =
+                    `第 ${ord} 项内容不同：\n` +
+                    `· ${fmt(leftName, mismatch.left)}\n` +
+                    `· ${fmt(rightName, mismatch.right)}`;
+                break;
+        }
+
+        return (
+            `标题未对齐（级别 ${levelsLabel}；当前 ${leftCount} / 对侧 ${rightCount}，按位置）。\n` +
+            `${spot}\n` +
+            `→ 优先处理：${sideLabel}；查找方向：${dirLabel}\n` +
+            `${hint.action}\n` +
+            `已跳转到差异行，处理后请再运行「对齐标题」。`
+        );
+    }
+
+    /** 在已有并排窗口中跳到首个对不齐的标题行 */
+    private revealHeadingMismatchInEditors(
+        primary: vscode.TextEditor,
+        secondary: vscode.TextEditor,
+        mismatch: HeadingAlignMismatch
+    ): void {
+        this.revealHeadingLine(primary, mismatch.left?.line);
+        this.revealHeadingLine(secondary, mismatch.right?.line);
+    }
+
+    private revealHeadingLine(editor: vscode.TextEditor, line1Based?: number): void {
+        if (line1Based === undefined || line1Based < 1) {
+            return;
+        }
+        const line = Math.min(line1Based - 1, editor.document.lineCount - 1);
+        const range = editor.document.lineAt(line).range;
+        editor.selection = new vscode.Selection(range.start, range.end);
+        editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
     }
 
     /** 对全文分词 */

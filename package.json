@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.5",
+  "version": "1.12.6",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -276,6 +276,10 @@
       {
         "command": "ai-proofread.markTitlesFromToc",
         "title": "AI Proofreader: mark titles from table of contents"
+      },
+      {
+        "command": "ai-proofread.alignHeadings",
+        "title": "AI Proofreader: align headings"
       },
       {
         "command": "ai-proofread.segmentFile",
@@ -1900,6 +1904,11 @@
         },
         {
           "command": "ai-proofread.markTitlesFromToc",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown"
+        },
+        {
+          "command": "ai-proofread.alignHeadings",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown"
         },
