@@ -111,7 +111,7 @@ export class UtilityCommandHandler {
                 return; // 用户取消
             }
 
-            let result: { updated: number; total: number };
+            let result: { updated: number; total: number; skipped: number };
 
             if (sourceType.value === 'json') {
                 // JSON 文件：让用户选择来源文件及来源字段
@@ -141,12 +141,18 @@ export class UtilityCommandHandler {
                     return;
                 }
 
+                const ignoreHeadingLevels = await this.promptIgnoreHeadingLevels();
+                if (ignoreHeadingLevels === undefined) {
+                    return;
+                }
+
                 result = await mergeTwoFiles(
                     document.uri.fsPath,
                     sourceFile[0].fsPath,
                     targetField as 'target' | 'reference' | 'context',
                     sourceField as 'target' | 'reference' | 'context',
-                    mergeMode.value as 'update' | 'concat'
+                    mergeMode.value as 'update' | 'concat',
+                    ignoreHeadingLevels
                 );
             } else {
                 // Markdown 文件：每个 JSON 项都合并同一文本
@@ -166,17 +172,26 @@ export class UtilityCommandHandler {
                     return;
                 }
 
+                const ignoreHeadingLevels = await this.promptIgnoreHeadingLevels();
+                if (ignoreHeadingLevels === undefined) {
+                    return;
+                }
+
                 result = await mergeMarkdownIntoJson(
                     document.uri.fsPath,
                     sourceFile[0].fsPath,
                     targetField as 'target' | 'reference' | 'context',
-                    mergeMode.value as 'update' | 'concat'
+                    mergeMode.value as 'update' | 'concat',
+                    ignoreHeadingLevels
                 );
             }
 
             // 显示结果
             const modeText = mergeMode.value === 'update' ? '更新' : '拼接';
             let message = `合并完成！${modeText}了 ${result.updated}/${result.total} 项`;
+            if (result.skipped > 0) {
+                message += `（跳过 ${result.skipped} 个忽略标题单元）`;
+            }
 
             // 如果用户选择更新Markdown文件，则执行更新
             if (updateMarkdown.value) {
@@ -232,7 +247,7 @@ export class UtilityCommandHandler {
             );
             if (updateMarkdown === undefined) return;
 
-            let result: { updated: number; total: number };
+            let result: { updated: number; total: number; skipped: number };
 
             if (sourceType.value === 'json') {
                 const sourceFile = await vscode.window.showOpenDialog({
@@ -248,11 +263,17 @@ export class UtilityCommandHandler {
                 );
                 if (!sourceField) return;
 
+                const ignoreHeadingLevels = await this.promptIgnoreHeadingLevels();
+                if (ignoreHeadingLevels === undefined) {
+                    return;
+                }
+
                 result = await mergeTwoFiles(
                     jsonFilePath, sourceFile[0].fsPath,
                     targetField as 'target' | 'reference' | 'context',
                     sourceField as 'target' | 'reference' | 'context',
-                    mergeMode.value as 'update' | 'concat'
+                    mergeMode.value as 'update' | 'concat',
+                    ignoreHeadingLevels
                 );
             } else {
                 const sourceFile = await vscode.window.showOpenDialog({
@@ -262,14 +283,23 @@ export class UtilityCommandHandler {
                 });
                 if (!sourceFile?.length) return;
 
+                const ignoreHeadingLevels = await this.promptIgnoreHeadingLevels();
+                if (ignoreHeadingLevels === undefined) {
+                    return;
+                }
+
                 result = await mergeMarkdownIntoJson(
                     jsonFilePath, sourceFile[0].fsPath,
                     targetField as 'target' | 'reference' | 'context',
-                    mergeMode.value as 'update' | 'concat'
+                    mergeMode.value as 'update' | 'concat',
+                    ignoreHeadingLevels
                 );
             }
 
             let message = `合并完成！${mergeMode.value === 'update' ? '更新' : '拼接'}了 ${result.updated}/${result.total} 项`;
+            if (result.skipped > 0) {
+                message += `（跳过 ${result.skipped} 个忽略标题单元）`;
+            }
             if (updateMarkdown.value) {
                 try {
                     await this.updateMarkdownFileFromJson(jsonFilePath, targetField as 'target' | 'reference' | 'context');
@@ -282,6 +312,38 @@ export class UtilityCommandHandler {
         } catch (error) {
             ErrorUtils.showError(error, '合并文件时出错：');
         }
+    }
+
+    /**
+     * 询问当前 JSON 侧要忽略的标题级别（空=不忽略）。
+     * @returns 级别数组；用户取消时返回 undefined
+     */
+    private async promptIgnoreHeadingLevels(): Promise<number[] | undefined> {
+        const input = await vscode.window.showInputBox({
+            prompt: '当前文件：忽略哪些标题级别的单元（不从来源合并）？留空表示不忽略',
+            placeHolder: '例如：1，2，4（兼容全角逗号）；默认留空',
+            value: '',
+            ignoreFocusOut: true,
+            validateInput: (value) => {
+                if (!value.trim()) {
+                    return null;
+                }
+                const parsed = parseHeadingLevels(value);
+                return 'error' in parsed ? parsed.error : null;
+            },
+        });
+        if (input === undefined) {
+            return undefined;
+        }
+        if (!input.trim()) {
+            return [];
+        }
+        const parsed = parseHeadingLevels(input);
+        if ('error' in parsed) {
+            vscode.window.showWarningMessage(parsed.error);
+            return undefined;
+        }
+        return parsed.levels;
     }
 
     /**
