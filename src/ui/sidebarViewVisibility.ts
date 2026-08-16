@@ -1,34 +1,48 @@
 /**
- * Activity Bar 按需 TreeView 的显示状态（与 setContext 同步，供欢迎页开关等使用）
+ * Activity Bar 按需 TreeView 的显示状态（与 setContext 同步）
+ *
+ * 配置类视图可跨启动记住；结果类视图仅在对应命令跑完后出现，不持久化，
+ * 同时只显示其中一棵，避免侧栏堆叠。
  */
 
 import * as vscode from 'vscode';
 import { getExtensionContext } from '../extensionContextHolder';
 import { focusWordCheckView } from '../xh7/wordCheckView';
 
-export interface SidebarToggleState {
+export interface SidebarConfigState {
     modelRoutes: boolean;
     prompts: boolean;
+    /** 词典/通规检查类型 + 自定义替换表 */
+    wordCheckConfig: boolean;
+}
+
+export type SidebarResultKey =
+    | 'wordCheck'
+    | 'referenceHit'
+    | 'citations'
+    | 'duplicates'
+    | 'numbering'
+    | 'numberingSegments'
+    | 'proofreadItems';
+
+export interface SidebarResultState {
     wordCheck: boolean;
-    /** 资料检索命中 TreeView */
     referenceHit: boolean;
-    /** 引文核查 TreeView */
     citations: boolean;
-    /** 重文检查 TreeView */
     duplicates: boolean;
-    /** 标题树 TreeView */
     numbering: boolean;
-    /** 段内序号 TreeView */
     numberingSegments: boolean;
-    /** 校对条目 TreeView */
     proofreadItems: boolean;
 }
+
+export interface SidebarToggleState extends SidebarConfigState, SidebarResultState {}
 
 const SIDEBAR_TOGGLE_STATE_KEY = 'sidebarToggleState';
 
 const state: SidebarToggleState = {
     modelRoutes: false,
     prompts: false,
+    wordCheckConfig: false,
     wordCheck: false,
     referenceHit: false,
     citations: false,
@@ -48,10 +62,15 @@ function notify(): void {
     }
 }
 
-async function persistSidebarToggleState(): Promise<void> {
+async function persistSidebarConfigState(): Promise<void> {
     const ctx = getExtensionContext();
     if (ctx) {
-        await ctx.globalState.update(SIDEBAR_TOGGLE_STATE_KEY, getSidebarToggleState());
+        const config: SidebarConfigState = {
+            modelRoutes: state.modelRoutes,
+            prompts: state.prompts,
+            wordCheckConfig: state.wordCheckConfig,
+        };
+        await ctx.globalState.update(SIDEBAR_TOGGLE_STATE_KEY, config);
     }
 }
 
@@ -66,6 +85,8 @@ export function onSidebarToggleStateChanged(listener: StateListener): vscode.Dis
 
 interface SetVisibleOptions {
     persist?: boolean;
+    /** 显示结果树时是否收起其他结果树，默认 true */
+    exclusive?: boolean;
 }
 
 async function tryFocus(command: string): Promise<void> {
@@ -76,37 +97,67 @@ async function tryFocus(command: string): Promise<void> {
     }
 }
 
+async function hideOtherResultViews(keep: SidebarResultKey): Promise<void> {
+    const hideOpts: SetVisibleOptions = { persist: false, exclusive: false };
+    if (keep !== 'wordCheck' && state.wordCheck) {
+        await setWordCheckResultVisible(false, hideOpts);
+    }
+    if (keep !== 'referenceHit' && state.referenceHit) {
+        await setReferenceHitVisible(false, hideOpts);
+    }
+    if (keep !== 'citations' && state.citations) {
+        await setCitationsVisible(false, hideOpts);
+    }
+    if (keep !== 'duplicates' && state.duplicates) {
+        await setDuplicatesVisible(false, hideOpts);
+    }
+    if (keep !== 'numbering' && state.numbering) {
+        await setNumberingVisible(false, hideOpts);
+    }
+    if (keep !== 'numberingSegments' && state.numberingSegments) {
+        await setNumberingSegmentsVisible(false, hideOpts);
+    }
+    if (keep !== 'proofreadItems' && state.proofreadItems) {
+        await setProofreadItemsVisible(false, hideOpts);
+    }
+}
+
+/** 收起全部结果树（配置类视图不动） */
+export async function hideAllResultViews(): Promise<void> {
+    const hideOpts: SetVisibleOptions = { persist: false, exclusive: false };
+    await setWordCheckResultVisible(false, hideOpts);
+    await setReferenceHitVisible(false, hideOpts);
+    await setCitationsVisible(false, hideOpts);
+    await setDuplicatesVisible(false, hideOpts);
+    await setNumberingVisible(false, hideOpts);
+    await setNumberingSegmentsVisible(false, hideOpts);
+    await setProofreadItemsVisible(false, hideOpts);
+}
+
 /** 扩展激活时：默认隐藏所有按需视图 */
 export async function hideAllOnDemandSidebarViews(): Promise<void> {
     await setModelRoutesVisible(false, { persist: false });
     await setPromptsViewsVisible(false, { persist: false });
-    await setWordCheckViewsVisible(false, { persist: false });
-    await setReferenceHitVisible(false, { persist: false });
-    await setCitationsVisible(false, { persist: false });
-    await setDuplicatesVisible(false, { persist: false });
-    await setNumberingVisible(false, { persist: false });
-    await setNumberingSegmentsVisible(false, { persist: false });
-    await setProofreadItemsVisible(false, { persist: false });
-    await persistSidebarToggleState();
+    await setSourceTextCharacteristicsVisible(false);
+    await setDictPrepPromptsVisible(false);
+    await setWordCheckConfigVisible(false, { persist: false });
+    await hideAllResultViews();
+    await persistSidebarConfigState();
 }
 
-/** 扩展激活时：从 globalState 恢复侧栏开关，无记录则全部隐藏 */
+/** 扩展激活时：只恢复配置类视图；结果树一律隐藏 */
 export async function restoreSidebarToggleStateOnActivate(): Promise<void> {
-    const saved = getExtensionContext()?.globalState.get<SidebarToggleState>(SIDEBAR_TOGGLE_STATE_KEY);
+    const saved = getExtensionContext()?.globalState.get<Partial<SidebarConfigState> & Partial<SidebarResultState>>(
+        SIDEBAR_TOGGLE_STATE_KEY
+    );
+    await hideAllOnDemandSidebarViews();
     if (!saved) {
-        await hideAllOnDemandSidebarViews();
         return;
     }
     await setModelRoutesVisible(!!saved.modelRoutes, { persist: false });
     await setPromptsViewsVisible(!!saved.prompts, { persist: false });
-    await setWordCheckViewsVisible(!!saved.wordCheck, { persist: false });
-    await setReferenceHitVisible(!!saved.referenceHit, { persist: false });
-    await setCitationsVisible(!!saved.citations, { persist: false });
-    await setDuplicatesVisible(!!saved.duplicates, { persist: false });
-    await setNumberingVisible(!!saved.numbering, { persist: false });
-    await setNumberingSegmentsVisible(!!saved.numberingSegments, { persist: false });
-    await setProofreadItemsVisible(!!saved.proofreadItems, { persist: false });
-    await persistSidebarToggleState();
+    await setWordCheckConfigVisible(!!saved.wordCheckConfig, { persist: false });
+    await persistSidebarConfigState();
 }
 
 export async function setModelRoutesVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
@@ -116,7 +167,7 @@ export async function setModelRoutesVisible(visible: boolean, options?: SetVisib
         await tryFocus('ai-proofread.modelRoutes.focus');
     }
     if (options?.persist !== false) {
-        await persistSidebarToggleState();
+        await persistSidebarConfigState();
     }
     notify();
 }
@@ -126,16 +177,19 @@ export async function toggleModelRoutesVisible(): Promise<boolean> {
     return state.modelRoutes;
 }
 
+/** 只显示主提示词树，不连带源文本特性 / 检索规划提示词 */
 export async function setPromptsViewsVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
     state.prompts = visible;
     await vscode.commands.executeCommand('setContext', 'aiProofread.showPromptsView', visible);
-    await vscode.commands.executeCommand('setContext', 'aiProofread.showDictPrepPromptsView', visible);
-    await vscode.commands.executeCommand('setContext', 'aiProofread.showSourceTextCharacteristicsView', visible);
+    if (!visible) {
+        await setSourceTextCharacteristicsVisible(false);
+        await setDictPrepPromptsVisible(false);
+    }
     if (visible) {
         await tryFocus('ai-proofread.prompts.focus');
     }
     if (options?.persist !== false) {
-        await persistSidebarToggleState();
+        await persistSidebarConfigState();
     }
     notify();
 }
@@ -145,34 +199,62 @@ export async function togglePromptsViewsVisible(): Promise<boolean> {
     return state.prompts;
 }
 
-export async function setWordCheckViewsVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
-    state.wordCheck = visible;
-    await vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', visible);
+export async function setSourceTextCharacteristicsVisible(visible: boolean): Promise<void> {
+    await vscode.commands.executeCommand('setContext', 'aiProofread.showSourceTextCharacteristicsView', visible);
+    if (visible) {
+        await tryFocus('ai-proofread.sourceTextCharacteristics.focus');
+    }
+}
+
+export async function setDictPrepPromptsVisible(visible: boolean): Promise<void> {
+    await vscode.commands.executeCommand('setContext', 'aiProofread.showDictPrepPromptsView', visible);
+    if (visible) {
+        await tryFocus('ai-proofread.dictPrepPrompts.focus');
+    }
+}
+
+export async function setWordCheckConfigVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
+    state.wordCheckConfig = visible;
     await vscode.commands.executeCommand('setContext', 'aiProofread.showDictCheckTypesView', visible);
     await vscode.commands.executeCommand('setContext', 'aiProofread.showTgsccCheckTypesView', visible);
     await vscode.commands.executeCommand('setContext', 'aiProofread.showCustomTablesView', visible);
-    if (visible) {
-        await focusWordCheckView();
-    }
     if (options?.persist !== false) {
-        await persistSidebarToggleState();
+        await persistSidebarConfigState();
     }
     notify();
 }
 
+/** 只显示字词检查结果树 */
+export async function setWordCheckResultVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
+    if (visible && options?.exclusive !== false) {
+        await hideOtherResultViews('wordCheck');
+    }
+    state.wordCheck = visible;
+    await vscode.commands.executeCommand('setContext', 'aiProofread.showWordCheckView', visible);
+    if (visible) {
+        await focusWordCheckView();
+    }
+    notify();
+}
+
+/** @deprecated 兼容旧调用：等同于显示/隐藏结果树 */
+export async function setWordCheckViewsVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
+    await setWordCheckResultVisible(visible, options);
+}
+
 export async function toggleWordCheckViewsVisible(): Promise<boolean> {
-    await setWordCheckViewsVisible(!state.wordCheck);
+    await setWordCheckResultVisible(!state.wordCheck);
     return state.wordCheck;
 }
 
 export async function setReferenceHitVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
+    if (visible && options?.exclusive !== false) {
+        await hideOtherResultViews('referenceHit');
+    }
     state.referenceHit = visible;
     await vscode.commands.executeCommand('setContext', 'aiProofread.showReferencePrepResultsView', visible);
     if (visible) {
         await tryFocus('ai-proofread.referencePrepResults.focus');
-    }
-    if (options?.persist !== false) {
-        await persistSidebarToggleState();
     }
     notify();
 }
@@ -183,13 +265,13 @@ export async function toggleReferenceHitVisible(): Promise<boolean> {
 }
 
 export async function setCitationsVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
+    if (visible && options?.exclusive !== false) {
+        await hideOtherResultViews('citations');
+    }
     state.citations = visible;
     await vscode.commands.executeCommand('setContext', 'aiProofread.showCitationView', visible);
     if (visible) {
         await tryFocus('ai-proofread.citation.focus');
-    }
-    if (options?.persist !== false) {
-        await persistSidebarToggleState();
     }
     notify();
 }
@@ -200,13 +282,13 @@ export async function toggleCitationsVisible(): Promise<boolean> {
 }
 
 export async function setDuplicatesVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
+    if (visible && options?.exclusive !== false) {
+        await hideOtherResultViews('duplicates');
+    }
     state.duplicates = visible;
     await vscode.commands.executeCommand('setContext', 'aiProofread.showDuplicateView', visible);
     if (visible) {
         await tryFocus('ai-proofread.duplicate.focus');
-    }
-    if (options?.persist !== false) {
-        await persistSidebarToggleState();
     }
     notify();
 }
@@ -217,13 +299,13 @@ export async function toggleDuplicatesVisible(): Promise<boolean> {
 }
 
 export async function setNumberingVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
+    if (visible && options?.exclusive !== false) {
+        await hideOtherResultViews('numbering');
+    }
     state.numbering = visible;
     await vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingView', visible);
     if (visible) {
         await tryFocus('ai-proofread.numbering.focus');
-    }
-    if (options?.persist !== false) {
-        await persistSidebarToggleState();
     }
     notify();
 }
@@ -234,13 +316,13 @@ export async function toggleNumberingVisible(): Promise<boolean> {
 }
 
 export async function setNumberingSegmentsVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
+    if (visible && options?.exclusive !== false) {
+        await hideOtherResultViews('numberingSegments');
+    }
     state.numberingSegments = visible;
     await vscode.commands.executeCommand('setContext', 'aiProofread.showNumberingSegmentsView', visible);
     if (visible) {
         await tryFocus('ai-proofread.numberingSegments.focus');
-    }
-    if (options?.persist !== false) {
-        await persistSidebarToggleState();
     }
     notify();
 }
@@ -251,13 +333,13 @@ export async function toggleNumberingSegmentsVisible(): Promise<boolean> {
 }
 
 export async function setProofreadItemsVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
+    if (visible && options?.exclusive !== false) {
+        await hideOtherResultViews('proofreadItems');
+    }
     state.proofreadItems = visible;
     await vscode.commands.executeCommand('setContext', 'aiProofread.showProofreadItemsView', visible);
     if (visible) {
         await tryFocus('ai-proofread.proofreadItems.focus');
-    }
-    if (options?.persist !== false) {
-        await persistSidebarToggleState();
     }
     notify();
 }

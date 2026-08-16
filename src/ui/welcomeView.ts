@@ -116,43 +116,19 @@ function getHtml(): string {
         <button type="button" class="btn-primary" data-action="openSearchConsole" title="打开参考资料检索控制台">检索面板</button>
     </div>
     <div class="action-grid">
-        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="modelRoutes" title="显示或隐藏模型路由 TreeView">
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="modelRoutes" title="显示或隐藏模型路由">
             <span class="cell-label">模型路由</span>
         </button>
-        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="prompts" title="显示或隐藏提示词相关 TreeView">
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="prompts" title="显示或隐藏提示词">
             <span class="cell-label">提示词</span>
         </button>
     </div>
     <div class="action-grid">
-        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="wordCheck" title="显示或隐藏字词检查相关 TreeView">
-            <span class="cell-label">字词检查</span>
-        </button>
-        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="referenceHit" title="显示或隐藏资料检索命中 TreeView">
-            <span class="cell-label">资料检索</span>
-        </button>
-    </div>
-    <div class="action-grid">
-        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="citations" title="显示或隐藏引文核查 TreeView">
-            <span class="cell-label">引文核查</span>
-        </button>
-        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="duplicates" title="显示或隐藏重文检查 TreeView">
-            <span class="cell-label">重文检查</span>
-        </button>
-    </div>
-    <div class="action-grid">
-        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="numbering" title="显示或隐藏标题树 TreeView">
-            <span class="cell-label">标题树</span>
-        </button>
-        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="numberingSegments" title="显示或隐藏段内序号 TreeView">
-            <span class="cell-label">段内序号</span>
-        </button>
-    </div>
-    <div class="action-grid">
-        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="proofreadItems" title="显示或隐藏校对条目 TreeView">
-            <span class="cell-label">校对条目</span>
-        </button>
         <button type="button" class="cell cell-action" data-action="openSettings" title="打开扩展设置">
             <span class="cell-label">设置</span>
+        </button>
+        <button type="button" class="cell cell-action" data-action="hideResultViews" title="收起字词、引文、重文等检查结果列表">
+            <span class="cell-label">收起结果列表</span>
         </button>
     </div>
     <div class="action-grid">
@@ -164,10 +140,10 @@ function getHtml(): string {
         </button>
     </div>
     <div class="hint">
-        可通过三种方式使用本扩展：
+        检查结果会在运行对应命令后出现在侧栏；配置类视图（模型路由、提示词）可在此开关。
         <ol>
-            <li>打开校对面板 / 搜索面板，使用按钮</li>
-            <li>打开命令面板 (Ctrl+Shift+P)，输入 AI Proofreader … 筛查检索命令</li>
+            <li>打开校对面板 / 检索面板，使用按钮</li>
+            <li>打开命令面板 (Ctrl+Shift+P)，输入 AI Proofreader</li>
             <li>在编辑窗口使用鼠标右键菜单</li>
         </ol>
     </div>
@@ -222,13 +198,6 @@ export function registerWelcomeView(context: vscode.ExtensionContext): void {
                         const cmdByKey: Record<string, string> = {
                             modelRoutes: 'ai-proofread.modelRoutes.toggleView',
                             prompts: 'ai-proofread.prompts.toggleViews',
-                            wordCheck: 'ai-proofread.wordCheck.toggleViews',
-                            referenceHit: 'ai-proofread.referencePrep.toggleResultsView',
-                            citations: 'ai-proofread.citation.toggleView',
-                            duplicates: 'ai-proofread.duplicate.toggleView',
-                            numbering: 'ai-proofread.numbering.toggleView',
-                            numberingSegments: 'ai-proofread.numberingSegments.toggleView',
-                            proofreadItems: 'ai-proofread.proofreadItems.toggleView',
                         };
                         const cmd = key ? cmdByKey[key] : undefined;
                         if (cmd) {
@@ -236,6 +205,9 @@ export function registerWelcomeView(context: vscode.ExtensionContext): void {
                         }
                         break;
                     }
+                    case 'hideResultViews':
+                        await vscode.commands.executeCommand('ai-proofread.sidebar.hideResultViews');
+                        break;
                     case 'showExtension':
                         await showExtensionInEditor(context);
                         break;

@@ -4,6 +4,7 @@
  */
 
 import * as vscode from 'vscode';
+import { requireWorkingTextEditor } from '../ui/lastActiveTextEditor';
 import type { NumberingTreeDataProvider } from '../numbering/numberingTreeProvider';
 import type { SegmentTreeDataProvider } from '../numbering/segmentTreeProvider';
 import type { NumberingNode } from '../numbering/types';
@@ -49,9 +50,8 @@ export class NumberingCheckCommandHandler {
     ) {}
 
     async handleCheckCommand(): Promise<void> {
-        const editor = vscode.window.activeTextEditor;
+        const editor = requireWorkingTextEditor('请先打开要检查的文档。');
         if (!editor) {
-            vscode.window.showWarningMessage('请先打开要检查的文档。');
             return;
         }
 
@@ -218,9 +218,8 @@ export class NumberingCheckCommandHandler {
         const sp = this.segmentProvider;
         const stv = this.segmentTreeView;
         if (!sp || !stv) return;
-        const editor = vscode.window.activeTextEditor;
+        const editor = requireWorkingTextEditor('请先打开要检查的文档。');
         if (!editor) {
-            vscode.window.showWarningMessage('请先打开要检查的文档。');
             return;
         }
         const doc = editor.document;

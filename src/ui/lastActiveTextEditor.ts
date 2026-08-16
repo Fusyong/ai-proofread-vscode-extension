@@ -56,6 +56,16 @@ export function getWorkingTextEditor(): vscode.TextEditor | undefined {
     return visible;
 }
 
+/** 取工作编辑器；没有则提示并返回 undefined */
+export function requireWorkingTextEditor(message = '请先打开目标文档。'): vscode.TextEditor | undefined {
+    const editor = getWorkingTextEditor();
+    if (!editor) {
+        vscode.window.showWarningMessage(message);
+        return undefined;
+    }
+    return editor;
+}
+
 /**
  * 将工作编辑器重新设为活动（供仍读取 activeTextEditor 的命令使用）。
  * 尽量保持原 viewColumn 与选区。

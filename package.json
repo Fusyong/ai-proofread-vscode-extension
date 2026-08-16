@@ -30,6 +30,20 @@
         "title": "删除"
       },
       {
+        "command": "ai-proofread.sourceTextCharacteristics.openView",
+        "title": "源文本特性提示词",
+        "icon": "$(symbol-keyword)"
+      },
+      {
+        "command": "ai-proofread.dictPrepPrompts.openView",
+        "title": "检索规划提示词",
+        "icon": "$(book)"
+      },
+      {
+        "command": "ai-proofread.sidebar.hideResultViews",
+        "title": "收起结果列表"
+      },
+      {
         "command": "ai-proofread.dictPrepPrompts.new",
         "title": "新建提示词"
       },
@@ -90,7 +104,8 @@
       {
         "command": "ai-proofread.referencePrep.openConsole",
         "title": "Open Reference Search Panel（检索面板）",
-        "category": "AI Proofreader Search"
+        "category": "AI Proofreader Search",
+        "icon": "$(window)"
       },
       {
         "command": "ai-proofread.modelRoutes.openView",
@@ -288,7 +303,8 @@
       {
         "command": "ai-proofread.citation.openView",
         "title": "Verify Citations（核对全文引文）",
-        "category": "AI Proofreader Search"
+        "category": "AI Proofreader Search",
+        "icon": "$(check)"
       },
       {
         "command": "ai-proofread.citation.toggleView",
@@ -299,7 +315,8 @@
         "command": "ai-proofread.citation.rebuildIndex",
         "title": "Build Citation Reference Index（建立引文索引）",
         "category": "AI Proofreader Search",
-        "description": "供核对全文引文与资料准备的 BM25 通道共用"
+        "description": "供核对全文引文与资料准备的 BM25 通道共用",
+        "icon": "$(database)"
       },
       {
         "command": "ai-proofread.citation.verifySelection",
@@ -317,7 +334,8 @@
       },
       {
         "command": "ai-proofread.duplicate.scanDocument",
-        "title": "AI Proofreader: scan duplicate sentences in document"
+        "title": "AI Proofreader: scan duplicate sentences in document",
+        "icon": "$(search)"
       },
       {
         "command": "ai-proofread.duplicate.scanSelection",
@@ -334,7 +352,8 @@
       },
       {
         "command": "ai-proofread.checkWords",
-        "title": "AI Proofreader: check words"
+        "title": "AI Proofreader: check words",
+        "icon": "$(play)"
       },
       {
         "command": "ai-proofread.wordCheck.prevOccurrence",
@@ -416,6 +435,11 @@
         "title": "AI Proofreader: check numbering hierarchy"
       },
       {
+        "command": "ai-proofread.numbering.checkTitles",
+        "title": "检查标题树",
+        "icon": "$(list-tree)"
+      },
+      {
         "command": "ai-proofread.numbering.toggleView",
         "title": "Toggle Numbering (Title Tree) View",
         "category": "AI Proofreader"
@@ -443,23 +467,28 @@
       },
       {
         "command": "ai-proofread.numbering.toggleSimplifiedLevel",
-        "title": "伸缩层级"
+        "title": "伸缩层级",
+        "icon": "$(fold)"
       },
       {
         "command": "ai-proofread.numbering.defineTitle",
-        "title": "定义标题"
+        "title": "定义标题",
+        "icon": "$(add)"
       },
       {
         "command": "ai-proofread.numbering.checkSegments",
-        "title": "检查段内序号"
+        "title": "检查段内序号",
+        "icon": "$(list-ordered)"
       },
       {
         "command": "ai-proofread.numberingSegments.toggleSimplifiedLevel",
-        "title": "伸缩层级"
+        "title": "伸缩层级",
+        "icon": "$(fold)"
       },
       {
         "command": "ai-proofread.numbering.defineSegmentPattern",
-        "title": "定义段内序号"
+        "title": "定义段内序号",
+        "icon": "$(add)"
       },
       {
         "command": "ai-proofread.editorialMemory.clear",
@@ -1556,6 +1585,11 @@
           "group": "navigation@1"
         },
         {
+          "command": "ai-proofread.checkWords",
+          "when": "view == ai-proofread.wordCheck",
+          "group": "navigation@1"
+        },
+        {
           "command": "ai-proofread.wordCheck.sortAndFilter",
           "when": "view == ai-proofread.wordCheck",
           "group": "1_sort"
@@ -1571,24 +1605,54 @@
           "group": "2_apply@2"
         },
         {
+          "command": "ai-proofread.numbering.checkTitles",
+          "when": "view == ai-proofread.numbering",
+          "group": "navigation@1"
+        },
+        {
           "command": "ai-proofread.numbering.toggleSimplifiedLevel",
           "when": "view == ai-proofread.numbering",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "command": "ai-proofread.numbering.defineTitle",
           "when": "view == ai-proofread.numbering",
-          "group": "navigation"
+          "group": "navigation@3"
+        },
+        {
+          "command": "ai-proofread.numbering.checkSegments",
+          "when": "view == ai-proofread.numberingSegments",
+          "group": "navigation@1"
         },
         {
           "command": "ai-proofread.numberingSegments.toggleSimplifiedLevel",
           "when": "view == ai-proofread.numberingSegments",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "command": "ai-proofread.numbering.defineSegmentPattern",
           "when": "view == ai-proofread.numberingSegments",
-          "group": "navigation"
+          "group": "navigation@3"
+        },
+        {
+          "command": "ai-proofread.duplicate.scanDocument",
+          "when": "view == ai-proofread.duplicate",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ai-proofread.citation.openView",
+          "when": "view == ai-proofread.citation",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ai-proofread.citation.rebuildIndex",
+          "when": "view == ai-proofread.citation",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ai-proofread.referencePrep.openConsole",
+          "when": "view == ai-proofread.referencePrepResults",
+          "group": "navigation@1"
         },
         {
           "command": "ai-proofread.proofreadItems.setSort",
@@ -1603,7 +1667,17 @@
         {
           "command": "ai-proofread.prompts.new",
           "when": "view == ai-proofread.prompts",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "ai-proofread.sourceTextCharacteristics.openView",
+          "when": "view == ai-proofread.prompts",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ai-proofread.dictPrepPrompts.openView",
+          "when": "view == ai-proofread.prompts",
+          "group": "navigation@3"
         },
         {
           "command": "ai-proofread.dictPrepPrompts.new",

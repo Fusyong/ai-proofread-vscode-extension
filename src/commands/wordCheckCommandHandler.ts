@@ -9,12 +9,16 @@ import type { CustomTable } from '../xh7/types';
 import type { WordCheckTreeDataProvider } from '../xh7/wordCheckTreeProvider';
 import {
     registerWordCheckView,
-    focusWordCheckView,
     getLastSelectedEntry,
     getCurrentOccurrenceIndex,
     setCurrentOccurrenceIndex,
 } from '../xh7/wordCheckView';
-import { setWordCheckViewsVisible, toggleWordCheckViewsVisible } from '../ui/sidebarViewVisibility';
+import {
+    setWordCheckConfigVisible,
+    setWordCheckResultVisible,
+    toggleWordCheckViewsVisible,
+} from '../ui/sidebarViewVisibility';
+import { requireWorkingTextEditor } from '../ui/lastActiveTextEditor';
 import {
     initTableLoader,
     getDict,
@@ -119,9 +123,9 @@ export class WordCheckCommandHandler {
         this.tgsccCheckTypesProvider = tgsccReg.provider as TgsccCheckTypesTreeDataProvider;
     }
 
-    /** 显示字词检查相关侧栏视图（不自动执行扫描） */
+    /** 显示字词检查结果树（不自动执行扫描） */
     async openWordCheckViews(): Promise<void> {
-        await setWordCheckViewsVisible(true);
+        await setWordCheckResultVisible(true);
     }
 
     /** 切换字词检查相关侧栏视图的显示/隐藏 */
@@ -197,9 +201,8 @@ export class WordCheckCommandHandler {
     }
 
     async handleCheckWordsCommand(): Promise<void> {
-        const editor = vscode.window.activeTextEditor;
+        const editor = requireWorkingTextEditor('请先打开要检查的文档。');
         if (!editor) {
-            vscode.window.showWarningMessage('请先打开要检查的文档。');
             return;
         }
 
@@ -235,12 +238,14 @@ export class WordCheckCommandHandler {
         );
         if (!action) return;
         if (action.value === 'manage') {
+            await setWordCheckConfigVisible(true);
             await vscode.commands.executeCommand(`${DICT_CHECK_TYPES_VIEW_ID}.focus`);
             return;
         }
         const types = this.dictCheckTypesProvider?.getOrderedSelectedTypes() ?? [];
         if (types.length === 0) {
             vscode.window.showWarningMessage('请在侧栏「词典检查类型」视图中勾选至少一项参与检查。');
+            await setWordCheckConfigVisible(true);
             await vscode.commands.executeCommand(`${DICT_CHECK_TYPES_VIEW_ID}.focus`);
             return;
         }
@@ -258,12 +263,14 @@ export class WordCheckCommandHandler {
         );
         if (!action) return;
         if (action.value === 'manage') {
+            await setWordCheckConfigVisible(true);
             await vscode.commands.executeCommand(`${TGSCC_CHECK_TYPES_VIEW_ID}.focus`);
             return;
         }
         const types = this.tgsccCheckTypesProvider?.getOrderedSelectedTypes() ?? [];
         if (types.length === 0) {
             vscode.window.showWarningMessage('请在侧栏「通规检查类型」视图中勾选至少一项参与检查。');
+            await setWordCheckConfigVisible(true);
             await vscode.commands.executeCommand(`${TGSCC_CHECK_TYPES_VIEW_ID}.focus`);
             return;
         }
@@ -327,7 +334,7 @@ export class WordCheckCommandHandler {
             if (!this.treeProvider) return;
             this.treeProvider.refresh(entries, editor.document.uri);
             this.updateViewTitle();
-            await focusWordCheckView();
+            await setWordCheckResultVisible(true);
             if (entries.length === 0) {
                 vscode.window.showInformationMessage('当前文档中未发现需要提示的字词。');
             }
@@ -623,7 +630,7 @@ export class WordCheckCommandHandler {
             if (!this.treeProvider) return;
             this.treeProvider.refresh(entries, editor.document.uri);
             this.updateViewTitle();
-            await focusWordCheckView();
+            await setWordCheckResultVisible(true);
 
             if (entries.length === 0) {
                 vscode.window.showInformationMessage('当前文档中未发现需要提示的字词。');
@@ -639,6 +646,7 @@ export class WordCheckCommandHandler {
     }
 
     async handleManageCustomTablesCommand(): Promise<void> {
+        await setWordCheckConfigVisible(true);
         await vscode.commands.executeCommand(`${CUSTOM_TABLES_VIEW_ID}.focus`);
     }
 

@@ -3,6 +3,7 @@
  */
 
 import * as vscode from 'vscode';
+import { requireWorkingTextEditor } from '../ui/lastActiveTextEditor';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ReferenceStore, getCitationNormalizeOptions } from '../citation';
@@ -181,9 +182,9 @@ export class CitationCommandHandler {
     }
 
     async handleOpenViewCommand(): Promise<void> {
-        const doc = vscode.window.activeTextEditor?.document;
+        const editor = requireWorkingTextEditor('请先打开要核对的文档。');
+        const doc = editor?.document;
         if (!doc) {
-            vscode.window.showWarningMessage('请先打开要核对的文档。');
             return;
         }
         const refStore = ReferenceStore.getInstance(this.context);
@@ -263,7 +264,7 @@ export class CitationCommandHandler {
      * 规划提示词为 citation_selection；结果展示在「参考资料命中」TreeView，不进入校对。
      */
     async handleVerifySelectionCommand(): Promise<void> {
-        const editor = vscode.window.activeTextEditor;
+        const editor = requireWorkingTextEditor('请先选中要核对的引文文本。');
         const doc = editor?.document;
         if (!doc || !editor?.selection || editor.selection.isEmpty) {
             vscode.window.showWarningMessage('请先选中要核对的引文文本。');

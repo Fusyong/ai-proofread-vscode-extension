@@ -22,14 +22,16 @@ import { DuplicateCommandHandler } from './commands/duplicateCommandHandler';
 import { WordCheckCommandHandler } from './commands/wordCheckCommandHandler';
 import {
     restoreSidebarToggleStateOnActivate,
+    hideAllResultViews,
     setCitationsVisible,
+    setDictPrepPromptsVisible,
     setDuplicatesVisible,
     setNumberingSegmentsVisible,
     setNumberingVisible,
     setProofreadItemsVisible,
     setPromptsViewsVisible,
     setReferenceHitVisible,
-    setWordCheckViewsVisible,
+    setSourceTextCharacteristicsVisible,
     toggleCitationsVisible,
     toggleDuplicatesVisible,
     toggleNumberingSegmentsVisible,
@@ -303,6 +305,13 @@ export async function activate(context: vscode.ExtensionContext) {
             await setPromptsViewsVisible(true);
         }),
         vscode.commands.registerCommand('ai-proofread.prompts.toggleViews', () => togglePromptsViewsVisible()),
+        vscode.commands.registerCommand('ai-proofread.sourceTextCharacteristics.openView', async () => {
+            await setSourceTextCharacteristicsVisible(true);
+        }),
+        vscode.commands.registerCommand('ai-proofread.dictPrepPrompts.openView', async () => {
+            await setDictPrepPromptsVisible(true);
+        }),
+        vscode.commands.registerCommand('ai-proofread.sidebar.hideResultViews', () => hideAllResultViews()),
 
         vscode.commands.registerCommand('ai-proofread.prompts.new', async () => {
             await promptManager.addPrompt();
@@ -672,7 +681,6 @@ export async function activate(context: vscode.ExtensionContext) {
             await wordCheckHandler.toggleWordCheckViews();
         }),
         vscode.commands.registerCommand('ai-proofread.checkWords', async () => {
-            await wordCheckHandler.openWordCheckViews();
             await wordCheckHandler.handleCheckWordsCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.wordCheck.prevOccurrence', () => wordCheckHandler.handlePrevOccurrenceCommand()),
@@ -689,7 +697,6 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.wordCheck.applyInsertVisible', () => wordCheckHandler.handleApplyInsertVisibleCommand()),
         vscode.commands.registerCommand('ai-proofread.wordCheck.sortAndFilter', () => wordCheckHandler.handleWordCheckSortAndFilterCommand()),
         vscode.commands.registerCommand('ai-proofread.manageCustomTables', async () => {
-            await setWordCheckViewsVisible(true);
             await wordCheckHandler.handleManageCustomTablesCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.customTables.delete', (el: import('./xh7/customTablesView').CustomTableTreeItem) => wordCheckHandler.handleCustomTableDelete(el)),
@@ -720,6 +727,11 @@ export async function activate(context: vscode.ExtensionContext) {
                 await new Promise((r) => setTimeout(r, 50));
                 await numberingHandler.handleSegmentCheckCommand();
             }
+        }),
+        vscode.commands.registerCommand('ai-proofread.numbering.checkTitles', async () => {
+            await setNumberingVisible(true);
+            await new Promise((r) => setTimeout(r, 50));
+            await numberingHandler.handleCheckCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.numbering.toggleView', () => toggleNumberingVisible()),
         vscode.commands.registerCommand('ai-proofread.numbering.reveal', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleRevealCommand(node)),

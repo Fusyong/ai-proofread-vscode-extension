@@ -3,6 +3,7 @@
  */
 
 import * as vscode from 'vscode';
+import { requireWorkingTextEditor } from '../ui/lastActiveTextEditor';
 import * as path from 'path';
 import { findDuplicatesInText } from '../duplicate/findDuplicates';
 import { getJiebaWasm } from '../jiebaLoader';
@@ -52,9 +53,8 @@ export class DuplicateCommandHandler {
     }
 
     async handleScanDocument(): Promise<void> {
-        const editor = vscode.window.activeTextEditor;
+        const editor = requireWorkingTextEditor('请先打开要扫描的文档。');
         if (!editor) {
-            vscode.window.showWarningMessage('请先打开要扫描的文档。');
             return;
         }
         const rawSlice = editor.document.getText();
@@ -62,10 +62,9 @@ export class DuplicateCommandHandler {
     }
 
     async handleScanSelection(): Promise<void> {
-        const editor = vscode.window.activeTextEditor;
+        const editor = requireWorkingTextEditor('请先打开文档。');
         const doc = editor?.document;
         if (!editor || !doc) {
-            vscode.window.showWarningMessage('请先打开文档。');
             return;
         }
         if (editor.selection.isEmpty) {
