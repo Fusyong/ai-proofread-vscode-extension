@@ -211,18 +211,18 @@ export class ProgressTracker {
     public static generateProgressBarCss(): string {
         return `
             .progress-container {
-                margin: 16px 0;
-                padding: 16px;
+                margin: 6px 0;
+                padding: 8px 10px;
                 background-color: #F8FAFB;
                 border: 1px solid #E8F0F2;
-                border-radius: 6px;
+                border-radius: 5px;
             }
             
             .progress-header {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                margin-bottom: 12px;
+                margin-bottom: 6px;
             }
             
             .progress-header h4 {
@@ -263,7 +263,7 @@ export class ProgressTracker {
             }
             
             .progress-bar-container {
-                margin-bottom: 12px;
+                margin-bottom: 6px;
             }
             
             .progress-bar {
@@ -302,8 +302,8 @@ export class ProgressTracker {
             .progress-legend {
                 display: flex;
                 justify-content: center;
-                gap: 16px;
-                margin-top: 8px;
+                gap: 12px;
+                margin-top: 4px;
                 flex-wrap: wrap;
             }
             
@@ -343,9 +343,9 @@ export class ProgressTracker {
             .progress-details-inline {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 12px;
-                margin-top: 10px;
-                padding-top: 10px;
+                gap: 8px 12px;
+                margin-top: 6px;
+                padding-top: 6px;
                 border-top: 1px solid #E8F0F2;
                 font-size: 11px;
             }
@@ -353,9 +353,9 @@ export class ProgressTracker {
             .progress-details {
                 display: grid;
                 grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-                gap: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
+                gap: 6px;
+                margin-top: 6px;
+                padding-top: 6px;
                 border-top: 1px solid #E8F0F2;
             }
             

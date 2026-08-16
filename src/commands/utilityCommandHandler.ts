@@ -20,6 +20,12 @@ import {
 import { showDiff } from '../differ';
 import { ErrorUtils, FilePathUtils, normalizeLineEndings } from '../utils';
 import { parseToc, markTitles, TocItem } from '../titleMarker';
+import {
+    extractMarkdownHeadings,
+    firstHeadingMismatchIndex,
+    formatHeadingMismatchSummary,
+    type OutlineHeading,
+} from '../headingOutline';
 
 export class UtilityCommandHandler {
     /**
@@ -585,6 +591,38 @@ export class UtilityCommandHandler {
     }
 
     /**
+     * 比较已并排打开的两个文件的 Markdown 标题是否一致（切分后按标题合并前）。
+     */
+    public async handleAlignHeadingsCommand(): Promise<void> {
+        const pair = getSideBySideTextEditors();
+        if (!pair) {
+            vscode.window.showInformationMessage('请先并排打开两个要对照标题的文件。');
+            return;
+        }
+        const [left, right] = pair;
+        const nameA = path.basename(left.document.uri.fsPath || left.document.fileName);
+        const nameB = path.basename(right.document.uri.fsPath || right.document.fileName);
+
+        try {
+            const headingsA = extractMarkdownHeadings(left.document.getText());
+            const headingsB = extractMarkdownHeadings(right.document.getText());
+            const { ok, message } = formatHeadingMismatchSummary(nameA, nameB, headingsA, headingsB);
+            const mismatch = firstHeadingMismatchIndex(headingsA, headingsB);
+            if (mismatch >= 0) {
+                await revealHeading(left, headingsA[mismatch]);
+                await revealHeading(right, headingsB[mismatch]);
+            }
+            if (ok) {
+                vscode.window.showInformationMessage(message);
+            } else {
+                vscode.window.showWarningMessage(message);
+            }
+        } catch (error) {
+            ErrorUtils.showError(error, '对齐标题时出错：');
+        }
+    }
+
+    /**
      * 处理根据目录标记标题命令
      */
     public async handleMarkTitlesFromTocCommand(editor: vscode.TextEditor): Promise<void> {
@@ -871,4 +909,48 @@ export class UtilityCommandHandler {
         }
         await this.runSegment(editor, context, editor.selection);
     }
+}
+
+/** 取最左侧两个编辑组中的活动文本编辑器（忽略 Webview 等非文本标签） */
+function getSideBySideTextEditors(): [vscode.TextEditor, vscode.TextEditor] | undefined {
+    const groups = [...vscode.window.tabGroups.all]
+        .filter((g) => typeof g.viewColumn === 'number')
+        .sort((a, b) => (a.viewColumn as number) - (b.viewColumn as number));
+
+    const editors: vscode.TextEditor[] = [];
+    for (const g of groups) {
+        const tab = g.activeTab;
+        if (!tab?.input || !(tab.input instanceof vscode.TabInputText)) {
+            continue;
+        }
+        const uriStr = tab.input.uri.toString();
+        const ed = vscode.window.visibleTextEditors.find(
+            (e) => e.viewColumn === g.viewColumn && e.document.uri.toString() === uriStr
+        );
+        if (ed) {
+            editors.push(ed);
+        }
+    }
+    if (editors.length < 2) {
+        return undefined;
+    }
+    if (editors[0].document.uri.toString() === editors[1].document.uri.toString()) {
+        return undefined;
+    }
+    return [editors[0], editors[1]];
+}
+
+async function revealHeading(editor: vscode.TextEditor, heading: OutlineHeading | undefined): Promise<void> {
+    if (!heading) {
+        return;
+    }
+    const line = Math.min(Math.max(0, heading.lineNumber - 1), editor.document.lineCount - 1);
+    const range = editor.document.lineAt(line).range;
+    await vscode.window.showTextDocument(editor.document, {
+        viewColumn: editor.viewColumn,
+        preserveFocus: true,
+        preview: false,
+    });
+    editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+    editor.selection = new vscode.Selection(range.start, range.end);
 }

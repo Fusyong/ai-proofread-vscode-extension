@@ -281,6 +281,10 @@
         "title": "AI Proofreader: mark titles from table of contents"
       },
       {
+        "command": "ai-proofread.alignHeadings",
+        "title": "AI Proofreader: align headings"
+      },
+      {
         "command": "ai-proofread.segmentFile",
         "title": "AI Proofreader: segment file"
       },
@@ -455,15 +459,23 @@
       },
       {
         "command": "ai-proofread.numbering.markAsTitle",
-        "title": "标记为 Markdown 标题"
+        "title": "标记为 Markdown 标题",
+        "icon": "$(markdown)"
+      },
+      {
+        "command": "ai-proofread.numbering.markAllAsTitle",
+        "title": "全部标为标题",
+        "icon": "$(markdown)"
       },
       {
         "command": "ai-proofread.numbering.promote",
-        "title": "升级"
+        "title": "升级",
+        "icon": "$(chevron-up)"
       },
       {
         "command": "ai-proofread.numbering.demote",
-        "title": "降级"
+        "title": "降级",
+        "icon": "$(chevron-down)"
       },
       {
         "command": "ai-proofread.numbering.toggleSimplifiedLevel",
@@ -1610,14 +1622,19 @@
           "group": "navigation@1"
         },
         {
-          "command": "ai-proofread.numbering.toggleSimplifiedLevel",
+          "command": "ai-proofread.numbering.markAllAsTitle",
           "when": "view == ai-proofread.numbering",
           "group": "navigation@2"
         },
         {
-          "command": "ai-proofread.numbering.defineTitle",
+          "command": "ai-proofread.numbering.toggleSimplifiedLevel",
           "when": "view == ai-proofread.numbering",
           "group": "navigation@3"
+        },
+        {
+          "command": "ai-proofread.numbering.defineTitle",
+          "when": "view == ai-proofread.numbering",
+          "group": "1_config@1"
         },
         {
           "command": "ai-proofread.numbering.checkSegments",
@@ -1632,7 +1649,7 @@
         {
           "command": "ai-proofread.numbering.defineSegmentPattern",
           "when": "view == ai-proofread.numberingSegments",
-          "group": "navigation@3"
+          "group": "1_config@1"
         },
         {
           "command": "ai-proofread.duplicate.scanDocument",
@@ -1823,6 +1840,11 @@
         },
         {
           "command": "ai-proofread.numbering.markAsTitle",
+          "group": "inline@1",
+          "when": "view == ai-proofread.numbering && viewItem == numberingHeading"
+        },
+        {
+          "command": "ai-proofread.numbering.markAsTitle",
           "group": "numbering@2",
           "when": "view == ai-proofread.numbering && viewItem == numberingHeading"
         },
@@ -1954,6 +1976,11 @@
           "command": "ai-proofread.markTitlesFromToc",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown"
+        },
+        {
+          "command": "ai-proofread.alignHeadings",
+          "group": "ai-proofread@13.1",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == plaintext"
         },
         {
           "command": "ai-proofread.numbering.check",

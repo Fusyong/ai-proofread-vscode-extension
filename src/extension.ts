@@ -557,6 +557,10 @@ export async function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleMarkTitlesFromTocCommand(editor);
         }),
 
+        vscode.commands.registerCommand('ai-proofread.alignHeadings', async () => {
+            await utilityHandler.handleAlignHeadingsCommand();
+        }),
+
         // 注册分词命令
         vscode.commands.registerCommand('ai-proofread.segmentFile', async () => {
             const editor = vscode.window.activeTextEditor;
@@ -736,6 +740,11 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.numbering.toggleView', () => toggleNumberingVisible()),
         vscode.commands.registerCommand('ai-proofread.numbering.reveal', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleRevealCommand(node)),
         vscode.commands.registerCommand('ai-proofread.numbering.markAsTitle', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleMarkAsTitleCommand(node)),
+        vscode.commands.registerCommand('ai-proofread.numbering.markAllAsTitle', async () => {
+            await setNumberingVisible(true);
+            await new Promise((r) => setTimeout(r, 50));
+            await numberingHandler.handleMarkAllAsTitleCommand();
+        }),
         vscode.commands.registerCommand('ai-proofread.numbering.promote', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handlePromoteCommand(node)),
         vscode.commands.registerCommand('ai-proofread.numbering.demote', (node?: import('./numbering/types').NumberingNode) => numberingHandler.handleDemoteCommand(node)),
         vscode.commands.registerCommand('ai-proofread.numbering.toggleSimplifiedLevel', () => numberingHandler.handleToggleSimplifiedLevelCommand()),

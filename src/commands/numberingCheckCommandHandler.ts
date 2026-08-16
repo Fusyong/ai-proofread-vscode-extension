@@ -21,6 +21,23 @@ import {
 import type { CustomLevelConfig } from '../numbering/hierarchySchema';
 import { clearLevelsCache } from '../numbering/hierarchySchema';
 
+/** 收集全部标题序号节点（深度优先） */
+function collectHeadingNodes(roots: NumberingNode[]): NumberingNode[] {
+    const out: NumberingNode[] = [];
+    function walk(node: NumberingNode) {
+        if (node.category === 'heading') {
+            out.push(node);
+        }
+        for (const child of node.children) {
+            walk(child);
+        }
+    }
+    for (const root of roots) {
+        walk(root);
+    }
+    return out;
+}
+
 /** 从树中查找目标节点的同级兄弟（含自身） */
 function getSiblings(roots: NumberingNode[], target: NumberingNode): NumberingNode[] {
     function walk(node: NumberingNode, parent: NumberingNode | null): NumberingNode[] | null {
@@ -320,6 +337,33 @@ export class NumberingCheckCommandHandler {
         const roots = this.provider.getRoots();
         const siblings = getSiblings(roots, target);
         const applied = await this.applyLineEdits(siblings, (line, node) => {
+            const parsed = parseLine(line);
+            return toTitleLine(parsed, node.assignedLevel);
+        });
+        if (applied) {
+            await this.handleCheckCommand();
+        }
+    }
+
+    async handleMarkAllAsTitleCommand(): Promise<void> {
+        let headings = collectHeadingNodes(this.provider.getRoots());
+        if (headings.length === 0) {
+            await this.handleCheckCommand();
+            headings = collectHeadingNodes(this.provider.getRoots());
+        }
+        if (headings.length === 0) {
+            vscode.window.showInformationMessage('未找到可标记的标题序号。');
+            return;
+        }
+        const confirm = await vscode.window.showWarningMessage(
+            `将把 ${headings.length} 处标题序号按检查得到的层级标为 Markdown 标题。是否继续？`,
+            { modal: true },
+            '全部标为标题'
+        );
+        if (confirm !== '全部标为标题') {
+            return;
+        }
+        const applied = await this.applyLineEdits(headings, (line, node) => {
             const parsed = parseLine(line);
             return toTitleLine(parsed, node.assignedLevel);
         });
