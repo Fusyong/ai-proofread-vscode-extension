@@ -673,6 +673,14 @@ export class WebviewManager {
                     await runWithWorkingEditor('ai-proofread.convertQuotes');
                     break;
                 }
+                case 'halfToFullPunctuation': {
+                    await runWithWorkingEditor('ai-proofread.halfToFullPunctuation');
+                    break;
+                }
+                case 'fullToHalfPunctuation': {
+                    await runWithWorkingEditor('ai-proofread.fullToHalfPunctuation');
+                    break;
+                }
                 case 'deleteInlineWhitespace': {
                     await runWithWorkingEditor('ai-proofread.deleteInlineWhitespace');
                     break;
@@ -814,9 +822,12 @@ export class WebviewManager {
                     ${sep}
                     <button class="action-button" onclick="handleAction('formatParagraphs')" title="整理段落">整理段落</button>
                     <button class="action-button" onclick="handleAction('deleteInlineWhitespace')" title="删除行中空白">删除行中空白</button>
+                    ${sep}
                     <button class="action-button" onclick="handleAction('convertQuotes')" title="半角引号转全角">半角引号转全角</button>
+                    <button class="action-button" onclick="handleAction('halfToFullPunctuation')" title="半角 ,;:!? 转为 ，；：！？">半角标点转全角</button>
+                    <button class="action-button" onclick="handleAction('fullToHalfPunctuation')" title="全角 ，；：！？ 转为 ,;:!?">全角标点转半角</button>
                     <button class="action-button" onclick="handleAction('opencc')" title="繁简 / 地区用字转换">繁简转换</button>
-                    <button class="action-button" onclick="handleAction('replaceFounderCircledNumbers')" title="方正带圈序号替换">方正带圈序号替换</button>
+                    <button class="action-button" onclick="handleAction('replaceFounderCircledNumbers')" title="方正书版带圈序号转为 Unicode 或 [n]">方正带圈序号</button>
                     ${sep}
                     <button class="action-button" onclick="handleAction('markTitlesFromToc')" title="根据目录标记标题">根据目录标记标题</button>
                     <button class="action-button" onclick="handleAction('alignHeadings')" title="请先并排打开两个文件，再检查标题是否一致">对齐标题</button>

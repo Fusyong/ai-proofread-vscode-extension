@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.7",
+  "version": "1.12.8",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -1973,6 +1973,11 @@
           "command": "ai-proofread.convertQuotes",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
+          "command": "ai-proofread.replaceFounderCircledNumbers",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == plaintext"
         },
         {
           "command": "ai-proofread.halfToFullPunctuation",
