@@ -527,6 +527,36 @@ export async function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleConvertQuotesCommand(editor);
         }),
 
+        // 方正书版带圈序号 → Unicode / 方头扩注序号
+        vscode.commands.registerCommand('ai-proofread.replaceFounderCircledNumbers', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleReplaceFounderCircledNumbersCommand(editor);
+        }),
+
+        // 注册半角标点转全角命令
+        vscode.commands.registerCommand('ai-proofread.halfToFullPunctuation', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleHalfToFullPunctuationCommand(editor);
+        }),
+
+        // 注册全角标点转半角命令
+        vscode.commands.registerCommand('ai-proofread.fullToHalfPunctuation', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleFullToHalfPunctuationCommand(editor);
+        }),
+
         // 注册段落整理命令
         vscode.commands.registerCommand('ai-proofread.formatParagraphs', async () => {
             const editor = vscode.window.activeTextEditor;
@@ -557,8 +587,14 @@ export async function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleMarkTitlesFromTocCommand(editor);
         }),
 
+        // 注册对齐标题命令
         vscode.commands.registerCommand('ai-proofread.alignHeadings', async () => {
-            await utilityHandler.handleAlignHeadingsCommand();
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleAlignHeadingsCommand(editor, context);
         }),
 
         // 注册分词命令

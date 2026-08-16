@@ -76,7 +76,7 @@
 | 步骤 | 操作（优先用 UI） |
 |------|-------------------|
 | 1. 切分 | **校对面板** 选主稿 → 点 **「切分文档」**，得到 JSON |
-| 2. 合并语境 | **校对面板** 切分完成后，点 **「合并 JSON」**，选答案文件，拼接到 target 或 context |
+| 2. 合并语境 | **校对面板** 切分完成后，点 **「合并 JSON」**，选答案文件，拼接到 target 或 context；若正文侧多了章/节标题单元，可在提示中填写要忽略的标题级别 |
 | 3. 校对 | **校对面板** 点 **「校对JSON文件」** |
 
 ### 1.4 学术稿（需核对引文 / 查资料）
@@ -257,6 +257,9 @@ flowchart LR
 | AI Proofreader: mark titles from table of contents | 根据目录表（Markdown 列表）在文档中标记标题 |
 | AI Proofreader: check numbering hierarchy | 检查带序号的标题，也可用于标记这些标题 |
 | AI Proofreader: convert quotes to Chinese | 半角引号转全角（可设为校对后自动执行） |
+| AI Proofreader: replace Founder circled numbers | 方正书版 PDF 带圈序号 → Unicode ①… 或方头扩注序号 [1]；并清除常见版面杂质 |
+| AI Proofreader: half-width punctuation to full-width | 半角标点转全角（,;:!? → ，；：！？） |
+| AI Proofreader: full-width punctuation to half-width | 全角标点转半角（，；：！？ → ,;:!?） |
 | **文档切分与语境合并** | |
 | AI Proofreader: split file ⭐ | 切分文件（统一入口，会提示选择切分模式） |
 | AI Proofreader: split by length | 按长度切分，输入目标字符数 |

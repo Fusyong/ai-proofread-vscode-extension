@@ -416,19 +416,20 @@ export class WebviewManager {
                     break;
                 }
                 case 'formatParagraphs':
-                case 'markTitlesFromToc': {
-                    const prepCmd: Record<string, string> = {
-                        formatParagraphs: 'ai-proofread.formatParagraphs',
-                        markTitlesFromToc: 'ai-proofread.markTitlesFromToc',
-                    };
-                    await runWithWorkingEditor(prepCmd[command]);
+                case 'markTitlesFromToc':
+                case 'alignHeadings': {
+                    const cmd =
+                        command === 'formatParagraphs'
+                            ? 'ai-proofread.formatParagraphs'
+                            : command === 'markTitlesFromToc'
+                              ? 'ai-proofread.markTitlesFromToc'
+                              : 'ai-proofread.alignHeadings';
+                    await runWithWorkingEditor(cmd);
                     break;
                 }
-                case 'alignHeadings':
-                    await vscode.commands.executeCommand('ai-proofread.alignHeadings');
-                    break;
                 case 'formatParagraphsUseMainFile':
-                case 'markTitlesFromTocUseMainFile': {
+                case 'markTitlesFromTocUseMainFile':
+                case 'alignHeadingsUseMainFile': {
                     // 主文件板块：使用主文件
                     const mainPath = this.mainFilePath ?? this.getMainFilePath();
                     if (!mainPath) {
@@ -438,7 +439,11 @@ export class WebviewManager {
                     const doc = await vscode.workspace.openTextDocument(mainPath);
                     await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
                     await vscode.commands.executeCommand(
-                        command === 'formatParagraphsUseMainFile' ? 'ai-proofread.formatParagraphs' : 'ai-proofread.markTitlesFromToc'
+                        command === 'formatParagraphsUseMainFile'
+                            ? 'ai-proofread.formatParagraphs'
+                            : command === 'markTitlesFromTocUseMainFile'
+                              ? 'ai-proofread.markTitlesFromToc'
+                              : 'ai-proofread.alignHeadings'
                     );
                     break;
                 }
@@ -676,6 +681,10 @@ export class WebviewManager {
                     await runWithWorkingEditor('ai-proofread.opencc');
                     break;
                 }
+                case 'replaceFounderCircledNumbers': {
+                    await runWithWorkingEditor('ai-proofread.replaceFounderCircledNumbers');
+                    break;
+                }
                 case 'citationOpenView':
                     await vscode.commands.executeCommand('ai-proofread.citation.openView');
                     break;
@@ -807,6 +816,7 @@ export class WebviewManager {
                     <button class="action-button" onclick="handleAction('deleteInlineWhitespace')" title="删除行中空白">删除行中空白</button>
                     <button class="action-button" onclick="handleAction('convertQuotes')" title="半角引号转全角">半角引号转全角</button>
                     <button class="action-button" onclick="handleAction('opencc')" title="繁简 / 地区用字转换">繁简转换</button>
+                    <button class="action-button" onclick="handleAction('replaceFounderCircledNumbers')" title="方正带圈序号替换">方正带圈序号替换</button>
                     ${sep}
                     <button class="action-button" onclick="handleAction('markTitlesFromToc')" title="根据目录标记标题">根据目录标记标题</button>
                     <button class="action-button" onclick="handleAction('alignHeadings')" title="请先并排打开两个文件，再检查标题是否一致">对齐标题</button>
@@ -1093,7 +1103,6 @@ export class WebviewManager {
                 </div>
         `;
     }
-
 
     /**
      * 处理句子对齐（生成勘误表）

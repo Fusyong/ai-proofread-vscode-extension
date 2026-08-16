@@ -148,7 +148,7 @@ describe('modelRouteResolver', () => {
     it('independent platform/model falls back thinking to proofread root', () => {
         configStore['proofread.disableThinking'] = false;
         configStore.modelRoutes = {
-            referencePrep: { inherit: false, platform: 'aliyun', model: 'qwen3-max' },
+            referencePrep: { inherit: false, platform: 'aliyun', model: 'qwen3.8-max' },
         };
         const prep = resolveModelRoute('referencePrep');
         expect(prep.inherited).toBe(false);

@@ -8,10 +8,6 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 Additionally, you can set your own prompts for other text processing scenarios, such as translation, annotation, and creating exercises; you can also customize replacement tables and checklists, run batch regex find-and-replace, or use them as prompts only. 
 
-!!! caution 
-    因DeepSeek V3最终版本（0324）以后的校对效果不理想，默认平台已经由DeepSeek改成阿里云百炼。只有DeepSeek账号的用户须手动改回DeepSeek（也可用阿里云百炼平台deepseek-v3作为替代）。
-    DeepSeek 平台默认支持 deepseek-v4-flash，如果你改为deepseek-v4-pro，还需要**关注价格变动并测试效果**；旧版 deepseek-chat 在 2026/07/24 前仍可用
-
 ## 1. 安装和必要配置
 
 **本文档仅以Windows系统为例**
@@ -142,7 +138,8 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 2. 打开右键菜单，选择`AI proofreader: Merge Two Files`（或通过命令面板）命令
 3. 选择要合并的文件
 4. 确定要处理的字段和资料来源字段，以及拼接模式或更新（覆盖）模式。比如你想把试题及其答案合并后校对，那么可用拼接模式，拼接到同一个target中。
-5. 确定是否更新对应的Markdown文件（默认是），更新时会备份原文件。
+5. 可输入当前文件要**忽略的标题级别**（如 `1，2，4`，兼容全角逗号；默认留空不忽略）。以这些级别 ATX 标题开头的单元会跳过：JSON 来源时不取对应单元且有效个数须相同；Markdown 来源时不向这些单元写入同一全文。
+6. 确定是否更新对应的Markdown文件（默认是），更新时会备份原文件。
 
 组织校对语境是一个看起来有些麻烦，但非常有效的工作。比如校对练习册，有必要把练习和答案拼成语境（拼在一个target中更能节省费用）。而对一首古诗的解释如果不可靠，可以用一篇可靠的作为reference。包含人物的内容，则可以用词典中的任务条目作为reference。
 
@@ -485,8 +482,8 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 **推荐模型组合**（DeepSeek 示例，可按平台替换）：
 
-- **校对**：`deepseek-v4-pro`（质量优先）；日常建议关闭思考
-- **参考资料规划**：`deepseek-v4-flash` 或 `qwen3-max`（多轮 JSON 规划，成本适中）；复杂书稿可单独开思考
+- **校对**：`qwen3.8-max`（质量优先）；日常建议关闭思考
+- **参考资料规划**：`deepseek-v4-flash` （多轮 JSON 规划，成本适中）；复杂书稿可单独开思考
 - **预筛 / 精排**：跟随参考资料规划，建议保持关思考
 - **编辑记忆合并**：跟随校对；需要时再开思考
 
@@ -548,6 +545,13 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 12. 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
 
 ## 6. 更新日志
+
+### v1.12.7
+
+- 特性：简单的半角全角标点符号转换命令，支持`，；：？！`五种
+- 特性：把方正书版带圈字符转换为扩注字符或Unicode字符（50以内）
+- 特性：标题对其功能，比如检查练习题与答案是否一一对其
+- 特性：合并 JSON 时可忽略当前文件中指定标题级别开头的单元（JSON↔JSON 与 Markdown→JSON 均支持）
 
 ### v1.12.3
 

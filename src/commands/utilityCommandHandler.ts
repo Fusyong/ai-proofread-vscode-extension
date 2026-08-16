@@ -11,6 +11,11 @@ import { searchSelectionInPDF } from '../pdfSearcher';
 import { searchSelectionInShidianguji } from '../shidiangujiSearch';
 import { searchSelectionInAncientbooks } from '../ancientbooksSearch';
 import { convertQuotes } from '../quoteConverter';
+import { fullToHalfPunctuation, halfToFullPunctuation } from '../punctuationConverter';
+import {
+    replaceFounderCircledNumbers,
+    type FounderCircledFormat,
+} from '../founderCircledNumbers';
 import { formatParagraphs } from '../paragraphDetector';
 import {
     DEFAULT_DELETE_INLINE_WHITESPACE_OPTIONS,
@@ -21,11 +26,15 @@ import { showDiff } from '../differ';
 import { ErrorUtils, FilePathUtils, normalizeLineEndings } from '../utils';
 import { parseToc, markTitles, TocItem } from '../titleMarker';
 import {
-    extractMarkdownHeadings,
-    firstHeadingMismatchIndex,
-    formatHeadingMismatchSummary,
-    type OutlineHeading,
-} from '../headingOutline';
+    alignHeadings,
+    diagnoseHeadingMismatch,
+    parseHeadingLevels,
+    type HeadingAlignFixHint,
+    type HeadingAlignMismatch,
+    type HeadingAlignMode,
+} from '../headingAligner';
+
+const ALIGN_HEADINGS_LAST_LEVELS_KEY = 'ai-proofread.alignHeadings.lastLevels';
 
 export class UtilityCommandHandler {
     /**
@@ -102,7 +111,7 @@ export class UtilityCommandHandler {
                 return; // 用户取消
             }
 
-            let result: { updated: number; total: number };
+            let result: { updated: number; total: number; skipped: number };
 
             if (sourceType.value === 'json') {
                 // JSON 文件：让用户选择来源文件及来源字段
@@ -132,12 +141,18 @@ export class UtilityCommandHandler {
                     return;
                 }
 
+                const ignoreHeadingLevels = await this.promptIgnoreHeadingLevels();
+                if (ignoreHeadingLevels === undefined) {
+                    return;
+                }
+
                 result = await mergeTwoFiles(
                     document.uri.fsPath,
                     sourceFile[0].fsPath,
                     targetField as 'target' | 'reference' | 'context',
                     sourceField as 'target' | 'reference' | 'context',
-                    mergeMode.value as 'update' | 'concat'
+                    mergeMode.value as 'update' | 'concat',
+                    ignoreHeadingLevels
                 );
             } else {
                 // Markdown 文件：每个 JSON 项都合并同一文本
@@ -157,17 +172,26 @@ export class UtilityCommandHandler {
                     return;
                 }
 
+                const ignoreHeadingLevels = await this.promptIgnoreHeadingLevels();
+                if (ignoreHeadingLevels === undefined) {
+                    return;
+                }
+
                 result = await mergeMarkdownIntoJson(
                     document.uri.fsPath,
                     sourceFile[0].fsPath,
                     targetField as 'target' | 'reference' | 'context',
-                    mergeMode.value as 'update' | 'concat'
+                    mergeMode.value as 'update' | 'concat',
+                    ignoreHeadingLevels
                 );
             }
 
             // 显示结果
             const modeText = mergeMode.value === 'update' ? '更新' : '拼接';
             let message = `合并完成！${modeText}了 ${result.updated}/${result.total} 项`;
+            if (result.skipped > 0) {
+                message += `（跳过 ${result.skipped} 个忽略标题单元）`;
+            }
 
             // 如果用户选择更新Markdown文件，则执行更新
             if (updateMarkdown.value) {
@@ -223,7 +247,7 @@ export class UtilityCommandHandler {
             );
             if (updateMarkdown === undefined) return;
 
-            let result: { updated: number; total: number };
+            let result: { updated: number; total: number; skipped: number };
 
             if (sourceType.value === 'json') {
                 const sourceFile = await vscode.window.showOpenDialog({
@@ -239,11 +263,17 @@ export class UtilityCommandHandler {
                 );
                 if (!sourceField) return;
 
+                const ignoreHeadingLevels = await this.promptIgnoreHeadingLevels();
+                if (ignoreHeadingLevels === undefined) {
+                    return;
+                }
+
                 result = await mergeTwoFiles(
                     jsonFilePath, sourceFile[0].fsPath,
                     targetField as 'target' | 'reference' | 'context',
                     sourceField as 'target' | 'reference' | 'context',
-                    mergeMode.value as 'update' | 'concat'
+                    mergeMode.value as 'update' | 'concat',
+                    ignoreHeadingLevels
                 );
             } else {
                 const sourceFile = await vscode.window.showOpenDialog({
@@ -253,14 +283,23 @@ export class UtilityCommandHandler {
                 });
                 if (!sourceFile?.length) return;
 
+                const ignoreHeadingLevels = await this.promptIgnoreHeadingLevels();
+                if (ignoreHeadingLevels === undefined) {
+                    return;
+                }
+
                 result = await mergeMarkdownIntoJson(
                     jsonFilePath, sourceFile[0].fsPath,
                     targetField as 'target' | 'reference' | 'context',
-                    mergeMode.value as 'update' | 'concat'
+                    mergeMode.value as 'update' | 'concat',
+                    ignoreHeadingLevels
                 );
             }
 
             let message = `合并完成！${mergeMode.value === 'update' ? '更新' : '拼接'}了 ${result.updated}/${result.total} 项`;
+            if (result.skipped > 0) {
+                message += `（跳过 ${result.skipped} 个忽略标题单元）`;
+            }
             if (updateMarkdown.value) {
                 try {
                     await this.updateMarkdownFileFromJson(jsonFilePath, targetField as 'target' | 'reference' | 'context');
@@ -273,6 +312,38 @@ export class UtilityCommandHandler {
         } catch (error) {
             ErrorUtils.showError(error, '合并文件时出错：');
         }
+    }
+
+    /**
+     * 询问当前 JSON 侧要忽略的标题级别（空=不忽略）。
+     * @returns 级别数组；用户取消时返回 undefined
+     */
+    private async promptIgnoreHeadingLevels(): Promise<number[] | undefined> {
+        const input = await vscode.window.showInputBox({
+            prompt: '当前文件：忽略哪些标题级别的单元（不从来源合并）？留空表示不忽略',
+            placeHolder: '例如：1，2，4（兼容全角逗号）；默认留空',
+            value: '',
+            ignoreFocusOut: true,
+            validateInput: (value) => {
+                if (!value.trim()) {
+                    return null;
+                }
+                const parsed = parseHeadingLevels(value);
+                return 'error' in parsed ? parsed.error : null;
+            },
+        });
+        if (input === undefined) {
+            return undefined;
+        }
+        if (!input.trim()) {
+            return [];
+        }
+        const parsed = parseHeadingLevels(input);
+        if ('error' in parsed) {
+            vscode.window.showWarningMessage(parsed.error);
+            return undefined;
+        }
+        return parsed.levels;
     }
 
     /**
@@ -388,6 +459,138 @@ export class UtilityCommandHandler {
             vscode.window.showInformationMessage('引号转换完成！');
         } catch (error) {
             ErrorUtils.showError(error, '转换引号时出错：');
+        }
+    }
+
+    /**
+     * 半角标点转全角标点（,;:!? → ，；：！？）
+     */
+    public async handleHalfToFullPunctuationCommand(editor: vscode.TextEditor): Promise<void> {
+        await this.replaceEditorText(
+            editor,
+            halfToFullPunctuation,
+            '半角标点已转为全角！',
+            '半角标点转全角时出错：'
+        );
+    }
+
+    /**
+     * 方正书版带圈序号 → Unicode 带圈符号或方头扩注序号 [n]
+     */
+    public async handleReplaceFounderCircledNumbersCommand(
+        editor: vscode.TextEditor
+    ): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor!');
+            return;
+        }
+
+        try {
+            const formatPick = await vscode.window.showQuickPick(
+                [
+                    {
+                        label: 'Unicode 带圈符号',
+                        description: '①–㊿；大于 50 用 [n]',
+                        value: 'unicode' as FounderCircledFormat,
+                    },
+                    {
+                        label: '方头扩注序号',
+                        description: '一律替换为 [1]、[2]…',
+                        value: 'bracket' as FounderCircledFormat,
+                    },
+                ],
+                {
+                    placeHolder: '选择替换格式',
+                    ignoreFocusOut: true,
+                }
+            );
+            if (!formatPick) {
+                return;
+            }
+
+            const document = editor.document;
+            const selection = editor.selection;
+            const text = selection.isEmpty ? document.getText() : document.getText(selection);
+            const { text: convertedText, replacedCount, strippedArtifactCount } =
+                replaceFounderCircledNumbers(text, { format: formatPick.value });
+
+            if (replacedCount === 0 && strippedArtifactCount === 0) {
+                vscode.window.showInformationMessage('未发现方正书版带圈序号或版面杂质。');
+                return;
+            }
+
+            await editor.edit((editBuilder) => {
+                if (selection.isEmpty) {
+                    const fullRange = new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(document.getText().length)
+                    );
+                    editBuilder.replace(fullRange, convertedText);
+                } else {
+                    editBuilder.replace(selection, convertedText);
+                }
+            });
+
+            const parts: string[] = [];
+            if (replacedCount > 0) {
+                parts.push(`替换 ${replacedCount} 处序号`);
+            }
+            if (strippedArtifactCount > 0) {
+                parts.push(`清除 ${strippedArtifactCount} 处版面杂质`);
+            }
+            vscode.window.showInformationMessage(`方正带圈序号处理完成：${parts.join('，')}。`);
+        } catch (error) {
+            ErrorUtils.showError(error, '替换方正带圈序号时出错：');
+        }
+    }
+
+    /**
+     * 全角标点转半角标点（，；：！？ → ,;:!?）
+     */
+    public async handleFullToHalfPunctuationCommand(editor: vscode.TextEditor): Promise<void> {
+        await this.replaceEditorText(
+            editor,
+            fullToHalfPunctuation,
+            '全角标点已转为半角！',
+            '全角标点转半角时出错：'
+        );
+    }
+
+    /**
+     * 将选区或全文经 transform 后写回编辑器
+     */
+    private async replaceEditorText(
+        editor: vscode.TextEditor,
+        transform: (text: string) => string,
+        successMessage: string,
+        errorPrefix: string
+    ): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor!');
+            return;
+        }
+
+        try {
+            const document = editor.document;
+            const selection = editor.selection;
+            const text = selection.isEmpty ? document.getText() : document.getText(selection);
+            const convertedText = transform(text);
+
+            await editor.edit(editBuilder => {
+                if (selection.isEmpty) {
+                    const fullRange = new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(document.getText().length)
+                    );
+                    editBuilder.replace(fullRange, convertedText);
+                } else {
+                    editBuilder.replace(selection, convertedText);
+                }
+            });
+
+            vscode.window.showInformationMessage(successMessage);
+        } catch (error) {
+            ErrorUtils.showError(error, errorPrefix);
         }
     }
 
@@ -587,38 +790,6 @@ export class UtilityCommandHandler {
             vscode.window.showInformationMessage(message);
         } catch (error) {
             ErrorUtils.showError(error, '整理段落时出错：');
-        }
-    }
-
-    /**
-     * 比较已并排打开的两个文件的 Markdown 标题是否一致（切分后按标题合并前）。
-     */
-    public async handleAlignHeadingsCommand(): Promise<void> {
-        const pair = getSideBySideTextEditors();
-        if (!pair) {
-            vscode.window.showInformationMessage('请先并排打开两个要对照标题的文件。');
-            return;
-        }
-        const [left, right] = pair;
-        const nameA = path.basename(left.document.uri.fsPath || left.document.fileName);
-        const nameB = path.basename(right.document.uri.fsPath || right.document.fileName);
-
-        try {
-            const headingsA = extractMarkdownHeadings(left.document.getText());
-            const headingsB = extractMarkdownHeadings(right.document.getText());
-            const { ok, message } = formatHeadingMismatchSummary(nameA, nameB, headingsA, headingsB);
-            const mismatch = firstHeadingMismatchIndex(headingsA, headingsB);
-            if (mismatch >= 0) {
-                await revealHeading(left, headingsA[mismatch]);
-                await revealHeading(right, headingsB[mismatch]);
-            }
-            if (ok) {
-                vscode.window.showInformationMessage(message);
-            } else {
-                vscode.window.showWarningMessage(message);
-            }
-        } catch (error) {
-            ErrorUtils.showError(error, '对齐标题时出错：');
         }
     }
 
@@ -888,6 +1059,232 @@ export class UtilityCommandHandler {
         vscode.window.showInformationMessage(`字频统计已保存至：${path.basename(outputPath)}`);
     }
 
+    /**
+     * 对齐并排两个 Markdown 窗口中指定级别的标题。
+     * 默认：当前窗口 + 右侧窗口；无右侧则用左侧；否则提示先并排打开两个 md。
+     * 一旦对不齐：在两窗口内跳到差异处，用户处理后可再次运行本命令。
+     */
+    public async handleAlignHeadingsCommand(
+        editor: vscode.TextEditor,
+        context: vscode.ExtensionContext
+    ): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor!');
+            return;
+        }
+
+        try {
+            const pair = this.resolveSideBySideMarkdownPair(editor);
+            if (!pair) {
+                vscode.window.showWarningMessage(
+                    '请并排打开两个 Markdown 窗口后再运行「对齐标题」（默认比较当前窗口与右侧，无右侧则与左侧比较）。'
+                );
+                return;
+            }
+            const { primary, secondary } = pair;
+
+            const lastLevels =
+                context.globalState.get<string>(ALIGN_HEADINGS_LAST_LEVELS_KEY)?.trim() || '1';
+            const levelInput = await vscode.window.showInputBox({
+                prompt: '请输入要对齐的标题级别（1–6），多个用逗号分隔',
+                placeHolder: '例如：1，2，4',
+                value: lastLevels,
+                ignoreFocusOut: true,
+                validateInput: (value) => {
+                    const parsed = parseHeadingLevels(value);
+                    return 'error' in parsed ? parsed.error : null;
+                },
+            });
+            if (levelInput === undefined) {
+                return;
+            }
+            const parsedLevels = parseHeadingLevels(levelInput);
+            if ('error' in parsedLevels) {
+                vscode.window.showWarningMessage(parsedLevels.error);
+                return;
+            }
+            const levels = parsedLevels.levels;
+            const levelsKey = levels.join('，');
+            await context.globalState.update(ALIGN_HEADINGS_LAST_LEVELS_KEY, levelsKey);
+
+            const modePick = await vscode.window.showQuickPick(
+                [
+                    {
+                        label: '有序号则只比较序号，否则比较全文（默认）',
+                        description: '两侧都有前部序号时只比序号；否则去空白后比全文',
+                        value: 'serialOrFullText' as HeadingAlignMode,
+                    },
+                    {
+                        label: '比较全文',
+                        description: '去空白后标题全文须一致',
+                        value: 'fullText' as HeadingAlignMode,
+                    },
+                ],
+                {
+                    placeHolder: '选择标题比较方式',
+                    ignoreFocusOut: true,
+                }
+            );
+            if (!modePick) {
+                return;
+            }
+            const mode = modePick.value;
+
+            const leftText = primary.document.getText();
+            const rightText = secondary.document.getText();
+            const leftName = path.basename(primary.document.fileName) || primary.document.uri.toString();
+            const rightName = path.basename(secondary.document.fileName) || secondary.document.uri.toString();
+            const levelsLabel = levels.join('，');
+
+            const result = alignHeadings(leftText, rightText, levels, mode);
+            if (result.mismatch) {
+                this.revealHeadingMismatchInEditors(primary, secondary, result.mismatch);
+                const hint = diagnoseHeadingMismatch(
+                    result.left,
+                    result.right,
+                    result.mismatch,
+                    mode
+                );
+                const detail = this.formatHeadingMismatchMessage(
+                    leftName,
+                    rightName,
+                    levelsLabel,
+                    result.mismatch,
+                    result.left.length,
+                    result.right.length,
+                    hint
+                );
+                vscode.window.showWarningMessage(detail);
+                return;
+            }
+
+            vscode.window.showInformationMessage(
+                `标题已对齐：${leftName} 与 ${rightName}（级别 ${levelsLabel}，共 ${result.left.length} 个，按位置顺序）一致。`
+            );
+        } catch (error) {
+            ErrorUtils.showError(error, '对齐标题时出错：');
+        }
+    }
+
+    /** 当前窗口 + 右侧 md；无右侧则左侧 md；找不到则 undefined */
+    private resolveSideBySideMarkdownPair(
+        active: vscode.TextEditor
+    ): { primary: vscode.TextEditor; secondary: vscode.TextEditor } | undefined {
+        if (!this.isMarkdownEditor(active)) {
+            return undefined;
+        }
+        const activeCol = active.viewColumn;
+        if (activeCol === undefined) {
+            return undefined;
+        }
+
+        const others = vscode.window.visibleTextEditors.filter(
+            (e) =>
+                e !== active &&
+                e.viewColumn !== undefined &&
+                e.viewColumn !== activeCol &&
+                this.isMarkdownEditor(e)
+        );
+
+        const right = others
+            .filter((e) => (e.viewColumn as number) > (activeCol as number))
+            .sort((a, b) => (a.viewColumn as number) - (b.viewColumn as number))[0];
+        if (right) {
+            return { primary: active, secondary: right };
+        }
+
+        const left = others
+            .filter((e) => (e.viewColumn as number) < (activeCol as number))
+            .sort((a, b) => (b.viewColumn as number) - (a.viewColumn as number))[0];
+        if (left) {
+            return { primary: active, secondary: left };
+        }
+
+        return undefined;
+    }
+
+    private isMarkdownEditor(editor: vscode.TextEditor): boolean {
+        if (editor.document.languageId === 'markdown') {
+            return true;
+        }
+        const name = editor.document.fileName || editor.document.uri.fsPath || '';
+        return /\.md$/i.test(name);
+    }
+
+    private formatHeadingMismatchMessage(
+        leftName: string,
+        rightName: string,
+        levelsLabel: string,
+        mismatch: HeadingAlignMismatch,
+        leftCount: number,
+        rightCount: number,
+        hint: HeadingAlignFixHint
+    ): string {
+        const ord = mismatch.index + 1;
+        const clip = (s: string, n = 36) => (s.length > n ? `${s.slice(0, n)}…` : s);
+        const fmt = (name: string, h?: { line: number; level: number; text: string }) =>
+            h ? `${name} L${h.line}（${h.level}级）${clip(h.text)}` : `${name}（无）`;
+
+        const sideLabel =
+            hint.preferSide === 'left'
+                ? `当前窗口「${leftName}」`
+                : hint.preferSide === 'right'
+                  ? `对侧窗口「${rightName}」`
+                  : `两侧（当前「${leftName}」/ 对侧「${rightName}」）`;
+        const dirLabel =
+            hint.direction === 'here' ? '本处' : hint.direction === 'up' ? '往上' : '往下';
+
+        let spot: string;
+        switch (mismatch.reason) {
+            case 'missingLeft':
+                spot = `第 ${ord} 项：当前侧已无标题；对侧为 ${fmt(rightName, mismatch.right)}`;
+                break;
+            case 'missingRight':
+                spot = `第 ${ord} 项：对侧已无标题；当前侧为 ${fmt(leftName, mismatch.left)}`;
+                break;
+            case 'level':
+                spot =
+                    `第 ${ord} 项级别不同：\n` +
+                    `· ${fmt(leftName, mismatch.left)}\n` +
+                    `· ${fmt(rightName, mismatch.right)}`;
+                break;
+            default:
+                spot =
+                    `第 ${ord} 项内容不同：\n` +
+                    `· ${fmt(leftName, mismatch.left)}\n` +
+                    `· ${fmt(rightName, mismatch.right)}`;
+                break;
+        }
+
+        return (
+            `标题未对齐（级别 ${levelsLabel}；当前 ${leftCount} / 对侧 ${rightCount}，按位置）。\n` +
+            `${spot}\n` +
+            `→ 优先处理：${sideLabel}；查找方向：${dirLabel}\n` +
+            `${hint.action}\n` +
+            `已跳转到差异行，处理后请再运行「对齐标题」。`
+        );
+    }
+
+    /** 在已有并排窗口中跳到首个对不齐的标题行 */
+    private revealHeadingMismatchInEditors(
+        primary: vscode.TextEditor,
+        secondary: vscode.TextEditor,
+        mismatch: HeadingAlignMismatch
+    ): void {
+        this.revealHeadingLine(primary, mismatch.left?.line);
+        this.revealHeadingLine(secondary, mismatch.right?.line);
+    }
+
+    private revealHeadingLine(editor: vscode.TextEditor, line1Based?: number): void {
+        if (line1Based === undefined || line1Based < 1) {
+            return;
+        }
+        const line = Math.min(line1Based - 1, editor.document.lineCount - 1);
+        const range = editor.document.lineAt(line).range;
+        editor.selection = new vscode.Selection(range.start, range.end);
+        editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+    }
+
     /** 对全文分词 */
     public async handleSegmentFileCommand(
         editor: vscode.TextEditor,
@@ -909,48 +1306,4 @@ export class UtilityCommandHandler {
         }
         await this.runSegment(editor, context, editor.selection);
     }
-}
-
-/** 取最左侧两个编辑组中的活动文本编辑器（忽略 Webview 等非文本标签） */
-function getSideBySideTextEditors(): [vscode.TextEditor, vscode.TextEditor] | undefined {
-    const groups = [...vscode.window.tabGroups.all]
-        .filter((g) => typeof g.viewColumn === 'number')
-        .sort((a, b) => (a.viewColumn as number) - (b.viewColumn as number));
-
-    const editors: vscode.TextEditor[] = [];
-    for (const g of groups) {
-        const tab = g.activeTab;
-        if (!tab?.input || !(tab.input instanceof vscode.TabInputText)) {
-            continue;
-        }
-        const uriStr = tab.input.uri.toString();
-        const ed = vscode.window.visibleTextEditors.find(
-            (e) => e.viewColumn === g.viewColumn && e.document.uri.toString() === uriStr
-        );
-        if (ed) {
-            editors.push(ed);
-        }
-    }
-    if (editors.length < 2) {
-        return undefined;
-    }
-    if (editors[0].document.uri.toString() === editors[1].document.uri.toString()) {
-        return undefined;
-    }
-    return [editors[0], editors[1]];
-}
-
-async function revealHeading(editor: vscode.TextEditor, heading: OutlineHeading | undefined): Promise<void> {
-    if (!heading) {
-        return;
-    }
-    const line = Math.min(Math.max(0, heading.lineNumber - 1), editor.document.lineCount - 1);
-    const range = editor.document.lineAt(line).range;
-    await vscode.window.showTextDocument(editor.document, {
-        viewColumn: editor.viewColumn,
-        preserveFocus: true,
-        preview: false,
-    });
-    editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
-    editor.selection = new vscode.Selection(range.start, range.end);
 }

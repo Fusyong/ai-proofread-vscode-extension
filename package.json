@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.3",
+  "version": "1.12.7",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -267,6 +267,18 @@
       {
         "command": "ai-proofread.convertQuotes",
         "title": "AI Proofreader: convert quotes to Chinese"
+      },
+      {
+        "command": "ai-proofread.replaceFounderCircledNumbers",
+        "title": "AI Proofreader: replace Founder circled numbers"
+      },
+      {
+        "command": "ai-proofread.halfToFullPunctuation",
+        "title": "AI Proofreader: half-width punctuation to full-width"
+      },
+      {
+        "command": "ai-proofread.fullToHalfPunctuation",
+        "title": "AI Proofreader: full-width punctuation to half-width"
       },
       {
         "command": "ai-proofread.formatParagraphs",
@@ -569,8 +581,8 @@
         "ai-proofread.proofread.models.aliyun": {
           "order": 12,
           "type": "string",
-          "default": "qwen3.7-max",
-          "description": "阿里云百炼平台模型,如: qwen3.7-max, qwen3.7-plus, qwen3.6-flash, deepseek-v3"
+          "default": "qwen3.8-max",
+          "description": "阿里云百炼平台模型,如: qwen3.8-max, qwen3.7-plus, qwen3.6-flash, deepseek-v3"
         },
         "ai-proofread.apiKeys.deepseek": {
           "order": 13,
@@ -1963,6 +1975,16 @@
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
         },
         {
+          "command": "ai-proofread.halfToFullPunctuation",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
+          "command": "ai-proofread.fullToHalfPunctuation",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
           "command": "ai-proofread.formatParagraphs",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
@@ -1979,8 +2001,8 @@
         },
         {
           "command": "ai-proofread.alignHeadings",
-          "group": "ai-proofread@13.1",
-          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == plaintext"
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown"
         },
         {
           "command": "ai-proofread.numbering.check",
