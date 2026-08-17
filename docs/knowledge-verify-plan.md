@@ -1,6 +1,6 @@
 # 统一参考资料准备（referencePrep）
 
-> **文档定位**：实现/设计说明。用户入门请先看 [README §3.1.5](../README.md) 与 [命令速查](commands-cheatsheet.md)。  
+> **文档定位**：实现/设计说明。用户入门请先看 [README §3.2.3](../README.md) 与 [命令速查](commands-cheatsheet.md)。  
 > **「知识核查」**：仅为预置校对提示词（item / full），在校对面板选用；不是独立命令或工作流名。
 
 ## 概述

@@ -6,7 +6,13 @@
 
 A VS Code extension for document and book proofreading based on LLM services, supporting three workflows: proofreading selected text directly, proofreading long documents after segmentation, and proofreading selected text with editorial memory (experimental). It also integrates proofreading-related auxiliary features. [Here is the code repository](https://github.com/Fusyong/ai-proofread-vscode-extension). The prototype of this extension is based on a Python proofreading tool library [Fusyong/ai-proofread](https://github.com/Fusyong/ai-proofread).
 
-Additionally, you can set your own prompts for other text processing scenarios, such as translation, annotation, and creating exercises; you can also customize replacement tables and checklists, run batch regex find-and-replace, or use them as prompts only. 
+Additionally, you can set your own prompts for other text processing scenarios, such as translation, annotation, and creating exercises; you can also customize replacement tables and checklists, run batch regex find-and-replace, or use them as prompts only.
+
+## 最近更新（v1.12.8）
+
+- 更新：校对面板「文档整理」增加半角/全角标点转换入口，并调整方正带圈序号等按钮文案
+
+完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
 ## 1. 安装和必要配置
 
@@ -32,25 +38,25 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ![/result_panel](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/ui_overview.png)
 
-1. 通过左侧活动栏图标的指引，或命令面板中的`open proofreading panel`命令打开校对面板，选择你要校对的主文件——通常是纯文本或markdown格式，并在每一个段落后添加一个空行（一个或多个空行是md的段落标记）作为允许切分的标记
-2. 使用切分文件按钮切分文档，选择切分模式（默认按长度），把当前文档切分为JSON文档，结果会呈现在校对面板中
-3. 通过校对面板中的“校对JSON文件”按钮，批量校对切分好的片段
-4. 通过校对面板中的“比较前后差异”按钮，可以看到和上文相同的校对结果
+1. 通过左侧活动栏图标的指引，或命令面板中的`open proofreading panel`命令打开校对面板。稿件一般为 Markdown（段落后须有空行，作为允许切分的标记）
+2. 在 **切分与合并** 区块选择主文件，点 **切分文档**（默认按长度），得到 JSON
+3. 同一区块点 **LLM 校对 JSON**，批量校对切分好的片段
+4. 在 **校对结果** 区块点 **比较前后差异**，可以看到和上文相同的校对结果
 
 ### 2.3. 尝试所有命令
 
 本扩展主要有四种操作入口：
 
 1. **活动栏 overview**：打开 **校对面板** / **检索面板**，并开关侧栏 TreeView（资料检索、引文核查、重文检查、标题树等）
-2. **校对面板**：文档准备、切分、批量校对、比较结果；底部快捷栏含格式整理、校对选中、字词/序号/重文、diff、提示词与设置
-3. **检索面板**：多源资料准备、命中勾选与导出/合并、引文核对；**不做校对**（校对请到校对面板）
+2. **校对面板**四块：**文档整理** → **切分与合并** → **校对结果** → **专项检查**；底部为选段校对。切分与合并可进入资料检索分支（「准备参考资料」）
+3. **检索面板**：资料检索分支——多源准备、命中勾选与导出/合并、引文核对；**不做校对**
 4. **命令面板**（Ctrl+Shift+P）与**右键菜单**：可访问全部命令
 
 ![所有命令](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/command_palette.png)
 
 用`open proofreading panel`打开校对面板，用`Open Reference Search Panel（检索面板）`打开检索面板。
 
-更详细的命令速查与业务流程图见[docs/commands-cheatsheet.md](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/docs/commands-cheatsheet.md)。
+更详细的命令速查与业务流程图见 [docs/commands-cheatsheet.md](docs/commands-cheatsheet.md)；完整版本历史见 [docs/changelog.md](docs/changelog.md)。
 
 #### 术语简表（资料检索相关）
 
@@ -65,9 +71,27 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 3. 使用说明
 
-### 3.1. 文档准备
+日常工作按校对面板的四块，加上「切分与合并」分出的资料检索来组织：
 
-#### 3.1.1. 转换为Markdown文档
+1. **文档整理**：转换格式、整理段落/空白/标点用字、标记或对齐标题、分句分词、比较文件。作用于**当前编辑窗口**。
+2. **切分与合并**：选定主文件后切分；切出 JSON 后可合并语境，并可 **准备参考资料** 或 **LLM 校对 JSON**。
+3. **资料检索**（切分与合并的分支）：在**检索面板**找资料、勾选导出或合并进 JSON；**不做校对**。
+4. **校对 / 校对结果**：选段校对在面板底部；JSON 校对入口在切分区块；进度与 diff / 勘误表在「校对结果」。
+5. **专项检查**：字词、标题树、段内序号、对齐标题、重文、引文核对。结果多在左侧栏。
+
+- [3.1 文档整理](#31-文档整理)
+- [3.2 切分与合并](#32-切分与合并)
+- [3.3 校对 / 校对结果](#33-校对--校对结果)
+- [3.4 专项检查](#34-专项检查)
+- [3.5 管理提示词](#35-管理提示词)
+- [3.6 日志等过程文件](#36-日志等过程文件)
+- [3.7 注意事项](#37-注意事项)
+
+### 3.1. 文档整理
+
+校对面板第一块。请先打开稿件，再点按钮（焦点可留在本面板）。
+
+#### 3.1.1. 转换为 Markdown
 
 目前作者端稿件多为docx类。排版端可能导出活文字PDF、死文字PDF（文字转曲转光栅，方正书版常见）、方正书版大样文件（常用于过黑马、方正审校）、纯文本（text，多数排版软件能导出）等。
 
@@ -77,7 +101,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 * **docx文档**（Word、WPS的通常格式），可以通过命令面板（Ctrl+Shift+P），使用convert docx to Markdown命令转换后进行校。本功能依赖[多功能文档格式转换工具Pandoc](https://pandoc.org/installing.html)，需要预先正确安装。安装后可能需要重启才能生效。
 * **活文字PDF文档**，可以通过命令面板，使用convert PDF to Markdown命令转换后进行校对。**Windows 用户无需另行安装**：扩展已内置 [Xpdf](https://www.xpdfreader.com/download.html) 4.06 的 `pdftotext.exe`（GPL，见扩展内 `vendor/xpdf/COPYING`）。macOS/Linux 仍需自行安装 Xpdf 命令行工具并加入 PATH。pdftotext 可忽略四周无用文字，如页码、页眉，尺寸单位是磅（pt），五号字是 10.5 pt，x mm = x/25.4*72 pt 。
 * **死文字PDF**，需要通过OCR处理成活文字PDF、docx、text、Markdown等后进一步处理。QQ交流群中上传了一个OCR命令行工具rapiddoc.exe。加密码限制提取文字的活文字PDF，也如此处理，或尝试用[SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)打开后复制文字。
-* **方正书版大样文档**，如果有方正智能审校工具，用它处理后即为活文字PDF（没有图），再进一步处理。另外，方正书版本身有一些间接导出活文字PDF的办法，但有各种问题，常常比不上用OCR工具处理。
+* **方正书版大样文档**，如果有方正智能审校工具，用它处理后即为活文字PDF（没有图），再进一步处理。另外，方正书版本身有一些间接导出活文字PDF的办法，但有各种问题，常常比不上用OCR工具处理。PDF 转出后若带圈序号变成乱码或私用区字符，可用命令 `replace Founder circled numbers`（校对面板「方正带圈序号」）：可选转为 Unicode 带圈符号（①–㊿，大于 50 用 `[n]`）或一律方头扩注 `[1]`、`[2]`…，并顺带清除常见分页/换行杂质。
 
 #### 3.1.2. 整理文档
 
@@ -86,13 +110,28 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 1. 本扩展命令`mark titles from table of contents`，可以根据一个目录表文件（Markdown分级列表的形式），逐行比较当前文档，把标题行标记出来，会自动忽略数字（如页码）、英文句点和省略号（页码前导符号）、空格、带圈数字①-㉟、Markdown形式的注码如 `[^1] [^abc]`、上标注码如 `^1^ ^abc^`。
 2. PDF导出的文本，如果没有使用空行分段，无法切分，可以使用整理段落命令`format paragraphs`中的“段末加空行”选项加以处理。
 3. Markdown中的段内断行是合法的，即使句子被断开，对大模型的影响也不大。当然，也可以用上述命令`format paragraphs`中的“删除段内分行”选项处理后再校对。
-4. 过多的无效字符影响输出速度，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。方正系排版软件可能使用半角标点，校对后通常会被改成全角，你也可以使用相同的方法加以替换，避免干扰。请参考上述讲整理技巧的文章。
-5. 更强大、通用的文本整理技术是正则表达式查找替换，这需要专门学习，可参考[给编辑朋友的正则表达式课程](https://blog.xiiigame.com/2020-05-31-给编辑朋友的正则表达式课程/)。
+4. 过多的无效字符影响输出速度，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。方正系排版软件可能使用半角标点，校对后通常会被改成全角；也可用校对面板中的 **半角标点转全角** / **全角标点转半角**（命令 `half-width punctuation to full-width` / `full-width punctuation to half-width`），仅处理 `，；：？！` 与 `,;:!?` 五对（不含引号；引号仍用 `convert quotes to Chinese`）。请参考上述讲整理技巧的文章。
+5. **对齐标题**：命令 `align headings`（校对面板「对齐标题」）。请先并排打开两个 Markdown 窗口（如练习题与答案、目录与正文），再运行本命令；可指定要对齐的标题级别（如 `1，2`），并选择「有序号则只比序号，否则比全文」或「比较全文」。一旦对不齐，会在两侧窗口跳到差异处，处理后可再次运行。
+6. 更强大、通用的文本整理技术是正则表达式查找替换，这需要专门学习，可参考[给编辑朋友的正则表达式课程](https://blog.xiiigame.com/2020-05-31-给编辑朋友的正则表达式课程/)。
 
 !!! caution 批量替换有风险
     批量替换的结果可能超出你的预期，即使你不准备原样使用处理后的文本，也有掩盖错误的风险。补强措施是：（一）备份文件。（二）先查找全部，复制到一个新文档中确认无误，然后再进行替换。（三）如果替换逻辑较为复杂，替换后还要比较文件（后文会提到），从头到尾确认所有更改。
 
-#### 3.1.3. 文档切分
+段落整理命令 `format paragraphs` 基于文档行长众数计算，适合整体较长、以长段落为主的文档；短小、段落零碎时准确率会比较低。也可使用 `delete inline whitespace` 删除汉字和中文标点内部过短的空白；`convert quotes to Chinese` 将半角引号转为全角（可在设置中改为校对后自动执行）；`opencc` / `opencc selection` 做繁简或地区用字转换。
+
+#### 3.1.3. 分句、分词与比较文件
+
+同在文档整理区块：
+
+* **切分为句子**（`split into sentences`）：对整篇或选区重新分句并插入分隔符；默认用两个分行符（一个空行）分隔。
+* **分词与统计**（`segment file` / `segment selection`）：可选分词后替换原文、输出词频统计表（词语、词性、词频）或字频统计表。分词使用 [jieba-wasm](https://github.com/fengkx/jieba-wasm)。
+* **与另一文件比较**（`diff it with another file`）：整理阶段也可用来对照两个稿本。校对完成后的差异、勘误表见 [3.3.5](#335-比较与勘误表)。vscode 资源管理器右键亦可比较文件。
+
+### 3.2. 切分与合并
+
+校对面板第二块：先 **选择主文件**（或从工作区选择），再 **切分文档**。切出 JSON 后露出配套文件，以及 **合并 JSON**、**准备参考资料**、**LLM 校对 JSON**。
+
+#### 3.2.1. 文档切分
 
 我的经验，在一般语言文字和知识校对场景中，大语言模型一次输出六百到八百字会有比较好的效果。因此，一本十来万字的书稿需要切分成三百多段，然后交给大模型校对。
 
@@ -115,14 +154,12 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 切分后都会生成同名的 `.json`（用于校对） 和 `.json.md`（可查看切分情况）两个结果文件。
 还会生成日志文件（`.log`），记录切分统计信息，并摘要呈现在校对面板中；**如有过长（如超过1500字符）片段时，可以手动加空行分段，然后再次切分。**
 
-校对面板有按钮提示用户选择查看结果的方式：比较前后差异（用分割线表示切分位置）、查看JSON结果或查看日志文件；还有一个校对JSON文件的按钮（面板失效后还可以打开JSON后用右键菜单开始校对）。
+切分完成后，本区块会列出 JSON / JSON.md / 切分日志，并可 **比较前后差异**（用分割线表示切分位置）、**合并 JSON**、**准备参考资料**（进入资料检索分支）、**LLM 校对 JSON**（结果出现在「校对结果」区块；面板失效后也可打开 JSON 用右键菜单开始校对）。
 
 !!! note 切分文档依赖两种标记
     本扩展默认用户需要校对的文档为[markdown格式](https://www.markdownguide.org/basic-syntax/)，文档切分依赖markdown文档中的两种标记：（1）空行。在markdown中，一个或多个空行表示分段，没有空行的断行在渲染时被忽略，即合并为一段。**至少要有合适的空行，否则无法切分。**（2）各级标题。如`## `开头的是二级标题。
 
-还有一个**把文本切分为句子的命令**（split into sentences），可对整篇或选中部分重新分句并插入分隔符，便于文稿整理。
-
-#### 3.1.4. 合并JSON，组织语境
+#### 3.2.2. 合并 JSON，组织语境
 
 跟人工校对一样，要想提交校对质量，大语言模型也需要了解上下文语境，还需要工具书、参考资料等。
 
@@ -143,13 +180,13 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 组织校对语境是一个看起来有些麻烦，但非常有效的工作。比如校对练习册，有必要把练习和答案拼成语境（拼在一个target中更能节省费用）。而对一首古诗的解释如果不可靠，可以用一篇可靠的作为reference。包含人物的内容，则可以用词典中的任务条目作为reference。
 
-命令 `Prepare References for JSON File（资料准备·JSON）`，或校对面板「准备参考资料」按钮，可为 JSON 片段做资料准备（**只写过程文件，不自动写入源 JSON 的 reference，也不校对**）。在检索面板勾选命中后「合并选中到源 JSON」，再到校对面板选用「知识核查」等提示词校对。
+JSON 切分后若要检索参考资料，见 [3.2.3](#323-资料检索切分与合并的分支实验功能)。
 
-#### 3.1.5 参考资料检索（实验功能）
+#### 3.2.3. 资料检索（切分与合并的分支，实验功能）
 
-支持检索校对知识性问题可能用到的参考资料。**检索面板只负责找资料与导出/合并；校对一律在校对面板完成。**
+这是「切分与合并」的分支：切出 JSON 后，校对面板该区块内点 **「准备参考资料」** 即打开检索面板（也可从 overview 或命令 `Open Reference Search Panel（检索面板）` 打开）。选段检索不必先切分。
 
-检索面板的打开方式：活动栏 overview → 检索面板，或命令 `Open Reference Search Panel（检索面板）`。
+**检索面板只负责找资料与导出/合并；校对一律回到校对面板完成。**
 
 在检索面板中可：
 
@@ -231,27 +268,37 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 **参考资料规划提示词**（侧栏 `prompts for reference prep`）：可自定义；须要求模型只输出 JSON（`sufficient` / `queries` / `prune`；grep 块可含 `unit`、`searchPhrases`）。未选择时使用内置规划提示词。
 
-### 3.2. 校对
+**检索面板底部外跳 / 即时工具**（不写入 reference corpus，除非走资料准备）：
 
-#### 3.2.1. 对文档选段进行校对
+* **从 md 反查 PDF**：`Search Selection In PDF`（需 [SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)；建议 `ReuseInstance = true`）
+* **在参考资料库中搜索**：`search selection in References`（Find in Files）
+* **连线搜索[中华经典古籍库](https://jingdian.ancientbooks.cn)**：`search selection in Ancientbooks (jingdian)`
+* **连线搜索[识典古籍](https://www.shidianguji.com/)**：`search selection in Shidianguji`
+* **直接查词典**：精确整词查 MDX；查段落、多词请用检索面板「开始准备」或意图检索
+
+### 3.3. 校对 / 校对结果
+
+JSON 批量校对的按钮在 **切分与合并** 区块（「LLM 校对 JSON」）；**选段校对**在校对面板底部。进度、未完成提示、比较前后差异、生成差异文件 / 勘误表在 **校对结果** 区块。
+
+#### 3.3.1. 对文档选段进行校对
 
 1. 打开Markdown文档（其他纯文本文档可改为.md后缀，即为Markdown文档）
 2. 选中要校对的段落，不宜过长
-3. 从右键菜单、命令面板（Ctrl+Shift+P）中选择 Proofread Selection
+3. 从校对面板底部 **校对选中文本**，或右键菜单、命令面板中选择 Proofread Selection
 4. 可选择上下文范围、参考文件和温度。加入上下文是为大语言模型提供语境，以便参考，并保持一致性。参考文件可以是相关的词条、更权威的文献等。模型温度较低时，随机性、创造性、稳定性较低；反之则随机性、创造性、不稳定性变高。可以参考模型文档进行测试。**使用不同温度多遍校对，或许可以覆盖不同的问题，值得尝试。**
 5. 校对结束后会打开 diff；**关闭右侧校对结果文档时**可选择是否将结果**写回选区**。**普通 Proofread Selection** 不会读写编辑记忆 JSON。**Proofread Selection with Memory** 会在接受写回后更新 **`.proofread/editorial-memory.json`**：**全局**为结构化条目（`original` / `changedTo` / **`weight`**；可选 **`note`** 修改说明；超员时**低 weight**先入存档）；**最近 d 次（默认 3）**校对的**扁平合并稿**栈 `currentRounds`（轮次间归一化完全相同则去重，单轮内不限条数）。注入：`<editorial_memory_global>`、`<editorial_memory_current_rounds>`、`<editorial_proofread_context>`。写回时 LLM 产出 `global_ops` + `current_round_flat`（或由程序摘要压栈），详见 `mergeAfterAccept` 等 `ai-proofread.editorialMemory.*` 设置。
 
 
-#### 3.2.2. 对切分好的JSON文档进行校对（批处理）
+#### 3.3.2. 对切分好的JSON文档进行校对（批处理）
 
-1. 打开已切分的 JSON 文件
-2. 通过右键菜单或命令面板选择Proofread File
+1. 打开已切分的 JSON 文件（或在校对面板 **切分与合并** 已选定主文件并切分完成）
+2. 通过该区块 **「LLM 校对 JSON」**，或右键菜单 / 命令面板选择 Proofread File
 3. 显示当前配置请你确认。配置说明见上文。
 4. 在校对面板中有进度、结果等信息。可中途取消校对。下次接着校对，会根据校对结果`文档.proofread.json`文件中的记录，跳过已经完成的部分；如果切分结果`文档.json`与校对结果`文档.proofread.json`条目数不一致，则会提示你手动对齐，或删除结果文档，从头重新校对。
 5. 最后会提示你查看结果：JSON结果、前后差异、日志文件，以及生成差异文件（类似带修改标记的Word文档）。
 6. 如有未完成的条目，可重新校对，重新校对时只处理未完成的条目
 
-#### 3.2.3. 对文档选段进行带记忆的校对，并自动维护项目级编辑记忆（实验功能）
+#### 3.3.3. 对文档选段进行带记忆的校对，并自动维护项目级编辑记忆（实验功能）
 
 本功能是在`Proofread Selection`基础上增加收集、处理、使用校对记忆的工作流。
 
@@ -275,13 +322,13 @@ Additionally, you can set your own prompts for other text processing scenarios, 
    - `sourceTextHint`（字符串，可选）：省略或 `""` 或 `"none"` — 不注入源文本特性。否则须为源文本特性提示词的内置 id或名称。可通过「管理提示词」维护提示词后再写进 JSON
 3. 编辑记忆文件路径：`<工作区根>/.proofread/editorial-memory.json`（活跃）、`editorial-memory-archive.json`（存档）。
 
-####  3.2.4. 用「知识核查」提示词校对（实验功能）
+#### 3.3.4. 用「知识核查」提示词校对（实验功能）
 
-*参考：§3.1.5 参考资料检索*
+*参考：[3.2.3 资料检索](#323-资料检索切分与合并的分支实验功能)*
 
 「知识核查」是**预置校对提示词**（item / full），不是独立命令。请先在检索面板完成资料准备并导出 md（选段）或合并到源 JSON，再到**校对面板**执行选段/JSON 校对，并选用「知识核查（item）」（推荐）或「知识核查（full）」。可选在选段校对时指定参考文件。会消耗比一般校对更多的 token。
 
-### 3.3. 比较（diff）校对前后的文件差异
+#### 3.3.5. 比较与勘误表
 
 在当前markdown或json界面，使用右键菜单`diff it with another file`，如果当前是markdown则有三种模式：
 
@@ -289,9 +336,21 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 2. 用jsdiff比较两个文件，生成HTML形式的结果，类似带修改标记的Word文档。本模式还支持JSON文件，自动拼接JSON一级元素或`target`字段内容进行比较，支持每次比较的片段数量（默认0表示所有片段），生成多个有序的差异文件，避免过长文本无法渲染的问题；校对面板“生成差异文件”按钮的功能与此相同（**注意：这个按钮使用的也是JSON中的文本，而不是md中的文本**）。
 3. 逐句对齐两个md文件，生成一个有筛选和比较功能的HTML文件，从而可用于制作审校记录、勘误表。校对面板“生成勘误表”按钮的功能与此相同。生成勘误表时可选择**同时收集常用词语错误**，输出为 CSV 格式（错误词语,正确词语,错误词语所在小句,错词长度,正词长度），保存为 `{主文件名}.word-errors.csv`，便于筛选和积累个人常用错词表、自定义替换表。
 
-### 3.4. 管理提示词
+### 3.4. 专项检查
 
-#### 3.4.1 提示词管理
+校对面板第四块，作用于当前编辑窗口；部分结果出现在左侧栏。对齐标题与文档整理区块按钮相同。
+
+![树视图（提示词管理、字词检查、引文检查）](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/special_checks.png)
+
+1. **字词检查**（`check words`）：三个分支——基于词典数据；基于《通用规范汉字表》；自定义替换表（预置简繁异对照、《第一批异形词整理表》、《古籍印刷通用字规范字形表》、规范人名与年号等）。可用 `manage custom tables` 加载自制正则/字面替换表，支持插入与按词语边界匹配。
+2. **标题树与段内序号**（`check numbering hierarchy`）：检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位、批量标记为 Markdown 标题、升级、降级。
+3. **对齐标题**（`align headings`）：并排两个 Markdown 后按指定级别检查是否一一对应。详见 [3.1.2](#312-整理文档)。
+4. **重文检查**（`scan duplicate sentences in document` / `selection`）：侧栏 **重文检查**。归一化与相似度相关配置与引文核对共用 `ai-proofread.citation`。
+5. **引文核对**：专项检查区可启动 **核对选中引文** / **核对全文引文**；详细流程与索引见 [3.2.3](#323-资料检索切分与合并的分支实验功能)。须先在检索面板 **建立引文索引**（`citation.referencesPath`，默认为工作区 `references`）。
+
+### 3.5. 管理提示词
+
+#### 3.5.1 提示词管理
 
 **本扩展目前默认提示词的功能是校对一般的语言文字错误和知识性错误**，具体内容见代码库中的proofreader.ts文件。你可以设置自己的提示词，不限于校对工作。
 
@@ -299,14 +358,14 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 也可以在配置文件中处理提示词，但不适合没有编程知识的用户使用。
 
-#### 3.4.2 预置提示词说明
+#### 3.5.2 预置提示词说明
 
 除 **系统默认提示词（full）**、**系统默认提示词（item）** 外，扩展在代码中内置了若干预置提示词。在「管理提示词」打开的 prompts 侧栏中可直接点选为当前提示词。
 
 | 名称 | 输出类型 | 适用场景 |
 |------|----------|----------|
 | 系统默认提示词（full） | 全文 | 常规语言文字与知识性校对；**默认项** |
-| 系统默认提示词（item） | 条目 | 同上，仅输出需改句子（JSON），省 token，见 [3.4.4](#344-提示词输出类型) |
+| 系统默认提示词（item） | 条目 | 同上，仅输出需改句子（JSON），省 token，见 [3.5.4](#354-提示词输出类型) |
 | 表述正常化（full） | 全文 | 凭语感修改违和处，使表述符合常情常理 |
 | 表述正常化（item） | 条目 | 同上，条目式输出 |
 | 硬伤发现（item） | 条目 | 只报必须改的硬伤（字词、语法、事实、逻辑等）；依据不足时标记较低 confidence |
@@ -315,8 +374,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 | 知识核查（full） | 全文 | 同上，全文输出 |
 | 拼音审校（full） | 全文 | 按部编版小学语文教材注音规则审校已有拼音（行间拼音、括注拼音等），包括读音、轻声、儿化、「啊/呀/哇/哪」用字 |
 | 拼音加注（full） | 全文 | 以同上标准在行间加注拼音 |
+| 段内重组与重述（full） | 全文 | 理顺段内逻辑与表述；默认只在段内调句序，必要时才改分段；不附说明 |
 
-#### 3.4.3 提示词原理与撰写示范
+#### 3.5.3 提示词原理与撰写示范
 
 为了写好提示词，你需要了解本扩展的工作原理：
 
@@ -349,7 +409,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 本人有一个[开源提示词库](https://github.com/Fusyong/LLM-prompts-from-a-book-editor)，但不是针对本扩展的，改造（对三种标签进行说明）后才能用于本扩展。
 
-#### 3.4.4 提示词输出类型
+#### 3.5.4 提示词输出类型
 
 本扩展支持三种提示词输出类型：full（全文输出）；item（条目式输出）；other（其他）。
 
@@ -370,13 +430,13 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 请注意，输出形式选item（条目式输出）时，JSON、items、original、corrected、explanation这些词语，对于大模型的理解和输出后的处理都有用，因此不要改变它们的形式。如果你对JSON格式了解不多，我建议直接在这个模版上改写。corrected和explanation两项可以省略。
 
-#### 3.4.5 源文本特性提示词注入
+#### 3.5.5 源文本特性提示词注入
 
-系统默认与预置提示词（见 [3.4.2](#342-预置提示词说明)）可注入源文本（如整本书）特性、校对重点等提示词，目的在于说明整本书的独特之处，提醒 LLM 注意；自定义提示词不会自动注入。请注意，系统会在你注入的提示词之前附加“目标文本（target）是一个更大的源文本的一部分。对这个源文本的整体说明如下：”。逻辑上你可以注入任何内容，但要考虑注入后的整体逻辑。
+系统默认与预置提示词（见 [3.5.2](#352-预置提示词说明)）可注入源文本（如整本书）特性、校对重点等提示词，目的在于说明整本书的独特之处，提醒 LLM 注意；自定义提示词不会自动注入。请注意，系统会在你注入的提示词之前附加“目标文本（target）是一个更大的源文本的一部分。对这个源文本的整体说明如下：”。逻辑上你可以注入任何内容，但要考虑注入后的整体逻辑。
 
 使用命令 `AI Proofreader: manage prompts` 会同时打开侧栏中的 prompts 与 source characteristics 视图；在后者中可查看内置条目并增删改自定义源文本特性提示词。
 
-#### 3.4.6 提示词重复功能
+#### 3.5.6 提示词重复功能
 
 本扩展支持基于谷歌研究的提示词重复功能，以提高准确度。其原理是：重复用户输入（reference、context、target），让模型在真正处理时已经获得全局信息，从而获得更好的上下文理解。
 
@@ -390,7 +450,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 - 重复发生在可并行化的prefill阶段，不增加延迟
 - 建议先在少量文本上测试效果，再决定是否启用。经初步测试，对于较长的文本效果更好
 
-### 3.5. 日志等过程文件
+### 3.6. 日志等过程文件
 
 为了让用户能够核验、控制每一个步骤，扩展会以要校对的文档的文件名（以“测试.md”为例）为基础，生成一些中间文件，各自的作用如下：
 
@@ -406,32 +466,6 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 10. 测试.word-errors.csv，常用词语错误收集结果（生成勘误表时选择「同时收集」可得），CSV 格式（错误词语,正确词语,错误词语所在小句,错词长度,正词长度），便于筛选
 
 **请特别注意：除自动累加的日志文件和提示备份的`测试.proofread.json`、自动备份的`测试.proofread.json.md`，其余中间文件，每次操作都将重新生成！如有需要，请自行备份。**
-
-### 3.6. 其他功能与工具
-
-已经作为辅助工具在前文提到的功能，这里也列入题目，以便速查。
-
-1. **转换文档格式**：前面说到`convert docx to markdown`和`convert PDF to markdown`两个命令。还有`convert markdown to docx`，可转换Markdown为docx（Word、WPS的常用格式）。
-2. **标记标题**：前面说到`mark titles from table of contents`命令可基于目录列表标记标题。如果文档标题以序号引导，还可以使用后面提到的`check numbering hierarchy`命令来标记。
-3. **段落整理**：前面说到`format paragraphs`命令，可以在段末加空行，即整理成符合Markdown格式的段落；还可以删除符合Markdown格式但不符合一般习惯的段内分行。基于文档行长众数来计算，因而适合整体较长，并且以长段落为主的文档；短小、段落零碎时准确率会比较低。
-4. **搜索选中文本**（优先在 **检索面板** 底部快捷栏）
-    * **从md反查PDF**：`Search Selection In PDF`（需 [SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader)；建议 `ReuseInstance = true`）
-    * **在参考资料库中搜索**：`search selection in References`
-    * **连线搜索[中华经典古籍库](https://jingdian.ancientbooks.cn)**：`search selection in Ancientbooks (jingdian)`
-    * **连线搜索[识典古籍](https://www.shidianguji.com/)**：`search selection in Shidianguji`
-    * **直接查词典**：精确整词查 MDX；查段落、多词请用检索面板「开始准备」或意图检索
-5. **意图检索 / 核对选中引文**：与资料准备共用 referencePrep；结果在侧栏 **资料检索**。核对全文引文仍用 **引文核查** 树。入口见检索面板。
-6. **字词检查**：命令`check words`（**校对面板**）。分类三个分支：基于词典数据的检查；基于《通用规范汉字表》的检查；自定义替换表的检查与替换功能。第三支含预置了《通用规范汉字表》简繁异对照表、《第一批异形词整理表》、《古籍印刷通用字规范字形表》、规范人名与年号等数据。用户还可以通过`manage custom tables`命令，加载自制的正则/字面替换表，可用于基于个人积累的专项检查，支持正则表达式，有较大潜力；其正则替换表与TextPro类似，计划逐步增强兼容能力。这是一个非常强大且灵活的功能，值得深入探索。
-    ![树视图（提示词管理、字词检查、引文检查）](https://blog.xiiigame.com/img/2025-03-28-用于AI图书校对的vscode扩展/special_checks.png)
-7. **标题树与段内序号检查**：命令`check numbering hierarchy`（**校对面板** / overview 开关）。检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位到文档、对标题序号执行同级别批量操作：标记为 Markdown 标题、升级、降级。
-8. **引文核对**：指定本地文献库根目录（默认为根目录下的`references`），在 **检索面板** 执行 `build citation reference index`。**核对选中引文** → **资料检索**；**核对全文引文** → **引文核查**。
-9. **文档内重复句核查**（**校对面板**）：`scan duplicate sentences in document` / `selection`；侧栏 **重文检查**。设置与引文核对共用 `ai-proofread.citation` 相关项。
-10. **转换半角引号为全角**：使用`convert quotes to Chinese`命令或菜单。也可在设置中设定为自动处理。某些LLM输出时一律使用英文引号，可以用这个命令来整理。
-11. **删除空白字符**：使用`delete inline whitespace`命令，删除汉字和中文标点内部小于指定长度的空白字符串。
-12.  **OpenCC**：集成了[opencc-js](https://github.com/nk2028/opencc-js)，支持繁简转换，命令为`opencc`和`opencc selection`。
-13. **分词、词频与字频统计**：使用`segment file`和`segment selection`命令，可选分词后替换原文、输出词频统计表（词语、词性、词频）或输出字频统计表（单字及频度）。分词模块使用的是[jieba-wasm](https://github.com/fengkx/jieba-wasm)。
-14. **按句子切分**：使用 `split into sentences` 命令，可选分隔符号；默认使用两个分行符（即一个空行）分隔句子。
-15. **vscode提供的文档比较（diff）功能**：通过文件浏览器右键菜单使用；本扩展在vscode中的比较即调用了本功能。vscode是这些年最流行的文本编辑器，[有许多便捷的文字编辑功能](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode_1)，很适合编辑工用作主力编辑器。
 
 ### 3.7. 注意事项
 
@@ -544,314 +578,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 11. 内部git版本管理
 12. 在按长度切分的基础上调用LLM辅助切分（似乎仅仅在没有空行分段文本上有必要）
 
-## 6. 更新日志
-
-### v1.12.8
-
-- 更新：UI改进
-
-### v1.12.7
-
-- 特性：简单的半角全角标点符号转换命令，支持`，；：？！`五种
-- 特性：把方正书版带圈字符转换为扩注字符或Unicode字符（50以内）
-- 特性：标题对其功能，比如检查练习题与答案是否一一对其
-- 特性：合并 JSON 时可忽略当前文件中指定标题级别开头的单元（JSON↔JSON 与 Markdown→JSON 均支持）
-
-### v1.12.3
-
-- 梳理：删除「知识核查」复合命令；知识核查仅作预置提示词；检索面板不再提供校对入口，校对一律在校对面板
-- 行为：JSON 资料准备**不再自动写入** `item.reference`，仅写过程文件；须在检索面板勾选后合并
-- 文案：统一术语（资料准备 / 意图检索 / 核对选中引文 / 核对全文引文）；命令 title 与检索面板按钮对齐
-- 特性：**检索面板**（多源配置、过程时间线、命中勾选导出/合并）；与校对面板按职责拆分
-- 特性：活动栏 overview 可开关侧栏视图（资料检索、引文核查、重文检查、标题树、段内序号、校对条目等）
-- 特性：项目级检索缓存 `.proofread/retrieval-cache.json`；检索完成后不再自动打开未保存合并预览
-- 说明：维基百科检索已接入；Web 搜索仍未实现
-
-### v1.11.4
-
-- 特性：增加提示词“段内重构与重述”
-- 特性：在知识核查中集成维基百科搜索
-- 更新：拼音提示词“某边”不（按照词典）轻声
-- debug：修复treeview按钮状态错乱
-
-### v1.11.2
-
-- 特性：增加删除汉字及中文标点间的空白的命令
-- 特性：把临时的源特性提示词输出到log
-- 设置：把qwen3.7-max和deepseek-v4-pro设为各自平台的默认模型
-- debug：treeview开关状态消失问题
-
-### v1.11.1
-
-- 特性：增加按用户意图检索本地词典和参考文件的命令（跟知识核查共用referencePrep，只是LLM对用户输入有不同的语意理解）
-- referencePrep架构升级为：Phase 0 资源范围 → 多轮 LLM 规划 → 多通道检索 → 混合打分/融合 → LLM 精排 → 结构化 corpus + TreeView。
-- debug：修复buildPdfToTextCommand在powershell下的错误
-
-### v1.11.0
-
-- 特性：增加知识核查智能体工作流，复用了原来的词典查询功能，增加本地参考资料库grep（暂时没有集成互联网查询服务）
-- 特性：增加模型配置treeview；优化treeview UI
-- 特性：集成pdftotext.exe，Windows用户不需要额外安装
-
-### v1.10.8
-
-- 特性：增加拼音加注与审校提示词
-- 特性：预置轻声词检查表
-- 特性：预置多音字词检查表
-
-### v1.10.4
-
-- 特性：预置提示词“表述正常化（full）”“表述正常化（item）”“硬伤发现（item）”“对应关系核对（item）”
-- 特性：item类型的提示词的结果，“查看校对条目”时可以打开diff窗口并跳转到定位原文，还可以根据置信度对条目进行排序、筛选
-
-### v1.10.2
-
-- 优化：proofread selection with memory 不再提示用户选择参数，而是通过 `.proofread` 中的设置文件控制参数
-- 优化：所有流程中与LLM交互的内容（请求和返回）都通过debug.enableConsoleLog控制是否打印到控制台
-
-### v1.10.1
-
-- **重构**：把带样例校对 `proofread selection with examples` 和持续校对 `continuous proofread` 相关功能重构为 **`proofread selection with memory`**
-- 优化：阿里云百炼平台默认支持改回qwen3-max；DeepSeek平台默认支持改为deepseek-v4-flash，非思考模式
-
-### v1.9.6
-
-- 优化：阿里云百炼平台默认支持qwen3.6-max-preview，非思考模式；DeepSeek平台默认支持deepseek-v4-pro，非思考模式
-- 特性：核对工具书的工作流，分为两段：「LLM 生成查词计划」，由LLM确定文本中需要查询工具书的词语；「查词并入 JSON」，然后查询本地mdx词典，合并到reference中，供校对时使用。
-- 优化：校对面板，文件路径后提供「打开」按钮，替代原有查看按钮
-
-### v1.9.5
-
-- 特性：核查文档内重复的句子。
-
-### v1.9.4
-
-- 特性：文档内重复句核查（`scan duplicate sentences in document` / `scan duplicate sentences in selection`），侧栏 **duplicates** 展示完全重复与近似重复组；归一化与相似度相关配置与引文核对、句子对齐共用
-- 优化：重构年号核验逻辑，增加核验形式；补充年号数据
-- 优化：自定义替换功能在替换基础上增加增加插入功能
-- debug：修正跨度仅一年的年号无效问题
-
-### v1.9.2
-
-- 特性：用户可以在系统默认提示词中注入来源文本整体特性、校对要求的提示词
-- debug：修复Debug Enable Console Log设置不可用的问题
-
-### v1.8.8
-
-- 特性：在识典古籍、中华经典古籍库、文献目录中搜索选中文本
-- 特性：对人名和年号给出年代、外文等信息，如括注、附加年信息，会进行校验。
-- 特性：对字词检查结果增加筛选和排序功能。
-
-### v1.8.4
-
-- 特性：引文核对时通过opencc-js繁转简后再计算相似度，以便匹配两侧简繁不同的文本
-- 特性：增加了opencc-js提供的转换文种功能
-
-### v1.8.3
-
-- 特性：在activity bar上增加扩展图标，展示概览页，引导用户使用
-- 优化：文档，速查手册
-
-### v1.8.1
-
-- 特性：词典检查中增加儿化词语检查；更新词典数据
-
-### v1.8.0
-
-- 特性：提示词增加输出类型标记：full（全文输出）；item（条目式输出）；other（其他，暂时按全文处理，可用于收集自定义的结构化数据）
-- 特性：支持条目式输出（提示词输出类型item），即输出原文（original，必选）、修改后（corrected）、解释（explanation）三项内容，这样可以节省输出token，适用于预期修改比较少的情形，比如专项审校
-- 特性：自定义替换表中预置《古籍印刷通用字規範字形表》
-
-### v1.7.2
-
-- bugfix：Cannot read properties of undefined (reading 'CrLf')
-
-### v1.7.1
-
-- 优化：文档和速查手册
-
-### v1.7.0
-
-- 特性：持续发现与监督校对流程（实验功能），即带样例校对，审改校对结果并收集样例，再次带样例校对，如此循环。是对现有几个功能的集成。**（现已移除：** 对应命令与快捷键见 **v1.9.6**；请以项目级 `editorial-memory.json`/存档、`proofread selection with memory`、选段校对手动 reference 等替代。**）**
-- 特性：标题树与段内序号检查
-- 特性：比较文件时自动收集错误词语与正确词语对，以便整理后用作自定义替换表
-- 优化：扩展结果面板为校对面板，即全流程控制面板
-- 特性：合并 JSON 时可合并 Markdown 作为每条 reference/context；切分为句子的命令。（历史上的「校对样例 / examples.md / edit proofreading examples」能力已先后在 v1.9.6、v1.10.0 移除；见当前版 changelog。）
-- 特性：用户加载非正则自定义替换表时允许指定是否按词语边界匹配
-- 优化：取消jieba调用失败时保持静默并使用备用方案的行为，改为报告并停止处理。
-- bugfix：删除opencc-js
-
-### v1.6.3
-
-- 特性：集成jieba-wasm分词库，支持用户词典路径
-    - 分词后再进行词语检查，提高精确性；
-    - 在句子对齐和引文核查中，可选分词（默认search模式）后再进行相似度计算，更准确，但速度稍慢。
-- 优化：字词检查
-    - 词典表外异形词划分为单字词和多字词两个选项，都在分词后检查
-    - 增加《第一批异形词整理表》数据，作为预置的自定义替换表
-    - 字词检查可选输出统计表
-    - 简化单字检查逻辑，大大提高速度
-- 特性：对文件或选段进行分词，或生成词频词性统计表；生成字频统计表
-- !!! caution 安装包体积由726KB增加到3.8MB
-
-### v1.5.3
-
-- 特性：根据词典检查字词，包括异体/繁体字、异形词等
-- 特性：根据《通用规范汉字表》检查字词，包括异体/繁体字、异形词等
-- 特性：自定义替换表检查，仿TextPro风格的给予批量自定义（正则）替换表的提示与替换
-- 优化：提示词管理器改用treeview，与字词检查类型/表、结果一致
-- 文档：在docs中增加了commands-cheatsheet.md，包含业务逻辑、命令的便览图标
-- 优化：优化了分行符的处理方式，改动有点大，是否有负面影响需要观察
-
-### v1.4.0
-
-- 特性：增加基于本地文献库（Markdown格式，可附带同名PDF以便反查）的引文核对功能，选中引文核对，或全文自动收集引文后核对
-
-### v1.3.1
-
-- 特性：HTML审校记录/勘误表
-    - 增加备注列，可以填入文字（无法保存，可用表格先准备好，筛选时粘入，再保存为PDF或复制到Word中）
-    - 打印时可以选择是否分页时添加表头
-
-### v1.3.0
-
-- 特性：增加根据目录表（Markdown形式的标题列表）在文档中标记标题的功能`mark titles from table of contents`
-
-### v1.2.2
-
-- 优化：合并JSON功能，默认改为“拼接模式”；增加更新对应的Markdown文件的功能
-
-### v1.2.0
-
-- 特性：支持提示词重复功能（据谷歌相关研究）
-- 特性：重新支持调试日志功能
-- 优化：对提示词作了少量优化
-- 优化：校对选中文本时可以通过Esc终止
-- debug: 扩展前后段落为语境算法跳过本段其余文本、不能处理选中段后分行符问题；校对选中文本、校对JSON改用同一个函数
-
-### v1.1.4
-
-- 优化：优化勘误表相关的句子分切、对齐算法，并允许设定相似度
-- 特性：勘误表增加多种筛选功能，如序号筛选，即可挑出要保留的条目
-
-### v1.1.0
-
-- 特性：`diff it with another file`命令增加功能，支持逐句对齐原始文档和校对后的文档，生成一个有筛选和比较功能的HTML文件，从而可用于制作勘误表
-
-### v1.0.4
-
-- 优化：支持直接从`*.proofread.json.md`反查`*.pdf`
-- 优化：文档
-
-### v1.0.3
-
-- bug修复
-- 优化：默认并发数改为10、rpm改为600、超时改为90秒
-- 优化：外语校对提示
-
-### v1.0.0
-
-- !!! caution 设置中的毫秒改为秒
-
-### v0.1.17
-
-- 特性：段落整理：在原有段末添加空行基础上，增加了删除段内分行的功能
-
-### v0.1.16
-
-- 特性：在段末添加空行，适用于从PDF转出的断行、无空行文本
-- 优化：“按长度切分，扩展前后段落为上下文”，修改为“按长度切分，以前后段落为上下文”，不再重复提交target自身
-- 优化：合并JSON功能增加“拼接”模式
-- 优化：只有当校对前后的JSON长度不一时才备份、删除，否则不备份；在参数确认后才开始备份；保持面板、菜单、命令各入口一致
-- 优化：文档
-
-### v0.1.15
-
-- 修复：并发失效问题
-- 修复：内容为空字符串问题（直接返回原内容）
-- 优化：文件转换工具兼容多平台和常用终端
-- 优化：统一文件备份逻辑为备份旧文件为bak
-
-### v0.1.14
-
-- 优化：支持 pdftotext 常用参数，模式、切边、页码等
-
-### v0.1.13
-
-- 优化：删除所有文件转换后的打开文件的功能
-- 优化：处理面板中增加校对耗时信息；删除重复的校对结果统计信息
-- 优化：取消用户设置提示词的数量限制
-- 优化：删除调试日志功能
-
-### v0.1.12
-
-- bug修复：测试pdftotext是否存在改为更通用的方法
-- 优化：使用前测试pandoc是否存在
-
-### v0.1.11
-
-- 增加使用pdftotext工具把PDF文件转换为Markdown文件（实际是纯文本）的功能
-
-### v0.1.10
-
-- result panel 优化：紧凑设计，减少冗余信息，尽量一屏展示；色调更淡雅
-
-### v0.1.9
-
-- 修复了转换子目录中的文档时不能正确处理图片的问题
-- 更新了文档
-
-### v0.1.8
-
-- 新增功能：JSON批量提交LLM前展示所有参数，请用户确认或取消
-  - 显示文件路径、总段落数、处理参数（平台、模型、温度、并发数、请求频率、提示词）
-  - 用户可以选择确认开始或取消操作
-  - 支持所有触发方式：右键菜单、命令面板、webview面板按钮等
-- 改进webwiew panel
-  - 增加进度条
-  - 呈现切分摘要信息，如段落数、超长段落等
-  - 查看日志文件时自动滚动到底部
-  - debug：重用webwiew报错
-
-### v0.1.7
-
-- 取消校对时生成jsdiff html，改成提示用户生成
-
-### v0.1.6
-
-- 切分和校对结果改成Webview Panel呈现，在一个切分、校对流程中可以重新打开
-- 切分结果菜单增加一个“校对JSON结果”按钮
-
-### v0.1.5
-
-- 禁用Gemini模型思考功能
-- 添加重试机制
-
-### v0.1.4
-
-- 新增功能：支持Ollama本地模型，无需网络连接即可使用本地大语言模型进行校对（适合专家用户）
-- 优化：为本地模型增加了更长的超时时间，适应本地计算的特点
-- 优化：完善校对过程中给用户的配置信息、日志文件中输出的配置信息
-
-### v0.1.3
-
-- 新增功能：markdown切分/选段校对时，可以加入前后段落作为context
-- 优化：转换半角引号为全角的算法，避免跨行引号转换错误
-
-### v0.1.2
-
-- 扩展了jsdiff比较并生成html的功能，支持JSON文件，并允许用户指定每次比较的片段数量，避免过长文本无法渲染的问题
-
-### v0.1.1
-
-- 优化了文件切分功能，新增统一的切分入口
-- 改进了校对进度显示和取消操作
-- 增强了自动备份功能
-- 优化了临时文件管理
-- 修复了并发请求数的默认值问题
-- 完善了错误处理和用户提示
-
-## 7. 开发命令
+## 6. 开发命令
 
 <!--
 Windows 若在 **PowerShell** 里直接运行 `npm` 报错「禁止运行脚本」（`PSSecurityException`），可任选其一：命令行改用 **`npm.cmd`**（例如 `npm.cmd run compile`）；或在 VS Code / Cursor 中按 **`Ctrl+Shift+B`** 使用本仓库自带的默认生成任务（`.vscode/tasks.json` 调用 `npm.cmd run compile`）；或在当前用户下执行 `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` 后再使用 `npm run …`。

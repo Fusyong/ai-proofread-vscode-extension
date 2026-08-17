@@ -1,24 +1,24 @@
 # AI Proofreader 扩展命令速查与业务流程图
 
-*v1.12.1*
+*v1.12.8*
 
-> **文档定位**：本文档是**快速入口**——帮你从业务场景找到对应流程和命令。详细说明、依赖安装、最佳实践见扩展主页面或 [README](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/README.md)。
+> **文档定位**：本文档是**快速入口**——帮你从业务场景找到对应流程和命令。详细说明、依赖安装、最佳实践见扩展主页面或 [README](../README.md)；完整版本历史见 [changelog.md](changelog.md)。
 
 ---
 
 ## 30 秒概览
 
-**四个入口**：（1）左侧活动栏 **overview**：打开**校对面板** / **检索面板**，并开关侧栏 TreeView；（2）**校对面板**集中文档准备、切分、校对、比较与字词/重文等命令；（3）**检索面板**集中资料准备、命中勾选导出/合并与引文相关命令（**不做校对**）；（4）命令面板（Ctrl+Shift+P）输入「AI Proofreader」可查全部命令；部分命令也有**右键菜单**。
+**四个入口**：（1）左侧活动栏 **overview**：打开**校对面板** / **检索面板**，并开关侧栏 TreeView；（2）**校对面板**按四块组织日常工作；（3）**检索面板**是「切分与合并」的资料检索分支（**不做校对**）；（4）命令面板（Ctrl+Shift+P）输入「AI Proofreader」可查全部命令；部分命令也有**右键菜单**。
 
-| 能力 | 说明 |
-|------|------|
-| **文档准备** | **校对面板**：docx/PDF（可选）、整理段落、标记标题、切分等 |
-| **校对路径** | ① 选段：`proofread selection`（或 **`proofread selection with memory`**）；② 长文档：切分 →「校对 JSON 文件」；需要 reference 时先在检索面板准备/导出或合并，再到校对面板指定并选用提示词 |
-| **资料准备** | **检索面板**：配置来源 → 多轮准备 → 侧栏「资料检索」勾选 → 导出 md 或合并到源 JSON；单源/意图检索与外跳工具见面板底部 |
-| **知识核查** | 预置提示词（item / full）；在**校对面板**校对时选用，不是独立命令 |
-| **结果查看** | **校对面板**「比较前后差异」「生成勘误表」；或 diff 命令 |
-| **辅助功能** | 校对面板：字词检查、重文扫描、序号等；检索面板：核对选中/全文引文；**overview** 可开关侧栏视图 |
-| **用户扩展能力** | 自定义提示词、自定义替换表、jieba 词典、标题/序号规则，见 [第六节](#六用户扩展能力) |
+| 业务场景 | 面板位置 | 说明 |
+|----------|----------|------|
+| **文档整理** | 校对面板第一块 | 转换格式、段落/空白/标点用字、标记或对齐标题、分句分词、比较文件；作用于当前编辑窗口 |
+| **切分与合并** | 校对面板第二块 | 选主文件 → 切分 → 合并 JSON；切出 JSON 后可「准备参考资料」「LLM 校对 JSON」 |
+| **资料检索** | 检索面板（切分与合并的分支） | 多源准备 → 侧栏「资料检索」勾选 → 导出 md 或合并到源 JSON；选段检索不必先切分 |
+| **校对 / 校对结果** | 切分区块内校对 JSON；底部选段校对；第三块看结果 | 进度、前后差异、差异文件、勘误表 |
+| **专项检查** | 校对面板第四块 | 字词、标题树、段内序号、对齐标题、重文、引文核对 |
+| **知识核查** | 预置提示词 | 先资料检索，再在校对时选用；不是独立命令 |
+| **用户扩展能力** | 提示词 / 替换表等 | 见 [第六节](#六用户扩展能力) |
 
 ### 术语简表
 
@@ -47,64 +47,69 @@
 
 ## 一、各业务场景快速入口
 
-从你的稿件类型或任务出发，找到简明操作指引。流程图见 [第三节](#三典型业务流程mermaid-图)。
+按校对面板四块 + 资料检索分支操作。流程图见 [第三节](#三典型业务流程mermaid-图)。稿件类型示例见 [1.6](#16-按稿件类型)。
 
-### 1.1 书稿（Word/PDF 来稿，整本书校对）
+### 1.1 文档整理
 
-先打开 **校对面板**（命令 open proofreading panel），面板内有**按钮**完成大部分操作。
-
-| 步骤 | 操作（优先用 UI） |
-|------|-------------------|
-| 1. 打开校对面板 | 通过左侧活动栏图标的指引打开 **校对面板**；或在命令面板输入「open proofreading panel」→ 打开 **校对面板** |
-| 2. 文件转换（可选） | 面板顶部点 **「docx → Markdown」** 或 **「PDF → Markdown」**（docx 需 Pandoc；PDF 在 Windows 已内置 pdftotext） |
-| 3. 整理（可选） | 面板内点 **「整理段落」**、**「根据目录标记标题」** |
-| 4. 选主文件 | 面板内点 **「选择主文件」** 或 **「从工作区选择」** |
-| 5. 切分 | 面板内点 **「切分文档」**，选择切分模式（见 [3.3](#33-切分模式选择决策简图)） |
-| 6. 校对 | 面板内点 **「校对JSON文件」** |
-| 7. 查看 | 面板内点 **「比较前后差异」** 或 **「生成勘误表」** |
-
-### 1.2 单篇文章 / 选段
-
-| 任务 | 操作（优先用 UI） |
-|------|-------------------|
-| 校对这一小段 | 选中文字 → **右键** → **proofread selection**（或 **with memory**）；或 **校对面板** 底部对应链接 |
-| 先查资料再校对 | overview → **检索面板** → 开始准备 → 勾选命中 → **导出 md** → **校对面板** proofread selection（可选「知识核查」提示词 + 参考文件） |
-| 要带固定参考全文 | 选段校对时选「使用参考文件」；或 JSON **Merge Two Files** 并入 Markdown |
-
-### 1.3 练习册（题 + 答案需一起校对）
-
-| 步骤 | 操作（优先用 UI） |
-|------|-------------------|
-| 1. 切分 | **校对面板** 选主稿 → 点 **「切分文档」**，得到 JSON |
-| 2. 合并语境 | **校对面板** 切分完成后，点 **「合并 JSON」**，选答案文件，拼接到 target 或 context；若正文侧多了章/节标题单元，可在提示中填写要忽略的标题级别 |
-| 3. 校对 | **校对面板** 点 **「校对JSON文件」** |
-
-### 1.4 学术稿（需核对引文 / 查资料）
-
-| 步骤 | 操作（优先用 UI） |
-|------|-------------------|
-| 1. 建索引 | 设置 `citation.referencesPath` → **检索面板** 底部 **「建立引文索引」** |
-| 2. 核对选中 | 选中引文 → **检索面板** **「核对选中引文」** → 侧栏 **资料检索** |
-| 3. 核对全文 | **检索面板** **「核对全文引文」** → 侧栏 **引文核查** |
-| 4. 多源检索 | **检索面板** 勾选来源 → **开始准备**；或底部单源 / 外跳命令 |
-
-### 1.5 专项检查（错别字、异形词、序号、重文）
-
-| 任务 | 操作（优先用 UI） |
-|------|-------------------|
-| 字词检查 | **校对面板** **「字词检查」** → overview 打开相关侧栏视图 |
-| 标题与序号 | overview **标题树 / 段内序号**；或命令 **check numbering hierarchy** |
-| 重文检查 | **校对面板** **「重复句扫描」** → 侧栏 **重文检查** |
-
-### 1.6 其他常用操作
-
-| 我想… | 建议操作（优先用 UI） |
+| 我想… | 操作（校对面板第一块） |
 |-------|------------------------|
-| 看改了哪里 | **校对面板** **「比较前后差异」** / **「生成勘误表」**；或右键 diff |
-| 换一种 AI 用法 | overview **提示词**；或 **校对面板** **「管理提示词」** |
-| 分词或词频统计 | **校对面板** **「分词与统计」** |
-| 转 Word 交稿 | **校对面板** **「Markdown → docx」** |
-| 清除检索缓存 | **检索面板** **「清除检索缓存」** |
+| 转 Markdown / 交 Word | **「docx → Markdown」** / **「PDF → Markdown」** / **「Markdown → docx」** |
+| 分段、去空白 | **「整理段落」**、**「删除行中空白」** |
+| 标点与用字 | **「半角引号转全角」**、**「半角标点转全角」** / **「全角标点转半角」**、**「繁简转换」**、**「方正带圈序号」** |
+| 标题 | **「根据目录标记标题」**；并排两个 md 后 **「对齐标题」** |
+| 分句 / 词频 | **「切分为句子」**、**「分词与统计」** |
+| 对照两个稿本 | **「与另一文件比较」** |
+
+### 1.2 切分与合并
+
+| 步骤 | 操作（校对面板第二块） |
+|------|------------------------|
+| 1. 选主文件 | **「选择主文件」** 或 **「从工作区选择」** |
+| 2. 切分 | **「切分文档」**，选择切分模式（见 [3.3](#33-切分模式选择决策简图)） |
+| 3. 合并语境（可选） | **「合并 JSON」**；可忽略当前文件指定标题级别开头的单元 |
+| 4. 资料检索（可选） | **「准备参考资料」** → 进入 [1.3](#13-资料检索切分与合并的分支) |
+| 5. 批量校对 | **「LLM 校对 JSON」** → 结果在「校对结果」 |
+
+### 1.3 资料检索（切分与合并的分支）
+
+JSON：切分区块 **「准备参考资料」**。选段：overview → **检索面板**（不必先切分）。**检索面板不做校对。**
+
+| 任务 | 操作 |
+|------|------|
+| 多源准备 | 勾选来源 → **开始准备** → 侧栏 **资料检索** 勾选命中 |
+| JSON 写入 reference | **合并选中到源 JSON**（唯一正式路径；不自动写入） |
+| 选段导出 | **导出 md** → 回到校对面板选段校对，可选用「知识核查」 |
+| 意图 / 词典 / 外跳 | 检索面板底部：意图检索、直接查词典、PDF / 识典 / 古籍库 |
+| 核对引文 | **核对选中引文** → 资料检索；**核对全文引文** → 引文核查（须先建索引） |
+| 清除检索缓存 | 检索面板 **「清除检索缓存」** |
+
+### 1.4 校对 / 校对结果
+
+| 任务 | 操作 |
+|------|------|
+| 校对这一小段 | 选中文字 → 校对面板底部 **校对选中文本**（或 **带编辑记忆**）；或右键 |
+| 批量校对 JSON | 切分与合并区块 **「LLM 校对 JSON」** |
+| 看改了哪里 | **校对结果** **「比较前后差异」** / **「生成差异文件」** / **「生成勘误表」** |
+| 换一种 AI 用法 | overview **提示词**；或「管理提示词」后在校对时选用 |
+
+### 1.5 专项检查
+
+| 任务 | 操作（校对面板第四块） |
+|------|------------------------|
+| 字词检查 | **「字词检查」** → overview 打开相关侧栏 |
+| 标题与序号 | **「检查标题树」** / **「检查段内序号」** |
+| 对齐两个文件的标题 | 并排打开两个 md → **「对齐标题」**（文档整理区亦有） |
+| 重文检查 | **「重复句扫描」** → 侧栏 **重文检查** |
+| 引文核对 | **「核对选中引文」** / **「核对全文引文」**；详细流程见 [1.3](#13-资料检索切分与合并的分支) |
+
+### 1.6 按稿件类型
+
+| 稿件 / 任务 | 建议路径 |
+|-------------|----------|
+| 书稿（Word/PDF，整本） | [1.1](#11-文档整理) 转换整理 → [1.2](#12-切分与合并) 切分校对 → [1.4](#14-校对--校对结果) 看结果 |
+| 单篇 / 选段 | [1.4](#14-校对--校对结果) 选段校对；需资料则 [1.3](#13-资料检索切分与合并的分支) |
+| 练习册（题 + 答案） | [1.1](#11-文档整理) 对齐标题 → [1.2](#12-切分与合并) 切分后合并 JSON（可忽略多余标题级别）→ 校对 |
+| 学术稿（引文 / 查资料） | [1.3](#13-资料检索切分与合并的分支) 建索引并核对；或 [1.5](#15-专项检查) 入口 |
 
 ---
 
@@ -122,6 +127,9 @@
 | 转 Word、转 Markdown | convert docx/markdown |
 | 查错别字、异形词 | check words |
 | 检查序号、标题层级 | check numbering hierarchy |
+| 对齐标题、题答是否一一对应 | align headings |
+| 半角标点、全角标点 | half-width / full-width punctuation |
+| 方正带圈序号、阳圈码 | replace Founder circled numbers |
 | 重文、重复句 | scan duplicate sentences |
 | 分词、词频、字频 | segment file / segment selection |
 | 合并语境、加参考资料 | merge two files；检索面板导出/合并到 JSON |
@@ -137,18 +145,19 @@ flowchart LR
     subgraph 方式一["选段校对"]
         S1["打开 Markdown"]
         S2["选中一段文字"]
-        S3["proofread selection<br/>（或 with memory 强制记忆）"]
-        S4["查看 diff → 写回选区/<br/>memory.json 记忆"]
+        S3["面板底部：校对选中文本<br/>（或带编辑记忆）"]
+        S4["查看 diff → 写回选区"]
         S1 --> S2 --> S3 --> S4
     end
 
     subgraph 方式二["长文档校对"]
-        L1["打开 Markdown"]
-        L2["split file <br> 切分文件"]
-        L3["得到 JSON"]
-        L4["proofread file <br> 批量校对文件"]
-        L5["结果面板 / diff / 勘误表"]
+        L1["文档整理"]
+        L2["切分与合并"]
+        L3["可选：资料检索"]
+        L4["LLM 校对 JSON"]
+        L5["校对结果：diff / 勘误表"]
         L1 --> L2 --> L3 --> L4 --> L5
+        L2 --> L4
     end
 ```
 
@@ -156,45 +165,36 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    subgraph 准备["📄 文档准备"]
-        A["原始稿：docx / PDF / text / TeX / LaTeX / ComTeXt"]
-        B["convert docx to markdown <br> Word 转 Markdown"]
-        C["convert PDF to markdown <br> PDF 转 Markdown"]
-        D["format paragraphs / mark titles <br> 整理段落 / 标记标题"]
-        E["可校对之 Markdown"]
-        A --> B
-        A --> C
-        B --> E
-        C --> D
-        D --> E
+    subgraph 整理["📄 文档整理"]
+        A["原始稿：docx / PDF / text / TeX"]
+        B["转换格式 / 整理段落标点 / 标记或对齐标题"]
+        C["可校对之 Markdown"]
+        A --> B --> C
     end
 
-    subgraph 切分["✂️ 文档切分"]
-        E --> F["split file <br> 选择模式切分文件"]
-        F --> G["按长度 / 按标题 / 按标题 + 长度 / 带上下文"]
-        G --> H["得到 filename.json + filename.json.md"]
+    subgraph 切分合并["✂️ 切分与合并"]
+        C --> D["选择主文件 → 切分文档"]
+        D --> E["filename.json + .json.md"]
+        E --> F["可选：合并 JSON 组织语境"]
     end
 
-    subgraph 语境["🔗 可选：组织语境"]
-        H --> I["merge two files <br> 合并两个文件"]
-        I --> J["并入或更新 target / context / reference （目标文本 / 语境 / 参考资料）"]
+    subgraph 检索["🔎 资料检索（分支）"]
+        E --> G["准备参考资料"]
+        G --> H["检索面板勾选 → 导出 md / 合并到源 JSON"]
     end
 
-    subgraph 校对["✏️ 校对"]
-        J --> K["proofread file <br> 校对JSON文件"]
-        H --> K
-        K --> L["得到 filename.proofread.json filename.proofread.json.md 等"]
+    subgraph 校对结果["✏️ 校对 / 校对结果"]
+        F --> I["LLM 校对 JSON"]
+        H --> I
+        E --> I
+        I --> J["校对结果：前后差异 / 差异文件 / 勘误表"]
+        C --> K["底部：选段校对"]
+        K --> J
     end
 
-    subgraph 查看["👀 查看结果"]
-        L --> M["diff it with another file <br> 与另一文件比较差异"]
-        L --> N["结果面板：前后差异 / 勘误表 / HTML"]
+    subgraph 专项["🔍 专项检查"]
+        C --> L["字词 / 标题树 / 段内序号 / 对齐标题 / 重文 / 引文"]
     end
-
-    准备 --> 切分
-    切分 --> 语境
-    语境 --> 校对
-    校对 --> 查看
 ```
 
 ### 3.3 切分模式选择（决策简图）
@@ -240,53 +240,40 @@ flowchart LR
 
 ## 四、命令速查表
 
-**优先用 UI**：
+**优先用 UI**，按校对面板四块 + 资料检索分支：
 
-- **校对面板**（overview「校对面板」或 `open proofreading panel`）：文档转换/整理、切分校对、字词与序号、重文、diff、提示词与设置。
-- **检索面板**（overview「检索面板」或 `Open Reference Search Panel（检索面板）`）：多源准备、单源/意图检索、外跳搜索、引文核对、清除检索缓存；命中可勾选导出 md/JSON 或合并到源 JSON。**校对请到校对面板。**
-- 两面板底部快捷命令**不重复**；命令面板（Ctrl+Shift+P）输入「AI Proofreader」可查全部。⭐ 表示核心/常用。
+- **文档整理 / 切分与合并 / 校对结果 / 专项检查**：overview「校对面板」或 `open proofreading panel`
+- **资料检索**：切分区块「准备参考资料」，或 overview「检索面板」。**校对请到校对面板。**
+- 命令面板（Ctrl+Shift+P）输入「AI Proofreader」可查全部。⭐ 表示核心/常用。
 
 | 命令 | 简短说明 |
 |------|----------|
-| **文档转换**（校对面板） | |
+| **文档整理**（校对面板第一块） | |
 | AI Proofreader: convert docx to markdown | 将 Word(docx) 转为 Markdown，需安装 Pandoc |
 | AI Proofreader: convert PDF to markdown | 将活文字 PDF 转为 Markdown（Windows 内置 pdftotext；其他系统需自行安装） |
 | AI Proofreader: convert markdown to docx | 将 Markdown 转为 Word(docx) |
-| **文档整理**（校对面板） | |
 | AI Proofreader: format paragraphs | 整理段落：段末加空行 / 删除段内分行 |
-| AI Proofreader: mark titles from table of contents | 根据目录表（Markdown 列表）在文档中标记标题 |
-| AI Proofreader: check numbering hierarchy | 检查带序号的标题，也可用于标记这些标题 |
+| AI Proofreader: delete inline whitespace | 删除汉字及中文标点之间过短的空白 |
 | AI Proofreader: convert quotes to Chinese | 半角引号转全角（可设为校对后自动执行） |
-| AI Proofreader: replace Founder circled numbers | 方正书版 PDF 带圈序号 → Unicode ①… 或方头扩注序号 [1]；并清除常见版面杂质 |
 | AI Proofreader: half-width punctuation to full-width | 半角标点转全角（,;:!? → ，；：！？） |
 | AI Proofreader: full-width punctuation to half-width | 全角标点转半角（，；：！？ → ,;:!?） |
-| **文档切分与语境合并** | |
+| AI Proofreader: OpenCC / OpenCC selection | 繁简或地区用字转换 |
+| AI Proofreader: replace Founder circled numbers | 方正书版 PDF 带圈序号 → Unicode ①… 或方头扩注 [n]；并清除常见版面杂质 |
+| AI Proofreader: mark titles from table of contents | 根据目录表（Markdown 列表）在文档中标记标题 |
+| AI Proofreader: align headings | 并排打开两个 Markdown，按指定级别检查标题是否一一对应（专项检查区亦有） |
+| AI Proofreader: split into sentences | 将整篇或选区按简易中文分句，并用所选分隔符连接 |
+| AI Proofreader: segment file / segment selection | 分词 / 词频统计 / 字频统计 |
+| AI Proofreader: diff it with another file ⭐ | 比较两个文件（整理阶段或校对结果均可；含内置 diff / HTML / 勘误表） |
+| **切分与合并**（校对面板第二块） | |
+| AI Proofreader: open proofreading panel ⭐ | 打开 **校对面板** |
 | AI Proofreader: split file ⭐ | 切分文件（统一入口，会提示选择切分模式） |
 | AI Proofreader: split by length | 按长度切分，输入目标字符数 |
 | AI Proofreader: split by title | 按标题切分，输入标题级别（如 1,2） |
 | AI Proofreader: split by title and length | 按标题+长度：题下过长则再切、过短则合并 |
 | AI Proofreader: split by length with title context | 按长度切分，并为每段配上所在标题范围的上下文（注意 token 费用） |
 | AI Proofreader: split by length with paragraph context | 按长度切分，并为每段配上前后段落作为上下文（注意 token 费用） |
-| AI Proofreader: merge two files | 合并两个 JSON：把语境/参考资料并入校对用 JSON |
-| **合并与校对**（校对面板） | |
-| AI Proofreader: open proofreading panel ⭐ | 打开 **校对面板** |
-| AI Proofreader: proofread file ⭐ | 批量校对当前打开的 JSON 文件 |
-| AI Proofreader: proofread selection ⭐ | 校对当前选中的文本（选段校对） |
-| AI Proofreader: proofread selection with memory ⭐ | 选段校对并强制启用项目编辑记忆注入与写回 |
-| AI Proofreader: split into sentences | 将整篇或选区按简易中文分句，并用所选分隔符连接 |
-| **比较与结果呈现** | |
-| AI Proofreader: diff it with another file ⭐ | 比较两个文件差异（内置 diff / 生成 HTML 差异 / 生成勘误表） |
-| **提示词** | |
-| AI Proofreader: manage prompts | 管理提示词：增、删、改；在侧栏 prompts 视图中选择当前提示词 |
-| **分词与统计**（校对面板） | |
-| AI Proofreader: segment file | 分词 / 词频统计 / 字频统计（整文件） |
-| AI Proofreader: segment selection | 分词 / 词频统计 / 字频统计（选中部分） |
-| **专项检查**（校对面板 + overview 开关） | |
-| AI Proofreader: check words | 字词检查：词典检查、通用规范汉字表、自定义替换表 |
-| AI Proofreader: manage custom tables | 管理自定义替换表 |
-| AI Proofreader: check numbering hierarchy | 检查标题序号层级与段内序号 |
-| AI Proofreader: scan duplicate sentences in document / selection | 重文检查（全文 / 选区） |
-| **资料准备 / 检索**（检索面板；命令面板搜 `AI Proofreader Search`） | |
+| AI Proofreader: merge two files | 合并两个 JSON，或把同一 Markdown 全文并入各条；可忽略当前文件指定标题级别开头的单元 |
+| **资料检索**（切分与合并的分支；命令面板搜 `AI Proofreader Search`） | |
 | Open Reference Search Panel（检索面板）⭐ | 打开 **检索面板**（配置、时间线、勾选命中、导出/合并；不做校对） |
 | Prepare References for Selection / JSON File（资料准备） | 选段或 JSON 批量准备；结果进过程文件；JSON **不自动写入**源文件 |
 | Look Up Local Dictionary（直接查词典） | 精确整词查本地 MDX（无 LLM） |
@@ -296,9 +283,18 @@ flowchart LR
 | Verify Selected Citation（核对选中引文） | 结果 → **资料检索** |
 | Verify Citations（核对全文引文） / Build Citation Reference Index | 结果 → **引文核查**；索引亦供 BM25 |
 | Clear Project Retrieval Cache | 清除 `.proofread/retrieval-cache.json` |
-| **便捷工具**（检索面板底部；`AI Proofreader Tools`） | |
 | Search Selection in PDF / Shidianguji / Ancientbooks | 外跳；不进入 reference corpus |
 | Search Citation in PDF | 引文树右键：文献 PDF 反查 |
+| **校对 / 校对结果** | |
+| AI Proofreader: proofread file ⭐ | 批量校对 JSON（切分区块「LLM 校对 JSON」） |
+| AI Proofreader: proofread selection ⭐ | 校对选中文本（面板底部） |
+| AI Proofreader: proofread selection with memory ⭐ | 选段校对并强制启用项目编辑记忆注入与写回 |
+| AI Proofreader: manage prompts | 管理提示词：增、删、改；在侧栏 prompts 视图中选择当前提示词 |
+| **专项检查**（校对面板第四块 + overview 开关） | |
+| AI Proofreader: check words | 字词检查：词典检查、通用规范汉字表、自定义替换表 |
+| AI Proofreader: manage custom tables | 管理自定义替换表 |
+| AI Proofreader: check numbering hierarchy | 检查标题序号层级与段内序号 |
+| AI Proofreader: scan duplicate sentences in document / selection | 重文检查（全文 / 选区） |
 
 ---
 
@@ -343,7 +339,7 @@ flowchart LR
 | **标题与序号** | numbering.ignoreMarkdownPrefix、customLevels、customInlinePatterns |
 | **资料检索** | referencePrep.*（来源、强度、维基、retrievalCache.enabled / ttlHours / maxEntries） |
 
-完整配置说明见 [README - 配置](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/README.md)。
+完整配置说明见 [README - 配置](../README.md)。
 
 ---
 
@@ -359,7 +355,7 @@ flowchart LR
 | **标题层级规则** | 设置 `numbering.customLevels` | 标题树检查用；自定义序号格式 |
 | **段内序号规则** | 设置 `numbering.customInlinePatterns` | 段内序号检查用；自定义 pattern |
 
-详细说明见扩展主页面或 [README](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/README.md)。
+详细说明见扩展主页面或 [README](../README.md)。
 
 ---
 
@@ -367,5 +363,5 @@ flowchart LR
 
 - **Mermaid 图**：可在支持 Mermaid 的 Markdown 预览（如 VS Code 插件）、GitHub/GitLab、Notion 等中直接渲染为流程图。
 - **命令查找**：命令面板输入「AI Proofreader」或「proofread」「split」「Search」等关键词即可缩小范围。
-- **详细说明**：每个命令的详细用法、依赖（Pandoc、pdftotext、SumatraPDF 等）和注意事项见扩展主页面或 [README](https://github.com/Fusyong/ai-proofread-vscode-extension/blob/main/README.md)；设置说明可在设置界面看到。
-- **面板分工**：资料检索、引文核对、外跳搜索只在**检索面板**；格式整理、校对、字词/序号/重文、diff 只在**校对面板**。
+- **详细说明**：每个命令的详细用法、依赖（Pandoc、pdftotext、SumatraPDF 等）和注意事项见扩展主页面或 [README](../README.md)；设置说明可在设置界面看到。版本历史见 [changelog.md](changelog.md)。
+- **面板分工**：校对面板四块为 **文档整理**、**切分与合并**、**校对结果**、**专项检查**；**资料检索**是切分与合并的分支（检索面板）。引文核对在检索面板与专项检查区都有入口。
