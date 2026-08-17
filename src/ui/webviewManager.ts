@@ -921,7 +921,7 @@ export class WebviewManager {
         return `
             <div class="process-section">
                 <h3>🔍 专项检查</h3>
-                <p class="hint">作用于当前编辑窗口。结果出现在左侧对应列表。</p>
+                <p class="hint">作用于当前编辑窗口。某些结果列表会出现在左侧栏。</p>
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('checkWords')" title="字词检查">字词检查</button>
                     <button class="action-button" onclick="handleAction('manageCustomTables')" title="管理自定义替换表">管理替换表</button>

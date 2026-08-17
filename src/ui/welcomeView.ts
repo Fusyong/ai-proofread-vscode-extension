@@ -140,10 +140,10 @@ function getHtml(): string {
         </button>
     </div>
     <div class="hint">
-        检查结果会在运行对应命令后出现在侧栏；配置类视图（模型路由、提示词）可在此开关。
+        使用本扩展的三个途径：
         <ol>
             <li>打开校对面板 / 检索面板，使用按钮</li>
-            <li>打开命令面板 (Ctrl+Shift+P)，输入 AI Proofreader</li>
+            <li>打开命令面板 (Ctrl+Shift+P)，输入 AI Proofreader ... 查找并运行命令</li>
             <li>在编辑窗口使用鼠标右键菜单</li>
         </ol>
     </div>
