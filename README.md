@@ -1,4 +1,4 @@
-*QQ群“ai-proofreader 校对插件”：1055031650*
+﻿*QQ群“ai-proofreader 校对插件”：1055031650*
 
 一个用于文档和图书校对、基于大语言模型服务的VS Code扩展，支持选中文本直接校对、长文档切分后批量校对、带记忆地校对选段（实验功能）三种工作流，并集成了一些跟校对相关的辅助功能。[这里是代码库](https://github.com/Fusyong/ai-proofread-vscode-extension)。本扩展的原型基于一个Python校对工具库[Fusyong/ai-proofread](https://github.com/Fusyong/ai-proofread)。
 
@@ -8,9 +8,12 @@ A VS Code extension for document and book proofreading based on LLM services, su
 
 Additionally, you can set your own prompts for other text processing scenarios, such as translation, annotation, and creating exercises; you can also customize replacement tables and checklists, run batch regex find-and-replace, or use them as prompts only.
 
-## 最近更新（v1.12.8）
+## 最近更新
 
-- 更新：校对面板「文档整理」增加半角/全角标点转换入口，并调整方正带圈序号等按钮文案
+当前版本 v1.12.9
+
+- 更新文档
+- 特性：在按钮提示中显示对应命令
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
