@@ -112,22 +112,22 @@ function getHtml(): string {
 </head>
 <body>
     <div class="btn-row">
-        <button type="button" class="btn-primary" data-action="openPanel" title="打开校对面板">校对面板</button>
-        <button type="button" class="btn-primary" data-action="openSearchConsole" title="打开参考资料检索控制台">检索面板</button>
+        <button type="button" class="btn-primary" data-action="openPanel" title="打开校对面板 (openProofreadingPanel)">校对面板</button>
+        <button type="button" class="btn-primary" data-action="openSearchConsole" title="打开参考资料检索控制台 (referencePrep.openConsole)">检索面板</button>
     </div>
     <div class="action-grid">
-        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="modelRoutes" title="显示或隐藏模型路由">
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="modelRoutes" title="显示或隐藏模型路由 (modelRoutes.toggleView)">
             <span class="cell-label">模型路由</span>
         </button>
-        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="prompts" title="显示或隐藏提示词">
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="prompts" title="显示或隐藏提示词 (prompts.toggleViews)">
             <span class="cell-label">提示词</span>
         </button>
     </div>
     <div class="action-grid">
-        <button type="button" class="cell cell-action" data-action="openSettings" title="打开扩展设置">
+        <button type="button" class="cell cell-action" data-action="openSettings" title="打开扩展设置 (workbench.action.openSettings)">
             <span class="cell-label">设置</span>
         </button>
-        <button type="button" class="cell cell-action" data-action="hideResultViews" title="收起字词、引文、重文等检查结果列表">
+        <button type="button" class="cell cell-action" data-action="hideResultViews" title="收起字词、引文、重文等检查结果列表 (sidebar.hideResultViews)">
             <span class="cell-label">收起结果列表</span>
         </button>
     </div>

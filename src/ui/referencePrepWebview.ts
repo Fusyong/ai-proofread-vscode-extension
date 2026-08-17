@@ -46,11 +46,12 @@ import {
 import { getWorkingTextEditor, focusWorkingTextEditor } from './lastActiveTextEditor';
 import { FilePathUtils } from '../utils';
 import { setReferenceHitVisible } from './sidebarViewVisibility';
+import { commandHoverTitle } from './commandHover';
 
 const PANEL_ID = 'ai-proofread.referencePrepConsole';
 const PANEL_TITLE = 'References search panel';
 /** 递增以在扩展更新后强制刷新已打开面板的 HTML（避免旧界面缺导出提示条）。 */
-const WEBVIEW_HTML_REVISION = 15;
+const WEBVIEW_HTML_REVISION = 16;
 
 export class ReferencePrepWebview {
     private panel: vscode.WebviewPanel | undefined;
@@ -1465,37 +1466,37 @@ body.mode-json .btn-json-only { display: inline-block; }
   <p class="header-commands-hint">常用检索命令（作用于当前编辑器选区/文档；Ctrl+Shift+P 可查全部）</p>
   <div class="header-actions">
     <span class="cmd-group-label">单源检索：</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.dictPrep" title="仅本地词典（LLM 规划+精排）">词典·LLM规划</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.dictPrep" title="${commandHoverTitle('仅本地词典（LLM 规划+精排）', 'ai-proofread.search.dictPrep')}">词典·LLM规划</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsGrep" title="仅参考资料 grep（规划+精排）">Grep</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsGrep" title="${commandHoverTitle('仅参考资料 grep（规划+精排）', 'ai-proofread.search.refsGrep')}">Grep</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="仅 BM25（规划+精排；需先建立引文索引）">BM25</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="${commandHoverTitle('仅 BM25（规划+精排；需先建立引文索引）', 'ai-proofread.search.refsBm25')}">BM25</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsVector" title="仅轻量向量（规划+精排）">向量</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsVector" title="${commandHoverTitle('仅轻量向量（规划+精排）', 'ai-proofread.search.refsVector')}">向量</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.wikipedia" title="仅维基百科（规划+精排）">查维基</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.wikipedia" title="${commandHoverTitle('仅维基百科（规划+精排）', 'ai-proofread.search.wikipedia')}">查维基</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.web" title="Web 搜索尚未实现" disabled style="opacity:0.5;cursor:not-allowed;text-decoration:none;">Web（未实现）</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.web" title="${commandHoverTitle('Web 搜索尚未实现', 'ai-proofread.search.web')}" disabled style="opacity:0.5;cursor:not-allowed;text-decoration:none;">Web（未实现）</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.llmGrepSearchReferences" title="用自然语言描述检索意图，LLM 规划后多源检索（默认词典+grep+BM25+向量）">意图检索</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.llmGrepSearchReferences" title="${commandHoverTitle('用自然语言描述检索意图，LLM 规划后多源检索（默认词典+grep+BM25+向量）', 'ai-proofread.llmGrepSearchReferences')}">意图检索</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.queryLocalDictSelection" title="整词查本地 MDX，无 LLM">直接查词典</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.queryLocalDictSelection" title="${commandHoverTitle('整词查本地 MDX，无 LLM', 'ai-proofread.queryLocalDictSelection')}">直接查词典</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInPDF" title="search selection in PDF">从md反查PDF</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInPDF" title="${commandHoverTitle('search selection in PDF', 'ai-proofread.searchSelectionInPDF')}">从md反查PDF</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInShidianguji" title="search selection in Shidianguji">识典古籍</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInShidianguji" title="${commandHoverTitle('search selection in Shidianguji', 'ai-proofread.searchSelectionInShidianguji')}">识典古籍</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInAncientbooks" title="search selection in Ancientbooks">中华经典古籍库</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInAncientbooks" title="${commandHoverTitle('search selection in Ancientbooks', 'ai-proofread.searchSelectionInAncientbooks')}">中华经典古籍库</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInReferences" title="search selection in References">VSCode搜索参考资料库</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInReferences" title="${commandHoverTitle('search selection in References', 'ai-proofread.searchSelectionInReferences')}">VSCode搜索参考资料库</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.citation.verifySelection" title="Verify Selected Citation">核对选中引文</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.citation.verifySelection" title="${commandHoverTitle('Verify Selected Citation', 'ai-proofread.citation.verifySelection')}">核对选中引文</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.citation.openView" title="Verify Citations">核对全文引文</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.citation.openView" title="${commandHoverTitle('Verify Citations', 'ai-proofread.citation.openView')}">核对全文引文</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.citation.rebuildIndex" title="供核对全文引文与资料准备 BM25 共用">建立引文索引</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.citation.rebuildIndex" title="${commandHoverTitle('供核对全文引文与资料准备 BM25 共用', 'ai-proofread.citation.rebuildIndex')}">建立引文索引</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.referencePrep.clearRetrievalCache" title="Clear Project Retrieval Cache">清除检索缓存</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.referencePrep.clearRetrievalCache" title="${commandHoverTitle('Clear Project Retrieval Cache', 'ai-proofread.referencePrep.clearRetrievalCache')}">清除检索缓存</button>
   </div>
 </div>
 
@@ -1770,12 +1771,14 @@ function renderHits(hits, groups, groupKind) {
       const b = document.createElement('button');
       b.className = 'secondary';
       b.textContent = '打开';
+      b.title = ${JSON.stringify(commandHoverTitle('打开命中位置', 'ai-proofread.referencePrep.openHit'))};
       b.onclick = () => vscode.postMessage({ command: 'openHit', hitId: h.hitId });
       actions.appendChild(b);
     }
     const copy = document.createElement('button');
     copy.className = 'secondary';
     copy.textContent = '复制';
+    copy.title = ${JSON.stringify(commandHoverTitle('复制 reference 块', 'ai-proofread.referencePrep.copyBlock'))};
     copy.onclick = () => vscode.postMessage({ command: 'copyBlock', hitId: h.hitId });
     actions.appendChild(copy);
     body.appendChild(actions);

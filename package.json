@@ -19,7 +19,8 @@
       },
       {
         "command": "ai-proofread.prompts.new",
-        "title": "新建提示词"
+        "title": "新建提示词 (prompts.new)",
+        "shortTitle": "新建提示词"
       },
       {
         "command": "ai-proofread.prompts.edit",
@@ -31,12 +32,14 @@
       },
       {
         "command": "ai-proofread.sourceTextCharacteristics.openView",
-        "title": "源文本特性提示词",
+        "title": "源文本特性提示词 (sourceTextCharacteristics.openView)",
+        "shortTitle": "源文本特性提示词",
         "icon": "$(symbol-keyword)"
       },
       {
         "command": "ai-proofread.dictPrepPrompts.openView",
-        "title": "检索规划提示词",
+        "title": "检索规划提示词 (dictPrepPrompts.openView)",
+        "shortTitle": "检索规划提示词",
         "icon": "$(book)"
       },
       {
@@ -45,7 +48,8 @@
       },
       {
         "command": "ai-proofread.dictPrepPrompts.new",
-        "title": "新建提示词"
+        "title": "新建提示词 (dictPrepPrompts.new)",
+        "shortTitle": "新建提示词"
       },
       {
         "command": "ai-proofread.dictPrepPrompts.edit",
@@ -57,7 +61,8 @@
       },
       {
         "command": "ai-proofread.sourceTextCharacteristics.new",
-        "title": "新建提示词"
+        "title": "新建提示词 (sourceTextCharacteristics.new)",
+        "shortTitle": "新建提示词"
       },
       {
         "command": "ai-proofread.sourceTextCharacteristics.edit",
@@ -103,13 +108,15 @@
       },
       {
         "command": "ai-proofread.referencePrep.openConsole",
-        "title": "Open Reference Search Panel（检索面板）",
+        "title": "Open Reference Search Panel（检索面板） (referencePrep.openConsole)",
+        "shortTitle": "Open Reference Search Panel（检索面板）",
         "category": "AI Proofreader Search",
         "icon": "$(window)"
       },
       {
         "command": "ai-proofread.modelRoutes.openView",
-        "title": "AI Proofreader: open model routes view",
+        "title": "AI Proofreader: open model routes view (modelRoutes.openView)",
+        "shortTitle": "AI Proofreader: open model routes view",
         "icon": "$(settings-gear)"
       },
       {
@@ -130,7 +137,8 @@
       },
       {
         "command": "ai-proofread.modelRoutes.refresh",
-        "title": "刷新模型路由",
+        "title": "刷新模型路由 (modelRoutes.refresh)",
+        "shortTitle": "刷新模型路由",
         "icon": "$(refresh)"
       },
       {
@@ -318,7 +326,8 @@
       },
       {
         "command": "ai-proofread.citation.openView",
-        "title": "Verify Citations（核对全文引文）",
+        "title": "Verify Citations（核对全文引文） (citation.openView)",
+        "shortTitle": "Verify Citations（核对全文引文）",
         "category": "AI Proofreader Search",
         "icon": "$(check)"
       },
@@ -329,7 +338,8 @@
       },
       {
         "command": "ai-proofread.citation.rebuildIndex",
-        "title": "Build Citation Reference Index（建立引文索引）",
+        "title": "Build Citation Reference Index（建立引文索引） (citation.rebuildIndex)",
+        "shortTitle": "Build Citation Reference Index（建立引文索引）",
         "category": "AI Proofreader Search",
         "description": "供核对全文引文与资料准备的 BM25 通道共用",
         "icon": "$(database)"
@@ -350,7 +360,8 @@
       },
       {
         "command": "ai-proofread.duplicate.scanDocument",
-        "title": "AI Proofreader: scan duplicate sentences in document",
+        "title": "AI Proofreader: scan duplicate sentences in document (duplicate.scanDocument)",
+        "shortTitle": "AI Proofreader: scan duplicate sentences in document",
         "icon": "$(search)"
       },
       {
@@ -368,7 +379,8 @@
       },
       {
         "command": "ai-proofread.checkWords",
-        "title": "AI Proofreader: check words",
+        "title": "AI Proofreader: check words (checkWords)",
+        "shortTitle": "AI Proofreader: check words",
         "icon": "$(play)"
       },
       {
@@ -397,17 +409,20 @@
       },
       {
         "command": "ai-proofread.wordCheck.applyReplaceVisible",
-        "title": "替换",
+        "title": "替换 (wordCheck.applyReplaceVisible)",
+        "shortTitle": "替换",
         "icon": "$(replace)"
       },
       {
         "command": "ai-proofread.wordCheck.applyInsertVisible",
-        "title": "插入",
+        "title": "插入 (wordCheck.applyInsertVisible)",
+        "shortTitle": "插入",
         "icon": "$(insert)"
       },
       {
         "command": "ai-proofread.wordCheck.sortAndFilter",
-        "title": "排序与筛选…",
+        "title": "排序与筛选… (wordCheck.sortAndFilter)",
+        "shortTitle": "排序与筛选…",
         "icon": "$(filter)"
       },
       {
@@ -428,7 +443,8 @@
       },
       {
         "command": "ai-proofread.customTables.loadTable",
-        "title": "加载替换表"
+        "title": "加载替换表 (customTables.loadTable)",
+        "shortTitle": "加载替换表"
       },
       {
         "command": "ai-proofread.dictCheckTypes.moveUp",
@@ -452,7 +468,8 @@
       },
       {
         "command": "ai-proofread.numbering.checkTitles",
-        "title": "检查标题树",
+        "title": "检查标题树 (numbering.checkTitles)",
+        "shortTitle": "检查标题树",
         "icon": "$(list-tree)"
       },
       {
@@ -471,12 +488,14 @@
       },
       {
         "command": "ai-proofread.numbering.markAsTitle",
-        "title": "标记为 Markdown 标题",
+        "title": "标记为 Markdown 标题 (numbering.markAsTitle)",
+        "shortTitle": "标记为 Markdown 标题",
         "icon": "$(markdown)"
       },
       {
         "command": "ai-proofread.numbering.markAllAsTitle",
-        "title": "全部标为标题",
+        "title": "全部标为标题 (numbering.markAllAsTitle)",
+        "shortTitle": "全部标为标题",
         "icon": "$(markdown)"
       },
       {
@@ -491,27 +510,32 @@
       },
       {
         "command": "ai-proofread.numbering.toggleSimplifiedLevel",
-        "title": "伸缩层级",
+        "title": "伸缩层级 (numbering.toggleSimplifiedLevel)",
+        "shortTitle": "伸缩层级",
         "icon": "$(fold)"
       },
       {
         "command": "ai-proofread.numbering.defineTitle",
-        "title": "定义标题",
+        "title": "定义标题 (numbering.defineTitle)",
+        "shortTitle": "定义标题",
         "icon": "$(add)"
       },
       {
         "command": "ai-proofread.numbering.checkSegments",
-        "title": "检查段内序号",
+        "title": "检查段内序号 (numbering.checkSegments)",
+        "shortTitle": "检查段内序号",
         "icon": "$(list-ordered)"
       },
       {
         "command": "ai-proofread.numberingSegments.toggleSimplifiedLevel",
-        "title": "伸缩层级",
+        "title": "伸缩层级 (numberingSegments.toggleSimplifiedLevel)",
+        "shortTitle": "伸缩层级",
         "icon": "$(fold)"
       },
       {
         "command": "ai-proofread.numbering.defineSegmentPattern",
-        "title": "定义段内序号",
+        "title": "定义段内序号 (numbering.defineSegmentPattern)",
+        "shortTitle": "定义段内序号",
         "icon": "$(add)"
       },
       {
@@ -529,12 +553,14 @@
       },
       {
         "command": "ai-proofread.proofreadItems.setSort",
-        "title": "排序…",
+        "title": "排序… (proofreadItems.setSort)",
+        "shortTitle": "排序…",
         "icon": "$(list-ordered)"
       },
       {
         "command": "ai-proofread.proofreadItems.setConfidenceFilter",
-        "title": "置信度筛选…",
+        "title": "置信度筛选… (proofreadItems.setConfidenceFilter)",
+        "shortTitle": "置信度筛选…",
         "icon": "$(filter)"
       },
       {

@@ -16,6 +16,7 @@ import { collectWordErrors, formatWordErrors, parseDelimitersFromConfig } from '
 import { proofreadJsonPathToSegmentsJsonPath, segmentsJsonPathToSplitMarkdownPath } from '../proofreadSplitLayout';
 import { focusWorkingTextEditor } from './lastActiveTextEditor';
 import { setProofreadItemsVisible } from './sidebarViewVisibility';
+import { commandHoverTitle } from './commandHover';
 
 // 接口定义
 /** 配套文档检测结果 */
@@ -789,7 +790,7 @@ export class WebviewManager {
     }
 
     /**
-     * 生成完整 HTML：文档整理 → 切分（含主文件）→ 校对结果 → 专项检查
+     * 生成完整 HTML：文档整理 → 切分与合并（含主文件）→ 校对结果 → 专项检查
      */
     private generateFullHtml(result: ProcessResult, context?: vscode.ExtensionContext): string {
         return this.getBaseHtml(`
@@ -816,31 +817,31 @@ export class WebviewManager {
                 <h3>📄 文档整理</h3>
                 <p class="hint">作用于当前编辑窗口中的文档。请先打开稿件，再点下方按钮（焦点可留在本面板）。</p>
                 <div class="section-actions">
-                    <button class="action-button" onclick="handleAction('convertDocxToMarkdown')" title="将 Word 转为 Markdown">docx → Markdown</button>
-                    <button class="action-button" onclick="handleAction('convertPdfToMarkdown')" title="将 PDF 转为 Markdown">PDF → Markdown</button>
-                    <button class="action-button" onclick="handleAction('convertMarkdownToDocx')" title="将 Markdown 转为 Word">Markdown → docx</button>
+                    <button class="action-button" onclick="handleAction('convertDocxToMarkdown')" title="${commandHoverTitle('将 Word 转为 Markdown', 'ai-proofread.convertDocxToMarkdown')}">docx → Markdown</button>
+                    <button class="action-button" onclick="handleAction('convertPdfToMarkdown')" title="${commandHoverTitle('将 PDF 转为 Markdown', 'ai-proofread.convertPdfToMarkdown')}">PDF → Markdown</button>
+                    <button class="action-button" onclick="handleAction('convertMarkdownToDocx')" title="${commandHoverTitle('将 Markdown 转为 Word', 'ai-proofread.convertMarkdownToDocx')}">Markdown → docx</button>
                     ${sep}
-                    <button class="action-button" onclick="handleAction('formatParagraphs')" title="整理段落">整理段落</button>
-                    <button class="action-button" onclick="handleAction('deleteInlineWhitespace')" title="删除行中空白">删除行中空白</button>
+                    <button class="action-button" onclick="handleAction('formatParagraphs')" title="${commandHoverTitle('整理段落', 'ai-proofread.formatParagraphs')}">整理段落</button>
+                    <button class="action-button" onclick="handleAction('deleteInlineWhitespace')" title="${commandHoverTitle('删除行中空白', 'ai-proofread.deleteInlineWhitespace')}">删除行中空白</button>
                     ${sep}
-                    <button class="action-button" onclick="handleAction('convertQuotes')" title="半角引号转全角">半角引号转全角</button>
-                    <button class="action-button" onclick="handleAction('halfToFullPunctuation')" title="半角 ,;:!? 转为 ，；：！？">半角标点转全角</button>
-                    <button class="action-button" onclick="handleAction('fullToHalfPunctuation')" title="全角 ，；：！？ 转为 ,;:!?">全角标点转半角</button>
-                    <button class="action-button" onclick="handleAction('opencc')" title="繁简 / 地区用字转换">繁简转换</button>
-                    <button class="action-button" onclick="handleAction('replaceFounderCircledNumbers')" title="方正书版带圈序号转为 Unicode 或 [n]">方正带圈序号</button>
+                    <button class="action-button" onclick="handleAction('convertQuotes')" title="${commandHoverTitle('半角引号转全角', 'ai-proofread.convertQuotes')}">半角引号转全角</button>
+                    <button class="action-button" onclick="handleAction('halfToFullPunctuation')" title="${commandHoverTitle('半角 ,;:!? 转为 ，；：！？', 'ai-proofread.halfToFullPunctuation')}">半角标点转全角</button>
+                    <button class="action-button" onclick="handleAction('fullToHalfPunctuation')" title="${commandHoverTitle('全角 ，；：！？ 转为 ,;:!?', 'ai-proofread.fullToHalfPunctuation')}">全角标点转半角</button>
+                    <button class="action-button" onclick="handleAction('opencc')" title="${commandHoverTitle('繁简 / 地区用字转换', 'ai-proofread.opencc')}">繁简转换</button>
+                    <button class="action-button" onclick="handleAction('replaceFounderCircledNumbers')" title="${commandHoverTitle('方正书版带圈序号转为 Unicode 或 [n]', 'ai-proofread.replaceFounderCircledNumbers')}">方正带圈序号</button>
                     ${sep}
-                    <button class="action-button" onclick="handleAction('markTitlesFromToc')" title="根据目录标记标题">根据目录标记标题</button>
-                    <button class="action-button" onclick="handleAction('alignHeadings')" title="请先并排打开两个文件，再检查标题是否一致">对齐标题</button>
+                    <button class="action-button" onclick="handleAction('markTitlesFromToc')" title="${commandHoverTitle('根据目录标记标题', 'ai-proofread.markTitlesFromToc')}">根据目录标记标题</button>
+                    <button class="action-button" onclick="handleAction('alignHeadings')" title="${commandHoverTitle('请先并排打开两个文件，再检查标题是否一致', 'ai-proofread.alignHeadings')}">对齐标题</button>
                     ${sep}
-                    <button class="action-button" onclick="handleAction('splitIntoSentences')" title="切分为句子">切分为句子</button>
-                    <button class="action-button" onclick="handleAction('segmentFile')" title="分词、词频与字频统计">分词与统计</button>
-                    <button class="action-button" onclick="handleAction('diffItWithAnotherFile')" title="与另一文件比较差异">与另一文件比较</button>
+                    <button class="action-button" onclick="handleAction('splitIntoSentences')" title="${commandHoverTitle('切分为句子', 'ai-proofread.splitIntoSentences')}">切分为句子</button>
+                    <button class="action-button" onclick="handleAction('segmentFile')" title="${commandHoverTitle('分词、词频与字频统计', 'ai-proofread.segmentFile')}">分词与统计</button>
+                    <button class="action-button" onclick="handleAction('diffItWithAnotherFile')" title="${commandHoverTitle('与另一文件比较差异', 'ai-proofread.diffItWithAnotherFile')}">与另一文件比较</button>
                 </div>
             </div>
         `;
     }
 
-    /** 切分：上部选主文件；有 JSON 后再露出配套文件与合并/校对 */
+    /** 切分与合并：上部选主文件；有 JSON 后再露出配套文件与合并/检索/校对 */
     private generateSplitSectionHtml(result: ProcessResult): string {
         const mainPath =
             result.mainFilePath ??
@@ -890,15 +891,15 @@ export class WebviewManager {
                 </div>
                 <div class="section-actions">
                     ${mainPath && jsonMdPath ? '<button class="action-button" onclick="handleAction(\'showSplitDiff\')">比较前后差异</button>' : ''}
-                    <button class="action-button" onclick="handleAction('mergeContext')">合并 JSON</button>
-                    <button class="action-button" onclick="handleAction('referencePrepJson')" title="打开切分 JSON 并打开检索面板">准备参考资料</button>
-                    <button class="action-button" onclick="handleAction('proofreadJson')">LLM 校对 JSON</button>
+                    <button class="action-button" onclick="handleAction('mergeContext')" title="${commandHoverTitle('合并 JSON', 'ai-proofread.mergeTwoFiles')}">合并 JSON</button>
+                    <button class="action-button" onclick="handleAction('referencePrepJson')" title="${commandHoverTitle('打开切分 JSON 并打开检索面板', 'ai-proofread.prepareReferencesJson')}">准备参考资料</button>
+                    <button class="action-button" onclick="handleAction('proofreadJson')" title="${commandHoverTitle('LLM 校对 JSON', 'ai-proofread.proofreadFile')}">LLM 校对 JSON</button>
                 </div>`
             : '';
 
         return `
             <div class="process-section">
-                <h3>✂️ 切分</h3>
+                <h3>✂️ 切分与合并</h3>
                 ${mainFileBlock}
                 ${lengthMismatch ? `
                 <div class="warning-box">
@@ -908,7 +909,7 @@ export class WebviewManager {
                 <div class="section-actions section-actions--between">
                     <button class="action-button" onclick="handleAction('selectMainFile')">${mainPath ? '更换主文件' : '选择主文件'}</button>
                     <button class="action-button" onclick="handleAction('selectMainFileFromWorkspace')">从工作区选择</button>
-                    <button class="action-button" onclick="handleAction('splitDocument')" title="AI Proofreader: split file"${mainPath ? '' : ' disabled'}>${hasJson ? '重新切分' : '切分文档'}</button>
+                    <button class="action-button" onclick="handleAction('splitDocument')" title="${commandHoverTitle('切分文档', 'ai-proofread.splitFile')}"${mainPath ? '' : ' disabled'}>${hasJson ? '重新切分' : '切分文档'}</button>
                 </div>
                 ${companionBlock}
             </div>
@@ -923,19 +924,19 @@ export class WebviewManager {
                 <h3>🔍 专项检查</h3>
                 <p class="hint">作用于当前编辑窗口。某些结果列表会出现在左侧栏。</p>
                 <div class="section-actions">
-                    <button class="action-button" onclick="handleAction('checkWords')" title="字词检查">字词检查</button>
-                    <button class="action-button" onclick="handleAction('manageCustomTables')" title="管理自定义替换表">管理替换表</button>
+                    <button class="action-button" onclick="handleAction('checkWords')" title="${commandHoverTitle('字词检查', 'ai-proofread.checkWords')}">字词检查</button>
+                    <button class="action-button" onclick="handleAction('manageCustomTables')" title="${commandHoverTitle('管理自定义替换表', 'ai-proofread.manageCustomTables')}">管理替换表</button>
                     ${sep}
-                    <button class="action-button" onclick="handleAction('numberingCheckTitles')" title="检查标题树">检查标题树</button>
-                    <button class="action-button" onclick="handleAction('numberingCheckSegments')" title="检查段内序号">检查段内序号</button>
+                    <button class="action-button" onclick="handleAction('numberingCheckTitles')" title="${commandHoverTitle('检查标题树', 'ai-proofread.numbering.checkTitles')}">检查标题树</button>
+                    <button class="action-button" onclick="handleAction('numberingCheckSegments')" title="${commandHoverTitle('检查段内序号', 'ai-proofread.numbering.checkSegments')}">检查段内序号</button>
                     ${sep}
-                    <button class="action-button" onclick="handleAction('alignHeadings')" title="请先并排打开两个文件，再检查标题是否一致">对齐标题</button>
+                    <button class="action-button" onclick="handleAction('alignHeadings')" title="${commandHoverTitle('请先并排打开两个文件，再检查标题是否一致', 'ai-proofread.alignHeadings')}">对齐标题</button>
                     ${sep}
-                    <button class="action-button" onclick="handleAction('duplicateScanDocument')" title="扫描全文重复句">重复句扫描</button>
-                    <button class="action-button" onclick="handleAction('duplicateScanSelection')" title="扫描选区重复句">重复句扫描（选区）</button>
+                    <button class="action-button" onclick="handleAction('duplicateScanDocument')" title="${commandHoverTitle('扫描全文重复句', 'ai-proofread.duplicate.scanDocument')}">重复句扫描</button>
+                    <button class="action-button" onclick="handleAction('duplicateScanSelection')" title="${commandHoverTitle('扫描选区重复句', 'ai-proofread.duplicate.scanSelection')}">重复句扫描（选区）</button>
                     ${sep}
-                    <button class="action-button" onclick="handleAction('citationOpenView')" title="核对全文引文">核对全文引文</button>
-                    <button class="action-button" onclick="handleAction('citationVerifySelection')" title="核对选中引文">核对选中引文</button>
+                    <button class="action-button" onclick="handleAction('citationOpenView')" title="${commandHoverTitle('核对全文引文', 'ai-proofread.citation.openView')}">核对全文引文</button>
+                    <button class="action-button" onclick="handleAction('citationVerifySelection')" title="${commandHoverTitle('核对选中引文', 'ai-proofread.citation.verifySelection')}">核对选中引文</button>
                 </div>
             </div>
         `;
@@ -947,9 +948,9 @@ export class WebviewManager {
         return `
             <p class="header-commands-hint">选段校对</p>
             <div class="header-actions">
-                <button type="button" class="link-button" onclick="handleAction('proofreadSelection')" title="校对选中文本">校对选中文本</button>
+                <button type="button" class="link-button" onclick="handleAction('proofreadSelection')" title="${commandHoverTitle('校对选中文本', 'ai-proofread.proofreadSelection')}">校对选中文本</button>
                 ${sep}
-                <button type="button" class="link-button" onclick="handleAction('proofreadSelectionWithMemory')" title="校对选中（带编辑记忆）">校对选中（带编辑记忆）</button>
+                <button type="button" class="link-button" onclick="handleAction('proofreadSelectionWithMemory')" title="${commandHoverTitle('校对选中（带编辑记忆）', 'ai-proofread.proofreadSelectionWithMemory')}">校对选中（带编辑记忆）</button>
             </div>
         `;
     }
@@ -1107,7 +1108,7 @@ export class WebviewManager {
                     ${this.filePathRowWithOpenButtonIfExists('校对日志:', proofreadResult.logFilePath, 'showProofreadLog')}
                 </div>
                 <div class="section-actions">
-                    ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'showProofreadItemsTree\')">查看校对条目</button>' : ''}
+                    ${proofreadResult.outputFilePath ? `<button class="action-button" onclick="handleAction('showProofreadItemsTree')" title="${commandHoverTitle('查看校对条目', 'ai-proofread.showProofreadItemsTree')}">查看校对条目</button>` : ''}
                     ${hasMain && hasMd ? '<button class="action-button" onclick="handleAction(\'showProofreadDiff\')">比较前后差异</button>' : ''}
                     ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'generateDiff\')">生成差异文件</button>' : ''}
                     ${hasMain && hasMd ? '<button class="action-button" onclick="handleAction(\'generateAlignment\')">生成勘误表</button>' : ''}
