@@ -3,7 +3,10 @@ import * as path from 'path';
 import type { CorpusHit, ReferencePrepProcessFileV020, ReferencePrepRound } from './schema';
 import { loadProcessFile, saveProcessFile } from './processFile';
 import { buildMergedReference } from './retrieval/executor';
+import { showDiff } from '../differ';
+import { citationTextForDiff, literatureTextForDiff } from './exportSelectedHits';
 import {
+    canDiffHit,
     canOpenHitInEditor,
     canOpenHitInBrowser,
     formatReferencePrepIntent,
@@ -187,7 +190,13 @@ export class ReferencePrepResultsProvider implements vscode.TreeDataProvider<Ref
                   : h.source === 'dict'
                     ? new vscode.ThemeIcon('book')
                     : new vscode.ThemeIcon('file');
-        if (canOpenHitInEditor(h) || canOpenHitInBrowser(h)) {
+        if (canDiffHit(h)) {
+            item.command = {
+                command: 'ai-proofread.referencePrep.showDiff',
+                title: '查看 diff',
+                arguments: [element],
+            };
+        } else if (canOpenHitInEditor(h) || canOpenHitInBrowser(h)) {
             item.command = {
                 command: 'ai-proofread.referencePrep.openHit',
                 title:
@@ -305,6 +314,29 @@ export function registerReferencePrepResultsView(context: vscode.ExtensionContex
     });
     context.subscriptions.push(treeView);
     return { provider, treeView };
+}
+
+/** 选区原文 vs 命中文献：VS Code 内置 diff（与旧「引文核查」匹配节点菜单一致） */
+export async function showCorpusHitDiff(
+    context: vscode.ExtensionContext,
+    process: { userInput?: string; targetPreview?: string },
+    hit: CorpusHit
+): Promise<void> {
+    if (!canDiffHit(hit)) {
+        vscode.window.showWarningMessage('词典、百科或网页命中与选区不是平行正文，不宜做 diff。');
+        return;
+    }
+    const left = citationTextForDiff(process);
+    const right = literatureTextForDiff(hit);
+    if (!left) {
+        vscode.window.showWarningMessage('没有选区原文，无法与命中比对。');
+        return;
+    }
+    if (!right) {
+        vscode.window.showWarningMessage('此命中没有可供比对的文献正文。');
+        return;
+    }
+    await showDiff(context, left, right, '.md', true, '引文 ↔ 文献');
 }
 
 export async function openCorpusHitInEditor(

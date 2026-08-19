@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    canDiffHit,
     canOpenHitInEditor,
     formatReferencePrepIntent,
     getAllQueryIds,
@@ -41,10 +42,11 @@ describe('referencePrepResultsTree', () => {
             status: 'active' as const,
         };
         expect(canOpenHitInEditor(hit)).toBe(false);
+        expect(canDiffHit(hit)).toBe(false);
         expect(referencePrepHitContextValue(hit)).toBe('referencePrepHitActiveDict');
     });
 
-    it('grep hits with relPath are openable', () => {
+    it('grep hits with relPath are openable and diffable', () => {
         const hit = {
             hitId: 'h-grep-1',
             source: 'grep_md' as const,
@@ -58,7 +60,39 @@ describe('referencePrepResultsTree', () => {
             relPath: 'foo.md',
         };
         expect(canOpenHitInEditor(hit)).toBe(true);
-        expect(referencePrepHitContextValue(hit)).toBe('referencePrepHitActive');
+        expect(canDiffHit(hit)).toBe(true);
+        expect(referencePrepHitContextValue(hit)).toBe('referencePrepHitActive,hitDiff');
+    });
+
+    it('wikipedia and heading-only hits are not diffable', () => {
+        expect(
+            canDiffHit({
+                hitId: 'w1',
+                source: 'wikipedia',
+                queryId: 'q1',
+                baseValue: 1,
+                aggregatedValue: 1,
+                snippet: 't',
+                digest: 'd',
+                referenceBlock: 'b',
+                status: 'active',
+            })
+        ).toBe(false);
+        expect(
+            canDiffHit({
+                hitId: 'nav',
+                source: 'grep_md',
+                kind: 'navigation_hint',
+                queryId: 'q1',
+                baseValue: 1,
+                aggregatedValue: 1,
+                snippet: 't',
+                digest: 'd',
+                referenceBlock: 'b',
+                status: 'active',
+                relPath: 'foo.md',
+            })
+        ).toBe(false);
     });
     it('only attributes orphan hits to first round with same queryId', () => {
         const p = proc({

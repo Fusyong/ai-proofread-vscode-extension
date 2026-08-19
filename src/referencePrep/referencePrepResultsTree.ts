@@ -25,15 +25,28 @@ export function canOpenHitInBrowser(hit: CorpusHit): boolean {
     );
 }
 
+/**
+ * 选区/引文 vs 文献摘录的 diff 只适用于平行正文（grep / BM25 / 向量）。
+ * 词典、百科、网页是释义或转述，与书稿做字面 diff 没有核对意义。
+ */
+export function canDiffHit(hit: CorpusHit): boolean {
+    if (hit.kind === 'navigation_hint') return false;
+    return hit.source === 'grep_md' || hit.source === 'bm25' || hit.source === 'vector';
+}
+
 export function referencePrepHitContextValue(hit: CorpusHit): string {
+    let base: string;
     if (hit.source === 'wikipedia' || hit.source === 'web') {
-        return hit.status === 'pruned' ? 'referencePrepHitPrunedWeb' : 'referencePrepHitActiveWeb';
+        base = hit.status === 'pruned' ? 'referencePrepHitPrunedWeb' : 'referencePrepHitActiveWeb';
+    } else {
+        const openable = canOpenHitInEditor(hit);
+        if (hit.status === 'pruned') {
+            base = openable ? 'referencePrepHitPruned' : 'referencePrepHitPrunedDict';
+        } else {
+            base = openable ? 'referencePrepHitActive' : 'referencePrepHitActiveDict';
+        }
     }
-    const openable = canOpenHitInEditor(hit);
-    if (hit.status === 'pruned') {
-        return openable ? 'referencePrepHitPruned' : 'referencePrepHitPrunedDict';
-    }
-    return openable ? 'referencePrepHitActive' : 'referencePrepHitActiveDict';
+    return canDiffHit(hit) ? `${base},hitDiff` : base;
 }
 
 /** 某轮某 query 在 corpus 中的命中（严格按 roundId，兼容无 roundId 的旧数据） */

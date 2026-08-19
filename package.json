@@ -221,6 +221,10 @@
         "title": "复制 reference 块"
       },
       {
+        "command": "ai-proofread.referencePrep.showDiff",
+        "title": "查看 diff"
+      },
+      {
         "command": "ai-proofread.proofreadFile",
         "title": "AI Proofreader: proofread file"
       },
@@ -1755,6 +1759,11 @@
           "command": "ai-proofread.proofreadItems.diffItem",
           "when": "view == ai-proofread.proofreadItems && viewItem == proofreadItem",
           "group": "proofreadItems@1"
+        },
+        {
+          "command": "ai-proofread.referencePrep.showDiff",
+          "when": "view == ai-proofread.referencePrepResults && viewItem == hitDiff",
+          "group": "referencePrep@1"
         },
         {
           "command": "ai-proofread.referencePrep.openHit",

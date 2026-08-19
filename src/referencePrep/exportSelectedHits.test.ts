@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { CorpusHit } from './schema';
 import {
+    citationTextForDiff,
     formatGroupedHitsAsJsonDocument,
     formatGroupedHitsAsMarkdown,
     formatSelectedHitsAsMarkdown,
+    literatureTextForDiff,
 } from './exportSelectedHits';
 
 function hit(partial: Partial<CorpusHit> & Pick<CorpusHit, 'hitId'>): CorpusHit {
@@ -57,5 +59,61 @@ describe('exportSelectedHits grouped', () => {
             { target: '李白', hits: [hit({ hitId: 'h1', referenceBlock: '甲' })] },
         ]);
         expect(doc).toEqual({ reference: '甲' });
+    });
+});
+
+describe('hit text for diff', () => {
+    it('uses userInput then targetPreview', () => {
+        expect(citationTextForDiff({ userInput: '  天时不如地利  ', targetPreview: '短' })).toBe(
+            '天时不如地利'
+        );
+        expect(citationTextForDiff({ targetPreview: '  地利  ' })).toBe('地利');
+        expect(citationTextForDiff({})).toBe('');
+    });
+
+    it('strips grep wrapper and 文献摘录 header', () => {
+        const text = literatureTextForDiff(
+            hit({
+                hitId: 'g1',
+                snippet: 'truncated',
+                referenceBlock:
+                    '<!-- ai-proofread:grepHit begin sha1=abc -->\n【文献摘录】孟子.md:12\n\n天时不如地利，地利不如人和。\n<!-- ai-proofread:grepHit end -->',
+            })
+        );
+        expect(text).toBe('天时不如地利，地利不如人和。');
+    });
+
+    it('strips dict wrapper and 本地词典 header', () => {
+        const text = literatureTextForDiff(
+            hit({
+                hitId: 'd1',
+                source: 'dict',
+                snippet: 'short',
+                referenceBlock:
+                    '<!-- ai-proofread:localDictEntry begin sha1=abc -->\n【本地词典】汉语大词典｜人和\n\n人心所向。\n<!-- ai-proofread:localDictEntry end -->',
+            })
+        );
+        expect(text).toBe('人心所向。');
+    });
+
+    it('strips wikipedia metadata and 摘录 prefix', () => {
+        const text = literatureTextForDiff(
+            hit({
+                hitId: 'w1',
+                source: 'wikipedia',
+                snippet: 'short',
+                referenceBlock:
+                    '<!-- ai-proofread:wikipediaHit begin sha1=abc -->\n【维基百科·zh】孟子\nURL: https://zh.wikipedia.org/wiki/孟子\nWikidata: Q123\n摘录：孟子，名轲。\n<!-- ai-proofread:wikipediaHit end -->',
+            })
+        );
+        expect(text).toBe('孟子，名轲。');
+    });
+
+    it('falls back to snippet when block is empty', () => {
+        expect(
+            literatureTextForDiff(
+                hit({ hitId: 's1', snippet: '  片段  ', referenceBlock: '' })
+            )
+        ).toBe('片段');
     });
 });

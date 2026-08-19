@@ -21,6 +21,45 @@ export function cleanBlockForLlm(block: string): string {
         .trim();
 }
 
+/** 选区原文（核对引文时即引文；意图检索时为查询文本） */
+export function citationTextForDiff(process: {
+    userInput?: string;
+    targetPreview?: string;
+}): string {
+    return (process.userInput || process.targetPreview || '').trim();
+}
+
+/**
+ * 命中侧供 diff 的正文：去掉机器注释与【文献摘录】等来源头，避免与引文比对时掺入元数据。
+ */
+export function literatureTextForDiff(hit: CorpusHit): string {
+    const cleaned = cleanBlockForLlm(hit.referenceBlock || '');
+    if (cleaned) {
+        const lines = cleaned.split('\n');
+        let i = 0;
+        while (i < lines.length) {
+            const t = lines[i].trim();
+            if (!t) {
+                i++;
+                continue;
+            }
+            if (/^【(?:文献摘录|本地词典|维基百科)/.test(t)) {
+                i++;
+                continue;
+            }
+            if (/^URL:/i.test(t) || /^Wikidata:/i.test(t)) {
+                i++;
+                continue;
+            }
+            break;
+        }
+        let rest = lines.slice(i).join('\n').trim();
+        rest = rest.replace(/^摘录：/, '').trim();
+        if (rest) return rest;
+    }
+    return (hit.snippet || '').trim();
+}
+
 function hitScore(h: CorpusHit): number {
     return h.finalScore ?? h.aggregatedValue ?? h.baseValue ?? 0;
 }

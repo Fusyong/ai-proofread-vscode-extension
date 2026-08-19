@@ -71,6 +71,7 @@ import { ModelRoutesCommandHandler } from './modelRoutes/modelRoutesCommandHandl
 import {
     registerReferencePrepResultsView,
     openCorpusHitInEditor,
+    showCorpusHitDiff,
     type ReferencePrepTreeNode,
 } from './referencePrep/referencePrepResultsView';
 import { canOpenHitInEditor } from './referencePrep/referencePrepResultsTree';
@@ -461,6 +462,11 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.referencePrep.copyBlock', async (node?: ReferencePrepTreeNode) => {
             if (node?.kind === 'hit' && node.hit.referenceBlock) {
                 await vscode.env.clipboard.writeText(node.hit.referenceBlock);
+            }
+        }),
+        vscode.commands.registerCommand('ai-proofread.referencePrep.showDiff', async (node?: ReferencePrepTreeNode) => {
+            if (node?.kind === 'hit') {
+                await showCorpusHitDiff(context, node.process, node.hit);
             }
         }),
 

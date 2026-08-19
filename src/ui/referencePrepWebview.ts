@@ -6,7 +6,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import type { ReferencePrepCommandHandler } from '../commands/referencePrepCommandHandler';
-import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
+import {
+    showCorpusHitDiff,
+    type ReferencePrepResultsProvider,
+} from '../referencePrep/referencePrepResultsView';
 import { loadReferencePrepLastRun, saveReferencePrepLastRun } from '../referencePrep/runPreferences';
 import {
     clampControls,
@@ -33,7 +36,7 @@ import type {
     ReferencePrepStrength,
     ReferenceSourceId,
 } from '../referencePrep/schema';
-import { canOpenHitInBrowser, canOpenHitInEditor } from '../referencePrep/referencePrepResultsTree';
+import { canOpenHitInBrowser, canDiffHit, canOpenHitInEditor } from '../referencePrep/referencePrepResultsTree';
 import { isWebSearchConfigured } from '../referencePrep/retrieval/webAdapter';
 import {
     cleanBlockForLlm,
@@ -51,7 +54,7 @@ import { commandHoverTitle } from './commandHover';
 const PANEL_ID = 'ai-proofread.referencePrepConsole';
 const PANEL_TITLE = 'References search panel';
 /** 递增以在扩展更新后强制刷新已打开面板的 HTML（避免旧界面缺导出提示条）。 */
-const WEBVIEW_HTML_REVISION = 16;
+const WEBVIEW_HTML_REVISION = 19;
 
 export class ReferencePrepWebview {
     private panel: vscode.WebviewPanel | undefined;
@@ -390,6 +393,7 @@ export class ReferencePrepWebview {
             finalScore: h.finalScore ?? h.aggregatedValue,
             canOpenEditor: canOpenHitInEditor(h),
             canOpenBrowser: canOpenHitInBrowser(h),
+            canDiff: canDiffHit(h),
             /** 导出正文的字符数（与导出洗净规则一致） */
             charCount: exportText.length,
             suggestedForExport: h.suggestedForExport,
@@ -794,6 +798,14 @@ export class ReferencePrepWebview {
                     }
                 }
                 break;
+            case 'showDiff':
+                if (msg.hitId) {
+                    const found = this.findHitContext(msg.hitId);
+                    if (found) {
+                        await showCorpusHitDiff(this.context, found.process, found.hit);
+                    }
+                }
+                break;
             case 'exportSelectedMd':
                 await this.exportSelectedAsMd(msg.hitIds);
                 break;
@@ -841,6 +853,12 @@ export class ReferencePrepWebview {
     }
 
     private findHit(hitId?: string): CorpusHit | undefined {
+        return this.findHitContext(hitId)?.hit;
+    }
+
+    private findHitContext(
+        hitId?: string
+    ): { hit: CorpusHit; process: ReferencePrepProcessFileV020 } | undefined {
         if (!hitId) return undefined;
         if (this.lastReplayRecords?.length) {
             const sep = hitId.indexOf('::');
@@ -850,12 +868,14 @@ export class ReferencePrepWebview {
             for (let i = 0; i < this.lastReplayRecords.length; i++) {
                 const rec = this.lastReplayRecords[i];
                 if (processRecordKey(rec, i) !== recordKey) continue;
-                return rec.corpus.find((h) => h.hitId === realId);
+                const hit = rec.corpus.find((h) => h.hitId === realId);
+                return hit ? { hit, process: rec } : undefined;
             }
             return undefined;
         }
         if (!this.lastProcess) return undefined;
-        return this.lastProcess.corpus.find((h) => h.hitId === hitId);
+        const hit = this.lastProcess.corpus.find((h) => h.hitId === hitId);
+        return hit ? { hit, process: this.lastProcess } : undefined;
     }
 
     private async replayFromAnchor(anchorPath?: string): Promise<void> {
@@ -1227,6 +1247,8 @@ select, textarea {
 #hits li.pruned { opacity: 0.55; }
 #hits li .hit-check { margin-top: 2px; }
 .hit-body { min-width: 0; }
+.hit-preview-diff { cursor: pointer; border-radius: 3px; padding: 2px 4px; margin: -2px -4px; }
+.hit-preview-diff:hover { background: var(--vscode-list-hoverBackground); }
 .hit-meta { font-size: 0.9em; color: var(--vscode-descriptionForeground); margin-bottom: 4px; }
 .hit-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .hit-actions button { padding: 2px 8px; font-size: 0.9em; }
@@ -1755,7 +1777,13 @@ function renderHits(hits, groups, groupKind) {
 
     const body = document.createElement('div');
     body.className = 'hit-body';
-    body.innerHTML =
+    const preview = document.createElement('div');
+    if (h.canDiff) {
+      preview.className = 'hit-preview-diff';
+      preview.title = ${JSON.stringify(commandHoverTitle('查看 diff', 'ai-proofread.referencePrep.showDiff'))};
+      preview.onclick = () => vscode.postMessage({ command: 'showDiff', hitId: h.hitId });
+    }
+    preview.innerHTML =
       '<div class="hit-meta">' + esc(h.source) +
       (h.refTag ? ' · ' + esc(h.refTag) : '') +
       (h.matchedKey ? ' · ' + esc(h.matchedKey) : '') +
@@ -1765,6 +1793,7 @@ function renderHits(hits, groups, groupKind) {
       (h.suggestedForExport === false ? ' · 未建议勾选' : '') +
       (h.status === 'pruned' ? ' · pruned' : '') + '</div>' +
       '<div>' + esc(h.snippet) + '</div>';
+    body.appendChild(preview);
     const actions = document.createElement('div');
     actions.className = 'hit-actions';
     if (h.canOpenEditor || h.canOpenBrowser) {
@@ -1781,6 +1810,14 @@ function renderHits(hits, groups, groupKind) {
     copy.title = ${JSON.stringify(commandHoverTitle('复制 reference 块', 'ai-proofread.referencePrep.copyBlock'))};
     copy.onclick = () => vscode.postMessage({ command: 'copyBlock', hitId: h.hitId });
     actions.appendChild(copy);
+    if (h.canDiff) {
+      const diff = document.createElement('button');
+      diff.className = 'secondary';
+      diff.textContent = 'diff';
+      diff.title = ${JSON.stringify(commandHoverTitle('查看 diff', 'ai-proofread.referencePrep.showDiff'))};
+      diff.onclick = () => vscode.postMessage({ command: 'showDiff', hitId: h.hitId });
+      actions.appendChild(diff);
+    }
     body.appendChild(actions);
     li.appendChild(body);
     hitsEl.appendChild(li);
