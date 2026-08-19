@@ -10,10 +10,10 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.9
+当前版本 v1.12.10
 
-- 更新文档
-- 特性：在按钮提示中显示对应命令
+- 优化：更清楚第区分文档中的“引文”与“参考资料”两个概念
+- debug：修正引文核对命中条目丢失diff菜单的问题
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
