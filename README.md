@@ -69,7 +69,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 | **知识核查** | 预置校对提示词（item / full）；在**校对面板**校对时选用，依据已准备的 reference 核查事实 |
 | **意图检索** | 用自然语言描述要查什么，再多源检索 |
 | **核对选中引文** | 对选中引文片段做出处检索 → 侧栏「资料检索」 |
-| **核对全文引文** | 批量相似度匹配 → 侧栏「引文核查」（须先建立引文索引） |
+| **核对全文引文** | 批量相似度匹配 → 侧栏「引文核查」（须先建立参考资料索引） |
 | **直接查词典** | 无 LLM，整词查本地 MDX |
 
 ## 3. 使用说明
@@ -256,7 +256,7 @@ JSON 切分后若要检索参考资料，见 [3.2.3](#323-资料检索切分与�
 - 选段准备：`Prepare References for Selection（资料准备·选段）`，或检索面板目标「Markdown 选段」
 - 意图检索：`Intent Search（意图检索）`（自然语言检索意图；共用预筛 / 规划 / 精排与侧栏「资料检索」；默认词典 + grep + BM25 + 向量）
 - 核对选中引文：`Verify Selected Citation（核对选中引文）`（结果在「资料检索」树，不校对）
-- 核对全文引文：`Verify Citations（核对全文引文）` + 侧栏「引文核查」树（须先建立引文索引）
+- 核对全文引文：`Verify Citations（核对全文引文）` + 侧栏「引文核查」树（须先建立参考资料索引）
 - JSON：校对面板「准备参考资料」，或 `Prepare References for JSON File（资料准备·JSON）`（**不自动写入** `item.reference`）
 - 结果查看：侧栏「资料检索」（overview 可开关；命令 `Open 资料检索 View`）；可打开文件跳转、复制块、手动 prune；检索面板内勾选导出/合并
 - 续跑：资料准备、意图检索、核对选中引文、检索面板选段若已有过程文件，可选择继续上次（追加 1 轮）或重新开始；JSON「继续未完成部分」按过程记录跳过已完成条目
@@ -266,7 +266,7 @@ JSON 切分后若要检索参考资料，见 [3.2.3](#323-资料检索切分与�
 - 合并到源 JSON：仅 JSON 条目结果可用；可按 target 写入对应条目，或覆盖/追加全部条目——**这是把资料写入源 JSON 的唯一正式路径**
 - 运行前可勾选资料来源（词典 / grep / BM25 / 向量 / 维基百科）；检索强度（轻量 / 标准 / 深入）控制轮次与查询上限
 - 维基百科资料来源（默认不勾选）：只读访问 MediaWiki + Wikidata；串行限速（默认 30 次/分钟）、会话 HTTP 预算、工作区缓存 `.proofread/wiki-cache.json`；TreeView 命中项可在浏览器打开条目 URL。配置见 `ai-proofread.referencePrep.wikipedia.*`
-- BM25 需先「建立引文索引」（该索引亦供核对全文引文使用）；向量索引首次使用时懒构建
+- BM25 需先「建立参考资料索引」（该索引亦供核对全文引文使用）；向量索引首次使用时懒构建
 - 检索缓存：`.proofread/retrieval-cache.json`（`referencePrep.retrievalCache.*`）；可用检索面板「清除检索缓存」
 
 **参考资料规划提示词**（侧栏 `prompts for reference prep`）：可自定义；须要求模型只输出 JSON（`sufficient` / `queries` / `prune`；grep 块可含 `unit`、`searchPhrases`）。未选择时使用内置规划提示词。
@@ -349,7 +349,7 @@ JSON 批量校对的按钮在 **切分与合并** 区块（「LLM 校对 JSON」
 2. **标题树与段内序号**（`check numbering hierarchy`）：检查标题序号和段内序号的层级与连续性；在侧栏「标题树」中可定位、批量标记为 Markdown 标题、升级、降级。
 3. **对齐标题**（`align headings`）：并排两个 Markdown 后按指定级别检查是否一一对应。详见 [3.1.2](#312-整理文档)。
 4. **重文检查**（`scan duplicate sentences in document` / `selection`）：侧栏 **重文检查**。归一化与相似度相关配置与引文核对共用 `ai-proofread.citation`。
-5. **引文核对**：专项检查区可启动 **核对选中引文** / **核对全文引文**；详细流程与索引见 [3.2.3](#323-资料检索切分与合并的分支实验功能)。须先在检索面板 **建立引文索引**（`citation.referencesPath`，默认为工作区 `references`）。
+5. **引文核对**：专项检查区可启动 **核对选中引文** / **核对全文引文**；详细流程与索引见 [3.2.3](#323-资料检索切分与合并的分支实验功能)。须先在检索面板 **建立参考资料索引**（`citation.referencesPath`，默认为工作区 `references`）。
 
 ### 3.5. 管理提示词
 

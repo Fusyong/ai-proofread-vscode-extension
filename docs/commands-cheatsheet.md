@@ -28,7 +28,7 @@
 | **知识核查** | 预置校对提示词；校对面板选用 |
 | **意图检索** | 自然语言描述检索意图后多源检索 |
 | **核对选中引文** | → 侧栏「资料检索」 |
-| **核对全文引文** | → 侧栏「引文核查」（须先建立引文索引） |
+| **核对全文引文** | → 侧栏「引文核查」（须先建立参考资料索引） |
 | **直接查词典** | 无 LLM，整词查 MDX |
 
 ---
@@ -230,7 +230,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    A["设置文献库路径"] --> B["检索面板：建立引文索引"]
+    A["设置文献库路径"] --> B["检索面板：建立参考资料索引"]
     B --> C["核对选中引文 / 核对全文引文"]
     C --> D["选中：侧栏「资料检索」<br/>全文：侧栏「引文核查」"]
     D --> E["diff / PDF 反查"]
@@ -281,7 +281,7 @@ flowchart LR
 | Intent Search（意图检索） | 自然语言多源检索（`search_intent`） |
 | Search Selection in References (Find in Files) | Find in Files（即时工具，无 LLM） |
 | Verify Selected Citation（核对选中引文） | 结果 → **资料检索** |
-| Verify Citations（核对全文引文） / Build Citation Reference Index | 结果 → **引文核查**；索引亦供 BM25 |
+| Verify Citations（核对全文引文） / Build Reference Index | 结果 → **引文核查**；索引亦供 BM25 |
 | Clear Project Retrieval Cache | 清除 `.proofread/retrieval-cache.json` |
 | Search Selection in PDF / Shidianguji / Ancientbooks | 外跳；不进入 reference corpus |
 | Search Citation in PDF | 引文树右键：文献 PDF 反查 |

@@ -218,7 +218,7 @@ export class ReferenceStore {
     private async ensureDb(): Promise<SqlJsDatabase> {
         const wantPath = this.getDbPath();
         if (!wantPath) {
-            throw new Error('请先配置「引文核对：参考资料根路径」并执行「重建引文索引」。');
+            throw new Error('请先配置「引文核对：参考资料根路径」并执行「建立参考资料索引」。');
         }
         if (this.db && this.dbPath !== wantPath) {
             this.db.close();

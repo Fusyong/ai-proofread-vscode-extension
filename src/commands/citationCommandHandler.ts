@@ -153,7 +153,7 @@ export class CitationCommandHandler {
                 { label: '仅新文件与变更', description: '只索引新增或修改过的文献', fullRebuild: false },
                 { label: '全部重新索引', description: '清空后重新索引所有文献', fullRebuild: true }
             ],
-            { placeHolder: '选择重建方式', title: '重建引文索引' }
+            { placeHolder: '选择重建方式', title: '重建参考资料索引' }
         );
         if (choice === undefined) return;
 
@@ -161,7 +161,7 @@ export class CitationCommandHandler {
             await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
-                    title: choice.fullRebuild ? '正在全部重建引文索引...' : '正在更新引文索引（仅新/变更）...',
+                    title: choice.fullRebuild ? '正在全部重建参考资料索引...' : '正在更新参考资料索引（仅新/变更）...',
                     cancellable: true
                 },
                 async (progress, cancelToken) => {
@@ -170,14 +170,14 @@ export class CitationCommandHandler {
                     progress.report({ increment: 100 });
                     vscode.window.showInformationMessage(
                         choice.fullRebuild
-                            ? `引文索引已全部重建：${fileCount} 个文件，${sentenceCount} 条句子。`
-                            : `引文索引已更新：${fileCount} 个文件有变更，共 ${sentenceCount} 条句子。更新文献后请手动执行「重建引文索引」以刷新。`
+                            ? `参考资料索引已全部重建：${fileCount} 个文件，${sentenceCount} 条句子。`
+                            : `参考资料索引已更新：${fileCount} 个文件有变更，共 ${sentenceCount} 条句子。更新文献后请手动执行「建立参考资料索引」以刷新。`
                     );
                 }
             );
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
-            vscode.window.showErrorMessage(`重建引文索引失败: ${msg}`);
+            vscode.window.showErrorMessage(`重建参考资料索引失败: ${msg}`);
         }
     }
 
@@ -190,7 +190,7 @@ export class CitationCommandHandler {
         const refStore = ReferenceStore.getInstance(this.context);
         const root = refStore.getReferencesRoot();
         if (!root || !fs.existsSync(root)) {
-            vscode.window.showWarningMessage('请先在设置中配置并确保「引文核对：参考资料根路径」存在，然后执行「重建引文索引」。');
+            vscode.window.showWarningMessage('请先在设置中配置并确保「引文核对：参考资料根路径」存在，然后执行「建立参考资料索引」。');
             if (this.citationTreeProvider) {
                 this.citationTreeProvider.refresh([], null);
                 this.updateCitationViewTitle(0);

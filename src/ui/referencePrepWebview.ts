@@ -1492,7 +1492,7 @@ body.mode-json .btn-json-only { display: inline-block; }
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.search.refsGrep" title="${commandHoverTitle('仅参考资料 grep（规划+精排）', 'ai-proofread.search.refsGrep')}">Grep</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="${commandHoverTitle('仅 BM25（规划+精排；需先建立引文索引）', 'ai-proofread.search.refsBm25')}">BM25</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="${commandHoverTitle('仅 BM25（规划+精排；需先建立参考资料索引）', 'ai-proofread.search.refsBm25')}">BM25</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.search.refsVector" title="${commandHoverTitle('仅轻量向量（规划+精排）', 'ai-proofread.search.refsVector')}">向量</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
@@ -1516,7 +1516,7 @@ body.mode-json .btn-json-only { display: inline-block; }
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.citation.openView" title="${commandHoverTitle('Verify Citations', 'ai-proofread.citation.openView')}">核对全文引文</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.citation.rebuildIndex" title="${commandHoverTitle('供核对全文引文与资料准备 BM25 共用', 'ai-proofread.citation.rebuildIndex')}">建立引文索引</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.citation.rebuildIndex" title="${commandHoverTitle('供核对全文引文与资料准备 BM25 共用', 'ai-proofread.citation.rebuildIndex')}">建立参考资料索引</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.referencePrep.clearRetrievalCache" title="${commandHoverTitle('Clear Project Retrieval Cache', 'ai-proofread.referencePrep.clearRetrievalCache')}">清除检索缓存</button>
   </div>
