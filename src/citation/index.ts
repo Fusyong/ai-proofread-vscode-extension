@@ -9,8 +9,10 @@ export {
     collectQuotedCitations,
     collectBlockquoteCitations,
     collectAllCitations,
+    citationEntryFromSelection,
     splitCitationBlocksIntoSentences
 } from './citationCollector';
+export { stripLeadingBlockquoteMarkers } from './stripBlockquote';
 export type {
     CitationEntry,
     CitationSentence,

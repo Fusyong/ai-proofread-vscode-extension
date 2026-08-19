@@ -13,7 +13,7 @@ import type {
 import type { ReferencePrepTargetKind } from './referencePrepPrompt';
 import type { PrepEventListener } from './prepEvents';
 
-/** 资料准备 / 意图检索 / 核对选中引文等共用的默认资料来源 */
+/** 资料准备 / 意图检索等共用的默认资料来源 */
 export const DEFAULT_REFERENCE_PREP_SOURCES: ReferenceSourceId[] = [
     'dict',
     'grep_md',
@@ -83,7 +83,7 @@ export interface ReferencePrepSessionResult {
 
 /**
  * 统一的参考资料准备会话：资源预筛 → 多轮规划 → 检索 → LLM 精排。
- * 资料准备、意图检索、核对选中引文均经此入口，差异在 targetKind / 规划提示词。
+ * 资料准备、意图检索均经此入口，差异在 targetKind / 规划提示词。
  */
 export async function runReferencePrepSession(
     params: ReferencePrepSessionParams

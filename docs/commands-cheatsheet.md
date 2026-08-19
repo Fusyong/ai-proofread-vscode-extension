@@ -27,7 +27,7 @@
 | **资料准备** | 多源检索 → 过程文件 + 侧栏「资料检索」；不自动校对；JSON 不自动写 `reference` |
 | **知识核查** | 预置校对提示词；校对面板选用 |
 | **意图检索** | 自然语言描述检索意图后多源检索 |
-| **核对选中引文** | → 侧栏「资料检索」 |
+| **核对选中引文** | → 侧栏「引文核查」（选区去掉行首 `>`，与全文同一套相似度匹配） |
 | **核对全文引文** | → 侧栏「引文核查」（须先建立参考资料索引） |
 | **直接查词典** | 无 LLM，整词查 MDX |
 
@@ -80,7 +80,7 @@ JSON：切分区块 **「准备参考资料」**。选段：overview → **检�
 | JSON 写入 reference | **合并选中到源 JSON**（唯一正式路径；不自动写入） |
 | 选段导出 | **导出 md** → 回到校对面板选段校对，可选用「知识核查」 |
 | 意图 / 词典 / 外跳 | 检索面板底部：意图检索、直接查词典、PDF / 识典 / 古籍库 |
-| 核对引文 | **核对选中引文** → 资料检索；**核对全文引文** → 引文核查（须先建索引） |
+| 核对引文 | **核对选中引文** / **核对全文引文** → 引文核查（须先建索引） |
 | 清除检索缓存 | 检索面板 **「清除检索缓存」** |
 
 ### 1.4 校对 / 校对结果
@@ -121,7 +121,7 @@ JSON：切分区块 **「准备参考资料」**。选段：overview → **检�
 |--------|----------|
 | 校稿、审稿、改错 | proofread selection / proofread file |
 | 出勘误表、审校记录 | diff it with another file → 逐句对齐 |
-| 核对引文、查出处 | 核对选中引文（资料检索）/ 核对全文引文（引文核查） |
+| 核对引文、查出处 | 核对选中引文 / 核对全文引文（引文核查） |
 | 查词典、查参考资料 | 检索面板；直接查词典 / 词典·LLM规划 / 意图检索 |
 | 知识核查 | 预置提示词；先资料准备再校对面板选用 |
 | 转 Word、转 Markdown | convert docx/markdown |
@@ -232,7 +232,7 @@ flowchart TD
 flowchart LR
     A["设置文献库路径"] --> B["检索面板：建立参考资料索引"]
     B --> C["核对选中引文 / 核对全文引文"]
-    C --> D["选中：侧栏「资料检索」<br/>全文：侧栏「引文核查」"]
+    C --> D["侧栏「引文核查」"]
     D --> E["diff / PDF 反查"]
 ```
 
@@ -280,7 +280,7 @@ flowchart LR
 | Search Local Dictionary / Grep·BM25·Vector / Wikipedia（LLM 规划） | 单源 LLM 规划检索；Web 未实现 |
 | Intent Search（意图检索） | 自然语言多源检索（`search_intent`） |
 | Search Selection in References (Find in Files) | Find in Files（即时工具，无 LLM） |
-| Verify Selected Citation（核对选中引文） | 结果 → **资料检索** |
+| Verify Selected Citation（核对选中引文） | 选区去掉行首 `>` 后相似度匹配 → **引文核查** |
 | Verify Citations（核对全文引文） / Build Reference Index | 结果 → **引文核查**；索引亦供 BM25 |
 | Clear Project Retrieval Cache | 清除 `.proofread/retrieval-cache.json` |
 | Search Selection in PDF / Shidianguji / Ancientbooks | 外跳；不进入 reference corpus |

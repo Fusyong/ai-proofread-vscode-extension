@@ -936,7 +936,7 @@ export class WebviewManager {
                     <button class="action-button" onclick="handleAction('duplicateScanSelection')" title="${commandHoverTitle('扫描选区重复句', 'ai-proofread.duplicate.scanSelection')}">重复句扫描（选区）</button>
                     ${sep}
                     <button class="action-button" onclick="handleAction('citationOpenView')" title="${commandHoverTitle('核对全文引文', 'ai-proofread.citation.openView')}">核对全文引文</button>
-                    <button class="action-button" onclick="handleAction('citationVerifySelection')" title="${commandHoverTitle('核对选中引文', 'ai-proofread.citation.verifySelection')}">核对选中引文</button>
+                    <button class="action-button" onclick="handleAction('citationVerifySelection')" title="${commandHoverTitle('对选中文本做与全文相同的相似度核对（去掉行首 >）', 'ai-proofread.citation.verifySelection')}">核对选中引文</button>
                 </div>
             </div>
         `;
