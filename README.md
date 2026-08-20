@@ -10,10 +10,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.11
+当前版本 v1.12.12
 
-- 行为：核对选中引文改回与全文相同的相似度匹配（选区去掉行首 `>`，结果在「引文核查」，不经 LLM）
-- 优化：检索面板顶部说明资料准备用途，并提示选段与 JSON 结果勿混用
+- 优化：根据目录标记标题时忽略前面的标题标记，即可以更改现有标题级别
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 

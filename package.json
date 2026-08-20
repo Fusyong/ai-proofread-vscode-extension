@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.11",
+  "version": "1.12.12",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
