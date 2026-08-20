@@ -1277,6 +1277,13 @@ body.mode-json .btn-json-only { display: inline-block; }
   padding-top: 12px;
   border-top: 1px solid var(--vscode-widget-border);
 }
+.panel-intro {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  margin: 0 0 4px;
+  line-height: 1.5;
+}
+.panel-intro-warn { margin-bottom: 12px; }
 .header-commands-hint {
   font-size: 12px;
   color: var(--vscode-descriptionForeground);
@@ -1382,6 +1389,8 @@ body.mode-json .btn-json-only { display: inline-block; }
 </style>
 </head>
 <body>
+<p class="panel-intro">为 Markdown 选段或 JSON 中的所有 target 检索参考资料。</p>
+<p class="panel-intro panel-intro-warn">选段与 JSON 检索相互独立，请勿混用结果。</p>
 <h2>配置</h2>
 <div class="row" id="sources"></div>
 <div class="row">
@@ -1492,7 +1501,7 @@ body.mode-json .btn-json-only { display: inline-block; }
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.search.refsGrep" title="${commandHoverTitle('仅参考资料 grep（规划+精排）', 'ai-proofread.search.refsGrep')}">Grep</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="${commandHoverTitle('仅 BM25（规划+精排；需先建立引文索引）', 'ai-proofread.search.refsBm25')}">BM25</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.search.refsBm25" title="${commandHoverTitle('仅 BM25（规划+精排；需先建立参考资料索引）', 'ai-proofread.search.refsBm25')}">BM25</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.search.refsVector" title="${commandHoverTitle('仅轻量向量（规划+精排）', 'ai-proofread.search.refsVector')}">向量</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
@@ -1512,11 +1521,11 @@ body.mode-json .btn-json-only { display: inline-block; }
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.searchSelectionInReferences" title="${commandHoverTitle('search selection in References', 'ai-proofread.searchSelectionInReferences')}">VSCode搜索参考资料库</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.citation.verifySelection" title="${commandHoverTitle('Verify Selected Citation', 'ai-proofread.citation.verifySelection')}">核对选中引文</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.citation.verifySelection" title="${commandHoverTitle('对选中文本做与全文相同的相似度核对（去掉行首 >），结果在引文核查', 'ai-proofread.citation.verifySelection')}">核对选中引文</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.citation.openView" title="${commandHoverTitle('Verify Citations', 'ai-proofread.citation.openView')}">核对全文引文</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.citation.rebuildIndex" title="${commandHoverTitle('供核对全文引文与资料准备 BM25 共用', 'ai-proofread.citation.rebuildIndex')}">建立引文索引</button>
+    <button type="button" class="link-button" data-cmd="ai-proofread.citation.rebuildIndex" title="${commandHoverTitle('供核对全文引文与资料准备 BM25 共用', 'ai-proofread.citation.rebuildIndex')}">建立参考资料索引</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.referencePrep.clearRetrievalCache" title="${commandHoverTitle('Clear Project Retrieval Cache', 'ai-proofread.referencePrep.clearRetrievalCache')}">清除检索缓存</button>
   </div>
@@ -1693,7 +1702,7 @@ function updateExportBarMode() {
     } else if (resultOrigin === 'json') {
       resultOriginHintEl.textContent = '当前结果：JSON 条目（可导出 JSON / 勾选后合并到源 JSON；不自动写入）';
     } else {
-      resultOriginHintEl.textContent = '选段与 JSON 检索相互独立，请勿混用结果。';
+      resultOriginHintEl.textContent = '';
     }
   }
 }

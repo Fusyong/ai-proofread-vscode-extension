@@ -281,6 +281,25 @@ export function collectBlockquoteCitations(document: vscode.TextDocument): Citat
     return entries;
 }
 
+/** 将编辑器选区做成一条引文块（用户已指定核对范围，不再按引号/注码过滤） */
+export function citationEntryFromSelection(
+    document: vscode.TextDocument,
+    selection: vscode.Selection,
+    strippedText: string
+): CitationEntry {
+    const raw = document.getText(selection);
+    const isBlockquote = /^[\s>]*>/m.test(raw);
+    return {
+        uri: document.uri,
+        text: strippedText,
+        startLine: selection.start.line + 1,
+        endLine: selection.end.line + 1,
+        range: new vscode.Range(selection.start, selection.end),
+        type: isBlockquote ? 'blockquote' : 'quote',
+        confidence: 'citation',
+    };
+}
+
 /** 合并引号与块引用，并标记可能非引文；按配置忽略过短或末尾无注码的引文，不列入结果 */
 export function collectAllCitations(document: vscode.TextDocument): CitationEntry[] {
     const quoted = collectQuotedCitations(document);

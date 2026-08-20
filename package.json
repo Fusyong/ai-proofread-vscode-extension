@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.9",
+  "version": "1.12.11",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -163,7 +163,7 @@
         "command": "ai-proofread.search.refsBm25",
         "title": "Search References with BM25（LLM 规划）",
         "category": "AI Proofreader Search",
-        "description": "仅参考资料 BM25（jieba；需先建立引文索引）"
+        "description": "仅参考资料 BM25（jieba；需先建立参考资料索引）"
       },
       {
         "command": "ai-proofread.search.refsVector",
@@ -342,8 +342,8 @@
       },
       {
         "command": "ai-proofread.citation.rebuildIndex",
-        "title": "Build Citation Reference Index（建立引文索引） (citation.rebuildIndex)",
-        "shortTitle": "Build Citation Reference Index（建立引文索引）",
+        "title": "Build Reference Index（建立参考资料索引） (citation.rebuildIndex)",
+        "shortTitle": "Build Reference Index（建立参考资料索引）",
         "category": "AI Proofreader Search",
         "description": "供核对全文引文与资料准备的 BM25 通道共用",
         "icon": "$(database)"
@@ -351,7 +351,8 @@
       {
         "command": "ai-proofread.citation.verifySelection",
         "title": "Verify Selected Citation（核对选中引文）",
-        "category": "AI Proofreader Search"
+        "category": "AI Proofreader Search",
+        "description": "对选中文本做与全文相同的相似度核对（去掉行首 >）；结果在引文核查"
       },
       {
         "command": "ai-proofread.citation.showDiff",

@@ -142,8 +142,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const citationHandler = new CitationCommandHandler(
         context,
         citationTreeProvider,
-        citationTreeView,
-        referencePrepResultsProvider
+        citationTreeView
     );
     const { provider: duplicateTreeProvider, treeView: duplicateTreeView } = registerDuplicateView(context);
     const duplicateHandler = new DuplicateCommandHandler(context, duplicateTreeProvider, duplicateTreeView);
@@ -694,7 +693,7 @@ export async function activate(context: vscode.ExtensionContext) {
             await citationHandler.handleRebuildIndexCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.citation.verifySelection', async () => {
-            await setReferenceHitVisible(true);
+            await setCitationsVisible(true);
             await citationHandler.handleVerifySelectionCommand();
         }),
         vscode.commands.registerCommand('ai-proofread.citation.showDiff', (nodeOrItem?: unknown) => {

@@ -8,7 +8,7 @@
 
 | 能力 | 命令 | 机制 | 结果树 |
 |------|------|------|--------|
-| **核对选中引文** | `Verify Selected Citation（核对选中引文）` | 共用 referencePrep（`citation_selection`），多源检索 | 侧栏 **资料检索** |
+| **核对选中引文** | `Verify Selected Citation（核对选中引文）` | 与全文相同：选区作一条引文，相似度匹配（去掉行首 `>`） | 侧栏 **引文核查** |
 | **核对全文引文** | `Verify Citations（核对全文引文）` | 本文档所述：引文索引 + 相似度匹配 | 侧栏 **引文核查** |
 
 「建立引文索引」同时供核对全文引文与资料准备的 **BM25** 通道使用（应用层 BM25 / jieba，**非 FTS5**）。资料准备总览见 [knowledge-verify-plan.md](knowledge-verify-plan.md)。

@@ -19,7 +19,6 @@
 | `Prepare References for Selection（资料准备·选段）` | 预筛 → 规划 → 检索 → 精排 → TreeView / 检索面板 | `manuscript` | 否 |
 | `Prepare References for JSON File（资料准备·JSON）` / 校对面板 **准备参考资料** | 同上（批量；**只写过程文件，不自动写源 JSON**） | `manuscript` | 否 |
 | `Intent Search（意图检索）` | 同上 | `search_intent` | 否 |
-| `Verify Selected Citation（核对选中引文）` | 同上 | `citation_selection` | 否 |
 | 单源：`search.dictPrep` / `search.refsGrep` / `refsBm25` / `refsVector` / `wikipedia` / `web` | 固定 `enabledSources` 跑同一流水线 | `search_intent` | 否 |
 | `Open Reference Search Panel（检索面板）` | Webview：配置多源、执行、展示规划过程与命中 | — | — |
 | `Open 资料检索 View` | 打开 TreeView | — | — |
@@ -27,7 +26,7 @@
 **正式资料来源**：本地词典、本地参考资料（grep / BM25 / 向量）、维基百科、Web（尚未实现）。  
 **便捷工具（不进入 corpus）**：同名 PDF 搜索、识典古籍、中华经典古籍库。
 
-**核对全文引文**（`Verify Citations（核对全文引文）`）仍走引文索引 + 相似度匹配 + 侧栏 **引文核查** 树，与上表不同。详见 [citation-verification-plan.md](citation-verification-plan.md)。
+**核对选中引文 / 核对全文引文**（`Verify Selected Citation` / `Verify Citations`）走引文索引 + 相似度匹配 + 侧栏 **引文核查** 树，与上表不同。选中核对以选区为一条引文（去掉行首 `>`），不经 LLM 规划。详见 [citation-verification-plan.md](citation-verification-plan.md)。
 
 复合准备默认来源：**词典 + grep + BM25 + 向量**；**维基百科**需勾选；**Web** 不可用。
 

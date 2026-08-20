@@ -6,8 +6,15 @@ import * as vscode from 'vscode';
 import { requireWorkingTextEditor } from '../ui/lastActiveTextEditor';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ReferenceStore, getCitationNormalizeOptions } from '../citation';
-import { collectAllCitations, splitCitationBlocksIntoSentences, type CitationEntry } from '../citation';
+import {
+    ReferenceStore,
+    getCitationNormalizeOptions,
+    collectAllCitations,
+    citationEntryFromSelection,
+    stripLeadingBlockquoteMarkers,
+    splitCitationBlocksIntoSentences,
+    type CitationEntry,
+} from '../citation';
 import { matchCitationsToReferences } from '../citation/citationMatcher';
 import { getJiebaWasm } from '../jiebaLoader';
 import { focusCitationView } from '../citation/citationView';
@@ -15,15 +22,6 @@ import type { CitationTreeDataProvider } from '../citation/citationTreeProvider'
 import type { CitationTreeNode } from '../citation/citationTreeProvider';
 import { showDiff } from '../differ';
 import { searchTextInPDF } from '../pdfSearcher';
-import { normalizeLineEndings, ErrorUtils } from '../utils';
-import { pickReferencePrepContinuation } from '../referencePrep/continuation';
-import {
-    pickReferencePrepStrength,
-    presentReferencePrepSessionResult,
-    runReferencePrepSession,
-    summarizeSessionPatterns,
-} from '../referencePrep/referencePrepSession';
-import type { ReferencePrepResultsProvider } from '../referencePrep/referencePrepResultsView';
 
 const CITATION_VIEW_BASE_TITLE = 'Citation';
 
@@ -58,8 +56,7 @@ export class CitationCommandHandler {
     constructor(
         private context: vscode.ExtensionContext,
         private citationTreeProvider: CitationTreeDataProvider | null = null,
-        private citationTreeView: vscode.TreeView<CitationTreeNode> | null = null,
-        private referencePrepResultsProvider?: ReferencePrepResultsProvider
+        private citationTreeView: vscode.TreeView<CitationTreeNode> | null = null
     ) {}
 
     /** 更新引文 TreeView 标题栏显示的条目数量 */
@@ -153,7 +150,7 @@ export class CitationCommandHandler {
                 { label: '仅新文件与变更', description: '只索引新增或修改过的文献', fullRebuild: false },
                 { label: '全部重新索引', description: '清空后重新索引所有文献', fullRebuild: true }
             ],
-            { placeHolder: '选择重建方式', title: '重建引文索引' }
+            { placeHolder: '选择重建方式', title: '重建参考资料索引' }
         );
         if (choice === undefined) return;
 
@@ -161,7 +158,7 @@ export class CitationCommandHandler {
             await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
-                    title: choice.fullRebuild ? '正在全部重建引文索引...' : '正在更新引文索引（仅新/变更）...',
+                    title: choice.fullRebuild ? '正在全部重建参考资料索引...' : '正在更新参考资料索引（仅新/变更）...',
                     cancellable: true
                 },
                 async (progress, cancelToken) => {
@@ -170,14 +167,14 @@ export class CitationCommandHandler {
                     progress.report({ increment: 100 });
                     vscode.window.showInformationMessage(
                         choice.fullRebuild
-                            ? `引文索引已全部重建：${fileCount} 个文件，${sentenceCount} 条句子。`
-                            : `引文索引已更新：${fileCount} 个文件有变更，共 ${sentenceCount} 条句子。更新文献后请手动执行「重建引文索引」以刷新。`
+                            ? `参考资料索引已全部重建：${fileCount} 个文件，${sentenceCount} 条句子。`
+                            : `参考资料索引已更新：${fileCount} 个文件有变更，共 ${sentenceCount} 条句子。更新文献后请手动执行「建立参考资料索引」以刷新。`
                     );
                 }
             );
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
-            vscode.window.showErrorMessage(`重建引文索引失败: ${msg}`);
+            vscode.window.showErrorMessage(`重建参考资料索引失败: ${msg}`);
         }
     }
 
@@ -187,10 +184,39 @@ export class CitationCommandHandler {
         if (!doc) {
             return;
         }
+        await this.matchAndPresent(doc, collectAllCitations(doc), '引文核对');
+    }
+
+    /**
+     * 核对选中引文：与全文核对同一套相似度匹配；输入为选区，并去掉行首 `>` 与空白。
+     * 结果展示在侧栏「引文核查」，不经 LLM 规划。
+     */
+    async handleVerifySelectionCommand(): Promise<void> {
+        const editor = requireWorkingTextEditor('请先选中要核对的引文文本。');
+        const doc = editor?.document;
+        if (!doc || !editor.selection || editor.selection.isEmpty) {
+            vscode.window.showWarningMessage('请先选中要核对的引文文本。');
+            return;
+        }
+        const text = stripLeadingBlockquoteMarkers(doc.getText(editor.selection)).trim();
+        if (!text) {
+            vscode.window.showWarningMessage('选中的内容为空。');
+            return;
+        }
+        const entry = citationEntryFromSelection(doc, editor.selection, text);
+        await this.matchAndPresent(doc, [entry], '核对选中引文');
+    }
+
+    /** 须已配置参考资料路径并建立索引；匹配后刷新「引文核查」树 */
+    private async matchAndPresent(
+        doc: vscode.TextDocument,
+        entries: CitationEntry[],
+        progressTitle: string
+    ): Promise<void> {
         const refStore = ReferenceStore.getInstance(this.context);
         const root = refStore.getReferencesRoot();
         if (!root || !fs.existsSync(root)) {
-            vscode.window.showWarningMessage('请先在设置中配置并确保「引文核对：参考资料根路径」存在，然后执行「重建引文索引」。');
+            vscode.window.showWarningMessage('请先在设置中配置并确保「引文核对：参考资料根路径」存在，然后执行「建立参考资料索引」。');
             if (this.citationTreeProvider) {
                 this.citationTreeProvider.refresh([], null);
                 this.updateCitationViewTitle(0);
@@ -200,7 +226,6 @@ export class CitationCommandHandler {
         }
 
         try {
-            const entries = collectAllCitations(doc);
             const opts = getCitationNormalizeOptions();
             const blocks = splitCitationBlocksIntoSentences(entries, opts);
             const config = vscode.workspace.getConfiguration('ai-proofread.citation');
@@ -225,7 +250,7 @@ export class CitationCommandHandler {
             const blockResults = await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
-                    title: '引文核对',
+                    title: progressTitle,
                     cancellable: true
                 },
                 async (progress, cancelToken) => {
@@ -256,88 +281,6 @@ export class CitationCommandHandler {
                 this.citationTreeProvider.refresh([], null);
                 this.updateCitationViewTitle(0);
             }
-        }
-    }
-
-    /**
-     * 核对选中引文：与 LLM 增强检索共用 referencePrep（预筛 / 规划 / 精排），
-     * 规划提示词为 citation_selection；结果展示在「参考资料命中」TreeView，不进入校对。
-     */
-    async handleVerifySelectionCommand(): Promise<void> {
-        const editor = requireWorkingTextEditor('请先选中要核对的引文文本。');
-        const doc = editor?.document;
-        if (!doc || !editor?.selection || editor.selection.isEmpty) {
-            vscode.window.showWarningMessage('请先选中要核对的引文文本。');
-            return;
-        }
-        let text = normalizeLineEndings(doc.getText(editor.selection));
-        text = text
-            .split('\n')
-            .map((line) => line.replace(/^[\s>]+/, ''))
-            .join('\n')
-            .replace(/^\s+/, '');
-        if (!text.trim()) {
-            vscode.window.showWarningMessage('选中的内容为空。');
-            return;
-        }
-
-        const strength = await pickReferencePrepStrength('核对选中引文');
-        if (!strength) return;
-
-        const anchorPath = doc.uri.scheme !== 'untitled' && doc.uri.fsPath ? doc.uri.fsPath : undefined;
-        if (!anchorPath) {
-            vscode.window.showWarningMessage('请先保存当前文档，以便写入参考资料过程文件。');
-            return;
-        }
-
-        try {
-            const cont = await pickReferencePrepContinuation({
-                context: this.context,
-                anchorPath,
-                target: text.trim(),
-                title: '核对选中引文 · 参考资料准备',
-            });
-            if (!cont) return;
-
-            const runTarget = cont.targetOverride ?? text.trim();
-            const runAnchor = cont.anchorPath;
-
-            const { mergedReference, hits, process } = await vscode.window.withProgress(
-                {
-                    location: vscode.ProgressLocation.Notification,
-                    title: cont.continuation ? '参考资料准备（续跑）' : '参考资料准备',
-                    cancellable: true,
-                },
-                async (progress, token) =>
-                    runReferencePrepSession({
-                        target: runTarget,
-                        targetKind: 'citation_selection',
-                        strength,
-                        context: this.context,
-                        anchorPath: runAnchor,
-                        intents: ['citation', 'entity_name', 'general_fact', 'term_norm'],
-                        freshProcess: cont.freshProcess,
-                        continuation: cont.continuation,
-                        maxRoundsOverride: cont.maxRoundsOverride,
-                        recordId: cont.recordId,
-                        onProgress: (m) => progress.report({ message: m }),
-                        token,
-                    })
-            );
-
-            const patternSummary = summarizeSessionPatterns(process);
-            await presentReferencePrepSessionResult({
-                resultsProvider: this.referencePrepResultsProvider,
-                anchorPath: runAnchor,
-                process,
-                mergedReference,
-                openMergedBeside: false,
-                informationMessage: mergedReference
-                    ? `引文核对完成：${hits.length} 条命中，${process.rounds.length} 轮（关键词：${patternSummary}）`
-                    : `引文核对完成，未命中（${process.rounds.length} 轮；关键词：${patternSummary}）`,
-            });
-        } catch (e) {
-            ErrorUtils.showError(e, '核对选中引文失败：');
         }
     }
 
