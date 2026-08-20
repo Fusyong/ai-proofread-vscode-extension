@@ -4,11 +4,23 @@
  * 换行符约定：入口处统一使用 normalizeLineEndings，内部仅按 LF 按行处理。
  */
 
-import { normalizeLineEndings } from './utils';
-
 export interface TocItem {
     name: string;
     level: number;
+}
+
+function normalizeLineEndings(text: string): string {
+    return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+/** 行首标题标记：一个或多个 `#` 后跟空白（如 `## `、`####### `）。 */
+const LEADING_ATX_HEADING = /^#+\s+/;
+
+/**
+ * 去掉行首 Markdown 标题标记，便于匹配或改写已标记过的标题。
+ */
+export function stripLeadingMarkdownHeading(line: string): string {
+    return line.replace(LEADING_ATX_HEADING, '');
 }
 
 /**
@@ -104,12 +116,13 @@ export function markTitles(
 
         for (let i = 0; i < textLines.length; i++) {
             const line = textLines[i];
-            // 移除空格、拼音、括号以便比较
-            const cleanedLine = cleanTitle(line.trim());
+            // 忽略行首已有的 Markdown 标题标记（如 `## `），再清理后比较
+            const titleText = stripLeadingMarkdownHeading(line.trim());
+            const cleanedLine = cleanTitle(titleText);
 
             if (itemName === cleanedLine) {
-                // 使用目录项的级别作为标题级别
-                markedLines[i] = `${'#'.repeat(itemLevel)} ${line.trim()}`;
+                // 按目录项级别重写标题标记，便于调整已标记过的级别
+                markedLines[i] = `${'#'.repeat(itemLevel)} ${titleText}`;
                 found = true;
                 // 注意：不 break，与 Python 版本保持一致，会标记所有匹配的行
             }

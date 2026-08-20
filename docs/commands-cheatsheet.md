@@ -259,7 +259,7 @@ flowchart LR
 | AI Proofreader: full-width punctuation to half-width | 全角标点转半角（，；：！？ → ,;:!?） |
 | AI Proofreader: OpenCC / OpenCC selection | 繁简或地区用字转换 |
 | AI Proofreader: replace Founder circled numbers | 方正书版 PDF 带圈序号 → Unicode ①… 或方头扩注 [n]；并清除常见版面杂质 |
-| AI Proofreader: mark titles from table of contents | 根据目录表（Markdown 列表）在文档中标记标题 |
+| AI Proofreader: mark titles from table of contents | 根据目录表（Markdown 列表）在文档中标记标题；可忽略并改写已有 `#`（不限级数） |
 | AI Proofreader: align headings | 并排打开两个 Markdown，按指定级别检查标题是否一一对应（专项检查区亦有） |
 | AI Proofreader: split into sentences | 将整篇或选区按简易中文分句，并用所选分隔符连接 |
 | AI Proofreader: segment file / segment selection | 分词 / 词频统计 / 字频统计 |

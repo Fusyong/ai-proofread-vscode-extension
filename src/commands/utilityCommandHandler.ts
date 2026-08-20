@@ -823,16 +823,13 @@ export class UtilityCommandHandler {
 
             // 让用户输入起始标题级别
             const baseLevelInput = await vscode.window.showInputBox({
-                prompt: '请输入起始标题级别（1-6，默认为1）',
+                prompt: '请输入起始标题级别（正整数，默认为1；可大于6）',
                 placeHolder: '1',
                 value: '1',
                 validateInput: (value) => {
                     const num = parseInt(value, 10);
-                    if (isNaN(num)) {
-                        return '请输入有效的数字';
-                    }
-                    if (num < 1 || num > 6) {
-                        return '标题级别必须在 1-6 之间';
+                    if (isNaN(num) || num < 1) {
+                        return '请输入大于或等于 1 的整数';
                     }
                     return null;
                 }

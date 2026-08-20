@@ -110,7 +110,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 文档转换后还有[一些整理技巧](https://blog.xiiigame.com/2022-01-10-给文字工作者的VSCode入门教程/#vscode)，不过对于使用本扩展进行校对而言，进一步的整理工作通常不是必须的。常见的例外情形是，你希望按篇、章、节、标题等结构来切分、校对，以便保持语境连贯，那么你需要学习更多整理技巧，或者使用其他工具，以便得到有标题的Markdown文档。
 
-1. 本扩展命令`mark titles from table of contents`，可以根据一个目录表文件（Markdown分级列表的形式），逐行比较当前文档，把标题行标记出来，会自动忽略数字（如页码）、英文句点和省略号（页码前导符号）、空格、带圈数字①-㉟、Markdown形式的注码如 `[^1] [^abc]`、上标注码如 `^1^ ^abc^`。
+1. 本扩展命令`mark titles from table of contents`，可以根据一个目录表文件（Markdown分级列表的形式），逐行比较当前文档，把标题行标记出来；匹配时会忽略行头已有的 `#` 标记（不限级数，如 `## `、`####### `），并按目录级别重写，因此可用来调整已经标记过的标题。比较时还会自动忽略数字（如页码）、英文句点和省略号（页码前导符号）、空格、带圈数字①-㉟、Markdown形式的注码如 `[^1] [^abc]`、上标注码如 `^1^ ^abc^`。
 2. PDF导出的文本，如果没有使用空行分段，无法切分，可以使用整理段落命令`format paragraphs`中的“段末加空行”选项加以处理。
 3. Markdown中的段内断行是合法的，即使句子被断开，对大模型的影响也不大。当然，也可以用上述命令`format paragraphs`中的“删除段内分行”选项处理后再校对。
 4. 过多的无效字符影响输出速度，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。方正系排版软件可能使用半角标点，校对后通常会被改成全角；也可用校对面板中的 **半角标点转全角** / **全角标点转半角**（命令 `half-width punctuation to full-width` / `full-width punctuation to half-width`），仅处理 `，；：？！` 与 `,;:!?` 五对（不含引号；引号仍用 `convert quotes to Chinese`）。请参考上述讲整理技巧的文章。
