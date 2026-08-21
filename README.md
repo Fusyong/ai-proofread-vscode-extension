@@ -10,9 +10,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.12
+当前版本 v1.12.13
 
-- 优化：根据目录标记标题时忽略前面的标题标记，即可以更改现有标题级别
+- 优化：记住proofread selection的用户选项
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 

@@ -24,6 +24,17 @@ import {
     type ProofreadSelectionWithMemoryConfig
 } from '../proofreadSelectionWithMemoryConfig';
 import { WebviewManager, ProcessResult } from '../ui/webviewManager';
+import { showQuickPickWithDefault } from '../ui/quickPickDefault';
+import {
+    loadProofreadSelectionLastRun,
+    PROOFREAD_SELECTION_CONTEXT_BUILD_METHODS,
+    PROOFREAD_SELECTION_HEADING_LEVELS,
+    saveProofreadSelectionLastRun,
+    type ProofreadSelectionContextBuildMethod,
+    type ProofreadSelectionHeadingLevel,
+    type ProofreadSelectionLastRun,
+    type ProofreadSelectionRepetitionMode
+} from '../proofreadSelectionLastRun';
 import { ProgressTracker } from '../progressTracker';
 import {
     addStats,
@@ -407,29 +418,32 @@ export class ProofreadCommandHandler {
                 return;
             }
 
-            // 让用户选择上下文构建方式
-            const contextBuildMethod = await vscode.window.showQuickPick(
-                ['不使用上下文', '前后增加段落', '使用所在标题范围'],
+            const lastRun = loadProofreadSelectionLastRun(context);
+
+            const contextBuildPick = await showQuickPickWithDefault(
+                PROOFREAD_SELECTION_CONTEXT_BUILD_METHODS.map((label) => ({ label })),
                 {
                     placeHolder: '选择上下文构建方式',
-                    ignoreFocusOut: true
+                    ignoreFocusOut: true,
+                    lastValue: lastRun?.contextBuildMethod
                 }
             );
 
-            // 如果用户按 ESC 取消，立即中断
-            if (contextBuildMethod === undefined) {
+            if (contextBuildPick === undefined) {
                 return;
             }
+            const contextBuildMethod = contextBuildPick.label as ProofreadSelectionContextBuildMethod;
 
             let contextLevel: string | undefined;
             let beforeParagraphs: number = 0;
             let afterParagraphs: number = 0;
 
             if (contextBuildMethod === '前后增加段落') {
-                // 选择前文增加段落个数
+                const beforeDefault =
+                    lastRun?.beforeParagraphs !== undefined ? String(lastRun.beforeParagraphs) : '1';
                 const beforeParagraphsInput = await vscode.window.showInputBox({
                     prompt: '前文增加段落个数',
-                    value: '1',
+                    value: beforeDefault,
                     validateInput: (value: string) => {
                         const num = parseInt(value);
                         if (isNaN(num) || num < 0 || num > 10) {
@@ -438,16 +452,16 @@ export class ProofreadCommandHandler {
                         return null;
                     }
                 });
-                // 如果用户按 ESC 取消，立即中断
                 if (beforeParagraphsInput === undefined) {
                     return;
                 }
                 beforeParagraphs = beforeParagraphsInput ? parseInt(beforeParagraphsInput) : 2;
 
-                // 选择后文增加段落个数
+                const afterDefault =
+                    lastRun?.afterParagraphs !== undefined ? String(lastRun.afterParagraphs) : '1';
                 const afterParagraphsInput = await vscode.window.showInputBox({
                     prompt: '后文增加段落个数',
-                    value: '1',
+                    value: afterDefault,
                     validateInput: (value: string) => {
                         const num = parseInt(value);
                         if (isNaN(num) || num < 0 || num > 10) {
@@ -456,7 +470,6 @@ export class ProofreadCommandHandler {
                         return null;
                     }
                 });
-                // 如果用户按 ESC 取消，立即中断
                 if (afterParagraphsInput === undefined) {
                     return;
                 }
@@ -464,38 +477,40 @@ export class ProofreadCommandHandler {
 
                 contextLevel = '前后增加段落';
             } else if (contextBuildMethod === '使用所在标题范围') {
-                // 让用户选择是否使用上下文和参考文件
-                contextLevel = await vscode.window.showQuickPick(
-                    ['1 级标题', '2 级标题', '3 级标题', '4 级标题', '5 级标题', '6 级标题'],
+                const headingPick = await showQuickPickWithDefault(
+                    PROOFREAD_SELECTION_HEADING_LEVELS.map((label) => ({ label })),
                     {
                         placeHolder: '选择上下文范围（可选）',
-                        ignoreFocusOut: true
+                        ignoreFocusOut: true,
+                        lastValue: lastRun?.headingLevel
                     }
                 );
-                // 如果用户按 ESC 取消，立即中断
-                if (contextLevel === undefined) {
+                if (headingPick === undefined) {
                     return;
                 }
+                contextLevel = headingPick.label;
             }
 
             let referenceFile: vscode.Uri[] | undefined;
             if (options?.presetReferenceFile) {
                 referenceFile = [options.presetReferenceFile];
             } else {
-                const useReference = await vscode.window.showQuickPick(
-                    ['否', '是'],
+                const useReferenceLast =
+                    lastRun?.useReference === true ? '是' : lastRun?.useReference === false ? '否' : undefined;
+                const useReferencePick = await showQuickPickWithDefault(
+                    [{ label: '否' }, { label: '是' }],
                     {
                         placeHolder: '是否使用参考文件？',
-                        ignoreFocusOut: true
+                        ignoreFocusOut: true,
+                        lastValue: useReferenceLast
                     }
                 );
 
-                // 如果用户按 ESC 取消，立即中断
-                if (useReference === undefined) {
+                if (useReferencePick === undefined) {
                     return;
                 }
 
-                if (useReference === '是') {
+                if (useReferencePick.label === '是') {
                     referenceFile = await vscode.window.showOpenDialog({
                         canSelectFiles: true,
                         canSelectFolders: false,
@@ -503,19 +518,22 @@ export class ProofreadCommandHandler {
                         filters: {
                             'Text files': ['txt', 'md']
                         },
-                        title: '选择参考文件'
+                        title: '选择参考文件',
+                        defaultUri: this.resolveReferenceDialogDefaultUri(lastRun?.referenceFilePath)
                     });
-                    // 如果用户按 ESC 取消，立即中断
                     if (referenceFile === undefined) {
                         return;
                     }
                 }
             }
 
-            // 让用户选择温度
+            const temperatureDefault =
+                lastRun?.temperature !== undefined
+                    ? lastRun.temperature.toString()
+                    : this.configManager.getTemperature().toString();
             const userTemperature = await vscode.window.showInputBox({
                 prompt: '请输入温度',
-                value: this.configManager.getTemperature().toString(),
+                value: temperatureDefault,
                 validateInput: (value: string) => {
                     const temperature = parseFloat(value);
                     if (isNaN(temperature) || temperature < 0 || temperature >= 2) {
@@ -525,31 +543,41 @@ export class ProofreadCommandHandler {
                 }
             });
 
-            // 如果用户按 ESC 取消，立即中断
             if (userTemperature === undefined) {
                 return;
             }
 
-            // 让用户选择提示词重复模式
-            const repetitionMode = await vscode.window.showQuickPick([
-                { label: '不重复', value: 'none', description: '不启用重复功能' },
-                { label: '仅重复目标文档', value: 'target', description: '只重复要修改的目标文档（target）' },
-                { label: '重复完整对话流程', value: 'all', description: '重复参考文档、语境和目标文档（完整对话流程）' }
-            ], {
-                placeHolder: '选择提示词重复模式（基于谷歌研究：重复提示词可提高准确度）',
-                ignoreFocusOut: true
-            });
+            type RepetitionPick = vscode.QuickPickItem & { value: ProofreadSelectionRepetitionMode };
+            const repetitionMode = await showQuickPickWithDefault<RepetitionPick>(
+                [
+                    { label: '不重复', value: 'none', description: '不启用重复功能' },
+                    { label: '仅重复目标文档', value: 'target', description: '只重复要修改的目标文档（target）' },
+                    { label: '重复完整对话流程', value: 'all', description: '重复参考文档、语境和目标文档（完整对话流程）' }
+                ],
+                {
+                    placeHolder: '选择提示词重复模式（基于谷歌研究：重复提示词可提高准确度）',
+                    ignoreFocusOut: true,
+                    lastValue: lastRun?.repetitionMode,
+                    getValue: (item) => item.value
+                }
+            );
 
-            // 如果用户按 ESC 取消，立即中断
             if (repetitionMode === undefined) {
                 return;
             }
 
-            // 获取用户选择的重复模式（不更新配置，仅作为参数传递）
-            let actualRepetitionMode: 'none' | 'target' | 'all' | undefined = undefined;
-            if (repetitionMode) {
-                actualRepetitionMode = repetitionMode.value as 'none' | 'target' | 'all';
-            }
+            const actualRepetitionMode = repetitionMode.value;
+
+            await saveProofreadSelectionLastRun(context, this.buildProofreadSelectionLastRun({
+                lastRun,
+                contextBuildMethod,
+                contextLevel,
+                beforeParagraphs,
+                afterParagraphs,
+                referenceFile,
+                temperature: parseFloat(userTemperature),
+                repetitionMode: actualRepetitionMode
+            }));
 
             let sourceTextCharacteristics = '';
             let sourceCharacteristicsDisplayTitle: string | undefined;
@@ -571,7 +599,7 @@ export class ProofreadCommandHandler {
                     afterParagraphs,
                     referenceFile,
                     userTemperature: parseFloat(userTemperature),
-                    actualRepetitionMode: (actualRepetitionMode ?? 'none') as 'none' | 'target' | 'all',
+                    actualRepetitionMode,
                     sourceTextCharacteristics,
                     sourceCharacteristicsDisplayTitle
                 },
@@ -658,6 +686,51 @@ export class ProofreadCommandHandler {
             },
             true
         );
+    }
+
+    private resolveReferenceDialogDefaultUri(filePath: string | undefined): vscode.Uri | undefined {
+        if (!filePath) {
+            return undefined;
+        }
+        if (fs.existsSync(filePath)) {
+            return vscode.Uri.file(filePath);
+        }
+        const dir = path.dirname(filePath);
+        if (dir && fs.existsSync(dir)) {
+            return vscode.Uri.file(dir);
+        }
+        return undefined;
+    }
+
+    private buildProofreadSelectionLastRun(params: {
+        lastRun?: ProofreadSelectionLastRun;
+        contextBuildMethod: ProofreadSelectionContextBuildMethod;
+        contextLevel?: string;
+        beforeParagraphs: number;
+        afterParagraphs: number;
+        referenceFile?: vscode.Uri[];
+        temperature: number;
+        repetitionMode: ProofreadSelectionRepetitionMode;
+    }): ProofreadSelectionLastRun {
+        const { lastRun, contextBuildMethod } = params;
+        const headingLevel =
+            contextBuildMethod === '使用所在标题范围' &&
+            params.contextLevel &&
+            (PROOFREAD_SELECTION_HEADING_LEVELS as readonly string[]).includes(params.contextLevel)
+                ? (params.contextLevel as ProofreadSelectionHeadingLevel)
+                : lastRun?.headingLevel;
+        return {
+            contextBuildMethod,
+            beforeParagraphs:
+                contextBuildMethod === '前后增加段落' ? params.beforeParagraphs : lastRun?.beforeParagraphs,
+            afterParagraphs:
+                contextBuildMethod === '前后增加段落' ? params.afterParagraphs : lastRun?.afterParagraphs,
+            headingLevel,
+            useReference: !!params.referenceFile?.length,
+            referenceFilePath: params.referenceFile?.[0]?.fsPath ?? lastRun?.referenceFilePath,
+            temperature: params.temperature,
+            repetitionMode: params.repetitionMode
+        };
     }
 
     private async runProofreadSelectionWithResolvedParams(
