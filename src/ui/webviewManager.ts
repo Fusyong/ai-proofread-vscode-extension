@@ -817,21 +817,20 @@ export class WebviewManager {
                 <h3>📄 文档整理</h3>
                 <p class="hint">作用于当前编辑窗口中的文档。请先打开稿件，再点下方按钮（焦点可留在本面板）。</p>
                 <div class="section-actions">
+                <button class="action-button" onclick="handleAction('convertPdfToMarkdown')" title="${commandHoverTitle('将 PDF 转为 Markdown', 'ai-proofread.convertPdfToMarkdown')}">PDF → Markdown</button>
                     <button class="action-button" onclick="handleAction('convertDocxToMarkdown')" title="${commandHoverTitle('将 Word 转为 Markdown', 'ai-proofread.convertDocxToMarkdown')}">docx → Markdown</button>
-                    <button class="action-button" onclick="handleAction('convertPdfToMarkdown')" title="${commandHoverTitle('将 PDF 转为 Markdown', 'ai-proofread.convertPdfToMarkdown')}">PDF → Markdown</button>
                     <button class="action-button" onclick="handleAction('convertMarkdownToDocx')" title="${commandHoverTitle('将 Markdown 转为 Word', 'ai-proofread.convertMarkdownToDocx')}">Markdown → docx</button>
-                    ${sep}
-                    <button class="action-button" onclick="handleAction('formatParagraphs')" title="${commandHoverTitle('整理段落', 'ai-proofread.formatParagraphs')}">整理段落</button>
-                    <button class="action-button" onclick="handleAction('deleteInlineWhitespace')" title="${commandHoverTitle('删除汉字与汉字/中文标点/拉丁字母/阿拉伯数字之间的半角空格', 'ai-proofread.deleteInlineWhitespace')}">删除行中空白</button>
-                    ${sep}
-                    <button class="action-button" onclick="handleAction('convertQuotes')" title="${commandHoverTitle('半角引号转全角', 'ai-proofread.convertQuotes')}">半角引号转全角</button>
-                    <button class="action-button" onclick="handleAction('halfToFullPunctuation')" title="${commandHoverTitle('半角 ,;:!?() 转为 ，；：！？（）', 'ai-proofread.halfToFullPunctuation')}">半角标点转全角</button>
-                    <button class="action-button" onclick="handleAction('fullToHalfPunctuation')" title="${commandHoverTitle('全角 ，；：！？（） 转为 ,;:!?()', 'ai-proofread.fullToHalfPunctuation')}">全角标点转半角</button>
-                    <button class="action-button" onclick="handleAction('opencc')" title="${commandHoverTitle('繁简 / 地区用字转换', 'ai-proofread.opencc')}">繁简转换</button>
-                    <button class="action-button" onclick="handleAction('replaceFounderCircledNumbers')" title="${commandHoverTitle('方正书版带圈序号转为 Unicode 或 [n]', 'ai-proofread.replaceFounderCircledNumbers')}">方正带圈序号</button>
                     ${sep}
                     <button class="action-button" onclick="handleAction('markTitlesFromToc')" title="${commandHoverTitle('根据目录标记标题', 'ai-proofread.markTitlesFromToc')}">根据目录标记标题</button>
                     <button class="action-button" onclick="handleAction('alignHeadings')" title="${commandHoverTitle('请先并排打开两个文件，再检查标题是否一致', 'ai-proofread.alignHeadings')}">对齐标题</button>
+                    <button class="action-button" onclick="handleAction('formatParagraphs')" title="${commandHoverTitle('整理段落', 'ai-proofread.formatParagraphs')}">整理段落</button>
+                    ${sep}
+                    <button class="action-button" onclick="handleAction('halfToFullPunctuation')" title="${commandHoverTitle('半角 ,;:!?() 转为 ，；：！？（）', 'ai-proofread.halfToFullPunctuation')}">半角标点转全角</button>
+                    <button class="action-button" onclick="handleAction('deleteInlineWhitespace')" title="${commandHoverTitle('删除汉字与汉字/中文标点/拉丁字母/阿拉伯数字之间的半角空格', 'ai-proofread.deleteInlineWhitespace')}">删除行中空白</button>
+                    <button class="action-button" onclick="handleAction('fullToHalfPunctuation')" title="${commandHoverTitle('全角 ，；：！？（） 转为 ,;:!?()', 'ai-proofread.fullToHalfPunctuation')}">全角标点转半角</button>
+                    <button class="action-button" onclick="handleAction('convertQuotes')" title="${commandHoverTitle('半角引号转全角', 'ai-proofread.convertQuotes')}">半角引号转全角</button>
+                    <button class="action-button" onclick="handleAction('opencc')" title="${commandHoverTitle('繁简 / 地区用字转换', 'ai-proofread.opencc')}">繁简转换</button>
+                    <button class="action-button" onclick="handleAction('replaceFounderCircledNumbers')" title="${commandHoverTitle('方正书版带圈序号转为 Unicode 或 [n]', 'ai-proofread.replaceFounderCircledNumbers')}">恢复方正带圈序号</button>
                     ${sep}
                     <button class="action-button" onclick="handleAction('splitIntoSentences')" title="${commandHoverTitle('切分为句子', 'ai-proofread.splitIntoSentences')}">切分为句子</button>
                     <button class="action-button" onclick="handleAction('segmentFile')" title="${commandHoverTitle('分词、词频与字频统计', 'ai-proofread.segmentFile')}">分词与统计</button>
@@ -1108,8 +1107,8 @@ export class WebviewManager {
                     ${this.filePathRowWithOpenButtonIfExists('校对日志:', proofreadResult.logFilePath, 'showProofreadLog')}
                 </div>
                 <div class="section-actions">
+                ${hasMain && hasMd ? '<button class="action-button" onclick="handleAction(\'showProofreadDiff\')">比较前后差异</button>' : ''}
                     ${proofreadResult.outputFilePath ? `<button class="action-button" onclick="handleAction('showProofreadItemsTree')" title="${commandHoverTitle('查看校对条目', 'ai-proofread.showProofreadItemsTree')}">查看校对条目</button>` : ''}
-                    ${hasMain && hasMd ? '<button class="action-button" onclick="handleAction(\'showProofreadDiff\')">比较前后差异</button>' : ''}
                     ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'generateDiff\')">生成差异文件</button>' : ''}
                     ${hasMain && hasMd ? '<button class="action-button" onclick="handleAction(\'generateAlignment\')">生成勘误表</button>' : ''}
                 </div>
