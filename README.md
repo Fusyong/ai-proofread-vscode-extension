@@ -10,9 +10,10 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.13
+当前版本 v1.12.14
 
-- 优化：记住proofread selection的用户选项
+- 优化：删除行内空格，支持汉字与拉丁字母、阿拉伯数字之间的空格；只处理半角空格，不处理全角空格和tab
+- 优化：全角与半角标点互转，支持圆括号的转换
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
@@ -112,14 +113,14 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 1. 本扩展命令`mark titles from table of contents`，可以根据一个目录表文件（Markdown分级列表的形式），逐行比较当前文档，把标题行标记出来；匹配时会忽略行头已有的 `#` 标记（不限级数，如 `## `、`####### `），并按目录级别重写，因此可用来调整已经标记过的标题。比较时还会自动忽略数字（如页码）、英文句点和省略号（页码前导符号）、空格、带圈数字①-㉟、Markdown形式的注码如 `[^1] [^abc]`、上标注码如 `^1^ ^abc^`。
 2. PDF导出的文本，如果没有使用空行分段，无法切分，可以使用整理段落命令`format paragraphs`中的“段末加空行”选项加以处理。
 3. Markdown中的段内断行是合法的，即使句子被断开，对大模型的影响也不大。当然，也可以用上述命令`format paragraphs`中的“删除段内分行”选项处理后再校对。
-4. 过多的无效字符影响输出速度，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。方正系排版软件可能使用半角标点，校对后通常会被改成全角；也可用校对面板中的 **半角标点转全角** / **全角标点转半角**（命令 `half-width punctuation to full-width` / `full-width punctuation to half-width`），仅处理 `，；：？！` 与 `,;:!?` 五对（不含引号；引号仍用 `convert quotes to Chinese`）。请参考上述讲整理技巧的文章。
+4. 过多的无效字符影响输出速度，如长串的表格分割线`-`、空格、链接等，可以通过查找替换、Ctrl+Shift+L选中所有相同项目等办法简化、删除。方正系排版软件可能使用半角标点，校对后通常会被改成全角；也可用校对面板中的 **半角标点转全角** / **全角标点转半角**（命令 `half-width punctuation to full-width` / `full-width punctuation to half-width`），仅处理 `，；：？！（）` 与 `,;:!?()` 七对（不含引号；引号仍用 `convert quotes to Chinese`）。请参考上述讲整理技巧的文章。
 5. **对齐标题**：命令 `align headings`（校对面板「对齐标题」）。请先并排打开两个 Markdown 窗口（如练习题与答案、目录与正文），再运行本命令；可指定要对齐的标题级别（如 `1，2`），并选择「有序号则只比序号，否则比全文」或「比较全文」。一旦对不齐，会在两侧窗口跳到差异处，处理后可再次运行。
 6. 更强大、通用的文本整理技术是正则表达式查找替换，这需要专门学习，可参考[给编辑朋友的正则表达式课程](https://blog.xiiigame.com/2020-05-31-给编辑朋友的正则表达式课程/)。
 
 !!! caution 批量替换有风险
     批量替换的结果可能超出你的预期，即使你不准备原样使用处理后的文本，也有掩盖错误的风险。补强措施是：（一）备份文件。（二）先查找全部，复制到一个新文档中确认无误，然后再进行替换。（三）如果替换逻辑较为复杂，替换后还要比较文件（后文会提到），从头到尾确认所有更改。
 
-段落整理命令 `format paragraphs` 基于文档行长众数计算，适合整体较长、以长段落为主的文档；短小、段落零碎时准确率会比较低。也可使用 `delete inline whitespace` 删除汉字和中文标点内部过短的空白；`convert quotes to Chinese` 将半角引号转为全角（可在设置中改为校对后自动执行）；`opencc` / `opencc selection` 做繁简或地区用字转换。
+段落整理命令 `format paragraphs` 基于文档行长众数计算，适合整体较长、以长段落为主的文档；短小、段落零碎时准确率会比较低。也可使用 `delete inline whitespace` 删除汉字与汉字、中文标点、拉丁字母或阿拉伯数字之间过短的半角空格（不处理 Tab、全角空格）；`convert quotes to Chinese` 将半角引号转为全角（可在设置中改为校对后自动执行）；`opencc` / `opencc selection` 做繁简或地区用字转换。
 
 #### 3.1.3. 分句、分词与比较文件
 

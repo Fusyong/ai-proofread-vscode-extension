@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.13",
+  "version": "1.12.14",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -1202,19 +1202,19 @@
           "type": "number",
           "default": 1,
           "minimum": 0,
-          "description": "删除行中空白字符：仅删除连续个数小于等于此值的空白序列（默认 1）"
+          "description": "删除行中空白字符：仅删除连续个数小于等于此值的半角空格序列（默认 1）"
         },
         "ai-proofread.deleteInlineWhitespace.preserveLineEdges": {
           "order": 40.2,
           "type": "boolean",
           "default": true,
-          "description": "删除行中空白字符：是否保留行首行尾空白（默认是）"
+          "description": "删除行中空白字符：是否保留行首行尾半角空格（默认是）"
         },
         "ai-proofread.deleteInlineWhitespace.askOnRun": {
           "order": 40.3,
           "type": "boolean",
           "default": true,
-          "description": "删除行中空白字符：执行命令时是否弹出选项对话框（默认是）。仅处理汉字、中文标点之间的空白；设为否则直接使用上述配置"
+          "description": "删除行中空白字符：执行命令时是否弹出选项对话框（默认是）。仅删除半角空格；条件为汉字与汉字、中文标点、拉丁字母或阿拉伯数字之间。设为否则直接使用上述配置"
         },
         "ai-proofread.defaultSplitLength": {
           "order": 41,

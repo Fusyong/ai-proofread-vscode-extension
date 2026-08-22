@@ -822,11 +822,11 @@ export class WebviewManager {
                     <button class="action-button" onclick="handleAction('convertMarkdownToDocx')" title="${commandHoverTitle('将 Markdown 转为 Word', 'ai-proofread.convertMarkdownToDocx')}">Markdown → docx</button>
                     ${sep}
                     <button class="action-button" onclick="handleAction('formatParagraphs')" title="${commandHoverTitle('整理段落', 'ai-proofread.formatParagraphs')}">整理段落</button>
-                    <button class="action-button" onclick="handleAction('deleteInlineWhitespace')" title="${commandHoverTitle('删除行中空白', 'ai-proofread.deleteInlineWhitespace')}">删除行中空白</button>
+                    <button class="action-button" onclick="handleAction('deleteInlineWhitespace')" title="${commandHoverTitle('删除汉字与汉字/中文标点/拉丁字母/阿拉伯数字之间的半角空格', 'ai-proofread.deleteInlineWhitespace')}">删除行中空白</button>
                     ${sep}
                     <button class="action-button" onclick="handleAction('convertQuotes')" title="${commandHoverTitle('半角引号转全角', 'ai-proofread.convertQuotes')}">半角引号转全角</button>
-                    <button class="action-button" onclick="handleAction('halfToFullPunctuation')" title="${commandHoverTitle('半角 ,;:!? 转为 ，；：！？', 'ai-proofread.halfToFullPunctuation')}">半角标点转全角</button>
-                    <button class="action-button" onclick="handleAction('fullToHalfPunctuation')" title="${commandHoverTitle('全角 ，；：！？ 转为 ,;:!?', 'ai-proofread.fullToHalfPunctuation')}">全角标点转半角</button>
+                    <button class="action-button" onclick="handleAction('halfToFullPunctuation')" title="${commandHoverTitle('半角 ,;:!?() 转为 ，；：！？（）', 'ai-proofread.halfToFullPunctuation')}">半角标点转全角</button>
+                    <button class="action-button" onclick="handleAction('fullToHalfPunctuation')" title="${commandHoverTitle('全角 ，；：！？（） 转为 ,;:!?()', 'ai-proofread.fullToHalfPunctuation')}">全角标点转半角</button>
                     <button class="action-button" onclick="handleAction('opencc')" title="${commandHoverTitle('繁简 / 地区用字转换', 'ai-proofread.opencc')}">繁简转换</button>
                     <button class="action-button" onclick="handleAction('replaceFounderCircledNumbers')" title="${commandHoverTitle('方正书版带圈序号转为 Unicode 或 [n]', 'ai-proofread.replaceFounderCircledNumbers')}">方正带圈序号</button>
                     ${sep}

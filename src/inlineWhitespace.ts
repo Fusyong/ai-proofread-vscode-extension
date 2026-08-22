@@ -1,17 +1,26 @@
 /**
- * 删除行中空白字符（仅处理汉字、中文标点之间的空白）
+ * 删除行中空白字符
+ *
+ * 仅删除半角空格（不处理 Tab、全角空格）。
+ * 删除条件：空格两侧至少一侧为汉字，另一侧为汉字、中文标点、拉丁字母或阿拉伯数字。
  */
 
 /** 汉字 */
 const HAN_CHAR_RE = /\p{Script=Han}/u;
 
-/** 行内空白（不含换行） */
-const INLINE_WHITESPACE_RUN_RE = /[ \t\u3000]+/g;
+/** 仅半角空格（不含 Tab、全角空格、换行） */
+const HALFWIDTH_SPACE_RUN_RE = / +/g;
+
+/** 拉丁字母：半角 A-Za-z、全角 Ａ-Ｚａ-ｚ */
+const LATIN_LETTER_RE = /[A-Za-zＡ-Ｚａ-ｚ]/u;
+
+/** 阿拉伯数字：半角 0-9、全角 ０-９ */
+const ARABIC_DIGIT_RE = /[0-9０-９]/u;
 
 export interface DeleteInlineWhitespaceOptions {
     /** 仅删除连续个数小于等于此值的空白序列，默认 1 */
     maxConsecutive: number;
-    /** 保留行首行尾空白，默认 true */
+    /** 保留行首行尾半角空格，默认 true */
     preserveLineEdges: boolean;
 }
 
@@ -32,8 +41,17 @@ function isChinesePunctuation(ch: string): boolean {
     return /\p{P}/u.test(ch);
 }
 
-function isHanOrChinesePunctuation(ch: string): boolean {
-    return isHanChar(ch) || isChinesePunctuation(ch);
+function isLatinLetter(ch: string): boolean {
+    return LATIN_LETTER_RE.test(ch);
+}
+
+function isArabicDigit(ch: string): boolean {
+    return ARABIC_DIGIT_RE.test(ch);
+}
+
+/** 可与汉字配对、从而删除其间半角空格的字符 */
+function isAllowedHanNeighbor(ch: string): boolean {
+    return isHanChar(ch) || isChinesePunctuation(ch) || isLatinLetter(ch) || isArabicDigit(ch);
 }
 
 function shouldDeleteWhitespaceRun(
@@ -48,11 +66,15 @@ function shouldDeleteWhitespaceRun(
     if (!charBefore || !charAfter) {
         return false;
     }
-    return isHanOrChinesePunctuation(charBefore) && isHanOrChinesePunctuation(charAfter);
+    return (
+        (isHanChar(charBefore) || isHanChar(charAfter)) &&
+        isAllowedHanNeighbor(charBefore) &&
+        isAllowedHanNeighbor(charAfter)
+    );
 }
 
 function processLineMiddle(middle: string, options: DeleteInlineWhitespaceOptions): string {
-    return middle.replace(INLINE_WHITESPACE_RUN_RE, (match, offset: number) => {
+    return middle.replace(HALFWIDTH_SPACE_RUN_RE, (match, offset: number) => {
         const charBefore = offset > 0 ? middle[offset - 1] : '';
         const charAfter =
             offset + match.length < middle.length ? middle[offset + match.length] : '';
@@ -65,17 +87,19 @@ function processLine(line: string, options: DeleteInlineWhitespaceOptions): stri
         return processLineMiddle(line, options);
     }
 
-    const leadingMatch = line.match(/^[ \t\u3000]*/);
+    const leadingMatch = line.match(/^ */);
     const leading = leadingMatch ? leadingMatch[0] : '';
-    const trailingMatch = line.match(/[ \t\u3000]*$/);
+    const trailingMatch = line.match(/ *$/);
     const trailing = trailingMatch ? trailingMatch[0] : '';
+    if (leading.length + trailing.length >= line.length) {
+        return line;
+    }
     const middle = line.slice(leading.length, line.length - trailing.length);
     return leading + processLineMiddle(middle, options) + trailing;
 }
 
 /**
- * 删除文本行内符合条件的空白字符，保留换行结构。
- * 仅删除汉字与中文标点之间的空白。
+ * 删除文本行内符合条件的半角空格，保留换行结构。
  */
 export function deleteInlineWhitespace(
     text: string,

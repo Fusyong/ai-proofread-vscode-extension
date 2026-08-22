@@ -463,7 +463,7 @@ export class UtilityCommandHandler {
     }
 
     /**
-     * 半角标点转全角标点（,;:!? → ，；：！？）
+     * 半角标点转全角标点（,;:!?() → ，；：！？（））
      */
     public async handleHalfToFullPunctuationCommand(editor: vscode.TextEditor): Promise<void> {
         await this.replaceEditorText(
@@ -545,7 +545,7 @@ export class UtilityCommandHandler {
     }
 
     /**
-     * 全角标点转半角标点（，；：！？ → ,;:!?）
+     * 全角标点转半角标点（，；：！？（） → ,;:!?()）
      */
     public async handleFullToHalfPunctuationCommand(editor: vscode.TextEditor): Promise<void> {
         await this.replaceEditorText(
@@ -619,7 +619,7 @@ export class UtilityCommandHandler {
     ): Promise<DeleteInlineWhitespaceOptions | undefined> {
         const maxConsecutiveInput = await vscode.window.showInputBox({
             title: '删除行中空白字符',
-            prompt: '连续空白个数小于等于（仅删除长度不超过此值的空白序列）',
+            prompt: '连续半角空格个数小于等于（仅删除长度不超过此值的半角空格序列）',
             value: String(defaults.maxConsecutive),
             ignoreFocusOut: true,
             validateInput: (value) => {
@@ -638,18 +638,18 @@ export class UtilityCommandHandler {
             [
                 {
                     label: '是（默认）',
-                    description: '保留每行行首与行尾空白',
+                    description: '保留每行行首与行尾半角空格',
                     value: true
                 },
                 {
                     label: '否',
-                    description: '行首行尾空白也参与处理',
+                    description: '行首行尾半角空格也参与处理',
                     value: false
                 }
             ],
             {
                 title: '删除行中空白字符',
-                placeHolder: '是否保留行首行尾空白？',
+                placeHolder: '是否保留行首行尾半角空格？',
                 ignoreFocusOut: true
             }
         );

@@ -4,8 +4,8 @@ import { fullToHalfPunctuation, halfToFullPunctuation } from './punctuationConve
 
 describe('halfToFullPunctuation', () => {
     it('converts common half-width punctuation to full-width', () => {
-        expect(halfToFullPunctuation('你好,世界;注意:危险!真的?')).toBe(
-            '你好，世界；注意：危险！真的？'
+        expect(halfToFullPunctuation('你好,世界;注意:危险!真的?(示例)')).toBe(
+            '你好，世界；注意：危险！真的？（示例）'
         );
     });
 
@@ -20,8 +20,8 @@ describe('halfToFullPunctuation', () => {
 
 describe('fullToHalfPunctuation', () => {
     it('converts common full-width punctuation to half-width', () => {
-        expect(fullToHalfPunctuation('你好，世界；注意：危险！真的？')).toBe(
-            '你好,世界;注意:危险!真的?'
+        expect(fullToHalfPunctuation('你好，世界；注意：危险！真的？（示例）')).toBe(
+            '你好,世界;注意:危险!真的?(示例)'
         );
     });
 

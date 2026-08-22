@@ -253,10 +253,10 @@ flowchart LR
 | AI Proofreader: convert PDF to markdown | 将活文字 PDF 转为 Markdown（Windows 内置 pdftotext；其他系统需自行安装） |
 | AI Proofreader: convert markdown to docx | 将 Markdown 转为 Word(docx) |
 | AI Proofreader: format paragraphs | 整理段落：段末加空行 / 删除段内分行 |
-| AI Proofreader: delete inline whitespace | 删除汉字及中文标点之间过短的空白 |
+| AI Proofreader: delete inline whitespace | 删除汉字与汉字/中文标点/拉丁字母/阿拉伯数字之间过短的半角空格（不处理 Tab、全角空格） |
 | AI Proofreader: convert quotes to Chinese | 半角引号转全角（可设为校对后自动执行） |
-| AI Proofreader: half-width punctuation to full-width | 半角标点转全角（,;:!? → ，；：！？） |
-| AI Proofreader: full-width punctuation to half-width | 全角标点转半角（，；：！？ → ,;:!?） |
+| AI Proofreader: half-width punctuation to full-width | 半角标点转全角（,;:!?() → ，；：！？（）） |
+| AI Proofreader: full-width punctuation to half-width | 全角标点转半角（，；：！？（） → ,;:!?()） |
 | AI Proofreader: OpenCC / OpenCC selection | 繁简或地区用字转换 |
 | AI Proofreader: replace Founder circled numbers | 方正书版 PDF 带圈序号 → Unicode ①… 或方头扩注 [n]；并清除常见版面杂质 |
 | AI Proofreader: mark titles from table of contents | 根据目录表（Markdown 列表）在文档中标记标题；可忽略并改写已有 `#`（不限级数） |
