@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.14",
+  "version": "1.12.15",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -1246,7 +1246,7 @@
           "order": 44,
           "type": "number",
           "default": 120,
-          "description": "标题加长度切分：最小长度，小于此长度的段落将被合并"
+          "description": "标题加长度切分：最小长度。过短片段若以不深于最低切分级别的标题开头则并入后一段，否则并入前一段"
         },
         "ai-proofread.proofread.defaultContextLevel": {
           "order": 45,

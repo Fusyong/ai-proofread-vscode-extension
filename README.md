@@ -10,10 +10,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.14
+当前版本 v1.12.15
 
-- 优化：删除行内空格，支持汉字与拉丁字母、阿拉伯数字之间的空格；只处理半角空格，不处理全角空格和tab
-- 优化：全角与半角标点互转，支持圆括号的转换
+- 优化：文档切分功能，确保开头的片段不为空；按标题加长度切分时，过短片段如果开头是标题，且不低于切分标题的最低一级，则合并到后面的片段之前，否则合并到前面的片段之后。
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 

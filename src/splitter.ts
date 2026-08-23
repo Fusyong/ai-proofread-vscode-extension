@@ -225,41 +225,98 @@ export function splitTextInListByLength(textList: string[], threshold: number = 
 }
 
 /**
- * 合并短段落到后一段
+ * 读取片段头部的 Markdown ATX 标题级数（1–6）。
+ * 跳过开头空行；首个非空行不是 `# ` 标题则返回 null。
+ */
+export function getLeadingMarkdownHeadingLevel(text: string): number | null {
+    for (const line of text.split('\n')) {
+        if (!line.trim()) {
+            continue;
+        }
+        const match = line.match(/^(#{1,6}) /);
+        if (match) {
+            return match[1].length;
+        }
+        return null;
+    }
+    return null;
+}
+
+function shouldMergeShortForward(text: string, lowestSplitLevel: number): boolean {
+    const level = getLeadingMarkdownHeadingLevel(text);
+    // 不低于最低切分级别：一级到该级（如 [2,4] 或 [4,2] → 1–4）都向前并
+    return level !== null && level <= lowestSplitLevel;
+}
+
+/** 切分标题中最低（最深）一级；与输入顺序无关。 */
+function lowestSplitHeadingLevel(levels: number[] | undefined): number {
+    const valid = (levels ?? []).filter((n) => Number.isInteger(n) && n >= 1 && n <= 6);
+    return valid.length > 0 ? Math.max(...valid) : 2;
+}
+
+/**
+ * 合并过短片段。
+ * 头部标题级数不高于切分标题最低一级（`levels` 中最深的一级，与输入顺序无关，如 [2,4] 与 [4,2] 均为 4）时，
+ * 并入后一段之前；否则（无标题，或比最低切分级更深）并入前一段之后。
+ * 文末同样：应向前且后无可并则单独成片；应向后则并入前一段。
+ * 文首应向后但前无可并时，改为随后一段。
+ *
  * @param paragraphs 段落列表
  * @param minLength 段落最小长度，小于此长度的段落将被合并
- * @returns 合并短段落后的段落列表
+ * @param levels 切分所用标题级别，默认 [2]
  */
-export function mergeShortParagraphs(paragraphs: string[], minLength: number = 100): string[] {
+export function mergeShortParagraphs(
+    paragraphs: string[],
+    minLength: number = 100,
+    levels: number[] = [2]
+): string[] {
+    const lowestSplitLevel = lowestSplitHeadingLevel(levels);
     const result: string[] = [];
-    let tempParagraphs: string[] = [];
+    const pendingForward: string[] = [];
+
+    const flushPendingOnto = (anchor: string): string => {
+        if (pendingForward.length === 0) {
+            return anchor;
+        }
+        const merged = [...pendingForward, anchor].join('\n');
+        pendingForward.length = 0;
+        return merged;
+    };
 
     for (const para of paragraphs) {
-        const paraLength = para.length;
+        if (para.length >= minLength) {
+            result.push(flushPendingOnto(para));
+            continue;
+        }
 
-        if (paraLength < minLength) {
-            // 短段落暂存
-            tempParagraphs.push(para);
+        if (shouldMergeShortForward(para, lowestSplitLevel)) {
+            pendingForward.push(para);
+            continue;
+        }
+
+        if (pendingForward.length > 0) {
+            pendingForward.push(para);
+        } else if (result.length > 0) {
+            result[result.length - 1] = result[result.length - 1] + '\n' + para;
         } else {
-            // 正常长度段落
-            if (tempParagraphs.length > 0) {
-                // 如果有暂存段落，合并后添加
-                tempParagraphs.push(para);
-                result.push(tempParagraphs.join('\n'));
-                tempParagraphs = [];
-            } else {
-                // 直接添加
-                result.push(para);
-            }
+            pendingForward.push(para);
         }
     }
 
-    // 处理剩余的暂存段落
-    if (tempParagraphs.length > 0) {
-        result.push(tempParagraphs.join('\n'));
+    if (pendingForward.length > 0) {
+        result.push(pendingForward.join('\n'));
     }
 
     return result;
+}
+
+/** 丢掉切分结果开头仅含空白（空行、空格等）的片段，保证 JSON 第一条有正文。 */
+function dropLeadingWhitespaceOnlySegments(
+    segments: Array<{ target: string; context?: string }>
+): void {
+    while (segments.length > 0 && !segments[0].target.trim()) {
+        segments.shift();
+    }
 }
 
 export interface SplitOptions {
@@ -312,9 +369,11 @@ export function splitText(
         // 标题加长度切分：先按标题切分，然后处理长短段落
         let textList = splitMarkdownByTitle(text, options.levels);
         textList = splitTextInListByLength(textList, options.threshold, options.cutBy);
-        textList = mergeShortParagraphs(textList, options.minLength);
+        textList = mergeShortParagraphs(textList, options.minLength, options.levels);
         segments = textList.map(x => ({ target: x }));
     }
+
+    dropLeadingWhitespaceOnlySegments(segments);
 
     // 生成JSON输出
     const jsonOutput = JSON.stringify(segments, null, 2);
@@ -425,8 +484,8 @@ export async function handleFileSplit(
     const segmentLengths = segments.map(segment => segment.target.trim().length);
     const stats = {
         segmentCount: segments.length,
-        maxSegmentLength: Math.max(...segmentLengths),
-        minSegmentLength: Math.min(...segmentLengths)
+        maxSegmentLength: segmentLengths.length > 0 ? Math.max(...segmentLengths) : 0,
+        minSegmentLength: segmentLengths.length > 0 ? Math.min(...segmentLengths) : 0
     };
 
     return {

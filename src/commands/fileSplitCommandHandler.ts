@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { handleFileSplit } from '../splitter';
+import { parseHeadingLevels } from '../headingAligner';
 import { ErrorUtils, FilePathUtils } from '../utils';
 import { WebviewManager, ProcessResult } from '../ui/webviewManager';
 
@@ -210,21 +211,19 @@ export class FileSplitCommandHandler {
             prompt: '请输入标题级别，用作文本或语境的切分点（如：1,2）',
             value: defaultLevels.join(','),
             validateInput: (value: string) => {
-                const levels = value.split(/[，,]/).map(x => parseInt(x.trim()));
-                if (levels.some(isNaN)) {
-                    return '请输入有效的数字，用逗号分隔';
-                }
-                if (levels.some(x => x < 1 || x > 6)) {
-                    return '标题级别必须在1到6之间';
-                }
-                return null;
+                const parsed = parseHeadingLevels(value);
+                return 'error' in parsed ? parsed.error : null;
             }
         });
 
         if (!inputLevels) {
             return null;
         }
-        options.levels = inputLevels.split(',').map(x => parseInt(x.trim()));
+        const parsedLevels = parseHeadingLevels(inputLevels);
+        if ('error' in parsedLevels) {
+            return null;
+        }
+        options.levels = [...parsedLevels.levels].sort((a, b) => a - b);
 
         if (mode === 'titleContext') {
             // 获取带上下文切分的配置
@@ -303,7 +302,7 @@ export class FileSplitCommandHandler {
 
                 // 让用户修改最小长度
                 const inputMinLength = await vscode.window.showInputBox({
-                    prompt: '请输入最小长度（小于此长度的段落将被合并）',
+                    prompt: '请输入最小长度（过短片段若以不深于最低切分级别的标题开头则并入后一段，否则并入前一段）',
                     value: options.minLength.toString(),
                     validateInput: (value: string) => {
                         const num = parseInt(value);
