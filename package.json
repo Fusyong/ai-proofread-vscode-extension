@@ -356,7 +356,7 @@
       },
       {
         "command": "ai-proofread.citation.showDiff",
-        "title": "Diff Citations vs References"
+        "title": "Diff References vs Citations"
       },
       {
         "command": "ai-proofread.citation.searchInPdf",

@@ -316,7 +316,7 @@ export function registerReferencePrepResultsView(context: vscode.ExtensionContex
     return { provider, treeView };
 }
 
-/** 选区原文 vs 命中文献：VS Code 内置 diff（与旧「引文核查」匹配节点菜单一致） */
+/** 命中文献 vs 选区原文：VS Code 内置 diff（与「引文核查」匹配节点菜单一致） */
 export async function showCorpusHitDiff(
     context: vscode.ExtensionContext,
     process: { userInput?: string; targetPreview?: string },
@@ -326,17 +326,17 @@ export async function showCorpusHitDiff(
         vscode.window.showWarningMessage('词典、百科或网页命中与选区不是平行正文，不宜做 diff。');
         return;
     }
-    const left = citationTextForDiff(process);
-    const right = literatureTextForDiff(hit);
-    if (!left) {
+    const left = literatureTextForDiff(hit);
+    const right = citationTextForDiff(process);
+    if (!right) {
         vscode.window.showWarningMessage('没有选区原文，无法与命中比对。');
         return;
     }
-    if (!right) {
+    if (!left) {
         vscode.window.showWarningMessage('此命中没有可供比对的文献正文。');
         return;
     }
-    await showDiff(context, left, right, '.md', true, '引文 ↔ 文献');
+    await showDiff(context, left, right, '.md', true, '文献 ↔ 引文');
 }
 
 export async function openCorpusHitInEditor(

@@ -284,26 +284,26 @@ export class CitationCommandHandler {
         }
     }
 
-    /** 查看 diff：整块引文 vs 整段文献（需在引文核对视图中选中一条「匹配」节点） */
+    /** 查看 diff：整段文献 vs 整块引文（需在引文核对视图中选中一条「匹配」节点） */
     async handleShowDiffCommand(nodeOrItem?: CitationTreeNode | { id?: string }): Promise<void> {
         const data = this.getSelectedMatchData(nodeOrItem);
         if (!data) {
-            vscode.window.showWarningMessage('请在引文核对视图中选中一条匹配结果后再执行「diff citations vs references」。');
+            vscode.window.showWarningMessage('请在引文核对视图中选中一条匹配结果后再执行「diff references vs citations」。');
             return;
         }
         const refText = data.refFragment.map((r) => r.content).join('\n');
         try {
             await showDiff(
                 this.context,
-                data.citationText,
                 refText,
+                data.citationText,
                 '.md',
                 true,
-                'Citation ↔ Reference'
+                'Reference ↔ Citation'
             );
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
-            vscode.window.showErrorMessage(`diff citations vs references failed: ${msg}`);
+            vscode.window.showErrorMessage(`diff references vs citations failed: ${msg}`);
         }
     }
 
