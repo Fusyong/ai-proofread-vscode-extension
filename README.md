@@ -13,6 +13,8 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 当前版本 v1.12.15
 
 - 优化：文档切分功能，确保开头的片段不为空；按标题加长度切分时，过短片段如果开头是标题，且不低于切分标题的最低一级，则合并到后面的片段之前，否则合并到前面的片段之后。
+- 优化：引文验证diff左右文档调换，改为左边是参考资料，右边是引文
+- 优化：默认并发数改为50
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
@@ -485,7 +487,7 @@ other类型输出的后续处理暂时跟全文输出相同，可用于收集自
 
 参考：
 
-* 阿里云百炼平台[限流规则](https://help.aliyun.com/zh/model-studio/rate-limit)：qwen-max系列稳定版的rpm通常为600甚至更高，带日期的快照版通常为60，没有并发限制（建议为10，经验100以内通常没有问题）
+* 阿里云百炼平台[限流规则](https://help.aliyun.com/zh/model-studio/rate-limit)：qwen-max系列稳定版的rpm通常为600甚至更高，带日期的快照版通常为60，没有并发限制（建议为50，经验100以内通常没有问题）
 * Deepseek[限速](https://api-docs.deepseek.com/zh-cn/quick_start/rate_limit)：没有并发限制，但服务器在高流量时会延迟（需要注意观察）
 * 谷歌[rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits)
 

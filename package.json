@@ -691,8 +691,8 @@
         "ai-proofread.proofread.maxConcurrent": {
           "order": 25,
           "type": "number",
-          "default": 10,
-          "description": "最大并发请求数，默认10"
+          "default": 50,
+          "description": "最大并发请求数，默认50"
         },
         "ai-proofread.proofread.temperature": {
           "order": 26,

@@ -318,9 +318,9 @@ flowchart LR
 | 设置项 | 简短说明 |
 |--------|----------|
 | **proofread.temperature** | 模型温度 [0~2)，默认 1.0 |
-| **proofread.timeout** | 单次 API 请求超时（**秒**），默认 90 |
+| **proofread.timeout** | 单次 API 请求超时（**秒**），默认 120 |
 | **proofread.rpm** | 每分钟最大请求数；百炼 qwen-max 稳定版常为 600 |
-| **proofread.maxConcurrent** | 最大并发请求数，默认 10 |
+| **proofread.maxConcurrent** | 最大并发请求数，默认 50 |
 | **proofread.disableThinking** | 校对管线默认禁用思考（快模式）；子管线可在「模型路由」中覆盖 |
 | **modelRoutes** | 各管线平台/模型/思考覆盖；`disableThinking` 可单独覆盖，侧栏会提示收益与负担 |
 | **convertQuotes** | 是否在校对后自动将半角引号转为中文全角 |
