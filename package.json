@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.15",
+  "version": "1.12.16",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -433,6 +433,14 @@
       {
         "command": "ai-proofread.manageCustomTables",
         "title": "AI Proofreader: manage custom tables"
+      },
+      {
+        "command": "ai-proofread.openDictCheckTypes",
+        "title": "AI Proofreader: open dict checks"
+      },
+      {
+        "command": "ai-proofread.openTgsccCheckTypes",
+        "title": "AI Proofreader: open TGSCC checks"
       },
       {
         "command": "ai-proofread.customTables.delete",

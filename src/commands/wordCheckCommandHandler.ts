@@ -650,6 +650,16 @@ export class WordCheckCommandHandler {
         await vscode.commands.executeCommand(`${CUSTOM_TABLES_VIEW_ID}.focus`);
     }
 
+    async handleOpenDictCheckTypesCommand(): Promise<void> {
+        await setWordCheckConfigVisible(true);
+        await vscode.commands.executeCommand(`${DICT_CHECK_TYPES_VIEW_ID}.focus`);
+    }
+
+    async handleOpenTgsccCheckTypesCommand(): Promise<void> {
+        await setWordCheckConfigVisible(true);
+        await vscode.commands.executeCommand(`${TGSCC_CHECK_TYPES_VIEW_ID}.focus`);
+    }
+
     /** 加载替换表：文件选择 → 正则/字面 → 加入列表并刷新视图 */
     async handleLoadCustomTableCommand(): Promise<void> {
         const lastFolder = this.context.workspaceState.get<string>(KEY_LAST_ADD_FOLDER);

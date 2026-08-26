@@ -744,6 +744,12 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ai-proofread.manageCustomTables', async () => {
             await wordCheckHandler.handleManageCustomTablesCommand();
         }),
+        vscode.commands.registerCommand('ai-proofread.openDictCheckTypes', async () => {
+            await wordCheckHandler.handleOpenDictCheckTypesCommand();
+        }),
+        vscode.commands.registerCommand('ai-proofread.openTgsccCheckTypes', async () => {
+            await wordCheckHandler.handleOpenTgsccCheckTypesCommand();
+        }),
         vscode.commands.registerCommand('ai-proofread.customTables.delete', (el: import('./xh7/customTablesView').CustomTableTreeItem) => wordCheckHandler.handleCustomTableDelete(el)),
         vscode.commands.registerCommand('ai-proofread.customTables.moveUp', (el: import('./xh7/customTablesView').CustomTableTreeItem) => wordCheckHandler.handleCustomTableMoveUp(el)),
         vscode.commands.registerCommand('ai-proofread.customTables.moveDown', (el: import('./xh7/customTablesView').CustomTableTreeItem) => wordCheckHandler.handleCustomTableMoveDown(el)),

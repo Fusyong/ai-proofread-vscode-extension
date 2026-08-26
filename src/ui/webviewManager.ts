@@ -731,6 +731,12 @@ export class WebviewManager {
                 case 'manageCustomTables':
                     await vscode.commands.executeCommand('ai-proofread.manageCustomTables');
                     break;
+                case 'openDictCheckTypes':
+                    await vscode.commands.executeCommand('ai-proofread.openDictCheckTypes');
+                    break;
+                case 'openTgsccCheckTypes':
+                    await vscode.commands.executeCommand('ai-proofread.openTgsccCheckTypes');
+                    break;
                 case 'showProofreadItemsTree': {
                     const proofreadJsonPath = this.getProofreadJsonPath();
                     const segJson = proofreadJsonPath ? proofreadJsonPathToSegmentsJsonPath(proofreadJsonPath) : undefined;
@@ -924,6 +930,8 @@ export class WebviewManager {
                 <p class="hint">作用于当前编辑窗口。某些结果列表会出现在左侧栏。</p>
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('checkWords')" title="${commandHoverTitle('字词检查', 'ai-proofread.checkWords')}">字词检查</button>
+                    <button class="action-button" onclick="handleAction('openDictCheckTypes')" title="${commandHoverTitle('打开词典检查类型（dict checks）', 'ai-proofread.openDictCheckTypes')}">词典检查类型</button>
+                    <button class="action-button" onclick="handleAction('openTgsccCheckTypes')" title="${commandHoverTitle('打开通规检查类型（TGSCC checks）', 'ai-proofread.openTgsccCheckTypes')}">通规检查类型</button>
                     <button class="action-button" onclick="handleAction('manageCustomTables')" title="${commandHoverTitle('管理自定义替换表', 'ai-proofread.manageCustomTables')}">管理替换表</button>
                     ${sep}
                     <button class="action-button" onclick="handleAction('numberingCheckTitles')" title="${commandHoverTitle('检查标题树', 'ai-proofread.numbering.checkTitles')}">检查标题树</button>
