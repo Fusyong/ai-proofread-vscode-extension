@@ -301,6 +301,10 @@
         "title": "AI Proofreader: delete inline whitespace"
       },
       {
+        "command": "ai-proofread.deleteExcessBlankLines",
+        "title": "AI Proofreader: delete excess blank lines"
+      },
+      {
         "command": "ai-proofread.markTitlesFromToc",
         "title": "AI Proofreader: mark titles from table of contents"
       },
@@ -2040,6 +2044,11 @@
         },
         {
           "command": "ai-proofread.deleteInlineWhitespace",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
+          "command": "ai-proofread.deleteExcessBlankLines",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
         },

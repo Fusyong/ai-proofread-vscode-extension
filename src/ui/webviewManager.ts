@@ -686,6 +686,10 @@ export class WebviewManager {
                     await runWithWorkingEditor('ai-proofread.deleteInlineWhitespace');
                     break;
                 }
+                case 'deleteExcessBlankLines': {
+                    await runWithWorkingEditor('ai-proofread.deleteExcessBlankLines');
+                    break;
+                }
                 case 'opencc': {
                     await runWithWorkingEditor('ai-proofread.opencc');
                     break;
@@ -830,6 +834,7 @@ export class WebviewManager {
                     <button class="action-button" onclick="handleAction('markTitlesFromToc')" title="${commandHoverTitle('根据目录标记标题', 'ai-proofread.markTitlesFromToc')}">根据目录标记标题</button>
                     <button class="action-button" onclick="handleAction('alignHeadings')" title="${commandHoverTitle('请先并排打开两个文件，再检查标题是否一致', 'ai-proofread.alignHeadings')}">对齐标题</button>
                     <button class="action-button" onclick="handleAction('formatParagraphs')" title="${commandHoverTitle('整理段落', 'ai-proofread.formatParagraphs')}">整理段落</button>
+                    <button class="action-button" onclick="handleAction('deleteExcessBlankLines')" title="${commandHoverTitle('删除多余空行', 'ai-proofread.deleteExcessBlankLines')}">删除多余空行</button>
                     ${sep}
                     <button class="action-button" onclick="handleAction('halfToFullPunctuation')" title="${commandHoverTitle('半角 ,;:!?() 转为 ，；：！？（）', 'ai-proofread.halfToFullPunctuation')}">半角标点转全角</button>
                     <button class="action-button" onclick="handleAction('deleteInlineWhitespace')" title="${commandHoverTitle('删除汉字与汉字/中文标点/拉丁字母/阿拉伯数字之间的半角空格', 'ai-proofread.deleteInlineWhitespace')}">删除行中空白</button>

@@ -22,6 +22,11 @@ import {
     deleteInlineWhitespace,
     type DeleteInlineWhitespaceOptions
 } from '../inlineWhitespace';
+import {
+    DEFAULT_DELETE_EXCESS_BLANK_LINES_OPTIONS,
+    deleteExcessBlankLines,
+    type DeleteExcessBlankLinesOptions
+} from '../excessBlankLines';
 import { showDiff } from '../differ';
 import { ErrorUtils, FilePathUtils, normalizeLineEndings } from '../utils';
 import { parseToc, markTitles, TocItem } from '../titleMarker';
@@ -704,6 +709,103 @@ export class UtilityCommandHandler {
             vscode.window.showInformationMessage('行中空白字符已处理完成！');
         } catch (error) {
             ErrorUtils.showError(error, '删除行中空白字符时出错：');
+        }
+    }
+
+    /**
+     * 交互式收集「删除多余空行」选项
+     */
+    private async promptDeleteExcessBlankLinesOptions(
+        defaults: DeleteExcessBlankLinesOptions
+    ): Promise<DeleteExcessBlankLinesOptions | undefined> {
+        const maxConsecutiveInput = await vscode.window.showInputBox({
+            title: '删除多余空行',
+            prompt: '连续空行最多保留几行（可为 0）',
+            value: String(defaults.maxConsecutive),
+            ignoreFocusOut: true,
+            validateInput: (value) => {
+                const num = Number(value);
+                if (!Number.isInteger(num) || num < 0) {
+                    return '请输入非负整数';
+                }
+                return null;
+            }
+        });
+        if (maxConsecutiveInput === undefined) {
+            return undefined;
+        }
+
+        const treatWhitespaceChoice = await vscode.window.showQuickPick(
+            [
+                {
+                    label: '是（默认）',
+                    description: '空白行也算空行；保留的空行会去掉空白字符',
+                    value: true
+                },
+                {
+                    label: '否',
+                    description: '仅把完全无字符的行视作空行',
+                    value: false
+                }
+            ],
+            {
+                title: '删除多余空行',
+                placeHolder: '仅包含空白字符的行是否视作空行？',
+                ignoreFocusOut: true
+            }
+        );
+        if (treatWhitespaceChoice === undefined) {
+            return undefined;
+        }
+
+        return {
+            maxConsecutive: Number(maxConsecutiveInput),
+            treatWhitespaceOnlyAsBlank: treatWhitespaceChoice.value
+        };
+    }
+
+    /**
+     * 处理删除多余空行命令
+     */
+    public async handleDeleteExcessBlankLinesCommand(editor: vscode.TextEditor): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor!');
+            return;
+        }
+
+        try {
+            const options = await this.promptDeleteExcessBlankLinesOptions(
+                DEFAULT_DELETE_EXCESS_BLANK_LINES_OPTIONS
+            );
+            if (!options) {
+                return;
+            }
+
+            const document = editor.document;
+            const selection = editor.selection;
+            const text = selection.isEmpty ? document.getText() : document.getText(selection);
+            const processedText = deleteExcessBlankLines(text, options);
+
+            if (processedText === text) {
+                vscode.window.showInformationMessage('没有需要删除的多余空行。');
+                return;
+            }
+
+            await editor.edit((editBuilder) => {
+                if (selection.isEmpty) {
+                    const fullRange = new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(document.getText().length)
+                    );
+                    editBuilder.replace(fullRange, processedText);
+                } else {
+                    editBuilder.replace(selection, processedText);
+                }
+            });
+
+            vscode.window.showInformationMessage('多余空行已删除！');
+        } catch (error) {
+            ErrorUtils.showError(error, '删除多余空行时出错：');
         }
     }
 
