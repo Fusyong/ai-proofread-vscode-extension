@@ -13,6 +13,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 当前版本 v1.12.16
 
 - 优化：校对面板补齐词典检查选项和通规检查选项的按钮
+- 特性：增加删除多余空行的命令
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
