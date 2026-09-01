@@ -18,3 +18,9 @@ export type {
     CitationSentence,
     CitationBlockWithSentences
 } from './citationCollector';
+export {
+    matchCitationsToReferences,
+    alignWithNeighborMerge,
+    matchBlockBySlidingWindow
+} from './citationMatcher';
+export type { BlockMatchResult, BlockMatchCandidate } from './citationMatcher';

@@ -10,10 +10,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.16
+当前版本 v1.12.17
 
-- 优化：校对面板补齐词典检查选项和通规检查选项的按钮
-- 特性：增加删除多余空行的命令
+- 优化：引文核对支持合并句子后匹配和滑动窗口匹配，以解决两侧句子分合导致无法匹配的问题。
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 

@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.16",
+  "version": "1.12.17",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -1416,6 +1416,20 @@
           "minimum": 0.01,
           "maximum": 1,
           "description": "引文核对：候选文献句长度允许偏离锚点句的比例。0.2 表示 ±20%，只把长度在「锚点×0.8」到「锚点×1.2」之间的文献句当作候选；越大候选越多、越慢，越小越快、可能漏匹配。"
+        },
+        "ai-proofread.citation.maxMerge": {
+          "order": 60.5,
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 5,
+          "description": "引文核对：邻句合并对齐时，一侧最多合并的连续句数（1:1 / n:1 / 1:n）。用于缓解句号/逗号导致的分句不一致，默认 3。"
+        },
+        "ai-proofread.citation.enableBlockWindowFallback": {
+          "order": 60.6,
+          "type": "boolean",
+          "default": true,
+          "description": "引文核对：邻句合并对齐失败时，是否启用块级去标点滑窗作为 fallback（默认开启）。"
         },
         "ai-proofread.citation.matchesPerCitation": {
           "order": 61,
