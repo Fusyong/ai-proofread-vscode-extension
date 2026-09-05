@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.18",
+  "version": "1.12.19",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -129,7 +129,11 @@
       },
       {
         "command": "ai-proofread.wordCheck.toggleViews",
-        "title": "AI Proofreader: toggle word check views"
+        "title": "显示或隐藏字词检查结果"
+      },
+      {
+        "command": "ai-proofread.wordCheck.toggleConfigViews",
+        "title": "显示或隐藏字词检查表"
       },
       {
         "command": "ai-proofread.modelRoutes.configure",

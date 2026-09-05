@@ -1,5 +1,5 @@
 /**
- * 词典检查类型 / 通规检查类型 TreeView：排序、勾选并记住，不可删除
+ * 词典检查表 / 通规检查表 TreeView：排序、勾选并记住，不可删除
  */
 
 import * as vscode from 'vscode';

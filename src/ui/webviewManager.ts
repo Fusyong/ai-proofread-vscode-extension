@@ -732,14 +732,8 @@ export class WebviewManager {
                 case 'citationRebuildIndex':
                     await vscode.commands.executeCommand('ai-proofread.citation.rebuildIndex');
                     break;
-                case 'manageCustomTables':
-                    await vscode.commands.executeCommand('ai-proofread.manageCustomTables');
-                    break;
-                case 'openDictCheckTypes':
-                    await vscode.commands.executeCommand('ai-proofread.openDictCheckTypes');
-                    break;
-                case 'openTgsccCheckTypes':
-                    await vscode.commands.executeCommand('ai-proofread.openTgsccCheckTypes');
+                case 'toggleWordCheckConfig':
+                    await vscode.commands.executeCommand('ai-proofread.wordCheck.toggleConfigViews');
                     break;
                 case 'showProofreadItemsTree': {
                     const proofreadJsonPath = this.getProofreadJsonPath();
@@ -909,7 +903,7 @@ export class WebviewManager {
 
         return `
             <div class="process-section">
-                <h3>✂️ 切分 → 合并 → 校对</h3>
+                <h3>✂️ 切分 → (合并 →) 校对</h3>
                 ${mainFileBlock}
                 ${lengthMismatch ? `
                 <div class="warning-box">
@@ -935,9 +929,7 @@ export class WebviewManager {
                 <p class="hint">多数按钮作用于当前编辑窗口中打开的文档。某些结果会出现在左侧栏</p>
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('checkWords')" title="${commandHoverTitle('字词检查', 'ai-proofread.checkWords')}">字词检查</button>
-                    <button class="action-button" onclick="handleAction('openDictCheckTypes')" title="${commandHoverTitle('打开词典检查类型（dict checks）', 'ai-proofread.openDictCheckTypes')}">词典检查类型</button>
-                    <button class="action-button" onclick="handleAction('openTgsccCheckTypes')" title="${commandHoverTitle('打开通规检查类型（TGSCC checks）', 'ai-proofread.openTgsccCheckTypes')}">通规检查类型</button>
-                    <button class="action-button" onclick="handleAction('manageCustomTables')" title="${commandHoverTitle('管理自定义替换表', 'ai-proofread.manageCustomTables')}">管理替换表</button>
+                    <button class="action-button" onclick="handleAction('toggleWordCheckConfig')" title="${commandHoverTitle('显示或隐藏字词检查表', 'ai-proofread.wordCheck.toggleConfigViews')}">字词检查表</button>
                     ${sep}
                     <button class="action-button" onclick="handleAction('numberingCheckTitles')" title="${commandHoverTitle('检查标题树', 'ai-proofread.numbering.checkTitles')}">检查标题树</button>
                     <button class="action-button" onclick="handleAction('numberingCheckSegments')" title="${commandHoverTitle('检查段内序号', 'ai-proofread.numbering.checkSegments')}">检查段内序号</button>

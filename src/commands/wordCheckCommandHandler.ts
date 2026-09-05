@@ -115,7 +115,7 @@ export class WordCheckCommandHandler {
         this.customTablesTreeView = reg.treeView;
     }
 
-    /** 注册词典/通规检查类型 TreeView，供「管理检查类型」聚焦及上移/下移使用 */
+    /** 注册词典/通规检查表 TreeView，供「管理检查类型」聚焦及上移/下移使用 */
     registerCheckTypesViews(): void {
         const dictReg = registerDictCheckTypesView(this.context);
         this.dictCheckTypesProvider = dictReg.provider as DictCheckTypesTreeDataProvider;
@@ -244,7 +244,7 @@ export class WordCheckCommandHandler {
         }
         const types = this.dictCheckTypesProvider?.getOrderedSelectedTypes() ?? [];
         if (types.length === 0) {
-            vscode.window.showWarningMessage('请在侧栏「词典检查类型」视图中勾选至少一项参与检查。');
+            vscode.window.showWarningMessage('请在侧栏「词典检查表」视图中勾选至少一项参与检查。');
             await setWordCheckConfigVisible(true);
             await vscode.commands.executeCommand(`${DICT_CHECK_TYPES_VIEW_ID}.focus`);
             return;
@@ -269,7 +269,7 @@ export class WordCheckCommandHandler {
         }
         const types = this.tgsccCheckTypesProvider?.getOrderedSelectedTypes() ?? [];
         if (types.length === 0) {
-            vscode.window.showWarningMessage('请在侧栏「通规检查类型」视图中勾选至少一项参与检查。');
+            vscode.window.showWarningMessage('请在侧栏「通规检查表」视图中勾选至少一项参与检查。');
             await setWordCheckConfigVisible(true);
             await vscode.commands.executeCommand(`${TGSCC_CHECK_TYPES_VIEW_ID}.focus`);
             return;
@@ -388,7 +388,7 @@ export class WordCheckCommandHandler {
                 { label: '$(play) 检查后生成树状视图', value: 'run' as const },
                 { label: '$(file-text) 检查后输出统计表', value: 'csv' as const },
                 { label: '$(file-add) 加载新表…', value: 'add' as const },
-                { label: '$(settings-gear) 管理替换表', value: 'manage' as const },
+                { label: '$(settings-gear) 自定义替换表', value: 'manage' as const },
             ],
             { placeHolder: '选择操作', title: '自定义替换表检查' }
         );

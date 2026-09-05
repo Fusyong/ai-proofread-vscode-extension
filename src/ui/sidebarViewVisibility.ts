@@ -12,7 +12,7 @@ import { focusWordCheckView } from '../xh7/wordCheckView';
 export interface SidebarConfigState {
     modelRoutes: boolean;
     prompts: boolean;
-    /** 词典/通规检查类型 + 自定义替换表 */
+    /** 词典/通规检查表 + 自定义替换表 */
     wordCheckConfig: boolean;
 }
 
@@ -222,6 +222,15 @@ export async function setWordCheckConfigVisible(visible: boolean, options?: SetV
         await persistSidebarConfigState();
     }
     notify();
+}
+
+export async function toggleWordCheckConfigVisible(): Promise<boolean> {
+    const next = !state.wordCheckConfig;
+    await setWordCheckConfigVisible(next);
+    if (next) {
+        await tryFocus('ai-proofread.dictCheckTypes.focus');
+    }
+    return state.wordCheckConfig;
 }
 
 /** 只显示字词检查结果树 */

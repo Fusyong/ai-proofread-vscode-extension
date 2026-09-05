@@ -39,6 +39,7 @@ import {
     toggleProofreadItemsVisible,
     togglePromptsViewsVisible,
     toggleReferenceHitVisible,
+    toggleWordCheckConfigVisible,
 } from './ui/sidebarViewVisibility';
 import { NumberingTreeDataProvider } from './numbering/numberingTreeProvider';
 import { registerNumberingView } from './numbering/numberingView';
@@ -305,6 +306,9 @@ export async function activate(context: vscode.ExtensionContext) {
             await setPromptsViewsVisible(true);
         }),
         vscode.commands.registerCommand('ai-proofread.prompts.toggleViews', () => togglePromptsViewsVisible()),
+        vscode.commands.registerCommand('ai-proofread.wordCheck.toggleConfigViews', () =>
+            toggleWordCheckConfigVisible()
+        ),
         vscode.commands.registerCommand('ai-proofread.sourceTextCharacteristics.openView', async () => {
             await setSourceTextCharacteristicsVisible(true);
         }),

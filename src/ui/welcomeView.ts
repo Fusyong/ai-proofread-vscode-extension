@@ -124,11 +124,16 @@ function getHtml(): string {
         </button>
     </div>
     <div class="action-grid">
-        <button type="button" class="cell cell-action" data-action="openSettings" title="打开扩展设置 (workbench.action.openSettings)">
-            <span class="cell-label">设置</span>
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="wordCheckConfig" title="显示或隐藏词典/通规检查表与自定义替换表 (wordCheck.toggleConfigViews)">
+            <span class="cell-label">字词检查表</span>
         </button>
-        <button type="button" class="cell cell-action" data-action="hideResultViews" title="收起字词、引文、重文等检查结果列表 (sidebar.hideResultViews)">
-            <span class="cell-label">收起结果列表</span>
+        <button type="button" class="cell cell-action" data-action="toggleSidebar" data-key="wordCheckResult" title="显示或隐藏字词检查结果 (wordCheck.toggleViews)">
+            <span class="cell-label">字词检查结果</span>
+        </button>
+    </div>
+    <div class="action-grid">
+        <button type="button" class="cell cell-action" data-action="openSettings" title="打开扩展设置 (workbench.action.openSettings)" style="grid-column: 1 / -1">
+            <span class="cell-label">设置</span>
         </button>
     </div>
     <div class="action-grid">
@@ -198,6 +203,8 @@ export function registerWelcomeView(context: vscode.ExtensionContext): void {
                         const cmdByKey: Record<string, string> = {
                             modelRoutes: 'ai-proofread.modelRoutes.toggleView',
                             prompts: 'ai-proofread.prompts.toggleViews',
+                            wordCheckConfig: 'ai-proofread.wordCheck.toggleConfigViews',
+                            wordCheckResult: 'ai-proofread.wordCheck.toggleViews',
                         };
                         const cmd = key ? cmdByKey[key] : undefined;
                         if (cmd) {
@@ -205,9 +212,6 @@ export function registerWelcomeView(context: vscode.ExtensionContext): void {
                         }
                         break;
                     }
-                    case 'hideResultViews':
-                        await vscode.commands.executeCommand('ai-proofread.sidebar.hideResultViews');
-                        break;
                     case 'showExtension':
                         await showExtensionInEditor(context);
                         break;
