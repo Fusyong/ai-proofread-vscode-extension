@@ -10,9 +10,10 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.17
+当前版本 v1.12.18
 
-- 优化：引文核对支持合并句子后匹配和滑动窗口匹配，以解决两侧句子分合导致无法匹配的问题。
+- 特性：调用LLM时增加单次输入超长提示，以避免误操作和过长输入导致失败，阈值可设置
+- 优化：优化校对面板的标签和描述
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 

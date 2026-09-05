@@ -6,7 +6,8 @@ import {
     formatCharTokenLine,
     scaleStats,
     statsFromText,
-    summarizeJsonBatchContentStats
+    summarizeJsonBatchContentStats,
+    summarizeProofreadFieldStats
 } from './tokenEstimate';
 
 describe('estimateTokenCount', () => {
@@ -19,6 +20,16 @@ describe('estimateTokenCount', () => {
         const latin = estimateTokenCount('abcd');
         expect(cjk).toBeGreaterThan(latin);
         expect(cjk).toBe(Math.ceil(4 * 1.5));
+    });
+});
+
+describe('summarizeProofreadFieldStats', () => {
+    it('builds stats for a single item', () => {
+        const stats = summarizeProofreadFieldStats('甲甲', '乙', '丙丙丙');
+        expect(stats.target.chars).toBe(2);
+        expect(stats.reference.chars).toBe(1);
+        expect(stats.context.chars).toBe(3);
+        expect(stats.total.chars).toBe(6);
     });
 });
 

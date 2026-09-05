@@ -5,7 +5,13 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { processJsonFileAsync, proofreadSelection, getSystemPrompt } from '../proofreader';
+import {
+    assembleProofreadSelectionInput,
+    processJsonFileAsync,
+    proofreadSelection,
+    getSystemPrompt,
+    getOutputType
+} from '../proofreader';
 import { showSelectionProofreadDiffWithApply } from '../differ';
 import { runEditorialMemoryAfterAccept } from '../editorialMemory/service';
 import { FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
@@ -37,12 +43,20 @@ import {
 } from '../proofreadSelectionLastRun';
 import { ProgressTracker } from '../progressTracker';
 import {
+    confirmProofreadInputIfNeeded,
+    getProofreadInputConfirmSettings,
+    SINGLE_TARGET_OVERFLOW_CHARS
+} from '../proofreadInputConfirm';
+import { resolveProofreadModel } from '../modelRoutes/modelRouteResolver';
+import {
     addStats,
     countRequestableItems,
-    formatCharTokenLine,
+    estimateSingleRequestInputChars,
+    findMaxJsonBatchItemStats,
     scaleStats,
     statsFromText,
-    summarizeJsonBatchContentStats
+    summarizeJsonBatchContentStats,
+    summarizeProofreadFieldStats
 } from '../tokenEstimate';
 
 export class ProofreadCommandHandler {
@@ -768,6 +782,89 @@ export class ProofreadCommandHandler {
         let rawItemOutput: string | undefined;
         let itemChanges: Array<{ original: string; corrected: string }> | undefined;
 
+        const assembled = await assembleProofreadSelectionInput({
+            editor,
+            selection: sel,
+            contextLevel,
+            referenceFile,
+            beforeParagraphs,
+            afterParagraphs,
+            editorialMemoryForceEnabled
+        });
+
+        if (!assembled.isBlankTarget) {
+            const contentStats = summarizeProofreadFieldStats(
+                assembled.targetText,
+                assembled.referenceText,
+                assembled.contextText
+            );
+            const memoryStats = statsFromText(assembled.editorialMemoryXml);
+            const promptOnce = statsFromText(
+                getSystemPrompt(context, sourceTextCharacteristics)
+            );
+            const contentPlusMemory = addStats(contentStats.total, memoryStats);
+            const estimatedInputTotal = addStats(contentPlusMemory, promptOnce);
+            const currentPromptName = getPromptDisplayName(
+                context.globalState.get<string>('currentPrompt', '')
+            );
+            const confirmSettings = getProofreadInputConfirmSettings();
+            const targetOverflowChars =
+                confirmSettings.byField.target > 0
+                    ? confirmSettings.byField.target
+                    : SINGLE_TARGET_OVERFLOW_CHARS;
+            const outputType = getOutputType(context);
+            const thinkingEnabled = !resolveProofreadModel().disableThinking;
+            const requestContentChars = contentPlusMemory.chars;
+            const maxItemRequestChars = estimateSingleRequestInputChars(
+                requestContentChars,
+                contentStats.target.chars,
+                promptOnce.chars,
+                actualRepetitionMode
+            );
+
+            const confirmed = await confirmProofreadInputIfNeeded({
+                title: '📋 选区校对参数确认',
+                headerLines: [
+                    `📄 文件: ${editor.document.fileName}`,
+                    `📌 上下文: ${contextLevel || '不使用'}`,
+                    referenceFile?.[0]
+                        ? `📎 参考: ${referenceFile[0].fsPath}`
+                        : '📎 参考: 无'
+                ],
+                promptName: currentPromptName,
+                sourceCharacteristicsInjectSummary: sourceCharacteristicsDisplayTitle,
+                repetitionMode: actualRepetitionMode,
+                platform,
+                model,
+                temperature: userTemperature,
+                settings: confirmSettings,
+                selection: {
+                    targetChars: contentStats.target.chars,
+                    targetOverflowChars,
+                    outputType,
+                    thinkingEnabled,
+                    requestContentChars,
+                    maxItemRequestChars
+                },
+                contentStats,
+                contentTotalForDisplay: contentPlusMemory,
+                promptOnce,
+                promptScaled: promptOnce,
+                estimatedInputTotal,
+                extraFieldLines:
+                    memoryStats.chars > 0
+                        ? [
+                              `   • editorial_memory: ${memoryStats.chars.toLocaleString('zh-CN')} 字符 ≈ ${memoryStats.tokens.toLocaleString('zh-CN')} token`
+                          ]
+                        : undefined,
+                additionalCharsForThreshold: memoryStats.chars,
+                confirmButtonLabel: '确认开始'
+            });
+            if (!confirmed) {
+                return;
+            }
+        }
+
         const result = await proofreadSelection(
             editor,
             sel,
@@ -790,7 +887,9 @@ export class ProofreadCommandHandler {
             (raw) => {
                 rawItemOutput = raw;
             },
-            editorialMemoryForceEnabled
+            editorialMemoryForceEnabled,
+            undefined,
+            assembled
         );
 
         if (result) {
@@ -855,7 +954,7 @@ export class ProofreadCommandHandler {
     }
 
     /**
-     * 显示JSON批量提交参数确认对话框
+     * JSON 批量校对：按 confirmMode / 阈值决定是否弹出参数确认
      */
     private async showJsonBatchConfirmation(params: {
         jsonFilePath: string;
@@ -886,89 +985,69 @@ export class ProofreadCommandHandler {
             sourceCharacteristicsInjectSummary
         } = params;
 
-        // 获取当前提示词显示名称
         const currentPromptName = context
             ? getPromptDisplayName(context.globalState.get<string>('currentPrompt', ''))
             : '系统默认提示词（full）';
 
-        // 获取超时和重试配置
         const config = vscode.workspace.getConfiguration('ai-proofread');
         const timeout = config.get<number>('proofread.timeout', 50);
         const retryDelay = config.get<number>('proofread.retryDelay', 1);
         const retryAttempts = config.get<number>('proofread.retryAttempts', 3);
-
-        // 获取提示词重复模式
-        const repetitionMode = config.get<string>('proofread.promptRepetition', 'none');
-        const repetitionModeNames: { [key: string]: string } = {
-            'none': '不重复',
-            'target': '仅重复目标文档（target）',
-            'all': '重复完整对话流程（reference + context + target）'
-        };
-        const repetitionModeName = repetitionModeNames[repetitionMode] || '不重复';
-
-        // 计算token和费用提示
-        let tokenWarning = '';
-        if (repetitionMode === 'target') {
-            tokenWarning = '   ⚠️ 提示词重复模式：仅重复target，会增加输入token';
-        } else if (repetitionMode === 'all') {
-            tokenWarning = '   ⚠️ 提示词重复模式：重复完整对话流程，会增加输入token';
-        }
+        const repetitionMode = config.get<string>('proofread.promptRepetition', 'none') || 'none';
 
         const contentStats = summarizeJsonBatchContentStats(jsonContent);
         const promptOnce = statsFromText(getSystemPrompt(context, sourceTextCharacteristics));
         const requestCount = countRequestableItems(jsonContent);
         const promptBatch = scaleStats(promptOnce, requestCount);
         const estimatedInputTotal = addStats(contentStats.total, promptBatch);
-
-        // 构建确认信息
-        const confirmationMessage = [
-            '📋 JSON批量校对参数确认',
-            '',
-            `📁 文件路径: ${jsonFilePath}`,
-            `📊 总段落数: ${totalCount}（将请求 ${requestCount} 条）`,
-            '',
-            '⚙️ 处理参数:',
-            `   • 提示词: ${currentPromptName}`,
-            sourceCharacteristicsInjectSummary !== undefined
-                ? `   • 源文本特性注入: ${sourceCharacteristicsInjectSummary}`
-                : '',
-            `   • 提示词重复模式: ${repetitionModeName}`,
-            tokenWarning ? tokenWarning : '',
-            `   • 平台: ${platform}`,
-            `   • 模型: ${model}`,
-            `   • 温度: ${temperature}`,
-            `   • 并发数: ${maxConcurrent}`,
-            `   • 请求频率: ${rpm} 次/分钟`,
-            `   • 请求超时: ${timeout} 秒`,
-            `   • 重试间隔: ${retryDelay} 秒`,
-            `   • 重试次数: ${retryAttempts} 次`,
-            '',
-            '📏 内容体量（token 为粗估；不含提示词重复带来的加倍）:',
-            formatCharTokenLine('prompt（单次）', promptOnce),
-            formatCharTokenLine(`prompt×${requestCount}`, promptBatch),
-            formatCharTokenLine('target', contentStats.target),
-            formatCharTokenLine('reference', contentStats.reference),
-            formatCharTokenLine('context', contentStats.context),
-            formatCharTokenLine('内容合计', contentStats.total),
-            formatCharTokenLine('预估输入合计', estimatedInputTotal),
-            '',
-            '⚠️ 注意事项:',
-            '   • 💰批处理中使用思考/推理模型极易出错并形成高计费！！！',
-            '   • 💰重复提示词会增加输入token，但可能提高校对准确度。如果API支持缓存（如Deepseek），重复内容可能享受缓存命中的低价',
-            '   • 处理过程中可以随时取消',
-            '   • 已处理的段落会跳过',
-            '   • 结果会实时保存到输出文件',
-            '',
-            '是否确认开始批量校对？'
-        ].filter(line => line !== '').join('\n');
-
-        const result = await vscode.window.showInformationMessage(
-            confirmationMessage,
-            { modal: true },
-            '确认开始'
+        const maxItem = findMaxJsonBatchItemStats(jsonContent);
+        const maxItemRequestChars = estimateSingleRequestInputChars(
+            maxItem.contentChars,
+            maxItem.targetChars,
+            promptOnce.chars,
+            repetitionMode
         );
+        const thinkingEnabled = !resolveProofreadModel().disableThinking;
+        const confirmSettings = getProofreadInputConfirmSettings();
+        const targetOverflowChars =
+            confirmSettings.byField.target > 0
+                ? confirmSettings.byField.target
+                : SINGLE_TARGET_OVERFLOW_CHARS;
+        const outputType = getOutputType(context);
 
-        return result === '确认开始';
+        return confirmProofreadInputIfNeeded({
+            title: '📋 JSON批量校对参数确认',
+            headerLines: [`📁 文件路径: ${jsonFilePath}`],
+            promptName: currentPromptName,
+            sourceCharacteristicsInjectSummary,
+            repetitionMode,
+            platform,
+            model,
+            temperature,
+            settings: confirmSettings,
+            batch: {
+                rpm,
+                maxConcurrent,
+                timeout,
+                retryDelay,
+                retryAttempts,
+                totalCount,
+                requestCount,
+                thinkingEnabled,
+                maxItemContentChars: maxItem.contentChars,
+                maxItemIndex1: maxItem.index1,
+                maxItemRequestChars,
+                maxTargetChars: maxItem.maxTargetChars,
+                maxTargetIndex1: maxItem.maxTargetIndex1,
+                targetOverflowChars,
+                outputType
+            },
+            contentStats,
+            promptOnce,
+            promptScaled: promptBatch,
+            estimatedInputTotal,
+            confirmButtonLabel: '确认开始'
+        });
     }
 
     /**

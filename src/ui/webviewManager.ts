@@ -825,7 +825,7 @@ export class WebviewManager {
         return `
             <div class="process-section">
                 <h3>📄 文档整理</h3>
-                <p class="hint">作用于当前编辑窗口中的文档。请先打开稿件，再点下方按钮（焦点可留在本面板）。</p>
+                <p class="hint">多数按钮作用于当前编辑窗口中打开的文档</p>
                 <div class="section-actions">
                 <button class="action-button" onclick="handleAction('convertPdfToMarkdown')" title="${commandHoverTitle('将 PDF 转为 Markdown', 'ai-proofread.convertPdfToMarkdown')}">PDF → Markdown</button>
                     <button class="action-button" onclick="handleAction('convertDocxToMarkdown')" title="${commandHoverTitle('将 Word 转为 Markdown', 'ai-proofread.convertDocxToMarkdown')}">docx → Markdown</button>
@@ -909,7 +909,7 @@ export class WebviewManager {
 
         return `
             <div class="process-section">
-                <h3>✂️ 切分与合并</h3>
+                <h3>✂️ 切分 → 合并 → 校对</h3>
                 ${mainFileBlock}
                 ${lengthMismatch ? `
                 <div class="warning-box">
@@ -932,7 +932,7 @@ export class WebviewManager {
         return `
             <div class="process-section">
                 <h3>🔍 专项检查</h3>
-                <p class="hint">作用于当前编辑窗口。某些结果列表会出现在左侧栏。</p>
+                <p class="hint">多数按钮作用于当前编辑窗口中打开的文档。某些结果会出现在左侧栏</p>
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('checkWords')" title="${commandHoverTitle('字词检查', 'ai-proofread.checkWords')}">字词检查</button>
                     <button class="action-button" onclick="handleAction('openDictCheckTypes')" title="${commandHoverTitle('打开词典检查类型（dict checks）', 'ai-proofread.openDictCheckTypes')}">词典检查类型</button>

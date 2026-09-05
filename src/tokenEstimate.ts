@@ -91,6 +91,82 @@ export function summarizeJsonBatchContentStats(items: unknown[]): JsonBatchConte
     };
 }
 
+export type JsonBatchMaxItemStats = {
+    /** 内容合计最大条目的 1-based 序号；无有效条目时为 0 */
+    index1: number;
+    targetChars: number;
+    referenceChars: number;
+    contextChars: number;
+    /** target+reference+context */
+    contentChars: number;
+    /** target 最长条目的 1-based 序号 */
+    maxTargetIndex1: number;
+    /** 单条最大 target 字符数 */
+    maxTargetChars: number;
+};
+
+/**
+ * 找出内容体量最大的一条，并同时记录 target 最长的一条（仅统计有非空 target 的条目）。
+ * 用于批量确认时警示「单次输入过长 / 单次 target 过长」。
+ */
+export function findMaxJsonBatchItemStats(items: unknown[]): JsonBatchMaxItemStats {
+    let best: JsonBatchMaxItemStats = {
+        index1: 0,
+        targetChars: 0,
+        referenceChars: 0,
+        contextChars: 0,
+        contentChars: 0,
+        maxTargetIndex1: 0,
+        maxTargetChars: 0
+    };
+
+    items.forEach((item, i) => {
+        const t = fieldText(item, 'target');
+        if (t.trim() === '') {
+            return;
+        }
+        const r = fieldText(item, 'reference');
+        const c = fieldText(item, 'context');
+        const contentChars = t.length + r.length + c.length;
+        const index1 = i + 1;
+        if (contentChars > best.contentChars) {
+            best = {
+                ...best,
+                index1,
+                targetChars: t.length,
+                referenceChars: r.length,
+                contextChars: c.length,
+                contentChars
+            };
+        }
+        if (t.length > best.maxTargetChars) {
+            best.maxTargetChars = t.length;
+            best.maxTargetIndex1 = index1;
+        }
+    });
+
+    return best;
+}
+
+/**
+ * 粗估单次请求输入字符数（system prompt + 内容；按 repetition 近似加倍）。
+ * 不含 XML 标签开销，仅作超限警示。
+ */
+export function estimateSingleRequestInputChars(
+    contentChars: number,
+    targetChars: number,
+    promptChars: number,
+    repetitionMode: string
+): number {
+    let content = Math.max(0, contentChars);
+    if (repetitionMode === 'target') {
+        content += Math.max(0, targetChars);
+    } else if (repetitionMode === 'all') {
+        content *= 2;
+    }
+    return Math.max(0, promptChars) + content;
+}
+
 export function formatCharTokenLine(label: string, stats: FieldCharTokenStats): string {
     const chars = stats.chars.toLocaleString('zh-CN');
     const tokens = stats.tokens.toLocaleString('zh-CN');
@@ -122,4 +198,21 @@ export function scaleStats(stats: FieldCharTokenStats, times: number): FieldChar
 
 export function addStats(a: FieldCharTokenStats, b: FieldCharTokenStats): FieldCharTokenStats {
     return { chars: a.chars + b.chars, tokens: a.tokens + b.tokens };
+}
+
+/** 由单条 target / reference / context 文本汇总字符与粗估 token */
+export function summarizeProofreadFieldStats(
+    target: string,
+    reference: string = '',
+    context: string = ''
+): JsonBatchContentStats {
+    const t = statsFromText(target || '');
+    const r = statsFromText(reference || '');
+    const c = statsFromText(context || '');
+    return {
+        target: t,
+        reference: r,
+        context: c,
+        total: addStats(addStats(t, r), c)
+    };
 }

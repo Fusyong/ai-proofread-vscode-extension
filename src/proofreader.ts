@@ -1496,6 +1496,139 @@ export async function processJsonFileAsync(
  * @param editorialMemoryForceEnabled 为 true 时在请求中拼接编辑记忆注入（仅用「Proofread Selection with Memory」时使用）
  * @returns 校对后的文本
  */
+/** 选区校对组装结果（与实际发送字段一致，供体量确认与 API 调用共用） */
+export type ProofreadSelectionAssembled = {
+    targetText: string;
+    contextText: string;
+    referenceText: string;
+    editorialMemoryXml: string;
+    preText: string;
+    postText: string;
+    /** target 为空或仅空白时为 true（调用方应原样返回，不发起 LLM） */
+    isBlankTarget: boolean;
+};
+
+/**
+ * 组装选区校对将发送的 target / reference / context / 编辑记忆。
+ * 与 proofreadSelection 实际请求内容保持一致。
+ */
+export async function assembleProofreadSelectionInput(params: {
+    editor: vscode.TextEditor;
+    selection: vscode.Selection;
+    contextLevel?: string;
+    referenceFile?: vscode.Uri[];
+    beforeParagraphs?: number;
+    afterParagraphs?: number;
+    editorialMemoryForceEnabled?: boolean;
+    inlineReferenceText?: string;
+}): Promise<ProofreadSelectionAssembled> {
+    const {
+        editor,
+        selection,
+        contextLevel,
+        referenceFile,
+        beforeParagraphs,
+        afterParagraphs,
+        editorialMemoryForceEnabled,
+        inlineReferenceText
+    } = params;
+
+    const selectedText = editor.document.getText(selection);
+    if (!selectedText) {
+        throw new Error('请先选择要校对的文本！');
+    }
+
+    const targetText = selectedText;
+    let contextText = '';
+    let referenceText = '';
+
+    if (!targetText || targetText.trim() === '') {
+        return {
+            targetText,
+            contextText: '',
+            referenceText: '',
+            editorialMemoryXml: '',
+            preText: '',
+            postText: `<target>\n${targetText}\n</target>`,
+            isBlankTarget: true
+        };
+    }
+
+    if (contextLevel && contextLevel !== '不使用上下文') {
+        const fullText = editor.document.getText();
+        const selectionStartLine = selection.start.line;
+        const selectionEndLine = selection.end.line;
+
+        if (contextLevel === '前后增加段落') {
+            const selectionStart = editor.document.offsetAt(selection.start);
+            const selectionEnd = editor.document.offsetAt(selection.end);
+            contextText = buildParagraphBasedContext(
+                fullText,
+                selectionStart,
+                selectionEnd,
+                beforeParagraphs || 1,
+                afterParagraphs || 1
+            );
+        } else {
+            contextText = buildTitleBasedContext(
+                fullText,
+                selectionStartLine,
+                selectionEndLine,
+                contextLevel
+            );
+        }
+    }
+
+    if (referenceFile && referenceFile[0]) {
+        referenceText = fs.readFileSync(referenceFile[0].fsPath, 'utf8');
+    }
+    if (inlineReferenceText?.trim()) {
+        referenceText = referenceText
+            ? `${referenceText}\n\n${inlineReferenceText.trim()}`
+            : inlineReferenceText.trim();
+    }
+
+    let editorialMemoryXml = '';
+    if (editorialMemoryForceEnabled === true) {
+        try {
+            const emXml = await buildEditorialMemoryXml(
+                editor.document.uri,
+                editor.document.getText(),
+                selection.start.line,
+                true
+            );
+            if (emXml) {
+                editorialMemoryXml = emXml;
+            }
+        } catch {
+            /* 记忆注入失败不阻断校对 */
+        }
+    }
+
+    // 与 proofreadSelection 原逻辑一致：context 与 target 相同时不注入 context
+    const contextForSend =
+        contextText && contextText.trim() !== targetText.trim() ? contextText : '';
+
+    let preText = referenceText ? `<reference>\n${referenceText}\n</reference>` : '';
+    if (contextForSend) {
+        preText += `\n<context>\n${contextForSend}\n</context>`;
+    }
+    if (editorialMemoryXml) {
+        preText += editorialMemoryXml;
+    }
+    const postText = `<target>\n${targetText}\n</target>`;
+
+    return {
+        targetText,
+        contextText: contextForSend,
+        referenceText,
+        editorialMemoryXml,
+        preText,
+        postText,
+        isBlankTarget: false
+    };
+}
+
 export async function proofreadSelection(
     editor: vscode.TextEditor,
     selection: vscode.Selection,
@@ -1513,90 +1646,30 @@ export async function proofreadSelection(
     onItemItems?: (items: ProofreadItem[]) => void,
     onRawItemOutput?: (raw: string) => void,
     editorialMemoryForceEnabled?: boolean,
-    inlineReferenceText?: string
+    inlineReferenceText?: string,
+    /** 若已在外部组装（含确认），传入以避免重复读取/组装 */
+    preassembled?: ProofreadSelectionAssembled
 ): Promise<string | null> {
-    // 获取选中的文本
-    const selectedText = editor.document.getText(selection);
-    if (!selectedText) {
-        throw new Error('请先选择要校对的文本！');
-    }
+    const assembled =
+        preassembled ??
+        (await assembleProofreadSelectionInput({
+            editor,
+            selection,
+            contextLevel,
+            referenceFile,
+            beforeParagraphs,
+            afterParagraphs,
+            editorialMemoryForceEnabled,
+            inlineReferenceText
+        }));
 
-    // 准备校对文本
-    let targetText = selectedText;
-    let contextText = '';
-    let referenceText = '';
-
-    // 检查target是否为空字符串（包括空白行、空格等）
-    if (!targetText || targetText.trim() === '') {
-        // 如果target为空，直接原样返回内容作为结果
+    const { targetText, preText, postText, isBlankTarget } = assembled;
+    if (isBlankTarget) {
         return targetText;
     }
 
-    // 如果选择了上下文级别，获取上下文
-    if (contextLevel && contextLevel !== '不使用上下文') {
-        const fullText = editor.document.getText();
-        const selectionStartLine = selection.start.line;
-        const selectionEndLine = selection.end.line;
-
-        if (contextLevel === '前后增加段落') {
-            // 使用抽象的前后段落上下文构建函数
-            // 使用字符位置而不是行号，以便精确处理选中文本
-            const selectionStart = editor.document.offsetAt(selection.start);
-            const selectionEnd = editor.document.offsetAt(selection.end);
-            contextText = buildParagraphBasedContext(
-                fullText,
-                selectionStart,
-                selectionEnd,
-                beforeParagraphs || 1,
-                afterParagraphs || 1
-            );
-        } else {
-            // 使用抽象的标题级别上下文构建函数
-            contextText = buildTitleBasedContext(
-                fullText,
-                selectionStartLine,
-                selectionEndLine,
-                contextLevel
-            );
-        }
-    }
-
-    // 如果选择了参考文件，读取参考文件内容
-    if (referenceFile && referenceFile[0]) {
-        referenceText = fs.readFileSync(referenceFile[0].fsPath, 'utf8');
-    }
-    if (inlineReferenceText?.trim()) {
-        referenceText = referenceText
-            ? `${referenceText}\n\n${inlineReferenceText.trim()}`
-            : inlineReferenceText.trim();
-    }
-
-    // 构建提示文本
-    let preText = referenceText ? `<reference>\n${referenceText}\n</reference>` : '';
-    if (contextText && contextText.trim() !== targetText.trim()) {
-        preText += `\n<context>\n${contextText}\n</context>`;
-    }
-    if (editorialMemoryForceEnabled === true) {
-        try {
-            const emXml = await buildEditorialMemoryXml(
-                editor.document.uri,
-                editor.document.getText(),
-                selection.start.line,
-                true
-            );
-            if (emXml) {
-                preText += emXml;
-            }
-        } catch {
-            /* 记忆注入失败不阻断校对 */
-        }
-    }
-    const postText = `<target>\n${targetText}\n</target>`;
-
-    // 获取提示词重复模式（使用传入的参数，如果没有则从配置读取）
     const actualRepetitionMode = repetitionMode || getPromptRepetitionMode();
 
-    // 调用API进行校对（进度使用 Window，避免与随后 handler 的 InformationMessage 共用通知区导致进度看似不消失）
     const client = (() => {
         switch (platform) {
             case 'google':
@@ -1635,9 +1708,9 @@ export async function proofreadSelection(
         const items = parseItemOutput(result);
         if (items.length > 0) {
             onItemItems?.(items);
-            return applyItemReplacements(selectedText, items);
+            return applyItemReplacements(targetText, items);
         }
-        return selectedText;
+        return targetText;
     }
     return result;
 }

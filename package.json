@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.17",
+  "version": "1.12.18",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -728,8 +728,62 @@
           "default": "none",
           "description": "提示词重复模式（基于谷歌研究：重复提示词可提高准确度。注意：会增加输入token，但可能提高校对准确度）"
         },
-        "ai-proofread.localDicts": {
+        "ai-proofread.proofread.confirmMode": {
+          "order": 28,
+          "type": "string",
+          "enum": [
+            "always",
+            "aboveThreshold",
+            "never"
+          ],
+          "enumDescriptions": [
+            "每次校对（选区与 JSON 批量）均弹出确认",
+            "仅当输入体量达到阈值时弹出确认",
+            "从不弹出体量确认"
+          ],
+          "default": "aboveThreshold",
+          "description": "调用校对 LLM 前的输入体量确认模式。适用于选中文本校对与 JSON 批量校对。"
+        },
+        "ai-proofread.proofread.confirmAboveChars": {
+          "order": 29,
+          "type": "number",
+          "default": 10000,
+          "minimum": 0,
+          "description": "合计字符阈值（target + reference + context，选区带记忆时另含编辑记忆）。0 表示不按合计触发。仅 confirmMode 为 aboveThreshold 时生效。"
+        },
+        "ai-proofread.proofread.confirmAboveCharsByField": {
           "order": 30,
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "target": {
+              "type": "number",
+              "default": 5000,
+              "minimum": 0,
+              "description": "target 字段字符阈值；0 表示该字段不单独触发"
+            },
+            "reference": {
+              "type": "number",
+              "default": 0,
+              "minimum": 0,
+              "description": "reference 字段字符阈值；0 表示该字段不单独触发"
+            },
+            "context": {
+              "type": "number",
+              "default": 0,
+              "minimum": 0,
+              "description": "context 字段字符阈值；0 表示该字段不单独触发"
+            }
+          },
+          "default": {
+            "target": 5000,
+            "reference": 0,
+            "context": 0
+          },
+          "description": "分字段字符阈值。与合计阈值为 OR：任一达到即确认。仅 confirmMode 为 aboveThreshold 时生效。"
+        },
+        "ai-proofread.localDicts": {
+          "order": 31,
           "type": "array",
           "default": [],
           "items": {
