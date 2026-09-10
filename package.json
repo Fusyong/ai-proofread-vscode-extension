@@ -693,10 +693,10 @@
         "ai-proofread.proofread.timeout": {
           "order": 23,
           "type": "number",
-          "default": 120,
+          "default": 180,
           "minimum": 5,
           "maximum": 300,
-          "description": "API请求超时时间（秒），默认120秒"
+          "description": "API请求超时时间（秒），默认180秒"
         },
         "ai-proofread.proofread.rpm": {
           "order": 24,
