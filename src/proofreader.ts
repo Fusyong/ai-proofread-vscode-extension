@@ -37,6 +37,7 @@ import {
     PINYIN_ANNOTATION_OUTPUT_FORMAT,
 } from './pinyinPrompt';
 import { resolveProofreadModel } from './modelRoutes/modelRouteResolver';
+import { proofreadItemPathFromOutput } from './proofreadRoundLayout';
 
 // 加载环境变量
 dotenv.config();
@@ -1178,6 +1179,8 @@ export async function processJsonFileAsync(
         mdFilePath?: string; // 可选的 markdown 文件路径
         /** 仅内置全文/条目模板提示词时生效，注入源文本特性提示词段落 */
         sourceTextCharacteristics?: string;
+        /** 重叠校对：内存中的输入（含已替换的 target），不读磁盘 jsonInPath */
+        inputParagraphs?: any[];
     } = {}
 ): Promise<ProcessStats> {
     const logger = Logger.getInstance();
@@ -1195,13 +1198,14 @@ export async function processJsonFileAsync(
         token,
         context,
         sourceTextCharacteristics = '',
+        inputParagraphs: inputParagraphsOption,
     } = options;
 
     // 读取输入JSON文件
-    const inputParagraphs = JSON.parse(fs.readFileSync(jsonInPath, 'utf8'));
+    const inputParagraphs = inputParagraphsOption ?? JSON.parse(fs.readFileSync(jsonInPath, 'utf8'));
     const totalCount = inputParagraphs.length;
     const isItemMode = getOutputType(context) === 'item';
-    const itemPath = jsonOutPath.replace(/\.proofread\.json$/i, '.proofread-item.json');
+    const itemPath = proofreadItemPathFromOutput(jsonOutPath);
 
     // 全文模式：使用 .proofread.json；条目模式：阶段一写 .proofread-item.json，阶段二再写 .proofread.json
     let outputParagraphs: (string | null)[] = [];

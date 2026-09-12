@@ -56,6 +56,11 @@ import {
     proofreadJsonPathToSegmentsJsonPath,
     segmentsJsonPathToSplitMarkdownPath,
 } from './proofreadSplitLayout';
+import {
+    isProofreadItemJsonPath,
+    isProofreadJsonMarkdownPath,
+    isProofreadResultJsonPath,
+} from './proofreadRoundLayout';
 import { registerWelcomeView } from './ui/welcomeView';
 import { registerLastActiveTextEditorTracker } from './ui/lastActiveTextEditor';
 import { getJiebaWasm } from './jiebaLoader';
@@ -176,6 +181,9 @@ export async function activate(context: vscode.ExtensionContext) {
     webviewManager.setProofreadJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
         return proofreadHandler.handleProofreadJsonFile(jsonFilePath, ctx);
     });
+    webviewManager.setProofreadJsonOverlayCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
+        return proofreadHandler.handleOverlayProofreadJsonFile(jsonFilePath, ctx);
+    });
     webviewManager.setSplitCallback((mainFilePath: string, ctx: vscode.ExtensionContext) => {
         return fileSplitHandler.handleFileSplitByPath(mainFilePath, ctx);
     });
@@ -279,6 +287,15 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await proofreadHandler.handleProofreadFileCommand(editor, context);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.proofreadFileOverlay', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await proofreadHandler.handleOverlayProofreadFileCommand(editor, context);
         }),
 
         vscode.commands.registerCommand('ai-proofread.proofreadSelection', async () => {
@@ -841,11 +858,11 @@ export async function activate(context: vscode.ExtensionContext) {
             let segmentsJsonPath: string | undefined;
             if (ed) {
                 const fp = ed.document.uri.fsPath;
-                if (fp.endsWith('.proofread-item.json') || fp.endsWith('proofread-item.json')) {
+                if (isProofreadItemJsonPath(fp)) {
                     segmentsJsonPath = proofreadItemPathToSegmentsJsonPath(fp);
-                } else if (/\.proofread\.json$/i.test(fp)) {
+                } else if (isProofreadResultJsonPath(fp)) {
                     segmentsJsonPath = proofreadJsonPathToSegmentsJsonPath(fp);
-                } else if (/\.json\.md$/i.test(fp) && !/\.proofread\.json\.md$/i.test(fp)) {
+                } else if (/\.json\.md$/i.test(fp) && !isProofreadJsonMarkdownPath(fp)) {
                     segmentsJsonPath = fp.replace(/\.json\.md$/i, '.json');
                 }
             }

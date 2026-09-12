@@ -14,6 +14,15 @@ import {
     splitMarkdownPathToProofreadItemPath,
     segmentBaseOffsetInJoinedMarkdown,
 } from './proofreadSplitLayout';
+import {
+    inspectProofreadRounds,
+    isProofreadItemJsonPath,
+    isProofreadJsonMarkdownPath,
+    isProofreadResultJsonPath,
+    parseProofreadItemPath,
+    proofreadItemPathFromOutput,
+    segmentsJsonDirAndBase,
+} from './proofreadRoundLayout';
 import { showDiff } from './differ';
 
 export const PROOFREAD_ITEMS_VIEW_ID = 'ai-proofread.proofreadItems';
@@ -85,6 +94,12 @@ export class ProofreadItemsTreeDataProvider implements vscode.TreeDataProvider<P
         }
         if (this.minConfidence !== undefined) {
             parts.push(`筛选：≥ ${Math.round(this.minConfidence * 100)}%`);
+        }
+        if (this.sourcePath) {
+            const parsedItem = parseProofreadItemPath(this.sourcePath);
+            if (parsedItem) {
+                parts.push(`第 ${parsedItem.round} 轮`);
+            }
         }
         this.treeView.message = parts.length > 0 ? parts.join(' · ') : undefined;
     }
@@ -341,7 +356,7 @@ export class ProofreadItemsTreeDataProvider implements vscode.TreeDataProvider<P
                 seen.add(p);
                 if (
                     fs.existsSync(p) &&
-                    (p.endsWith('.proofread-item.json') || p.endsWith('proofread-item.json'))
+                    isProofreadItemJsonPath(p)
                 ) {
                     loadItemJsonPath(p);
                     return true;
@@ -357,10 +372,16 @@ export class ProofreadItemsTreeDataProvider implements vscode.TreeDataProvider<P
                 this.segmentsRaw = [];
                 this.segmentTargets = [];
             }
-        } else if (focusPath.endsWith('.proofread-item.json') || focusPath.endsWith('proofread-item.json')) {
+        } else if (isProofreadItemJsonPath(focusPath)) {
             loadItemJsonPath(focusPath);
-        } else if (/\.json\.md$/i.test(focusPath) && !/\.proofread\.json\.md$/i.test(focusPath)) {
-            const itemPath = splitMarkdownPathToProofreadItemPath(focusPath);
+        } else if (/\.json\.md$/i.test(focusPath) && !isProofreadJsonMarkdownPath(focusPath)) {
+            const segmentsJson = focusPath.replace(/\.json\.md$/i, '.json');
+            const { dir, base } = segmentsJsonDirAndBase(segmentsJson);
+            const inspected = inspectProofreadRounds(dir, base);
+            const latest = inspected.files.filter((f) => f.round === inspected.maxRound).slice(-1)[0];
+            const itemPath = latest
+                ? proofreadItemPathFromOutput(latest.jsonPath)
+                : splitMarkdownPathToProofreadItemPath(focusPath);
             if (fs.existsSync(itemPath)) {
                 loadItemJsonPath(itemPath);
             } else {
@@ -368,8 +389,8 @@ export class ProofreadItemsTreeDataProvider implements vscode.TreeDataProvider<P
                 this.segmentsRaw = [];
                 this.segmentTargets = [];
             }
-        } else if (focusPath.endsWith('.proofread.json')) {
-            const itemPath = focusPath.replace(/\.proofread\.json$/i, '.proofread-item.json');
+        } else if (isProofreadResultJsonPath(focusPath)) {
+            const itemPath = proofreadItemPathFromOutput(focusPath);
             if (fs.existsSync(itemPath)) {
                 loadItemJsonPath(itemPath);
             } else {
@@ -478,11 +499,11 @@ export function registerProofreadItemsView(context: vscode.ExtensionContext): {
     context.subscriptions.push(
         vscode.workspace.onDidChangeTextDocument((e) => {
             const fp = e.document.uri.fsPath;
-            if (fp.endsWith('.proofread-item.json') || fp.endsWith('proofread-item.json')) {
+            if (isProofreadItemJsonPath(fp)) {
                 provider.refresh(e.document.uri);
-            } else if (/\.proofread\.json$/i.test(fp)) {
+            } else if (isProofreadResultJsonPath(fp)) {
                 refreshWhenActiveEditor();
-            } else if (/\.json\.md$/i.test(fp) && !/\.proofread\.json\.md$/i.test(fp)) {
+            } else if (/\.json\.md$/i.test(fp) && !isProofreadJsonMarkdownPath(fp)) {
                 provider.refresh(e.document.uri);
             }
         })

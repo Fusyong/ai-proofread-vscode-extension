@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { FilePathUtils } from './utils';
+import { stripProofreadJsonMarkdownSuffix } from './proofreadRoundLayout';
 
 /**
  * 在指定 PDF 中搜索文本（用于引文核对等场景）
@@ -39,14 +40,11 @@ export async function searchSelectionInPDF(editor: vscode.TextEditor): Promise<v
     }
 
     const currentFile = editor.document.uri.fsPath;
-    // 支持从 文档名.proofread.json.md 反查 文档名.pdf
+    const proofreadStem = stripProofreadJsonMarkdownSuffix(currentFile);
     let pdfPath: string;
-    if (currentFile.endsWith('.proofread.json.md')) {
-        // 去掉 .proofread.json.md，添加 .pdf
-        const baseName = currentFile.slice(0, -'.proofread.json.md'.length);
-        pdfPath = baseName + '.pdf';
+    if (proofreadStem) {
+        pdfPath = proofreadStem + '.pdf';
     } else {
-        // 原有逻辑：从 文档名.md 反查 文档名.pdf
         pdfPath = FilePathUtils.getFilePath(currentFile, '', '.pdf');
     }
 

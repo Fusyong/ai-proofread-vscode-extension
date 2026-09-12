@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "AI Proofreader",
   "description": "AI powered proofreading tools",
-  "version": "1.12.19",
+  "version": "1.12.20",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -231,6 +231,10 @@
       {
         "command": "ai-proofread.proofreadFile",
         "title": "AI Proofreader: proofread file"
+      },
+      {
+        "command": "ai-proofread.proofreadFileOverlay",
+        "title": "AI Proofreader: overlay proofread file"
       },
       {
         "command": "ai-proofread.proofreadSelection",
@@ -2162,6 +2166,11 @@
         {
           "command": "ai-proofread.proofreadFile",
           "group": "ai-proofread@31",
+          "when": "resourceLangId == json"
+        },
+        {
+          "command": "ai-proofread.proofreadFileOverlay",
+          "group": "ai-proofread@31.5",
           "when": "resourceLangId == json"
         },
         {

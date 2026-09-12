@@ -14,6 +14,11 @@ import { generateHtmlReport } from '../alignmentReportGenerator';
 import { getJiebaWasm } from '../jiebaLoader';
 import { collectWordErrors, formatWordErrors, parseDelimitersFromConfig } from '../wordErrorCollector';
 import { proofreadJsonPathToSegmentsJsonPath, segmentsJsonPathToSplitMarkdownPath } from '../proofreadSplitLayout';
+import {
+    getProofreadPanelButtons,
+    inspectProofreadRounds,
+    parseProofreadRound,
+} from '../proofreadRoundLayout';
 import { focusWorkingTextEditor } from './lastActiveTextEditor';
 import { setProofreadItemsVisible } from './sidebarViewVisibility';
 import { commandHoverTitle } from './commandHover';
@@ -51,6 +56,7 @@ export interface ProofreadResult {
     logFilePath: string;
     originalFilePath: string;
     markdownFilePath: string;
+    round?: number;
     stats: {
         totalCount: number;
         processedCount: number;
@@ -103,6 +109,12 @@ export function detectCompanionFiles(mainFilePath: string): Partial<CompanionFil
         proofreadJsonMd: path.join(dir, `${base}.proofread.json.md`),
         proofreadLog: path.join(dir, `${base}.proofread.log`),
     };
+    const inspected = inspectProofreadRounds(dir, base);
+    const latest = inspected.files.filter((f) => f.round === inspected.maxRound).slice(-1)[0];
+    if (latest) {
+        paths.proofreadJson = latest.jsonPath;
+        paths.proofreadJsonMd = `${latest.jsonPath}.md`;
+    }
     for (const key of candidates) {
         if (fs.existsSync(paths[key])) {
             (result as any)[key] = paths[key];
@@ -130,6 +142,14 @@ function getProofreadNullCount(filePath: string): number | undefined {
     } catch {
         return undefined;
     }
+}
+
+function escapeHtml(text: string): string {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
 
 export class WebviewManager {
@@ -527,9 +547,17 @@ export class WebviewManager {
                 case 'proofreadJson': {
                     const jsonPath = this.getSplitJsonPath();
                     if (jsonPath) {
-                        // 直接调用校对JSON文件的回调函数
                         if ((this as any).proofreadJsonCallback) {
                             await (this as any).proofreadJsonCallback(jsonPath, context);
+                        }
+                    }
+                    break;
+                }
+                case 'proofreadJsonOverlay': {
+                    const jsonPath = this.getSplitJsonPath();
+                    if (jsonPath) {
+                        if ((this as any).proofreadJsonOverlayCallback) {
+                            await (this as any).proofreadJsonOverlayCallback(jsonPath, context);
                         }
                     }
                     break;
@@ -762,6 +790,10 @@ export class WebviewManager {
         (this as any).proofreadJsonCallback = callback;
     }
 
+    public setProofreadJsonOverlayCallback(callback: (jsonFilePath: string, context: vscode.ExtensionContext) => Promise<void>): void {
+        (this as any).proofreadJsonOverlayCallback = callback;
+    }
+
     /** 设置切分文档的回调（按主文件路径切分） */
     public setSplitCallback(callback: (mainFilePath: string, context: vscode.ExtensionContext) => Promise<void>): void {
         (this as any).splitCallback = callback;
@@ -879,6 +911,29 @@ export class WebviewManager {
                 </div>`
             : `<p class="hint">尚未选择主文件。切分、合并 JSON、校对 JSON 需要先选定主稿。</p>`;
 
+        const proofreadButtons = jsonPath
+            ? getProofreadPanelButtons(path.dirname(jsonPath), path.basename(jsonPath, '.json'))
+            : undefined;
+        const llmDisabled = proofreadButtons && !proofreadButtons.llmEnabled ? ' disabled' : '';
+        const overlayDisabled = !proofreadButtons || !proofreadButtons.overlayEnabled ? ' disabled' : '';
+        const llmLabel = proofreadButtons?.llmLabel ?? 'LLM 校对 JSON';
+        const overlayLabel = proofreadButtons?.overlayLabel ?? '重叠校对 JSON';
+        const llmTitle = commandHoverTitle(
+            proofreadButtons?.llmHint ?? 'LLM 校对 JSON',
+            'ai-proofread.proofreadFile'
+        );
+        const overlayTitle = commandHoverTitle(
+            proofreadButtons?.overlayHint ?? '重叠校对 JSON',
+            'ai-proofread.proofreadFileOverlay'
+        );
+        const proofreadHint = proofreadButtons && (!proofreadButtons.llmEnabled || !proofreadButtons.overlayEnabled)
+            ? `<p class="hint">${escapeHtml(
+                [proofreadButtons.llmHint, proofreadButtons.overlayHint]
+                    .filter((h, i, arr) => !!h && arr.indexOf(h) === i)
+                    .join(' ')
+            )}</p>`
+            : '';
+
         const companionBlock = hasJson && jsonPath
             ? `
                 ${stats ? `<div class="stats-section"><div class="stats-inline">
@@ -897,8 +952,10 @@ export class WebviewManager {
                     ${mainPath && jsonMdPath ? '<button class="action-button" onclick="handleAction(\'showSplitDiff\')">比较前后差异</button>' : ''}
                     <button class="action-button" onclick="handleAction('mergeContext')" title="${commandHoverTitle('合并 JSON', 'ai-proofread.mergeTwoFiles')}">合并 JSON</button>
                     <button class="action-button" onclick="handleAction('referencePrepJson')" title="${commandHoverTitle('打开切分 JSON 并打开检索面板', 'ai-proofread.prepareReferencesJson')}">准备参考资料</button>
-                    <button class="action-button" onclick="handleAction('proofreadJson')" title="${commandHoverTitle('LLM 校对 JSON', 'ai-proofread.proofreadFile')}">LLM 校对 JSON</button>
-                </div>`
+                    <button class="action-button" onclick="handleAction('proofreadJson')" title="${llmTitle}"${llmDisabled}>${llmLabel}</button>
+                    <button class="action-button" onclick="handleAction('proofreadJsonOverlay')" title="${overlayTitle}"${overlayDisabled}>${overlayLabel}</button>
+                </div>
+                ${proofreadHint}`
             : '';
 
         return `
@@ -907,7 +964,7 @@ export class WebviewManager {
                 ${mainFileBlock}
                 ${lengthMismatch ? `
                 <div class="warning-box">
-                    ⚠️ JSON 与 proofread.json 条目数不一致（${jsonLen} vs ${proofreadLen}），请检查或删除 proofread.json 后重新校对。
+                    ⚠️ JSON 与校对结果条目数不一致（${jsonLen} vs ${proofreadLen}），请检查或删除校对结果后重新校对。
                 </div>
                 ` : ''}
                 <div class="section-actions section-actions--between">
@@ -1062,11 +1119,13 @@ export class WebviewManager {
             result.splitResult?.originalFilePath ??
             this.mainFilePath ??
             '';
+        const parsed = comp.proofreadJson ? parseProofreadRound(comp.proofreadJson) : undefined;
         return {
             outputFilePath: comp.proofreadJson,
             markdownFilePath: comp.proofreadJsonMd ?? '',
             logFilePath: comp.proofreadLog ?? '',
             originalFilePath: main,
+            round: parsed?.round,
             stats: { totalCount: 0, processedCount: 0, processedLength: 0, totalLength: 0 },
         };
     }
@@ -1100,19 +1159,25 @@ export class WebviewManager {
         const hasUnfinished = (nullCount ?? 0) > 0;
         const hasMd = !!proofreadResult.markdownFilePath;
         const hasMain = !!proofreadResult.originalFilePath;
+        const round = proofreadResult.round ?? parseProofreadRound(proofreadResult.outputFilePath)?.round;
+        const roundLabel = round ? `第 ${round} 轮` : '';
+        const resultFileName = proofreadResult.outputFilePath
+            ? path.basename(proofreadResult.outputFilePath)
+            : '';
         return `
                 ${hasUnfinished ? `
                 <div class="warning-box">
-                    ⚠️ 有 <strong>${nullCount}</strong> 条未完成校对（.proofread.json 中为 null）。重新校对时将只处理未完成的条目。
+                    ⚠️ 有 <strong>${nullCount}</strong> 条未完成校对（${escapeHtml(resultFileName)} 中为 null）。续跑时将只处理未完成的条目。
                 </div>
                 ` : ''}
+                ${roundLabel ? `<p class="hint">当前校对结果：${escapeHtml(roundLabel)}（${escapeHtml(resultFileName)}）。比较前后差异为 <strong>原稿 vs ${escapeHtml(roundLabel)}</strong>。</p>` : ''}
                 <div class="file-paths-compact">
                     ${this.filePathRowWithOpenButtonIfExists('JSON:', proofreadResult.outputFilePath, 'showProofreadJson')}
                     ${this.filePathRowWithOpenButtonIfExists('JSON.md:', proofreadResult.markdownFilePath, 'showProofreadJsonMd')}
                     ${this.filePathRowWithOpenButtonIfExists('校对日志:', proofreadResult.logFilePath, 'showProofreadLog')}
                 </div>
                 <div class="section-actions">
-                ${hasMain && hasMd ? '<button class="action-button" onclick="handleAction(\'showProofreadDiff\')">比较前后差异</button>' : ''}
+                ${hasMain && hasMd ? `<button class="action-button" onclick="handleAction('showProofreadDiff')">比较前后差异（原稿 vs ${roundLabel || '最新一轮'}）</button>` : ''}
                     ${proofreadResult.outputFilePath ? `<button class="action-button" onclick="handleAction('showProofreadItemsTree')" title="${commandHoverTitle('查看校对条目', 'ai-proofread.showProofreadItemsTree')}">查看校对条目</button>` : ''}
                     ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'generateDiff\')">生成差异文件</button>' : ''}
                     ${hasMain && hasMd ? '<button class="action-button" onclick="handleAction(\'generateAlignment\')">生成勘误表</button>' : ''}
