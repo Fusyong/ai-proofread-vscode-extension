@@ -58,6 +58,17 @@ import {
     summarizeJsonBatchContentStats,
     summarizeProofreadFieldStats
 } from '../tokenEstimate';
+import {
+    asOverlaySourceItems,
+    asProofreadOutputStrings,
+    buildOverlayInput,
+    guardOverlayProofreadCommand,
+    guardProofreadFileCommand,
+    proofreadJsonPathToSegmentsJsonPath,
+    readJsonArray,
+    resolveSegmentsJsonPath,
+    segmentsJsonDirAndBase,
+} from '../proofreadRoundLayout';
 
 export class ProofreadCommandHandler {
     private webviewManager: WebviewManager;
@@ -74,13 +85,18 @@ export class ProofreadCommandHandler {
     private async executeProofreadJsonFile(
         jsonFilePath: string,
         jsonContent: any[],
-        context: vscode.ExtensionContext
+        context: vscode.ExtensionContext,
+        run: {
+            round: number;
+            outputFilePath: string;
+            targetSourceLabel: string;
+            inputParagraphs?: any[];
+        }
     ): Promise<void> {
-        // 生成输出文件路径
-        const outputFilePath = FilePathUtils.getFilePath(jsonFilePath, '.proofread', '.json');
+        const outputFilePath = run.outputFilePath;
         const logFilePath = FilePathUtils.getFilePath(jsonFilePath, '.proofread', '.log');
         const originalMarkdownFilePath = FilePathUtils.getFilePath(jsonFilePath, '', '.md');
-        const proofreadMarkdownFilePath = FilePathUtils.getFilePath(jsonFilePath, '.proofread.json', '.md');
+        const proofreadMarkdownFilePath = `${outputFilePath}.md`;
 
         // 获取配置
         const platform = this.configManager.getPlatform();
@@ -130,7 +146,10 @@ export class ProofreadCommandHandler {
             sourceCharacteristicsInjectSummary: useSystemDefaultPrompt
                 ? sourceCharacteristicsDisplayTitle ??
                   summarizeSourceCharacteristicsForLog(sourceTextCharacteristics)
-                : undefined
+                : undefined,
+            round: run.round,
+            outputFilePath,
+            targetSourceLabel: run.targetSourceLabel
         });
 
         if (!confirmResult) {
@@ -158,6 +177,9 @@ export class ProofreadCommandHandler {
         const startTime = new Date().toLocaleString();
         let logMessage = `\n${'='.repeat(50)}\n`;
         logMessage += `Start: ${startTime}\n`;
+        logMessage += `Round: ${run.round}\n`;
+        logMessage += `Output: ${outputFilePath}\n`;
+        logMessage += `TargetFrom: ${run.targetSourceLabel}\n`;
         logMessage += `Prompt: ${currentPromptName}\n`;
         logMessage += `SrcHint: ${formatSourceCharacteristicsForLog(sourceTextCharacteristics, sourceCharacteristicsDisplayTitle)}\n`;
         logMessage += `Model: ${platform}, ${model}, T. ${temperature}\n`;
@@ -184,6 +206,7 @@ export class ProofreadCommandHandler {
                     maxConcurrent,
                     temperature,
                     sourceTextCharacteristics,
+                    inputParagraphs: run.inputParagraphs,
                     onProgress: (info: string) => {
                         // 将进度信息写入日志
                         fs.appendFileSync(logFilePath, info + '\n', 'utf8');
@@ -267,10 +290,11 @@ export class ProofreadCommandHandler {
                     existingSplitResult ??
                     (() => {
                         // 从 proofread 路径反推切分结果路径，确保切分板块始终可展示
-                        const dir = path.dirname(outputFilePath);
-                        const base = path.basename(outputFilePath, '.proofread.json');
+                        const segmentsPath = proofreadJsonPathToSegmentsJsonPath(outputFilePath);
+                        const dir = path.dirname(segmentsPath);
+                        const base = path.basename(segmentsPath, '.json');
                         return {
-                            jsonFilePath: path.join(dir, `${base}.json`),
+                            jsonFilePath: segmentsPath,
                             markdownFilePath: path.join(dir, `${base}.json.md`),
                             logFilePath: path.join(dir, `${base}.log`),
                             originalFilePath: originalMarkdownFilePath
@@ -289,6 +313,7 @@ export class ProofreadCommandHandler {
                         logFilePath: logFilePath,
                         originalFilePath: originalMarkdownFilePath,
                         markdownFilePath: proofreadMarkdownFilePath,
+                        round: run.round,
                         stats: {
                             totalCount: stats.totalCount,
                             processedCount: stats.processedCount,
@@ -347,34 +372,58 @@ export class ProofreadCommandHandler {
         editor: vscode.TextEditor,
         context: vscode.ExtensionContext
     ): Promise<void> {
-        const document = editor.document;
-
-        // 检查文件是否为JSON
-        if (document.languageId !== 'json') {
-            vscode.window.showErrorMessage('请选择JSON文件进行校对！');
+        const jsonFilePath = this.resolveProofreadSourceJsonPath(editor);
+        if (!jsonFilePath) {
             return;
         }
+        await this.handleProofreadJsonFile(jsonFilePath, context);
+    }
 
+    /**
+     * 重叠校对（从右键菜单/命令面板调用）
+     */
+    public async handleOverlayProofreadFileCommand(
+        editor: vscode.TextEditor,
+        context: vscode.ExtensionContext
+    ): Promise<void> {
+        const jsonFilePath = this.resolveProofreadSourceJsonPath(editor);
+        if (!jsonFilePath) {
+            return;
+        }
+        await this.handleOverlayProofreadJsonFile(jsonFilePath, context);
+    }
+
+    private resolveProofreadSourceJsonPath(editor: vscode.TextEditor): string | undefined {
+        const document = editor.document;
+        if (document.languageId !== 'json') {
+            vscode.window.showErrorMessage('请选择JSON文件进行校对！');
+            return undefined;
+        }
+        const rawPath = document.uri.fsPath;
+        const jsonFilePath = resolveSegmentsJsonPath(rawPath);
+        if (!jsonFilePath) {
+            vscode.window.showErrorMessage('请选择切分得到的 JSON（含 target），或对应的校对结果 JSON。');
+            return undefined;
+        }
+        if (!fs.existsSync(jsonFilePath)) {
+            vscode.window.showErrorMessage(`未找到切分 JSON：${jsonFilePath}`);
+            return undefined;
+        }
+        return jsonFilePath;
+    }
+
+    private readSourceJsonContent(jsonFilePath: string): any[] | undefined {
         try {
-            // 解析JSON文件以验证格式
-            const content = document.getText();
-            const jsonContent = JSON.parse(content);
-
-            // 验证JSON格式是否符合要求
-            if (!Array.isArray(jsonContent) || !jsonContent.every(item =>
-                typeof item === 'object' && item !== null && 'target' in item
-            )) {
+            const jsonContent = JSON.parse(fs.readFileSync(jsonFilePath, 'utf8'));
+            const items = asOverlaySourceItems(jsonContent);
+            if (!items) {
                 vscode.window.showErrorMessage('JSON文件格式不正确！需要包含target字段的对象数组。');
-                return;
+                return undefined;
             }
-
-            // 获取当前文件路径
-            const jsonFilePath = document.uri.fsPath;
-
-            // 调用统一的核心校对逻辑
-            await this.executeProofreadJsonFile(jsonFilePath, jsonContent, context);
+            return items;
         } catch (error) {
             ErrorUtils.showError(error, '解析JSON文件时出错：');
+            return undefined;
         }
     }
 
@@ -970,6 +1019,9 @@ export class ProofreadCommandHandler {
         sourceTextCharacteristics?: string;
         /** 系统默认提示词时：已在上一环节选择的源文本特性注入摘要（如「无」、预设名） */
         sourceCharacteristicsInjectSummary?: string;
+        round?: number;
+        outputFilePath?: string;
+        targetSourceLabel?: string;
     }): Promise<boolean> {
         const {
             jsonFilePath,
@@ -982,7 +1034,10 @@ export class ProofreadCommandHandler {
             temperature,
             context,
             sourceTextCharacteristics = '',
-            sourceCharacteristicsInjectSummary
+            sourceCharacteristicsInjectSummary,
+            round,
+            outputFilePath,
+            targetSourceLabel
         } = params;
 
         const currentPromptName = context
@@ -1015,9 +1070,20 @@ export class ProofreadCommandHandler {
                 : SINGLE_TARGET_OVERFLOW_CHARS;
         const outputType = getOutputType(context);
 
+        const headerLines = [`📁 源 JSON: ${jsonFilePath}`];
+        if (round != null) {
+            headerLines.unshift(`第 ${round} 轮`);
+        }
+        if (outputFilePath) {
+            headerLines.push(`📤 输出: ${outputFilePath}`);
+        }
+        if (targetSourceLabel) {
+            headerLines.push(`🎯 target 来源: ${targetSourceLabel}`);
+        }
+
         return confirmProofreadInputIfNeeded({
-            title: '📋 JSON批量校对参数确认',
-            headerLines: [`📁 文件路径: ${jsonFilePath}`],
+            title: round && round > 1 ? `📋 重叠校对（第 ${round} 轮）参数确认` : '📋 JSON批量校对参数确认',
+            headerLines,
             promptName: currentPromptName,
             sourceCharacteristicsInjectSummary,
             repetitionMode,
@@ -1131,26 +1197,28 @@ export class ProofreadCommandHandler {
         context: vscode.ExtensionContext
     ): Promise<void> {
         try {
-            // 检查文件是否存在
             if (!fs.existsSync(jsonFilePath)) {
                 vscode.window.showErrorMessage('JSON文件不存在！');
                 return;
             }
 
-            // 读取并验证JSON文件
-            const content = fs.readFileSync(jsonFilePath, 'utf8');
-            const jsonContent = JSON.parse(content);
-
-            // 验证JSON格式是否符合要求
-            if (!Array.isArray(jsonContent) || !jsonContent.every(item =>
-                typeof item === 'object' && item !== null && 'target' in item
-            )) {
-                vscode.window.showErrorMessage('JSON文件格式不正确！需要包含target字段的对象数组。');
+            const jsonContent = this.readSourceJsonContent(jsonFilePath);
+            if (!jsonContent) {
                 return;
             }
 
-            // 调用统一的核心校对逻辑
-            await this.executeProofreadJsonFile(jsonFilePath, jsonContent, context);
+            const { dir, base } = segmentsJsonDirAndBase(jsonFilePath);
+            const guard = guardProofreadFileCommand(dir, base);
+            if (!guard.ok) {
+                vscode.window.showErrorMessage(guard.message);
+                return;
+            }
+
+            await this.executeProofreadJsonFile(jsonFilePath, jsonContent, context, {
+                round: 1,
+                outputFilePath: guard.outputJsonPath,
+                targetSourceLabel: `原稿 ${path.basename(jsonFilePath)}`
+            });
         } catch (error) {
             if (error instanceof Error && error.message.includes('未配置')) {
                 const result = await vscode.window.showErrorMessage(
@@ -1165,6 +1233,56 @@ export class ProofreadCommandHandler {
             } else {
                 ErrorUtils.showError(error, '校对JSON文件时出错：');
             }
+        }
+    }
+
+    public async handleOverlayProofreadJsonFile(
+        jsonFilePath: string,
+        context: vscode.ExtensionContext
+    ): Promise<void> {
+        try {
+            if (!fs.existsSync(jsonFilePath)) {
+                vscode.window.showErrorMessage('JSON文件不存在！');
+                return;
+            }
+
+            const sourceItems = this.readSourceJsonContent(jsonFilePath);
+            if (!sourceItems) {
+                return;
+            }
+
+            const { dir, base } = segmentsJsonDirAndBase(jsonFilePath);
+            const guard = guardOverlayProofreadCommand(dir, base);
+            if (!guard.ok) {
+                vscode.window.showErrorMessage(guard.message);
+                return;
+            }
+
+            const previousRaw = readJsonArray(guard.previousJsonPath);
+            const previousStrings = asProofreadOutputStrings(previousRaw);
+            if (!previousStrings) {
+                vscode.window.showErrorMessage(
+                    `无法读取上一轮结果：${guard.previousJsonPath}`
+                );
+                return;
+            }
+
+            let overlayInput: any[];
+            try {
+                overlayInput = buildOverlayInput(sourceItems, previousStrings);
+            } catch (error) {
+                vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error));
+                return;
+            }
+
+            await this.executeProofreadJsonFile(jsonFilePath, overlayInput, context, {
+                round: guard.round,
+                outputFilePath: guard.outputJsonPath,
+                targetSourceLabel: path.basename(guard.previousJsonPath),
+                inputParagraphs: overlayInput
+            });
+        } catch (error) {
+            ErrorUtils.showError(error, '重叠校对出错：');
         }
     }
 }
