@@ -4,8 +4,71 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { AlignmentItem, AlignmentOptions } from './sentenceAligner';
+import { AlignmentItem, AlignmentOptions, AlignmentStatistics } from './sentenceAligner';
 import { getAlignmentStatistics } from './sentenceAligner';
+
+/** 与 HTML 并列的机器可读勘误表。评分器只读这一份，不解析 HTML。 */
+export const ALIGNMENT_REPORT_VERSION = 1;
+
+const SERIALIZABLE_OPTION_KEYS = [
+    'windowSize',
+    'similarityThreshold',
+    'ngramSize',
+    'ngramGranularity',
+    'cutMode',
+    'offset',
+    'maxWindowExpansion',
+    'consecutiveFailThreshold',
+    'removeInnerWhitespace',
+    'removePunctuation',
+    'removeDigits',
+    'removeLatin',
+] as const satisfies readonly (keyof AlignmentOptions)[];
+
+export interface AlignmentReportJson {
+    version: typeof ALIGNMENT_REPORT_VERSION;
+    titleA: string;
+    titleB: string;
+    /** 对齐耗时（秒）；调用方未计时时为 0 */
+    runtime: number;
+    /** 不含 jieba 等不可序列化字段 */
+    options: Partial<AlignmentOptions>;
+    statistics: AlignmentStatistics;
+    items: AlignmentItem[];
+}
+
+/** `文稿.alignment.html` → `文稿.alignment.json` */
+export function alignmentJsonPath(htmlPath: string): string {
+    if (htmlPath.toLowerCase().endsWith('.html')) {
+        return htmlPath.slice(0, -'.html'.length) + '.json';
+    }
+    return `${htmlPath}.json`;
+}
+
+export function buildAlignmentReportJson(
+    alignment: AlignmentItem[],
+    titleA: string,
+    titleB: string,
+    options: AlignmentOptions = {},
+    runtime: number = 0
+): AlignmentReportJson {
+    const serializedOptions: Partial<AlignmentOptions> = {};
+    for (const key of SERIALIZABLE_OPTION_KEYS) {
+        const value = options[key];
+        if (value !== undefined) {
+            (serializedOptions as Record<string, unknown>)[key] = value;
+        }
+    }
+    return {
+        version: ALIGNMENT_REPORT_VERSION,
+        titleA: titleA || '原文',
+        titleB: titleB || '校对后',
+        runtime,
+        options: serializedOptions,
+        statistics: getAlignmentStatistics(alignment),
+        items: alignment,
+    };
+}
 
 /**
  * HTML转义函数
@@ -1033,6 +1096,8 @@ export function generateHtmlReport(
 </body>
 </html>`);
 
-    // 写入文件
+    // 写入文件。JSON 与 HTML 同目录，供评测读取，不替代给人看的勘误表。
     fs.writeFileSync(outputPath, htmlLines.join(''), 'utf8');
+    const report = buildAlignmentReportJson(alignment, titleA, titleB, options, runtime);
+    fs.writeFileSync(alignmentJsonPath(outputPath), JSON.stringify(report, null, 2), 'utf8');
 }

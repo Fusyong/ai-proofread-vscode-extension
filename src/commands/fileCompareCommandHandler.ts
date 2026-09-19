@@ -9,7 +9,7 @@ import { showFileDiff, jsDiffMarkdown, jsDiffJsonFiles } from '../differ';
 import { FilePathUtils, ErrorUtils } from '../utils';
 import { alignSentencesAnchor, getAlignmentStatistics, AlignmentOptions } from '../sentenceAligner';
 import { splitChineseSentencesWithLineNumbers } from '../splitter';
-import { generateHtmlReport } from '../alignmentReportGenerator';
+import { alignmentJsonPath, generateHtmlReport } from '../alignmentReportGenerator';
 import { getJiebaWasm } from '../jiebaLoader';
 import { collectWordErrors, formatWordErrors, parseDelimitersFromConfig } from '../wordErrorCollector';
 
@@ -348,7 +348,11 @@ export class FileCompareCommandHandler {
                     `移出: ${stats.moveout}\n` +
                     `移入: ${stats.movein}`;
 
-                vscode.window.showInformationMessage(statsMessage + `\n报告已保存至: ${path.basename(outputFile)}` + wordErrorsMessage);
+                vscode.window.showInformationMessage(
+                    statsMessage +
+                    `\n报告已保存至: ${path.basename(outputFile)}、${path.basename(alignmentJsonPath(outputFile))}` +
+                    wordErrorsMessage
+                );
             });
 
         } catch (error) {

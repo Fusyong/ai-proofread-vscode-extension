@@ -8,7 +8,7 @@ import * as path from 'path';
 import { alignSentencesAnchor, getAlignmentStatistics, AlignmentItem, AlignmentOptions } from '../sentenceAligner';
 import { splitChineseSentencesWithLineNumbers } from '../splitter';
 import { FilePathUtils, ErrorUtils } from '../utils';
-import { generateHtmlReport } from '../alignmentReportGenerator';
+import { alignmentJsonPath, generateHtmlReport } from '../alignmentReportGenerator';
 import { getJiebaWasm } from '../jiebaLoader';
 import { collectWordErrors, formatWordErrors, parseDelimitersFromConfig } from '../wordErrorCollector';
 
@@ -233,7 +233,11 @@ export class SentenceAlignmentCommandHandler {
                     `移出: ${stats.moveout}\n` +
                     `移入: ${stats.movein}`;
 
-                vscode.window.showInformationMessage(statsMessage + `\n报告已保存至: ${path.basename(outputFile)}` + wordErrorsMessage);
+                vscode.window.showInformationMessage(
+                    statsMessage +
+                    `\n报告已保存至: ${path.basename(outputFile)}、${path.basename(alignmentJsonPath(outputFile))}` +
+                    wordErrorsMessage
+                );
             });
 
         } catch (error) {
