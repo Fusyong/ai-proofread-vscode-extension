@@ -8,7 +8,7 @@
 
 ## 30 秒概览
 
-**四个入口**：（1）左侧活动栏 **overview**：打开**校对面板** / **检索面板**，并开关侧栏 TreeView；（2）**校对面板**按四块组织日常工作；（3）**检索面板**是「切分与合并」的资料检索分支（**不做校对**）；（4）命令面板（Ctrl+Shift+P）输入「AI Proofreader」可查全部命令；部分命令也有**右键菜单**。
+**四个入口**：（1）左侧活动栏 **概览**：打开**校对面板** / **检索面板**，并开关侧栏视图；（2）**校对面板**按四块组织日常工作；（3）**检索面板**是「切分与合并」的资料检索分支（**不做校对**）；（4）命令面板（Ctrl+Shift+P）输入「AI 校对」（英文界面为「AI Proofreader」）可查全部命令；部分命令也有**右键菜单**。
 
 | 业务场景 | 面板位置 | 说明 |
 |----------|----------|------|
@@ -27,9 +27,9 @@
 | **资料准备** | 多源检索 → 过程文件 + 侧栏「资料检索」；不自动校对；JSON 不自动写 `reference` |
 | **知识核查** | 预置校对提示词；校对面板选用 |
 | **意图检索** | 自然语言描述检索意图后多源检索 |
-| **核对选中引文** | → 侧栏「引文核查」（选区去掉行首 `>`，与全文同一套相似度匹配） |
-| **核对全文引文** | → 侧栏「引文核查」（须先建立参考资料索引） |
-| **直接查词典** | 无 LLM，整词查 MDX |
+| **核对选区引文** | → 侧栏「引文核查」（选区去掉行首 `>`，与核对文件引文同一套相似度匹配） |
+| **核对文件引文** | → 侧栏「引文核查」（须先建立参考资料索引） |
+| **查本地词典** | 无大模型，把选区当作一个词条查 MDX |
 
 ---
 
@@ -231,7 +231,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     A["设置文献库路径"] --> B["检索面板：建立参考资料索引"]
-    B --> C["核对选中引文 / 核对全文引文"]
+    B --> C["核对选区引文 / 核对文件引文"]
     C --> D["侧栏「引文核查」"]
     D --> E["diff / PDF 反查"]
 ```
@@ -242,60 +242,60 @@ flowchart LR
 
 **优先用 UI**，按校对面板四块 + 资料检索分支：
 
-- **文档整理 / 切分与合并 / 校对结果 / 专项检查**：overview「校对面板」或 `open proofreading panel`
-- **资料检索**：切分区块「准备参考资料」，或 overview「检索面板」。**校对请到校对面板。**
-- 命令面板（Ctrl+Shift+P）输入「AI Proofreader」可查全部。⭐ 表示核心/常用。
+- **文档整理 / 切分与合并 / 校对结果 / 专项检查**：概览「校对面板」，或命令「打开校对面板」
+- **资料检索**：切分区块「准备参考资料」，或概览「检索面板」。**校对请到校对面板。**
+- 命令标题随显示语言切换。下表为中文界面标题；英文界面用对应英文（分类同为 AI Proofreader）。命令面板输入「AI 校对」或「AI Proofreader」可查全部。⭐ 表示核心/常用。
 
 | 命令 | 简短说明 |
 |------|----------|
 | **文档整理**（校对面板第一块） | |
-| AI Proofreader: convert docx to markdown | 将 Word(docx) 转为 Markdown，需安装 Pandoc |
-| AI Proofreader: convert PDF to markdown | 将活文字 PDF 转为 Markdown（Windows 内置 pdftotext；其他系统需自行安装） |
-| AI Proofreader: convert markdown to docx | 将 Markdown 转为 Word(docx) |
-| AI Proofreader: format paragraphs | 整理段落：段末加空行 / 删除段内分行 |
-| AI Proofreader: delete inline whitespace | 删除汉字与汉字/中文标点/拉丁字母/阿拉伯数字之间过短的半角空格（不处理 Tab、全角空格） |
-| AI Proofreader: convert quotes to Chinese | 半角引号转全角（可设为校对后自动执行） |
-| AI Proofreader: half-width punctuation to full-width | 半角标点转全角（,;:!?() → ，；：！？（）） |
-| AI Proofreader: full-width punctuation to half-width | 全角标点转半角（，；：！？（） → ,;:!?()） |
-| AI Proofreader: OpenCC / OpenCC selection | 繁简或地区用字转换 |
-| AI Proofreader: replace Founder circled numbers | 方正书版 PDF 带圈序号 → Unicode ①… 或方头扩注 [n]；并清除常见版面杂质 |
-| AI Proofreader: mark titles from table of contents | 根据目录表（Markdown 列表）在文档中标记标题；可忽略并改写已有 `#`（不限级数） |
-| AI Proofreader: align headings | 并排打开两个 Markdown，按指定级别检查标题是否一一对应（专项检查区亦有） |
-| AI Proofreader: split into sentences | 将整篇或选区按简易中文分句，并用所选分隔符连接 |
-| AI Proofreader: segment file / segment selection | 分词 / 词频统计 / 字频统计 |
-| AI Proofreader: diff it with another file ⭐ | 比较两个文件（整理阶段或校对结果均可；含内置 diff / HTML / 勘误表） |
+| 将 DOCX 转为 Markdown | 将 Word(docx) 转为 Markdown，需安装 Pandoc |
+| 将 PDF 转为 Markdown | 将活文字 PDF 转为 Markdown（Windows 内置 pdftotext；其他系统需自行安装） |
+| 将 Markdown 转为 DOCX | 将 Markdown 转为 Word(docx) |
+| 整理段落 | 段末加空行 / 删除段内分行 |
+| 删除行内空白 | 删除汉字与汉字/中文标点/拉丁字母/阿拉伯数字之间过短的半角空格（不处理 Tab、全角空格） |
+| 将引号转为中文引号 | 半角引号转全角（可设为校对后自动执行） |
+| 将半角标点转为全角 | ,;:!?() → ，；：！？（） |
+| 将全角标点转为半角 | ，；：！？（） → ,;:!?() |
+| 用 OpenCC 转换 / 用 OpenCC 转换选区 | 繁简或地区用字转换 |
+| 替换方正带圈数字 | 方正书版 PDF 带圈序号 → Unicode ①… 或方头扩注 [n]；并清除常见版面杂质 |
+| 按目录标记标题 | 根据目录表（Markdown 列表）在文档中标记标题；可忽略并改写已有 `#`（不限级数） |
+| 对齐标题 | 并排打开两个 Markdown，按指定级别检查标题是否一一对应（专项检查区亦有） |
+| 切分为句子 | 将整篇或选区按简易中文分句，并用所选分隔符连接 |
+| 文件分词与统计 / 选区分词与统计 | 分词 / 词频统计 / 字频统计 |
+| 与另一文件比较 ⭐ | 比较两个文件（整理阶段或校对结果均可；含内置 diff / HTML / 勘误表） |
 | **切分与合并**（校对面板第二块） | |
-| AI Proofreader: open proofreading panel ⭐ | 打开 **校对面板** |
-| AI Proofreader: split file ⭐ | 切分文件（统一入口，会提示选择切分模式） |
-| AI Proofreader: split by length | 按长度切分，输入目标字符数 |
-| AI Proofreader: split by title | 按标题切分，输入标题级别（如 1,2） |
-| AI Proofreader: split by title and length | 按标题+长度：题下过长则再切、过短则合并 |
-| AI Proofreader: split by length with title context | 按长度切分，并为每段配上所在标题范围的上下文（注意 token 费用） |
-| AI Proofreader: split by length with paragraph context | 按长度切分，并为每段配上前后段落作为上下文（注意 token 费用） |
-| AI Proofreader: merge two files | 合并两个 JSON，或把同一 Markdown 全文并入各条；可忽略当前文件指定标题级别开头的单元 |
-| **资料检索**（切分与合并的分支；命令面板搜 `AI Proofreader Search`） | |
-| Open Reference Search Panel（检索面板）⭐ | 打开 **检索面板**（配置、时间线、勾选命中、导出/合并；不做校对） |
-| Prepare References for Selection / JSON File（资料准备） | 选段或 JSON 批量准备；结果进过程文件；JSON **不自动写入**源文件 |
-| Look Up Local Dictionary（直接查词典） | 精确整词查本地 MDX（无 LLM） |
-| Search Local Dictionary / Grep·BM25·Vector / Wikipedia（LLM 规划） | 单源 LLM 规划检索；Web 未实现 |
-| Intent Search（意图检索） | 自然语言多源检索（`search_intent`） |
-| Search Selection in References (Find in Files) | Find in Files（即时工具，无 LLM） |
-| Verify Selected Citation（核对选中引文） | 选区去掉行首 `>` 后相似度匹配 → **引文核查** |
-| Verify Citations（核对全文引文） / Build Reference Index | 结果 → **引文核查**；索引亦供 BM25 |
-| Clear Project Retrieval Cache | 清除 `.proofread/retrieval-cache.json` |
-| Search Selection in PDF / Shidianguji / Ancientbooks | 外跳；不进入 reference corpus |
-| Search Citation in PDF | 引文树右键：文献 PDF 反查 |
+| 打开校对面板 ⭐ | 打开 **校对面板** |
+| 切分文件 ⭐ | 统一入口，会提示选择切分模式 |
+| 按长度切分文件 | 输入目标字符数 |
+| 按标题切分文件 | 输入标题级别（如 1,2） |
+| 按标题和长度切分文件 | 题下过长则再切、过短则合并 |
+| 按长度切分文件，以标题范围为上下文 | 为每段配上所在标题范围的上下文（注意 token 费用） |
+| 按长度切分文件，以前后段落为上下文 | 为每段配上前后段落作为上下文（注意 token 费用） |
+| 合并两个文件 | 合并两个 JSON，或把同一 Markdown 全文并入各条；可忽略当前文件指定标题级别开头的单元 |
+| **资料检索**（切分与合并的分支） | |
+| 打开资料检索面板 ⭐ | 打开 **检索面板**（配置、时间线、勾选命中、导出/合并；不做校对） |
+| 为选区准备资料 / 为 JSON 文件准备资料 | 选区或 JSON 批量准备；结果进过程文件；JSON **不自动写入**源文件 |
+| 查本地词典 | 把选区当作一个词条查本地 MDX（无大模型） |
+| 检索本地词典 / 用 Grep·BM25·向量检索参考资料 / 检索维基百科 | 由大模型规划后单源检索；「检索网页」尚未实现 |
+| 意图检索 | 自然语言多源检索（`search_intent`） |
+| 在参考资料中检索选区 | 使用「在文件中查找」（即时工具，无大模型） |
+| 核对选区引文 | 选区去掉行首 `>` 后相似度匹配 → **引文核查** |
+| 核对文件引文 / 建立参考资料索引 | 结果 → **引文核查**；索引亦供 BM25 |
+| 清除项目检索缓存 | 清除 `.proofread/retrieval-cache.json` |
+| 在 PDF / 识典古籍 / 中华经典古籍库中检索选区 | 外跳；不进入 reference corpus |
+| 在 PDF 中检索引文 | 引文树右键：文献 PDF 反查 |
 | **校对 / 校对结果** | |
-| AI Proofreader: proofread file ⭐ | 批量校对 JSON 第 1 轮（切分区块「LLM 校对 JSON」；写出 `文档.proofread.1.json`） |
-| AI Proofreader: overlay proofread file | 重叠校对：用最近一轮已完成全文作 target，写出 `文档.proofread.N.json`（第 2 轮及以后）；续跑需紧邻上一轮完整 |
-| AI Proofreader: proofread selection ⭐ | 校对选中文本（面板底部） |
-| AI Proofreader: proofread selection with memory ⭐ | 选段校对并强制启用项目编辑记忆注入与写回 |
-| AI Proofreader: manage prompts | 管理提示词：增、删、改；在侧栏 prompts 视图中选择当前提示词 |
-| **专项检查**（校对面板第四块 + overview 开关） | |
-| AI Proofreader: check words | 字词检查：词典检查、通用规范汉字表、自定义替换表 |
-| AI Proofreader: manage custom tables | 管理自定义替换表 |
-| AI Proofreader: check numbering hierarchy | 检查标题序号层级与段内序号 |
-| AI Proofreader: scan duplicate sentences in document / selection | 重文检查（全文 / 选区） |
+| 校对文件 ⭐ | 批量校对 JSON 第 1 轮（切分区块「LLM 校对 JSON」；写出 `文档.proofread.1.json`） |
+| 重叠校对文件 | 在已有校对结果上再校一轮，写出 `文档.proofread.N.json`（第 2 轮及以后）；续跑需紧邻上一轮完整 |
+| 校对选区 ⭐ | 校对选中文本（面板底部） |
+| 校对选区（带记忆） ⭐ | 选区校对并强制启用项目编辑记忆注入与写回 |
+| 管理提示词 | 增、删、改；在侧栏「提示词」视图中选择当前提示词 |
+| **专项检查**（校对面板第四块 + 概览开关） | |
+| 检查字词 | 字词检查：词典检查、规范字检查、自定义检查 |
+| 管理自定义检查 | 管理自定义替换表 |
+| 检查序号 | 检查标题树或段内序号 |
+| 检查文件重文 / 检查选区重文 | 重文检查 |
 
 ---
 
@@ -363,6 +363,6 @@ flowchart LR
 ## 七、说明与建议
 
 - **Mermaid 图**：可在支持 Mermaid 的 Markdown 预览（如 VS Code 插件）、GitHub/GitLab、Notion 等中直接渲染为流程图。
-- **命令查找**：命令面板输入「AI Proofreader」或「proofread」「split」「Search」等关键词即可缩小范围。
+- **命令查找**：命令面板输入「AI 校对」或「AI Proofreader」，也可用「校对」「切分」「检索」等关键词缩小范围。标题随显示语言切换。
 - **详细说明**：每个命令的详细用法、依赖（Pandoc、pdftotext、SumatraPDF 等）和注意事项见扩展主页面或 [README](../README.md)；设置说明可在设置界面看到。版本历史见 [changelog.md](changelog.md)。
 - **面板分工**：校对面板四块为 **文档整理**、**切分与合并**、**校对结果**、**专项检查**；**资料检索**是切分与合并的分支（检索面板）。引文核对在检索面板与专项检查区都有入口。

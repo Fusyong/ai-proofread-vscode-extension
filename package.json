@@ -1,7 +1,7 @@
 {
   "name": "ai-proofreader",
-  "displayName": "AI Proofreader",
-  "description": "AI powered proofreading tools",
+  "displayName": "%displayName%",
+  "description": "%description%",
   "version": "1.12.20",
   "engines": {
     "vscode": "^1.85.0",
@@ -15,595 +15,711 @@
     "commands": [
       {
         "command": "ai-proofread.managePrompts",
-        "title": "AI Proofreader: manage prompts"
+        "title": "%cmd.managePrompts.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.prompts.new",
-        "title": "新建提示词 (prompts.new)",
-        "shortTitle": "新建提示词"
+        "title": "%cmd.prompts.new.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.prompts.new.shortTitle%"
       },
       {
         "command": "ai-proofread.prompts.edit",
-        "title": "编辑"
+        "title": "%cmd.prompts.edit.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.prompts.edit.shortTitle%"
       },
       {
         "command": "ai-proofread.prompts.delete",
-        "title": "删除"
+        "title": "%cmd.prompts.delete.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.prompts.delete.shortTitle%"
       },
       {
         "command": "ai-proofread.sourceTextCharacteristics.openView",
-        "title": "源文本特性提示词 (sourceTextCharacteristics.openView)",
-        "shortTitle": "源文本特性提示词",
+        "title": "%cmd.sourceTextCharacteristics.openView.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.sourceTextCharacteristics.openView.shortTitle%",
         "icon": "$(symbol-keyword)"
       },
       {
         "command": "ai-proofread.dictPrepPrompts.openView",
-        "title": "检索规划提示词 (dictPrepPrompts.openView)",
-        "shortTitle": "检索规划提示词",
+        "title": "%cmd.dictPrepPrompts.openView.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.dictPrepPrompts.openView.shortTitle%",
         "icon": "$(book)"
       },
       {
         "command": "ai-proofread.sidebar.hideResultViews",
-        "title": "收起结果列表"
+        "title": "%cmd.sidebar.hideResultViews.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.dictPrepPrompts.new",
-        "title": "新建提示词 (dictPrepPrompts.new)",
-        "shortTitle": "新建提示词"
+        "title": "%cmd.dictPrepPrompts.new.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.dictPrepPrompts.new.shortTitle%"
       },
       {
         "command": "ai-proofread.dictPrepPrompts.edit",
-        "title": "编辑"
+        "title": "%cmd.dictPrepPrompts.edit.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.dictPrepPrompts.edit.shortTitle%"
       },
       {
         "command": "ai-proofread.dictPrepPrompts.delete",
-        "title": "删除"
+        "title": "%cmd.dictPrepPrompts.delete.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.dictPrepPrompts.delete.shortTitle%"
       },
       {
         "command": "ai-proofread.sourceTextCharacteristics.new",
-        "title": "新建提示词 (sourceTextCharacteristics.new)",
-        "shortTitle": "新建提示词"
+        "title": "%cmd.sourceTextCharacteristics.new.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.sourceTextCharacteristics.new.shortTitle%"
       },
       {
         "command": "ai-proofread.sourceTextCharacteristics.edit",
-        "title": "编辑"
+        "title": "%cmd.sourceTextCharacteristics.edit.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.sourceTextCharacteristics.edit.shortTitle%"
       },
       {
         "command": "ai-proofread.sourceTextCharacteristics.delete",
-        "title": "删除"
+        "title": "%cmd.sourceTextCharacteristics.delete.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.sourceTextCharacteristics.delete.shortTitle%"
       },
       {
         "command": "ai-proofread.splitFileByLength",
-        "title": "AI Proofreader: split by length"
+        "title": "%cmd.splitFileByLength.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.splitFileByTitle",
-        "title": "AI Proofreader: split by title"
+        "title": "%cmd.splitFileByTitle.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.splitFileWithTitleContext",
-        "title": "AI Proofreader: split by length with title context"
+        "title": "%cmd.splitFileWithTitleContext.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.splitFileWithParagraphContext",
-        "title": "AI Proofreader: split by length with paragraph context"
+        "title": "%cmd.splitFileWithParagraphContext.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.splitFileByTitleAndLength",
-        "title": "AI Proofreader: split by title and length"
+        "title": "%cmd.splitFileByTitleAndLength.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.mergeTwoFiles",
-        "title": "AI Proofreader: merge two files"
+        "title": "%cmd.mergeTwoFiles.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.prepareReferencesJson",
-        "title": "Prepare References for JSON File（资料准备·JSON）",
-        "category": "AI Proofreader Search"
+        "title": "%cmd.prepareReferencesJson.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.prepareReferencesSelection",
-        "title": "Prepare References for Selection（资料准备·选段）",
-        "category": "AI Proofreader Search"
+        "title": "%cmd.prepareReferencesSelection.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.referencePrep.openConsole",
-        "title": "Open Reference Search Panel（检索面板） (referencePrep.openConsole)",
-        "shortTitle": "Open Reference Search Panel（检索面板）",
-        "category": "AI Proofreader Search",
+        "title": "%cmd.referencePrep.openConsole.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.referencePrep.openConsole.shortTitle%",
         "icon": "$(window)"
       },
       {
         "command": "ai-proofread.modelRoutes.openView",
-        "title": "AI Proofreader: open model routes view (modelRoutes.openView)",
-        "shortTitle": "AI Proofreader: open model routes view",
+        "title": "%cmd.modelRoutes.openView.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.modelRoutes.openView.shortTitle%",
         "icon": "$(settings-gear)"
       },
       {
         "command": "ai-proofread.modelRoutes.toggleView",
-        "title": "AI Proofreader: toggle model routes view"
+        "title": "%cmd.modelRoutes.toggleView.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.prompts.toggleViews",
-        "title": "AI Proofreader: toggle prompts views"
+        "title": "%cmd.prompts.toggleViews.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.wordCheck.toggleViews",
-        "title": "显示或隐藏字词检查结果"
+        "title": "%cmd.wordCheck.toggleViews.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.wordCheck.toggleConfigViews",
-        "title": "显示或隐藏字词检查表"
+        "title": "%cmd.wordCheck.toggleConfigViews.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.modelRoutes.configure",
-        "title": "配置模型路由"
+        "title": "%cmd.modelRoutes.configure.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.modelRoutes.refresh",
-        "title": "刷新模型路由 (modelRoutes.refresh)",
-        "shortTitle": "刷新模型路由",
+        "title": "%cmd.modelRoutes.refresh.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.modelRoutes.refresh.shortTitle%",
         "icon": "$(refresh)"
       },
       {
         "command": "ai-proofread.queryLocalDictSelection",
-        "title": "Look Up Local Dictionary（直接查词典）",
-        "category": "AI Proofreader Search",
-        "description": "把选中当作一个词条查本地词典（无 LLM）"
+        "title": "%cmd.queryLocalDictSelection.title%",
+        "category": "%category%",
+        "description": "%cmd.queryLocalDictSelection.description%"
       },
       {
         "command": "ai-proofread.search.dictPrep",
-        "title": "Search Local Dictionary（LLM 规划）",
-        "category": "AI Proofreader Search",
-        "description": "仅本地词典：LLM 规划后查 MDX"
+        "title": "%cmd.search.dictPrep.title%",
+        "category": "%category%",
+        "description": "%cmd.search.dictPrep.description%"
       },
       {
         "command": "ai-proofread.search.refsGrep",
-        "title": "Search References with Grep（LLM 规划）",
-        "category": "AI Proofreader Search",
-        "description": "仅参考资料 grep"
+        "title": "%cmd.search.refsGrep.title%",
+        "category": "%category%",
+        "description": "%cmd.search.refsGrep.description%"
       },
       {
         "command": "ai-proofread.search.refsBm25",
-        "title": "Search References with BM25（LLM 规划）",
-        "category": "AI Proofreader Search",
-        "description": "仅参考资料 BM25（jieba；需先建立参考资料索引）"
+        "title": "%cmd.search.refsBm25.title%",
+        "category": "%category%",
+        "description": "%cmd.search.refsBm25.description%"
       },
       {
         "command": "ai-proofread.search.refsVector",
-        "title": "Search References with Vector（LLM 规划）",
-        "category": "AI Proofreader Search",
-        "description": "仅参考资料轻量向量"
+        "title": "%cmd.search.refsVector.title%",
+        "category": "%category%",
+        "description": "%cmd.search.refsVector.description%"
       },
       {
         "command": "ai-proofread.search.wikipedia",
-        "title": "Search Wikipedia（LLM 规划）",
-        "category": "AI Proofreader Search",
-        "description": "仅维基百科 API"
+        "title": "%cmd.search.wikipedia.title%",
+        "category": "%category%",
+        "description": "%cmd.search.wikipedia.description%"
       },
       {
         "command": "ai-proofread.search.web",
-        "title": "Search the Web（LLM 规划·未实现）",
-        "category": "AI Proofreader Search",
-        "description": "Web 搜索尚未实现（适配器未配置）"
+        "title": "%cmd.search.web.title%",
+        "category": "%category%",
+        "description": "%cmd.search.web.description%"
       },
       {
         "command": "ai-proofread.llmGrepSearchReferences",
-        "title": "Intent Search（意图检索）",
-        "category": "AI Proofreader Search",
-        "description": "用自然语言描述检索意图，LLM 规划后默认词典+grep+BM25+向量多源检索"
+        "title": "%cmd.llmGrepSearchReferences.title%",
+        "category": "%category%",
+        "description": "%cmd.llmGrepSearchReferences.description%"
       },
       {
         "command": "ai-proofread.referencePrep.openView",
-        "title": "Open 资料检索 View",
-        "category": "AI Proofreader Search"
+        "title": "%cmd.referencePrep.openView.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.referencePrep.toggleResultsView",
-        "title": "Toggle 资料检索 View",
-        "category": "AI Proofreader Search"
+        "title": "%cmd.referencePrep.toggleResultsView.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.referencePrep.clearRetrievalCache",
-        "title": "Clear Project Retrieval Cache",
-        "category": "AI Proofreader Search"
+        "title": "%cmd.referencePrep.clearRetrievalCache.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.referencePrep.openHit",
-        "title": "打开命中位置"
+        "title": "%cmd.referencePrep.openHit.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.referencePrep.pruneHit",
-        "title": "丢弃此命中"
+        "title": "%cmd.referencePrep.pruneHit.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.referencePrep.restoreHit",
-        "title": "恢复此命中"
+        "title": "%cmd.referencePrep.restoreHit.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.referencePrep.copyBlock",
-        "title": "复制 reference 块"
+        "title": "%cmd.referencePrep.copyBlock.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.referencePrep.showDiff",
-        "title": "查看 diff"
+        "title": "%cmd.referencePrep.showDiff.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.proofreadFile",
-        "title": "AI Proofreader: proofread file"
+        "title": "%cmd.proofreadFile.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.proofreadFileOverlay",
-        "title": "AI Proofreader: overlay proofread file"
+        "title": "%cmd.proofreadFileOverlay.title%",
+        "category": "%category%",
+        "description": "%cmd.proofreadFileOverlay.description%"
       },
       {
         "command": "ai-proofread.proofreadSelection",
-        "title": "AI Proofreader: proofread selection"
+        "title": "%cmd.proofreadSelection.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.proofreadSelectionWithMemory",
-        "title": "AI Proofreader: proofread selection with memory"
+        "title": "%cmd.proofreadSelectionWithMemory.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.splitIntoSentences",
-        "title": "AI Proofreader: split into sentences"
+        "title": "%cmd.splitIntoSentences.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.diffItWithAnotherFile",
-        "title": "AI Proofreader: diff it with another file"
+        "title": "%cmd.diffItWithAnotherFile.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.searchSelectionInPDF",
-        "title": "Search Selection in PDF",
-        "category": "AI Proofreader Tools"
+        "title": "%cmd.searchSelectionInPDF.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.searchSelectionInShidianguji",
-        "title": "Search Selection in Shidianguji",
-        "category": "AI Proofreader Tools"
+        "title": "%cmd.searchSelectionInShidianguji.title%",
+        "category": "%category%",
+        "description": "%cmd.searchSelectionInShidianguji.description%"
       },
       {
         "command": "ai-proofread.searchSelectionInAncientbooks",
-        "title": "Search Selection in Ancientbooks",
-        "category": "AI Proofreader Tools"
+        "title": "%cmd.searchSelectionInAncientbooks.title%",
+        "category": "%category%",
+        "description": "%cmd.searchSelectionInAncientbooks.description%"
       },
       {
         "command": "ai-proofread.searchSelectionInReferences",
-        "title": "Search Selection in References (Find in Files)",
-        "category": "AI Proofreader Search"
+        "title": "%cmd.searchSelectionInReferences.title%",
+        "category": "%category%",
+        "description": "%cmd.searchSelectionInReferences.description%"
       },
       {
         "command": "ai-proofread.convertDocxToMarkdown",
-        "title": "AI Proofreader: convert docx to markdown"
+        "title": "%cmd.convertDocxToMarkdown.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.convertPdfToMarkdown",
-        "title": "AI Proofreader: convert PDF to markdown"
+        "title": "%cmd.convertPdfToMarkdown.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.convertMarkdownToDocx",
-        "title": "AI Proofreader: convert markdown to docx"
+        "title": "%cmd.convertMarkdownToDocx.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.convertQuotes",
-        "title": "AI Proofreader: convert quotes to Chinese"
+        "title": "%cmd.convertQuotes.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.replaceFounderCircledNumbers",
-        "title": "AI Proofreader: replace Founder circled numbers"
+        "title": "%cmd.replaceFounderCircledNumbers.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.halfToFullPunctuation",
-        "title": "AI Proofreader: half-width punctuation to full-width"
+        "title": "%cmd.halfToFullPunctuation.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.fullToHalfPunctuation",
-        "title": "AI Proofreader: full-width punctuation to half-width"
+        "title": "%cmd.fullToHalfPunctuation.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.formatParagraphs",
-        "title": "AI Proofreader: format paragraphs"
+        "title": "%cmd.formatParagraphs.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.deleteInlineWhitespace",
-        "title": "AI Proofreader: delete inline whitespace"
+        "title": "%cmd.deleteInlineWhitespace.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.deleteExcessBlankLines",
-        "title": "AI Proofreader: delete excess blank lines"
+        "title": "%cmd.deleteExcessBlankLines.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.markTitlesFromToc",
-        "title": "AI Proofreader: mark titles from table of contents"
+        "title": "%cmd.markTitlesFromToc.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.alignHeadings",
-        "title": "AI Proofreader: align headings"
+        "title": "%cmd.alignHeadings.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.segmentFile",
-        "title": "AI Proofreader: segment file"
+        "title": "%cmd.segmentFile.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.segmentSelection",
-        "title": "AI Proofreader: segment selection"
+        "title": "%cmd.segmentSelection.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.splitFile",
-        "title": "AI Proofreader: split file"
+        "title": "%cmd.splitFile.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.openProofreadingPanel",
-        "title": "AI Proofreader: open proofreading panel"
+        "title": "%cmd.openProofreadingPanel.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.reopenResultPanel",
-        "title": "AI Proofreader: reopen result panel"
+        "title": "%cmd.reopenResultPanel.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.citation.openView",
-        "title": "Verify Citations（核对全文引文） (citation.openView)",
-        "shortTitle": "Verify Citations（核对全文引文）",
-        "category": "AI Proofreader Search",
+        "title": "%cmd.citation.openView.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.citation.openView.shortTitle%",
         "icon": "$(check)"
       },
       {
         "command": "ai-proofread.citation.toggleView",
-        "title": "Toggle Citations View（引文核查）",
-        "category": "AI Proofreader Search"
+        "title": "%cmd.citation.toggleView.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.citation.rebuildIndex",
-        "title": "Build Reference Index（建立参考资料索引） (citation.rebuildIndex)",
-        "shortTitle": "Build Reference Index（建立参考资料索引）",
-        "category": "AI Proofreader Search",
-        "description": "供核对全文引文与资料准备的 BM25 通道共用",
+        "title": "%cmd.citation.rebuildIndex.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.citation.rebuildIndex.shortTitle%",
+        "description": "%cmd.citation.rebuildIndex.description%",
         "icon": "$(database)"
       },
       {
         "command": "ai-proofread.citation.verifySelection",
-        "title": "Verify Selected Citation（核对选中引文）",
-        "category": "AI Proofreader Search",
-        "description": "对选中文本做与全文相同的相似度核对（去掉行首 >）；结果在引文核查"
+        "title": "%cmd.citation.verifySelection.title%",
+        "category": "%category%",
+        "description": "%cmd.citation.verifySelection.description%"
       },
       {
         "command": "ai-proofread.citation.showDiff",
-        "title": "Diff References vs Citations"
+        "title": "%cmd.citation.showDiff.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.citation.searchInPdf",
-        "title": "Search Citation in PDF",
-        "category": "AI Proofreader Tools"
+        "title": "%cmd.citation.searchInPdf.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.duplicate.scanDocument",
-        "title": "AI Proofreader: scan duplicate sentences in document (duplicate.scanDocument)",
-        "shortTitle": "AI Proofreader: scan duplicate sentences in document",
+        "title": "%cmd.duplicate.scanDocument.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.duplicate.scanDocument.shortTitle%",
         "icon": "$(search)"
       },
       {
         "command": "ai-proofread.duplicate.scanSelection",
-        "title": "AI Proofreader: scan duplicate sentences in selection"
+        "title": "%cmd.duplicate.scanSelection.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.duplicate.toggleView",
-        "title": "Toggle Duplicates View",
-        "category": "AI Proofreader Search"
+        "title": "%cmd.duplicate.toggleView.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.wordCheck.openViews",
-        "title": "AI Proofreader: open word check views"
+        "title": "%cmd.wordCheck.openViews.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.checkWords",
-        "title": "AI Proofreader: check words (checkWords)",
-        "shortTitle": "AI Proofreader: check words",
+        "title": "%cmd.checkWords.title%",
+        "category": "%category%",
         "icon": "$(play)"
       },
       {
         "command": "ai-proofread.wordCheck.prevOccurrence",
-        "title": "上一处"
+        "title": "%cmd.wordCheck.prevOccurrence.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.wordCheck.nextOccurrence",
-        "title": "下一处"
+        "title": "%cmd.wordCheck.nextOccurrence.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.wordCheck.showNotes",
-        "title": "查看说明"
+        "title": "%cmd.wordCheck.showNotes.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.wordCheck.revealCurrentAndAdvance",
-        "title": "下一处"
+        "title": "%cmd.wordCheck.revealCurrentAndAdvance.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.wordCheck.applyReplaceForEntry",
-        "title": "应用替换（所有匹配处）"
+        "title": "%cmd.wordCheck.applyReplaceForEntry.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.wordCheck.applyInsertForEntry",
-        "title": "应用插入（所有匹配处）"
+        "title": "%cmd.wordCheck.applyInsertForEntry.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.wordCheck.applyReplaceVisible",
-        "title": "替换 (wordCheck.applyReplaceVisible)",
-        "shortTitle": "替换",
+        "title": "%cmd.wordCheck.applyReplaceVisible.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.wordCheck.applyReplaceVisible.shortTitle%",
         "icon": "$(replace)"
       },
       {
         "command": "ai-proofread.wordCheck.applyInsertVisible",
-        "title": "插入 (wordCheck.applyInsertVisible)",
-        "shortTitle": "插入",
+        "title": "%cmd.wordCheck.applyInsertVisible.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.wordCheck.applyInsertVisible.shortTitle%",
         "icon": "$(insert)"
       },
       {
         "command": "ai-proofread.wordCheck.sortAndFilter",
-        "title": "排序与筛选… (wordCheck.sortAndFilter)",
-        "shortTitle": "排序与筛选…",
+        "title": "%cmd.wordCheck.sortAndFilter.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.wordCheck.sortAndFilter.shortTitle%",
         "icon": "$(filter)"
       },
       {
         "command": "ai-proofread.manageCustomTables",
-        "title": "AI Proofreader: manage custom tables"
+        "title": "%cmd.manageCustomTables.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.openDictCheckTypes",
-        "title": "AI Proofreader: open dict checks"
+        "title": "%cmd.openDictCheckTypes.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.openTgsccCheckTypes",
-        "title": "AI Proofreader: open TGSCC checks"
+        "title": "%cmd.openTgsccCheckTypes.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.customTables.delete",
-        "title": "删除"
+        "title": "%cmd.customTables.delete.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.customTables.delete.shortTitle%"
       },
       {
         "command": "ai-proofread.customTables.moveUp",
-        "title": "上移"
+        "title": "%cmd.customTables.moveUp.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.customTables.moveUp.shortTitle%"
       },
       {
         "command": "ai-proofread.customTables.moveDown",
-        "title": "下移"
+        "title": "%cmd.customTables.moveDown.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.customTables.moveDown.shortTitle%"
       },
       {
         "command": "ai-proofread.customTables.loadTable",
-        "title": "加载替换表 (customTables.loadTable)",
-        "shortTitle": "加载替换表"
+        "title": "%cmd.customTables.loadTable.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.customTables.loadTable.shortTitle%"
       },
       {
         "command": "ai-proofread.dictCheckTypes.moveUp",
-        "title": "上移"
+        "title": "%cmd.dictCheckTypes.moveUp.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.dictCheckTypes.moveUp.shortTitle%"
       },
       {
         "command": "ai-proofread.dictCheckTypes.moveDown",
-        "title": "下移"
+        "title": "%cmd.dictCheckTypes.moveDown.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.dictCheckTypes.moveDown.shortTitle%"
       },
       {
         "command": "ai-proofread.tgsccCheckTypes.moveUp",
-        "title": "上移"
+        "title": "%cmd.tgsccCheckTypes.moveUp.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.tgsccCheckTypes.moveUp.shortTitle%"
       },
       {
         "command": "ai-proofread.tgsccCheckTypes.moveDown",
-        "title": "下移"
+        "title": "%cmd.tgsccCheckTypes.moveDown.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.tgsccCheckTypes.moveDown.shortTitle%"
       },
       {
         "command": "ai-proofread.numbering.check",
-        "title": "AI Proofreader: check numbering hierarchy"
+        "title": "%cmd.numbering.check.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.numbering.checkTitles",
-        "title": "检查标题树 (numbering.checkTitles)",
-        "shortTitle": "检查标题树",
+        "title": "%cmd.numbering.checkTitles.title%",
+        "category": "%category%",
         "icon": "$(list-tree)"
       },
       {
         "command": "ai-proofread.numbering.toggleView",
-        "title": "Toggle Numbering (Title Tree) View",
-        "category": "AI Proofreader"
+        "title": "%cmd.numbering.toggleView.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.numberingSegments.toggleView",
-        "title": "Toggle Numbering Segments View",
-        "category": "AI Proofreader"
+        "title": "%cmd.numberingSegments.toggleView.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.numbering.reveal",
-        "title": "定位到文档"
+        "title": "%cmd.numbering.reveal.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.numbering.markAsTitle",
-        "title": "标记为 Markdown 标题 (numbering.markAsTitle)",
-        "shortTitle": "标记为 Markdown 标题",
+        "title": "%cmd.numbering.markAsTitle.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.numbering.markAsTitle.shortTitle%",
         "icon": "$(markdown)"
       },
       {
         "command": "ai-proofread.numbering.markAllAsTitle",
-        "title": "全部标为标题 (numbering.markAllAsTitle)",
-        "shortTitle": "全部标为标题",
+        "title": "%cmd.numbering.markAllAsTitle.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.numbering.markAllAsTitle.shortTitle%",
         "icon": "$(markdown)"
       },
       {
         "command": "ai-proofread.numbering.promote",
-        "title": "升级",
+        "title": "%cmd.numbering.promote.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.numbering.promote.shortTitle%",
         "icon": "$(chevron-up)"
       },
       {
         "command": "ai-proofread.numbering.demote",
-        "title": "降级",
+        "title": "%cmd.numbering.demote.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.numbering.demote.shortTitle%",
         "icon": "$(chevron-down)"
       },
       {
         "command": "ai-proofread.numbering.toggleSimplifiedLevel",
-        "title": "伸缩层级 (numbering.toggleSimplifiedLevel)",
-        "shortTitle": "伸缩层级",
+        "title": "%cmd.numbering.toggleSimplifiedLevel.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.numbering.toggleSimplifiedLevel.shortTitle%",
         "icon": "$(fold)"
       },
       {
         "command": "ai-proofread.numbering.defineTitle",
-        "title": "定义标题 (numbering.defineTitle)",
-        "shortTitle": "定义标题",
+        "title": "%cmd.numbering.defineTitle.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.numbering.defineTitle.shortTitle%",
         "icon": "$(add)"
       },
       {
         "command": "ai-proofread.numbering.checkSegments",
-        "title": "检查段内序号 (numbering.checkSegments)",
-        "shortTitle": "检查段内序号",
+        "title": "%cmd.numbering.checkSegments.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.numbering.checkSegments.shortTitle%",
         "icon": "$(list-ordered)"
       },
       {
         "command": "ai-proofread.numberingSegments.toggleSimplifiedLevel",
-        "title": "伸缩层级 (numberingSegments.toggleSimplifiedLevel)",
-        "shortTitle": "伸缩层级",
+        "title": "%cmd.numberingSegments.toggleSimplifiedLevel.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.numberingSegments.toggleSimplifiedLevel.shortTitle%",
         "icon": "$(fold)"
       },
       {
         "command": "ai-proofread.numbering.defineSegmentPattern",
-        "title": "定义段内序号 (numbering.defineSegmentPattern)",
-        "shortTitle": "定义段内序号",
+        "title": "%cmd.numbering.defineSegmentPattern.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.numbering.defineSegmentPattern.shortTitle%",
         "icon": "$(add)"
       },
       {
         "command": "ai-proofread.editorialMemory.clear",
-        "title": "AI Proofreader: clear editorial memory file"
+        "title": "%cmd.editorialMemory.clear.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.showProofreadItemsTree",
-        "title": "AI Proofreader: show proofread items tree"
+        "title": "%cmd.showProofreadItemsTree.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.proofreadItems.toggleView",
-        "title": "Toggle Proofread Items View",
-        "category": "AI Proofreader"
+        "title": "%cmd.proofreadItems.toggleView.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.proofreadItems.setSort",
-        "title": "排序… (proofreadItems.setSort)",
-        "shortTitle": "排序…",
+        "title": "%cmd.proofreadItems.setSort.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.proofreadItems.setSort.shortTitle%",
         "icon": "$(list-ordered)"
       },
       {
         "command": "ai-proofread.proofreadItems.setConfidenceFilter",
-        "title": "置信度筛选… (proofreadItems.setConfidenceFilter)",
-        "shortTitle": "置信度筛选…",
+        "title": "%cmd.proofreadItems.setConfidenceFilter.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.proofreadItems.setConfidenceFilter.shortTitle%",
         "icon": "$(filter)"
       },
       {
         "command": "ai-proofread.proofreadItems.diffItem",
-        "title": "Diff",
+        "title": "%cmd.proofreadItems.diffItem.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.proofreadItems.diffItem.shortTitle%",
         "icon": "$(diff)"
       },
       {
         "command": "ai-proofread.opencc",
-        "title": "AI Proofreader: OpenCC"
+        "title": "%cmd.opencc.title%",
+        "category": "%category%"
       },
       {
         "command": "ai-proofread.openccSelection",
-        "title": "AI Proofreader: OpenCC selection"
+        "title": "%cmd.openccSelection.title%",
+        "category": "%category%"
       }
     ],
     "configuration": {
-      "title": "AI Proofread",
+      "title": "%displayName%",
       "properties": {
         "ai-proofread.proofread.platform": {
           "order": 10,
@@ -1631,7 +1747,7 @@
       "activitybar": [
         {
           "id": "ai-proofread",
-          "title": "AI Proofreader",
+          "title": "%displayName%",
           "icon": "icon28.png"
         }
       ]
@@ -1640,77 +1756,77 @@
       "ai-proofread": [
         {
           "id": "ai-proofread.welcome",
-          "name": "overview",
+          "name": "%view.welcome%",
           "type": "webview"
         },
         {
           "id": "ai-proofread.modelRoutes",
-          "name": "model routes",
+          "name": "%view.modelRoutes%",
           "when": "aiProofread.showModelRoutesView"
         },
         {
           "id": "ai-proofread.prompts",
-          "name": "prompts",
+          "name": "%view.prompts%",
           "when": "aiProofread.showPromptsView"
         },
         {
           "id": "ai-proofread.sourceTextCharacteristics",
-          "name": "prompts on source text",
+          "name": "%view.sourceTextCharacteristics%",
           "when": "aiProofread.showSourceTextCharacteristicsView"
         },
         {
           "id": "ai-proofread.dictPrepPrompts",
-          "name": "prompts for reference prep",
+          "name": "%view.dictPrepPrompts%",
           "when": "aiProofread.showDictPrepPromptsView"
         },
         {
           "id": "ai-proofread.dictCheckTypes",
-          "name": "dict checks",
+          "name": "%view.dictCheckTypes%",
           "when": "aiProofread.showDictCheckTypesView"
         },
         {
           "id": "ai-proofread.tgsccCheckTypes",
-          "name": "TGSCC checks",
+          "name": "%view.tgsccCheckTypes%",
           "when": "aiProofread.showTgsccCheckTypesView"
         },
         {
           "id": "ai-proofread.customTables",
-          "name": "custom checks",
+          "name": "%view.customTables%",
           "when": "aiProofread.showCustomTablesView"
         },
         {
           "id": "ai-proofread.wordCheck",
-          "name": "words checked",
+          "name": "%view.wordCheck%",
           "when": "aiProofread.showWordCheckView"
         },
         {
           "id": "ai-proofread.citation",
-          "name": "引文核查",
+          "name": "%view.citation%",
           "when": "aiProofread.showCitationView"
         },
         {
           "id": "ai-proofread.duplicate",
-          "name": "重文检查",
+          "name": "%view.duplicate%",
           "when": "aiProofread.showDuplicateView"
         },
         {
           "id": "ai-proofread.numbering",
-          "name": "标题树",
+          "name": "%view.numbering%",
           "when": "aiProofread.showNumberingView"
         },
         {
           "id": "ai-proofread.numberingSegments",
-          "name": "段内序号",
+          "name": "%view.numberingSegments%",
           "when": "aiProofread.showNumberingSegmentsView"
         },
         {
           "id": "ai-proofread.proofreadItems",
-          "name": "校对条目",
+          "name": "%view.proofreadItems%",
           "when": "aiProofread.showProofreadItemsView"
         },
         {
           "id": "ai-proofread.referencePrepResults",
-          "name": "资料检索",
+          "name": "%view.referencePrepResults%",
           "when": "aiProofread.showReferencePrepResultsView"
         }
       ]

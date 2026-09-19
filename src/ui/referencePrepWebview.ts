@@ -1494,7 +1494,7 @@ body.mode-json .btn-json-only { display: inline-block; }
 <ul id="hits"></ul>
 
 <div class="panel-footer-commands">
-  <p class="header-commands-hint">常用检索命令（作用于当前编辑器选区/文档；Ctrl+Shift+P 可查全部）</p>
+  <p class="header-commands-hint">常用检索命令（部分命令作用于当前编辑器选区/文档；Ctrl+Shift+P 可查全部）</p>
   <div class="header-actions">
     <span class="cmd-group-label">单源检索：</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.search.dictPrep" title="${commandHoverTitle('仅本地词典（LLM 规划+精排）', 'ai-proofread.search.dictPrep')}">词典·LLM规划</button>
