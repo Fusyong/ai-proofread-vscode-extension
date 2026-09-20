@@ -1,4 +1,4 @@
-# AI Proofreader：大语言模型驱动的图书编校助手
+# AI Proofreader：大语言模型驱动的图书审校助手
 
 *语文出版社  黄富雄*
 
