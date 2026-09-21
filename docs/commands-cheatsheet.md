@@ -333,7 +333,7 @@ flowchart LR
 
 | 类别 | 主要设置项 |
 |------|------------|
-| **勘误表/对齐** | alignment.similarityThreshold、windowSize、ngramSize、ngramGranularity |
+| **勘误表/对齐** | alignment.algorithm、alignment.wordDiffFallbackToAnchor、alignment.similarityThreshold、windowSize、ngramSize、ngramGranularity |
 | **jieba 分词** | jieba.customDictPath、jieba.cutMode |
 | **引文核对** | citation.referencesPath、matchesPerCitation、minCitationLength、lenDeltaRatio |
 | **字词检查** | wordCheck.replacePrefix/Suffix、wordErrorCollector.* |

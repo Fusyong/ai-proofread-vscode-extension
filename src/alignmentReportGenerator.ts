@@ -23,6 +23,9 @@ const SERIALIZABLE_OPTION_KEYS = [
     'removePunctuation',
     'removeDigits',
     'removeLatin',
+    'algorithm',
+    'wordDiffFallbackToAnchor',
+    'algorithmDisplayName',
 ] as const satisfies readonly (keyof AlignmentOptions)[];
 
 export interface AlignmentReportJson {
@@ -106,7 +109,8 @@ export function generateHtmlReport(
 
     const threshold = options.similarityThreshold || 0.6;
     const ngramSize = options.ngramSize ?? 1;
-    const algorithmName = '锚点算法';
+    const algorithmName = options.algorithmDisplayName
+        || (options.algorithm === 'wordDiff' ? '词流反解' : '锚点算法');
 
     // 获取统计信息
     const stats = getAlignmentStatistics(alignment);

@@ -178,3 +178,73 @@ diffLines 对**完全一致**的句子能正确对齐，但任何**细微差异*
 - [jsdiff GitHub](https://github.com/kpdecker/jsdiff)
 - [diff - npm](https://www.npmjs.com/package/diff)
 - 项目内：`src/sentenceAligner.ts`、`src/alignmentReportGenerator.ts`、`src/differ.ts`
+- 对比实验：`src/jsdiffAlignmentCompare.test.ts`
+
+## 十、补充实验（2026-03）：词流观感 vs 句级对齐 vs 段→句
+
+测试文件：`src/jsdiffAlignmentCompare.test.ts`  
+运行：`npx vitest run src/jsdiffAlignmentCompare.test.ts`
+
+### 10.1 你感觉「长篇中文很好用」时，jsdiff 在做什么？
+
+**不是按句/按段对齐。** 扩展里「生成 jsDiff 结果文件」调用的是：
+
+```ts
+Diff.diffWordsWithSpace(a, b, new Intl.Segmenter('zh', { granularity: 'word' }))
+```
+
+即把**整篇**切成中文词 token，再跑 Myers 最长公共子序列。未改动的词连成黑色连续流，改动处红删绿增——观感像「整篇对齐」，本质是**词流 LCS**，不是句子配对，也不是「把一段当一句」。
+
+因此：
+
+| 体验 | 原因 |
+|------|------|
+| 长文微调看起来很好 | 大部分词 token 公共，unchanged 比例高 |
+| 勘误表需要「第 i 句 ↔ 第 j 句」 | 词流**不提供**句索引 / 行号 / MATCH 行 |
+| 大段调序 | 词流仍可能「大部分字没变」，但句级序列 diff 会变成删+增 |
+
+### 10.2 「先对齐段落，再拆句」可行吗？
+
+**可行，且对 PDF 碎片稿值得做预处理**，但要注意边界：
+
+1. **预处理**：`formatParagraphs`（合并硬换行）能改善分句边界；但若合并后仍留空格差异，**精确** `diffArrays` 仍可能 0 匹配，需配合空白归一化或相似度门槛。
+2. **段级 exact**：段内任意改动 → 整段 removed+added，再在段内做句级 diff（本实验 `hierarchical-exact`）。
+3. **段级 similar**：用 Jaccard 决定是否进入段内句对齐；**段内大插入**会严重拉低段相似度，出现「整段放弃、全部删增」（见「插入」用例的 `hierarchical-similar`）。
+4. 推荐形态：**formatParagraphs → 段级 diffArrays → 配对段内用「相似门槛的句对齐」（或直接锚点）**，而不是裸 adjacent 硬配。
+
+### 10.3 边界用例实测摘要（match / del+ins / lowSim）
+
+| 场景 | 词流 unchanged | anchor | jsdiff-exact | pair-adjacent | pair-similar(≥0.6) | 要点 |
+|------|----------------|--------|--------------|---------------|-------------------|------|
+| 微调 | ~57% | m3 | m2 | m4 | m3 | exact 把改写句拆成删+增；adjacent 多配 1 对 |
+| 仅空白 | ~83% | m2 | **m0** | m2 | m2 | exact 完全挂；锚点/相似配对正常 |
+| 同义改写 | ~50% | m1 | m1 | m2(**lowSim1**) | m1 | adjacent 硬配无关改写（sim≈0.19） |
+| 无关句替换 | ~35% | m1 | m1 | m2(**lowSim1**) | m1 | 「苹果↔量子」被 adjacent 误配（sim≈0.07） |
+| 句子调序 | ~59% | **move=4** | del+ins | del+ins | del+ins | 仅锚点标 MOVE；jsdiff 无移动语义 |
+| 段中插入 | ~37% | m2/ins1 | 同左 | 同左 | 同左 | 句级序列 diff 此处表现正常 |
+| PDF 碎行 | ~84% | m3 | **m0** | m3 | m3 | 分句边界不一致时 exact 崩；相似/锚点仍可配 |
+
+### 10.4 结论（更新）
+
+1. **词流好用 ≠ 句对齐好用**；二者解决不同问题。勘误表仍需要句级配对算法。
+2. **jsdiff 句级 exact** 适合「几乎逐字相同」；空白/标点/分句不一致即失效。
+3. **adjacent 配对必须加相似度门槛**，否则编辑场景会误配。
+4. **段→句分层**值得作为可选路径，但段相似门槛与段内大插入是已知边界；PDF 应先 `formatParagraphs`。
+5. **移动检测、1 对多**仍是锚点算法优势；jsdiff 路径做可选「精确/近精确」模式即可。
+
+## 十一、词流反解句对（已落地）
+
+**配置**
+
+- `ai-proofread.alignment.algorithm`：`anchor`（默认）| `wordDiff`
+- `ai-proofread.alignment.wordDiffFallbackToAnchor`：默认 `true`（句袋相同但顺序不同，或同句既删又增时回退锚点）
+
+**入口**：生成勘误表时 QuickPick 可选算法；`alignDocuments()`（`src/documentAligner.ts`）统一分发。
+
+**实现**
+
+- `src/wordDiffSentenceProjection.ts` — 词流投影 + 相似门槛拆删增
+- `src/documentAligner.ts` — 算法分发与调序回退
+- `src/alignmentUi.ts` — 算法选择 UI
+
+**适用**：长文小改、空白/微调；大段调序自动回退锚点。

@@ -30,6 +30,9 @@ export interface AlignmentItem {
 /**
  * 对齐参数配置
  */
+/** 句子对齐算法：锚点 / 词流反解 */
+export type AlignmentAlgorithm = 'anchor' | 'wordDiff';
+
 export interface AlignmentOptions {
     windowSize?: number;                    // 搜索窗口大小（锚点左右各N个句子），默认10
     similarityThreshold?: number;            // 相似度阈值（0-1），默认0.6
@@ -44,6 +47,18 @@ export interface AlignmentOptions {
     removePunctuation?: boolean;           // 归一化时是否去掉标点（与引文核对共用），默认 false
     removeDigits?: boolean;                // 归一化时是否去掉阿拉伯数字（与引文核对共用），默认 false
     removeLatin?: boolean;                 // 归一化时是否去掉拉丁字符（与引文核对共用），默认 false
+    /** 对齐算法，默认 anchor */
+    algorithm?: AlignmentAlgorithm;
+    /**
+     * wordDiff 检测到整句调序时回退锚点，默认 true。
+     * 仅 algorithm=wordDiff 时有效。
+     */
+    wordDiffFallbackToAnchor?: boolean;
+    /**
+     * 报告展示用：实际采用的算法名称（含回退说明）。
+     * 由 alignDocuments 写入，不必手填。
+     */
+    algorithmDisplayName?: string;
 }
 
 /**

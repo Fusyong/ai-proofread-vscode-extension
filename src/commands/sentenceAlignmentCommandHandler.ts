@@ -5,8 +5,9 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { alignSentencesAnchor, getAlignmentStatistics, AlignmentItem, AlignmentOptions } from '../sentenceAligner';
-import { splitChineseSentencesWithLineNumbers } from '../splitter';
+import { getAlignmentStatistics, type AlignmentOptions } from '../sentenceAligner';
+import { alignDocuments } from '../documentAligner';
+import { promptAlignmentAlgorithm } from '../alignmentUi';
 import { FilePathUtils, ErrorUtils } from '../utils';
 import { alignmentJsonPath, generateHtmlReport } from '../alignmentReportGenerator';
 import { getJiebaWasm } from '../jiebaLoader';
@@ -87,6 +88,16 @@ export class SentenceAlignmentCommandHandler {
 
             const fileB = fileUrisB[0].fsPath;
 
+            // 读取对齐参数配置（归一化与引文核对共用 citation 配置）
+            const config = vscode.workspace.getConfiguration('ai-proofread.alignment');
+            const citationConfig = vscode.workspace.getConfiguration('ai-proofread.citation');
+
+            const configuredAlgo = config.get<'anchor' | 'wordDiff'>('algorithm', 'anchor');
+            const algorithm = await promptAlignmentAlgorithm(configuredAlgo);
+            if (!algorithm) {
+                return;
+            }
+
             const collectWordErrorsChoice = await vscode.window.showQuickPick(
                 [
                     { label: '否', description: '仅生成勘误表（默认）', value: false },
@@ -100,9 +111,6 @@ export class SentenceAlignmentCommandHandler {
             );
             const shouldCollectWordErrors = collectWordErrorsChoice?.value ?? false;
 
-            // 读取对齐参数配置（归一化与引文核对共用 citation 配置）
-            const config = vscode.workspace.getConfiguration('ai-proofread.alignment');
-            const citationConfig = vscode.workspace.getConfiguration('ai-proofread.citation');
             const ngramGranularity = config.get<'word' | 'char'>('ngramGranularity', 'word');
             let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
             if (ngramGranularity === 'word' || shouldCollectWordErrors) {
@@ -116,6 +124,8 @@ export class SentenceAlignmentCommandHandler {
                 }
             }
             const options: AlignmentOptions = {
+                algorithm,
+                wordDiffFallbackToAnchor: config.get<boolean>('wordDiffFallbackToAnchor', true),
                 windowSize: config.get<number>('windowSize', 10),
                 similarityThreshold: config.get<number>('similarityThreshold', 0.6),
                 ngramSize: config.get<number>('ngramSize', 1),
@@ -139,68 +149,21 @@ export class SentenceAlignmentCommandHandler {
             }, async (progress) => {
                 progress.report({ increment: 0, message: '读取文件...' });
 
-                // 读取文件内容
                 const textA = fs.readFileSync(fileA, 'utf8');
                 const textB = fs.readFileSync(fileB, 'utf8');
 
-                progress.report({ increment: 30, message: '切分句子...' });
+                progress.report({ increment: 40, message: '执行对齐算法...' });
 
-                // 切分句子并获取行号
-                const sentencesAWithLines = splitChineseSentencesWithLineNumbers(textA, true);
-                const sentencesBWithLines = splitChineseSentencesWithLineNumbers(textB, true);
+                const { alignment, fellBackToAnchor } = alignDocuments(textA, textB, options);
 
-                // 提取句子列表
-                const sentencesA = sentencesAWithLines.map(([s]) => s);
-                const sentencesB = sentencesBWithLines.map(([s]) => s);
+                progress.report({ increment: 85, message: '生成报告...' });
 
-                // 创建行号映射
-                const lineNumbersA = sentencesAWithLines.map(([, startLine]) => startLine);
-                const lineNumbersB = sentencesBWithLines.map(([, startLine]) => startLine);
-
-                progress.report({ increment: 50, message: '执行对齐算法...' });
-
-                // 执行对齐
-                const alignment = alignSentencesAnchor(sentencesA, sentencesB, options);
-
-                progress.report({ increment: 80, message: '添加行号信息...' });
-
-                // 为对齐结果添加行号信息
-                for (const item of alignment) {
-                    // 处理原文行号
-                    if (item.a_indices && item.a_indices.length > 0) {
-                        // 多个句子合并，取首行的行号
-                        item.a_line_numbers = item.a_indices.map(i => lineNumbersA[i]);
-                        item.a_line_number = lineNumbersA[item.a_indices[0]];
-                    } else if (item.a_index !== undefined && item.a_index !== null) {
-                        item.a_line_number = lineNumbersA[item.a_index];
-                        item.a_line_numbers = [lineNumbersA[item.a_index]];
-                    }
-
-                    // 处理校对后行号
-                    if (item.b_indices && item.b_indices.length > 0) {
-                        // 多个句子合并，取首行的行号
-                        item.b_line_numbers = item.b_indices.map(i => lineNumbersB[i]);
-                        item.b_line_number = lineNumbersB[item.b_indices[0]];
-                    } else if (item.b_index !== undefined && item.b_index !== null) {
-                        item.b_line_number = lineNumbersB[item.b_index];
-                        item.b_line_numbers = [lineNumbersB[item.b_index]];
-                    }
-                }
-
-                progress.report({ increment: 90, message: '生成报告...' });
-
-                // 生成HTML报告
                 const stats = getAlignmentStatistics(alignment);
                 const titleA = path.basename(fileA);
                 const titleB = path.basename(fileB);
-
-                // 生成输出文件路径（与文件A同目录）
                 const outputFile = FilePathUtils.getFilePath(fileA, '.alignment', '.html');
-
-                // 计算运行时间（简化处理，使用0）
                 const runtime = 0;
 
-                // 生成HTML报告
                 generateHtmlReport(alignment, outputFile, titleA, titleB, options, runtime);
 
                 let wordErrorsMessage = '';
@@ -224,8 +187,9 @@ export class SentenceAlignmentCommandHandler {
 
                 progress.report({ increment: 100, message: '完成' });
 
-                // 显示统计信息
-                const statsMessage = `对齐完成！\n` +
+                const fallbackNote = fellBackToAnchor ? '\n（检测到调序，已回退锚点算法）' : '';
+                const statsMessage = `对齐完成！${fallbackNote}\n` +
+                    `算法: ${options.algorithmDisplayName ?? algorithm}\n` +
                     `总计: ${stats.total}\n` +
                     `匹配: ${stats.match}\n` +
                     `删除: ${stats.delete}\n` +

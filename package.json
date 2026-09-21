@@ -1462,6 +1462,26 @@
           "default": 10,
           "description": "句子对齐（生成勘误表）：搜索窗口大小（锚点左右各N个句子）"
         },
+        "ai-proofread.alignment.algorithm": {
+          "order": 48.5,
+          "type": "string",
+          "enum": [
+            "anchor",
+            "wordDiff"
+          ],
+          "default": "anchor",
+          "enumDescriptions": [
+            "锚点算法：相似度匹配，支持调序/移动检测（默认）",
+            "词流反解：整篇词级 diff 投影句对，适合长文小改；检测到整句调序时自动回退锚点"
+          ],
+          "description": "句子对齐（生成勘误表）默认算法。命令执行时仍可临时选择。"
+        },
+        "ai-proofread.alignment.wordDiffFallbackToAnchor": {
+          "order": 48.6,
+          "type": "boolean",
+          "default": true,
+          "description": "词流反解检测到整句调序（同句既删又增）时，自动回退到锚点算法"
+        },
         "ai-proofread.alignment.ngramGranularity": {
           "order": 49,
           "type": "string",

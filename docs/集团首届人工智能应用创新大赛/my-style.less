@@ -1,0 +1,34 @@
+
+.markdown-preview.markdown-preview {
+  // modify your style here
+  // eg: background-color: blue;  
+
+  --base-font-size: 16px;
+  font-size: var(--base-font-size);
+  font-family: "仿宋";
+  --h-font-family: "宋体";
+  line-height: 1.5em;
+  --h-color: #272727;
+  
+  h1 {
+    font-size: calc(var(--base-font-size) * 2);
+    line-height: 1.2em;
+    font-family: var(--h-font-family);
+    text-align: center;
+    page-break-before: always;
+    color: var(--h-color);
+  }
+  
+  h2 {
+    font-size: calc(var(--base-font-size) * 1.5);
+    font-family: var(--h-font-family);
+    color: var(--h-color);
+  }
+  
+  h3 {
+    font-size: var(--base-font-size);
+    font-family: var(--h-font-family);
+    color: var(--h-color);
+  }
+
+}
