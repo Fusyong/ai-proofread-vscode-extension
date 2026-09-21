@@ -368,6 +368,26 @@ export function generateHtmlReport(
         .filter-reset:hover {
             background-color: #c0392b;
         }
+        .apply-index-filter {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #2c3e50;
+            cursor: pointer;
+            user-select: none;
+        }
+        .apply-index-filter input {
+            cursor: pointer;
+        }
+        .cache-status {
+            font-size: 12px;
+            color: #7f8c8d;
+            white-space: nowrap;
+        }
+        .cache-status.ok {
+            color: #27ae60;
+        }
         .filter-stats {
             font-size: 13px;
             color: #7f8c8d;
@@ -437,7 +457,7 @@ export function generateHtmlReport(
 </head>
 <body>
     <div class="header">
-        <h1>句子对齐（勘误表）</h1>
+        <h1>句子对齐（加工记录/勘误表）</h1>
         <p>对齐文件 ${escapeHtml(titleA)} 和 ${escapeHtml(titleB)}</p>
         <p style="font-size: 13px; margin-top: 10px; opacity: 0.9;">
             相似度算法: ${algorithmName} | 阈值: ${threshold.toFixed(2)} | N-gram大小: ${ngramSize} | 运行时间: ${runtime.toFixed(2)}秒
@@ -486,12 +506,17 @@ export function generateHtmlReport(
             <div class="filter-row">
                 <div class="filter-group" style="flex: 1;">
                     <label class="filter-label">序号：</label>
-                    <input type="text" class="filter-search index-filter" id="indexFilter" placeholder="如: 1,2,5-20,80-" oninput="applyFiltersIfDefined()" title="支持格式: 1,2,5-20,80- (注意：筛选条件无法保存)">
+                    <input type="text" class="filter-search index-filter" id="indexFilter" placeholder="如: 1,2,5-20,80-" oninput="applyFiltersIfDefined()" title="支持格式: 1,2,5-20,80-；会自动缓存到本机浏览器">
+                    <label class="apply-index-filter" title="取消勾选后保留序号内容，但不对表格做序号筛选">
+                        <input type="checkbox" id="applyIndexFilter" checked onchange="applyFiltersIfDefined()">
+                        <span>应用筛选</span>
+                    </label>
+                    <span class="cache-status" id="cacheStatus" title="筛选与备注自动写入本机浏览器缓存">自动缓存</span>
                 </div>
                 <div class="filter-group" style="flex: 1;">
                     <label class="filter-label">搜索：</label>
                     <div class="filter-input-group" style="flex: 1;">
-                        <input type="text" class="filter-search" id="searchText" placeholder="在左右文本中搜索..." oninput="applyFiltersIfDefined()" title="注意：筛选条件无法保存" style="flex: 1;">
+                        <input type="text" class="filter-search" id="searchText" placeholder="在左右文本中搜索..." oninput="applyFiltersIfDefined()" title="会自动缓存到本机浏览器" style="flex: 1;">
                         <button class="filter-reset" onclick="resetFilters()">重置</button>
                     </div>
                 </div>
@@ -577,7 +602,7 @@ export function generateHtmlReport(
                 <td class="col-similarity"><span class="similarity">${similarityText}</span></td>
                 <td class="col-sentence-a">${sentenceAText}</td>
                 <td class="col-sentence-b">${sentenceBText}</td>
-                <td class="col-remark hidden"><textarea class="remark-input" placeholder="备注" data-row-idx="${idx + 1}" title="备注内容无法保存" rows="1"></textarea></td>
+                <td class="col-remark hidden"><textarea class="remark-input" placeholder="备注" data-row-idx="${idx + 1}" title="备注会自动缓存到本机浏览器" rows="1"></textarea></td>
             </tr>`);
     });
 
@@ -589,6 +614,176 @@ export function generateHtmlReport(
 
     <script>
         function applyFiltersIfDefined() { if (typeof applyFilters === 'function') applyFilters(); }
+
+        // 筛选与备注自动缓存（按报告文件路径区分）
+        const REPORT_CACHE_KEY = 'ai-proofread.alignment.cache:' + (location.pathname || location.href);
+        const LEGACY_INDEX_FILTER_KEY = 'ai-proofread.alignment.indexFilter:' + (location.pathname || location.href);
+        let cacheSaveTimer = null;
+        let cacheStatusTimer = null;
+        let isRestoringCache = false;
+
+        function collectRemarks() {
+            const remarks = {};
+            document.querySelectorAll('.alignment-table .remark-input').forEach(function(ta) {
+                const v = ta.value;
+                if (v) {
+                    remarks[ta.getAttribute('data-row-idx')] = v;
+                }
+            });
+            return remarks;
+        }
+
+        function flashCacheStatus(ok) {
+            const el = document.getElementById('cacheStatus');
+            if (!el) return;
+            el.textContent = ok ? '已缓存' : '缓存失败';
+            el.classList.toggle('ok', !!ok);
+            if (cacheStatusTimer) clearTimeout(cacheStatusTimer);
+            cacheStatusTimer = setTimeout(function() {
+                el.textContent = '自动缓存';
+                el.classList.remove('ok');
+            }, 1200);
+        }
+
+        function saveReportCache() {
+            if (isRestoringCache) return;
+            try {
+                const payload = {
+                    version: 1,
+                    typeFilters: Object.assign({}, typeFilters),
+                    columnVisibility: Object.assign({}, columnVisibility),
+                    minSimilarity: document.getElementById('minSimilarity')?.value || '',
+                    maxSimilarity: document.getElementById('maxSimilarity')?.value || '',
+                    searchText: document.getElementById('searchText')?.value || '',
+                    indexFilter: document.getElementById('indexFilter')?.value || '',
+                    applyIndexFilter: document.getElementById('applyIndexFilter')?.checked !== false,
+                    printRepeatHeader: document.getElementById('printRepeatHeader')?.checked !== false,
+                    remarks: collectRemarks(),
+                    savedAt: new Date().toISOString()
+                };
+                localStorage.setItem(REPORT_CACHE_KEY, JSON.stringify(payload));
+                flashCacheStatus(true);
+            } catch (e) {
+                flashCacheStatus(false);
+            }
+        }
+
+        function scheduleReportCacheSave() {
+            if (isRestoringCache) return;
+            if (cacheSaveTimer) clearTimeout(cacheSaveTimer);
+            cacheSaveTimer = setTimeout(function() {
+                cacheSaveTimer = null;
+                saveReportCache();
+            }, 300);
+        }
+
+        function flushReportCacheSave() {
+            if (cacheSaveTimer) {
+                clearTimeout(cacheSaveTimer);
+                cacheSaveTimer = null;
+            }
+            saveReportCache();
+        }
+
+        function applyTypeFiltersUI() {
+            document.querySelectorAll('.filter-btn[data-type]').forEach(function(btn) {
+                btn.classList.toggle('active', !!typeFilters[btn.dataset.type]);
+            });
+        }
+
+        function applyColumnVisibilityUI() {
+            ['type', 'similarity', 'remark'].forEach(function(columnName) {
+                const visible = !!columnVisibility[columnName];
+                const btn = document.querySelector('[data-col="' + columnName + '"]');
+                if (btn) btn.classList.toggle('active', visible);
+                document.querySelectorAll('.alignment-table th.col-' + columnName + ', .alignment-table td.col-' + columnName).forEach(function(cell) {
+                    cell.classList.toggle('hidden', !visible);
+                });
+            });
+        }
+
+        function loadReportCache() {
+            let data = null;
+            try {
+                const raw = localStorage.getItem(REPORT_CACHE_KEY);
+                if (raw) data = JSON.parse(raw);
+            } catch (e) {
+                data = null;
+            }
+            if (!data) {
+                try {
+                    const legacyRaw = localStorage.getItem(LEGACY_INDEX_FILTER_KEY);
+                    if (legacyRaw) {
+                        const legacy = JSON.parse(legacyRaw);
+                        data = {
+                            indexFilter: typeof legacy.indexFilter === 'string' ? legacy.indexFilter : '',
+                            applyIndexFilter: typeof legacy.applyIndexFilter === 'boolean' ? legacy.applyIndexFilter : true
+                        };
+                    }
+                } catch (e) {
+                    data = null;
+                }
+            }
+            if (!data) return;
+
+            isRestoringCache = true;
+            try {
+                if (data.typeFilters && typeof data.typeFilters === 'object') {
+                    Object.keys(typeFilters).forEach(function(k) {
+                        if (typeof data.typeFilters[k] === 'boolean') {
+                            typeFilters[k] = data.typeFilters[k];
+                        }
+                    });
+                    applyTypeFiltersUI();
+                }
+                if (data.columnVisibility && typeof data.columnVisibility === 'object') {
+                    Object.keys(columnVisibility).forEach(function(k) {
+                        if (typeof data.columnVisibility[k] === 'boolean') {
+                            columnVisibility[k] = data.columnVisibility[k];
+                        }
+                    });
+                    applyColumnVisibilityUI();
+                }
+                const minEl = document.getElementById('minSimilarity');
+                const maxEl = document.getElementById('maxSimilarity');
+                const searchEl = document.getElementById('searchText');
+                const indexEl = document.getElementById('indexFilter');
+                const applyEl = document.getElementById('applyIndexFilter');
+                const printEl = document.getElementById('printRepeatHeader');
+                if (minEl && typeof data.minSimilarity === 'string') minEl.value = data.minSimilarity;
+                if (maxEl && typeof data.maxSimilarity === 'string') maxEl.value = data.maxSimilarity;
+                if (searchEl && typeof data.searchText === 'string') searchEl.value = data.searchText;
+                if (indexEl && typeof data.indexFilter === 'string') indexEl.value = data.indexFilter;
+                if (applyEl && typeof data.applyIndexFilter === 'boolean') applyEl.checked = data.applyIndexFilter;
+                if (printEl && typeof data.printRepeatHeader === 'boolean') {
+                    printEl.checked = data.printRepeatHeader;
+                    document.body.classList.toggle('print-no-repeat-header', !printEl.checked);
+                }
+                if (data.remarks && typeof data.remarks === 'object') {
+                    document.querySelectorAll('.alignment-table .remark-input').forEach(function(ta) {
+                        const key = ta.getAttribute('data-row-idx');
+                        if (typeof data.remarks[key] === 'string') {
+                            ta.value = data.remarks[key];
+                            if (typeof resizeRemarkInput === 'function') {
+                                resizeRemarkInput(ta);
+                            }
+                        }
+                    });
+                }
+            } finally {
+                isRestoringCache = false;
+            }
+        }
+
+        function setupReportCache() {
+            window.addEventListener('beforeunload', flushReportCacheSave);
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'hidden') {
+                    flushReportCacheSave();
+                }
+            });
+        }
+
         // 类型筛选状态
         const typeFilters = {
             'all': true,
@@ -647,7 +842,10 @@ export function generateHtmlReport(
             if (cb) document.body.classList.toggle('print-no-repeat-header', !cb.checked);
             var remarkInputs = document.querySelectorAll('.alignment-table .remark-input');
             remarkInputs.forEach(function(ta) {
-                ta.addEventListener('input', function() { resizeRemarkInput(ta); });
+                ta.addEventListener('input', function() {
+                    resizeRemarkInput(ta);
+                    scheduleReportCacheSave();
+                });
             });
             // 粘贴内容可能含 CRLF，按 \\r\\n 或 \\n 或 \\r 分割（避免正则中的 ? 在旧引擎中报 Unexpected token）
             document.addEventListener('paste', function(e) {
@@ -668,6 +866,7 @@ export function generateHtmlReport(
                     visibleInputs[start + i].value = lines[i];
                     resizeRemarkInput(visibleInputs[start + i]);
                 }
+                scheduleReportCacheSave();
             });
         });
 
@@ -675,6 +874,7 @@ export function generateHtmlReport(
         function togglePrintRepeatHeader() {
             var cb = document.getElementById('printRepeatHeader');
             document.body.classList.toggle('print-no-repeat-header', !cb.checked);
+            scheduleReportCacheSave();
         }
         // 切换列显示/隐藏
         function toggleColumn(columnName) {
@@ -701,6 +901,7 @@ export function generateHtmlReport(
                     cell.classList.add('hidden');
                 }
             });
+            scheduleReportCacheSave();
         }
 
         // 解析序号筛选字符串
@@ -770,7 +971,10 @@ export function generateHtmlReport(
             const maxSimilarity = parseFloat(document.getElementById('maxSimilarity').value) || 1;
             const searchText = document.getElementById('searchText').value.toLowerCase().trim();
             const indexFilterText = document.getElementById('indexFilter').value.trim();
-            const allowedIndices = parseIndexFilter(indexFilterText, maxRowIndex);
+            const applyIndexFilter = document.getElementById('applyIndexFilter')?.checked !== false;
+            const allowedIndices = (applyIndexFilter && indexFilterText)
+                ? parseIndexFilter(indexFilterText, maxRowIndex)
+                : null;
 
             let visibleCount = 0;
 
@@ -803,6 +1007,7 @@ export function generateHtmlReport(
             renderedRows.clear();
             updateRenderQueue();
             initialRender();
+            scheduleReportCacheSave();
         }
 
         // 更新筛选统计信息
@@ -832,6 +1037,10 @@ export function generateHtmlReport(
             document.getElementById('maxSimilarity').value = '';
             document.getElementById('searchText').value = '';
             document.getElementById('indexFilter').value = '';
+            const applyIndexFilterEl = document.getElementById('applyIndexFilter');
+            if (applyIndexFilterEl) {
+                applyIndexFilterEl.checked = true;
+            }
 
             // 重置列显示状态（类型、相似度显示，备注列默认关闭）
             columnVisibility['type'] = true;
@@ -1060,7 +1269,7 @@ export function generateHtmlReport(
             });
         }
 
-        // 显示筛选条件无法保存的提示
+        // 显示筛选条件保存相关提示
         function showFilterWarning() {
             // 检查是否已经显示过提示
             if (sessionStorage.getItem('filterWarningShown') === 'true') {
@@ -1070,7 +1279,7 @@ export function generateHtmlReport(
             // 创建提示元素
             const warningDiv = document.createElement('div');
             warningDiv.style.cssText = 'background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-bottom: 15px; color: #856404; font-size: 13px;';
-            warningDiv.innerHTML = '<strong>提示：</strong>筛选条件与备注无法保存，刷新、重新打开后会重置！建议：（1）另行存储你的筛选条件如条目列表，用列表或表格存储备注；（2）把条目列表和备注等粘贴到本表中；（3）复制筛选结果到Word文档中进一步处理，或通过浏览器打印为PDF。';
+            warningDiv.innerHTML = '<strong>提示：</strong>筛选条件与备注会自动缓存到本机浏览器，同一文件再次打开可恢复；换浏览器或清除浏览器数据后失效。重要内容建议另行备份，或复制结果到 Word，或打印为 PDF。';
 
             // 添加关闭按钮
             const closeBtn = document.createElement('button');
@@ -1090,8 +1299,12 @@ export function generateHtmlReport(
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            loadReportCache();
+            setupReportCache();
             showFilterWarning();
+            isRestoringCache = true;
             applyFilters();
+            isRestoringCache = false;
             initialRender();
             setupIntersectionObserver();
             window.addEventListener('scroll', handleScroll, { passive: true });

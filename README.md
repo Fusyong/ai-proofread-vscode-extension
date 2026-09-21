@@ -10,9 +10,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.22
+当前版本 v1.12.23
 
-- 优化句子对齐算法：引入两端覆盖率算法
+- 优化：勘误表筛选、备注自动在浏览器当前位置缓存
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 

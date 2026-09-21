@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.12.22",
+  "version": "1.12.23",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
