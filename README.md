@@ -1,7 +1,5 @@
 ﻿*QQ群“ai-proofreader 校对插件”：1055031650*
 
-给图书编辑的分步教程（从安装 VS Code 到出勘误表，含 Markdown 与 PDF 常识）：<https://blog.xiiigame.com/ai-proofreader/>。下文是功能说明书，不是入门课。
-
 一个用于文档和图书校对、基于大语言模型服务的VS Code扩展，支持选中文本直接校对、长文档切分后批量校对、带记忆地校对选段（实验功能）三种工作流，并集成了一些跟校对相关的辅助功能。[这里是代码库](https://github.com/Fusyong/ai-proofread-vscode-extension)。本扩展的原型基于一个Python校对工具库[Fusyong/ai-proofread](https://github.com/Fusyong/ai-proofread)。
 
 另外，你也可以设置自己的提示词，用于其他文本处理场景，比如翻译、注释、编写练习题等；还可以自定义替换表、检查表，支持批量正则查找替换，或仅作为提示。
