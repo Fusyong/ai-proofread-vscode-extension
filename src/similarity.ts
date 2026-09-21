@@ -179,3 +179,61 @@ export function jaccardSimilarity(
     }
     return intersection / union;
 }
+
+function commonPrefixLength(textA: string, textB: string): number {
+    const n = Math.min(textA.length, textB.length);
+    let i = 0;
+    while (i < n && textA[i] === textB[i]) {
+        i++;
+    }
+    return i;
+}
+
+function commonSuffixLength(textA: string, textB: string): number {
+    const n = Math.min(textA.length, textB.length);
+    let i = 0;
+    while (i < n && textA[textA.length - 1 - i] === textB[textB.length - 1 - i]) {
+        i++;
+    }
+    return i;
+}
+
+/**
+ * 头尾包含分。不改写字符。
+ * 公共前缀与公共后缀合起来占较短句的比例（重叠时最多为 1）。
+ * 是否配上，由调用方用相似度阈值判断这个比例。
+ *
+ * `<!` 与 `<！`：前缀 `<` 占 1/2，得 0.5。
+ * `#一〇六一年` 与 `#一六〇一年`：前缀 `#一`、后缀 `一年` 共 4/6，得 2/3。
+ * `南宋诗人。` 与 `南宋诗人、理学家。`：头尾盖住较短句全部，得 1。
+ */
+function endContainmentScore(textA: string, textB: string): number {
+    const shorter = Math.min(textA.length, textB.length);
+    if (shorter === 0) {
+        return 0;
+    }
+    const prefix = commonPrefixLength(textA, textB);
+    const suffix = commonSuffixLength(textA, textB);
+    return Math.min(shorter, prefix + suffix) / shorter;
+}
+
+/**
+ * 句子对齐用的多层相似度。引文核对、查重仍用 {@link jaccardSimilarity}。
+ * 取 n-gram Jaccard 与头尾包含分中的较高者。头尾包含分是公共前缀与后缀合计占较短句的比例。
+ */
+export function alignmentSimilarity(
+    textA: string,
+    textB: string,
+    optionsOrN: JaccardSimilarityOptions | number = {}
+): number {
+    if (!textA || !textB) {
+        return 0;
+    }
+    if (textA === textB) {
+        return 1;
+    }
+    return Math.max(
+        jaccardSimilarity(textA, textB, optionsOrN),
+        endContainmentScore(textA, textB)
+    );
+}

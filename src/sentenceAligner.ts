@@ -74,7 +74,7 @@ export interface AlignmentStatistics {
 }
 
 import type { JiebaWasmModule } from './jiebaLoader';
-import { normalizeForSimilarity, jaccardSimilarity, NormalizeForSimilarityOptions, type JaccardSimilarityOptions } from './similarity';
+import { normalizeForSimilarity, jaccardSimilarity, alignmentSimilarity, NormalizeForSimilarityOptions, type JaccardSimilarityOptions } from './similarity';
 
 /** 从 AlignmentOptions 构建归一化选项（供 similarity.normalizeForSimilarity） */
 function getNormalizeOptions(options: AlignmentOptions): NormalizeForSimilarityOptions {
@@ -177,7 +177,7 @@ export function alignSentencesAnchor(
             }
 
             const sentB = normalizeForSimilarity(sentencesB[bIdx], normalizeOpts);
-            const similarity = jaccardSimilarity(sentA, sentB, simOpts);
+            const similarity = alignmentSimilarity(sentA, sentB, simOpts);
 
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity;
@@ -207,7 +207,7 @@ export function alignSentencesAnchor(
                 }
 
                 const sentB = normalizeForSimilarity(sentencesB[bIdx], normalizeOpts);
-                const similarity = jaccardSimilarity(sentA, sentB, simOpts);
+                const similarity = alignmentSimilarity(sentA, sentB, simOpts);
 
                 if (similarity > bestSimilarity) {
                     bestSimilarity = similarity;
@@ -561,7 +561,7 @@ function rematchDeleteInsertSequences(
                         if (dCandidate.text && insCandidate.text) {
                             const sentA = normalizeForSimilarity(dCandidate.text, normalizeOpts);
                             const sentB = normalizeForSimilarity(insCandidate.text, normalizeOpts);
-                            const similarity = jaccardSimilarity(sentA, sentB, simOpts);
+                            const similarity = alignmentSimilarity(sentA, sentB, simOpts);
 
                             if (similarity > bestSimilarity && similarity >= similarityThreshold) {
                                 bestSimilarity = similarity;
@@ -861,7 +861,7 @@ function rematchNonAdjacentDeleteInsert(
                 if (dItem.a && insItem.b) {
                     const sentA = normalizeForSimilarity(dItem.a, normalizeOpts);
                     const sentB = normalizeForSimilarity(insItem.b, normalizeOpts);
-                    const similarity = jaccardSimilarity(sentA, sentB, simOpts);
+                    const similarity = alignmentSimilarity(sentA, sentB, simOpts);
 
                     if (similarity > bestSimilarity && similarity >= similarityThreshold) {
                         bestSimilarity = similarity;

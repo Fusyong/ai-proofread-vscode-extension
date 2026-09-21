@@ -10,9 +10,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.21
+当前版本 v1.12.22
 
-- 设置：阿里云百炼默认模型改回qwen3.7-max，它是纯文本模型，经测试，它的知识更丰富
+- 优化句子对齐算法：引入两端覆盖率算法
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
