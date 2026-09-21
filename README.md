@@ -12,7 +12,12 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 当前版本 v1.12.20
 
+- 特性：增加基于jsdiff的对齐新算法（较慢），优势有待观察
+- 特性：句子对齐时会输出JSON文件，方便后续利用
+- 特性：支持中文语言界面（安装官方中文插件后生效）
 - 特性：JSON 批量校对结果改为带轮次序号；新增重叠校对（用上一轮结果作为新的 target 再校一轮）
+- 设置：请求超时改为默认180秒
+- fix：修正条目式输出有多余标点的问题
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
