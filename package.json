@@ -749,7 +749,7 @@
           "order": 12,
           "type": "string",
           "default": "qwen3.7-max",
-          "description": "阿里云百炼平台模型,如纯文本模型 qwen3.7-max, qwen3.8-2.4t-a95b, 图文视频模型qwen3.8-max, qwen3.7-plus, qwen3.6-flash等, 以及旧版 deepseek-v3"
+          "description": "阿里云百炼平台模型,如纯文本模型 qwen3.7-max, 图文视频模型qwen3.8-max, qwen3.7-plus, qwen3.6-flash等, 以及旧版 deepseek-v3"
         },
         "ai-proofread.apiKeys.deepseek": {
           "order": 13,

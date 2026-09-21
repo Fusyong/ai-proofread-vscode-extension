@@ -45,6 +45,7 @@ import { ProgressTracker } from '../progressTracker';
 import {
     confirmProofreadInputIfNeeded,
     getProofreadInputConfirmSettings,
+    getRepetitionModeDisplayName,
     SINGLE_TARGET_OVERFLOW_CHARS
 } from '../proofreadInputConfirm';
 import { resolveProofreadModel } from '../modelRoutes/modelRouteResolver';
@@ -173,6 +174,11 @@ export class ProofreadCommandHandler {
         const currentPromptName = context
             ? getPromptDisplayName(context.globalState.get<string>('currentPrompt', ''))
             : '系统默认提示词（full）';
+        const repetitionMode =
+            vscode.workspace.getConfiguration('ai-proofread').get<string>('proofread.promptRepetition', 'none') ||
+            'none';
+        const thinkingEnabled = !resolveProofreadModel().disableThinking;
+        const outputType = getOutputType(context);
 
         const startTime = new Date().toLocaleString();
         let logMessage = `\n${'='.repeat(50)}\n`;
@@ -182,6 +188,9 @@ export class ProofreadCommandHandler {
         logMessage += `TargetFrom: ${run.targetSourceLabel}\n`;
         logMessage += `Prompt: ${currentPromptName}\n`;
         logMessage += `SrcHint: ${formatSourceCharacteristicsForLog(sourceTextCharacteristics, sourceCharacteristicsDisplayTitle)}\n`;
+        logMessage += `RepetitionMode: ${getRepetitionModeDisplayName(repetitionMode)}\n`;
+        logMessage += `OutputType: ${outputType}\n`;
+        logMessage += `Thinking: ${thinkingEnabled ? 'on' : 'off'}\n`;
         logMessage += `Model: ${platform}, ${model}, T. ${temperature}\n`;
         logMessage += `RPM: ${rpm}\n`;
         logMessage += `MaxConcurrent: ${maxConcurrent}\n`;
@@ -946,17 +955,26 @@ export class ProofreadCommandHandler {
                 ? getPromptDisplayName(context.globalState.get<string>('currentPrompt', ''))
                 : '系统默认提示词（full）';
 
-            const repetitionModeNames: { [key: string]: string } = {
-                none: '不重复',
-                target: '仅重复目标文档',
-                all: '重复完整对话流程'
-            };
-            const repetitionModeName =
-                actualRepetitionMode ? repetitionModeNames[actualRepetitionMode] || '不重复' : '不重复';
+            const repetitionModeName = getRepetitionModeDisplayName(actualRepetitionMode || 'none');
+            const thinkingEnabled = !resolveProofreadModel().disableThinking;
+            const outputType = getOutputType(context);
+            const editorialMemoryOn = editorialMemoryForceEnabled === true;
 
             const logFilePath = FilePathUtils.getFilePath(editor.document.uri.fsPath, '.proofread', '.log');
             const resultForLog = rawItemOutput !== undefined ? rawItemOutput : result;
-            const logMessage = `\n${'='.repeat(50)}\nPrompt: ${currentPromptName}\nSrcHint: ${formatSourceCharacteristicsForLog(sourceTextCharacteristics, sourceCharacteristicsDisplayTitle)}\nRepetitionMode: ${repetitionModeName}\nModel: ${platform}, ${model}, T. ${userTemperature}\nContextLevel: ${contextLevel}\nReference: ${referenceFile}\nResult:\n\n${resultForLog}\n${'='.repeat(50)}\n\n`;
+            const logMessage =
+                `\n${'='.repeat(50)}\n` +
+                `Prompt: ${currentPromptName}\n` +
+                `SrcHint: ${formatSourceCharacteristicsForLog(sourceTextCharacteristics, sourceCharacteristicsDisplayTitle)}\n` +
+                `RepetitionMode: ${repetitionModeName}\n` +
+                `OutputType: ${outputType}\n` +
+                `Thinking: ${thinkingEnabled ? 'on' : 'off'}\n` +
+                `EditorialMemory: ${editorialMemoryOn ? 'on' : 'off'}\n` +
+                `Model: ${platform}, ${model}, T. ${userTemperature}\n` +
+                `ContextLevel: ${contextLevel}\n` +
+                `Reference: ${referenceFile}\n` +
+                `Result:\n\n${resultForLog}\n` +
+                `${'='.repeat(50)}\n\n`;
             fs.appendFileSync(logFilePath, logMessage, 'utf8');
 
             await new Promise<void>((resolve) => setImmediate(resolve));
