@@ -54,11 +54,12 @@ export interface AlignmentOptions {
      * 仅 algorithm=wordDiff 时有效。
      */
     wordDiffFallbackToAnchor?: boolean;
-    /**
-     * 报告展示用：实际采用的算法名称（含回退说明）。
-     * 由 alignDocuments 写入，不必手填。
-     */
+    /** 报告展示用：实际采用的算法名称（含回退说明）。由 alignDocuments 写入。 */
     algorithmDisplayName?: string;
+    /** 分句后过短句合并阈值（去空白字符数），默认 8；0 关闭 */
+    minSentenceChars?: number;
+    /** 缺口词流精炼：未改字符占比达到此值才收成 match，默认 0.55 */
+    gapEqualRatio?: number;
 }
 
 /**
@@ -75,6 +76,7 @@ export interface AlignmentStatistics {
 
 import type { JiebaWasmModule } from './jiebaLoader';
 import { normalizeForSimilarity, jaccardSimilarity, alignmentSimilarity, NormalizeForSimilarityOptions, type JaccardSimilarityOptions } from './similarity';
+import { refineAlignmentGaps } from './alignmentGapRefine';
 
 /** 从 AlignmentOptions 构建归一化选项（供 similarity.normalizeForSimilarity） */
 function getNormalizeOptions(options: AlignmentOptions): NormalizeForSimilarityOptions {
@@ -340,7 +342,7 @@ export function alignSentencesAnchor(
     // - 匹配和删除按A的顺序
     // - 新增按B的原始顺序插入到合适位置
 
-    // 后处理：在相邻的DELETE和INSERT序列之间尝试重新匹配
+    // 后处理：相邻 DELETE/INSERT 仅做 1:1 重配（不再多句合并）
     const resultAfterRematch = rematchDeleteInsertSequences(
         result,
         similarityThreshold,
@@ -348,31 +350,23 @@ export function alignSentencesAnchor(
         normalizeOpts
     );
 
-    // 后处理：在一定的序号上下范围内处理不相邻的DELETE和INSERT
+    // 后处理：一定序号范围内的不相邻 DELETE/INSERT
     const resultAfterNonAdjacentRematch = rematchNonAdjacentDeleteInsert(
         resultAfterRematch,
         similarityThreshold,
         simOpts,
-        windowSize,  // 使用窗口大小作为索引范围
+        windowSize,
         normalizeOpts
     );
 
-    // 后处理：将单独的DELETE项合并到相邻的MATCH组中
-    const resultAfterMergeDelete = mergeDeleteIntoMatch(
-        resultAfterNonAdjacentRematch,
-        simOpts,
-        normalizeOpts
-    );
+    // 缺口精炼：双侧未配句拼接后词流比对，高重合收成一条 match
+    const resultAfterGap = refineAlignmentGaps(resultAfterNonAdjacentRematch, {
+        gapEqualRatio: options.gapEqualRatio ?? 0.55,
+        removeInnerWhitespace: options.removeInnerWhitespace !== false
+    });
 
-    // 后处理：将单独的INSERT项合并到相邻的MATCH组中（与 delete 合并对称，处理 b 侧）
-    const resultAfterMerge = mergeInsertIntoMatch(
-        resultAfterMergeDelete,
-        simOpts,
-        normalizeOpts
-    );
-
-    // 后处理：检测和处理句子移动，创建movein和moveout条目
-    const finalResult = detectAndHandleMovements(resultAfterMerge);
+    // 后处理：检测和处理句子移动
+    const finalResult = detectAndHandleMovements(resultAfterGap);
 
     return finalResult;
 }
@@ -523,27 +517,9 @@ function rematchDeleteInsertSequences(
             if (deleteItems.length > 0 && insertItems.length > 0) {
                 const matchedPairs: Array<[Candidate, Candidate, number]> = [];
 
-                // 如果一方较短，尝试合并相邻的句子
-                let deleteCandidates: Candidate[];
-                let insertCandidates: Candidate[];
-
-                if (deleteItems.length < insertItems.length) {
-                    // DELETE较短，生成DELETE的合并候选（以便匹配多个INSERT）
-                    deleteCandidates = generateMergedCandidates(deleteItems, 'a');
-                    insertCandidates = generateMergedCandidates(insertItems, 'b', false);
-                } else if (insertItems.length < deleteItems.length) {
-                    // INSERT较短，生成DELETE的合并候选（以便多个DELETE匹配一个INSERT）
-                    deleteCandidates = generateMergedCandidates(deleteItems, 'a');
-                    insertCandidates = generateMergedCandidates(insertItems, 'b', false);
-                } else {
-                    // 长度相等，都生成合并候选（但优先单个匹配）
-                    deleteCandidates = generateMergedCandidates(deleteItems, 'a');
-                    insertCandidates = generateMergedCandidates(insertItems, 'b');
-                }
-
-                // 按候选长度降序排序，优先匹配更长的（合并的）候选
-                deleteCandidates.sort((a, b) => b.indices.length - a.indices.length);
-                insertCandidates.sort((a, b) => b.indices.length - a.indices.length);
+                // 仅 1:1 重配；多句合并改由 refineAlignmentGaps 处理
+                const deleteCandidates = generateMergedCandidates(deleteItems, 'a', false);
+                const insertCandidates = generateMergedCandidates(insertItems, 'b', false);
 
                 for (const dCandidate of deleteCandidates) {
                     if (dCandidate.matched) {
@@ -959,303 +935,6 @@ function rematchNonAdjacentDeleteInsert(
     return result;
 }
 
-/**
- * 后处理：将单独的DELETE项合并到相邻的MATCH组中
- * @param alignment 对齐结果
- * @param simOpts 相似度计算选项
- * @returns 优化后的对齐结果
- */
-function mergeDeleteIntoMatch(
-    alignment: AlignmentItem[],
-    simOpts: JaccardSimilarityOptions = {},
-    normalizeOpts: NormalizeForSimilarityOptions = {}
-): AlignmentItem[] {
-    if (alignment.length === 0) {
-        return alignment;
-    }
-
-    const result: AlignmentItem[] = [];
-    let i = 0;
-
-    while (i < alignment.length) {
-        const currentItem = alignment[i];
-
-        // 如果是单独的DELETE项，尝试合并到相邻的MATCH
-        if (currentItem.type === 'delete' && currentItem.a) {
-            // 检查前一个和后一个项
-            const prevItem = i > 0 ? alignment[i - 1] : null;
-            const nextItem = i < alignment.length - 1 ? alignment[i + 1] : null;
-
-            let bestMatch: AlignmentItem | null = null;
-            let bestSimilarity = 0.0;
-            let mergeDirection: 'prev' | 'next' | null = null;
-
-            // 尝试合并到前一个MATCH
-            if (prevItem &&
-                prevItem.type === 'match' &&
-                prevItem.a &&
-                prevItem.b) {
-                const prevA = prevItem.a;
-                const prevB = prevItem.b;
-                const mergedA = prevA + currentItem.a;
-                const sentA = normalizeForSimilarity(mergedA, normalizeOpts);
-                const sentB = normalizeForSimilarity(prevB, normalizeOpts);
-                const newSimilarity = jaccardSimilarity(sentA, sentB, simOpts);
-
-                // 如果新相似度高于原相似度，则合并
-                const prevSim = prevItem.similarity ?? 0.0;
-                if (newSimilarity > prevSim) {
-                    if (newSimilarity > bestSimilarity) {
-                        bestSimilarity = newSimilarity;
-                        bestMatch = prevItem;
-                        mergeDirection = 'prev';
-                    }
-                }
-            }
-
-            // 尝试合并到后一个MATCH
-            if (nextItem &&
-                nextItem.type === 'match' &&
-                nextItem.a &&
-                nextItem.b) {
-                const mergedA = currentItem.a + nextItem.a;
-                const sentA = normalizeForSimilarity(mergedA, normalizeOpts);
-                const sentB = normalizeForSimilarity(nextItem.b, normalizeOpts);
-                const newSimilarity = jaccardSimilarity(sentA, sentB, simOpts);
-
-                // 如果新相似度高于原相似度，则合并
-                const nextSim = nextItem.similarity ?? 0.0;
-                if (newSimilarity > nextSim) {
-                    if (newSimilarity > bestSimilarity) {
-                        bestSimilarity = newSimilarity;
-                        bestMatch = nextItem;
-                        mergeDirection = 'next';
-                    }
-                }
-            }
-
-            // 如果找到可以合并的MATCH，进行合并
-            if (bestMatch !== null && mergeDirection !== null) {
-                if (mergeDirection === 'prev') {
-                    // 合并到前一个MATCH，更新result中最后一个项（前一个MATCH）
-                    if (result.length > 0 && result[result.length - 1].type === 'match') {
-                        result[result.length - 1].a = result[result.length - 1].a! + currentItem.a!;
-                        result[result.length - 1].similarity = bestSimilarity;
-                        // 更新索引数组
-                        const deleteAIndices = currentItem.a_indices || [];
-                        if (deleteAIndices.length > 0) {
-                            if (!result[result.length - 1].a_indices) {
-                                result[result.length - 1].a_indices = [];
-                            }
-                            result[result.length - 1].a_indices!.push(...deleteAIndices);
-                        } else if (currentItem.a_index !== undefined && currentItem.a_index !== null) {
-                            if (!result[result.length - 1].a_indices) {
-                                result[result.length - 1].a_indices = [];
-                            }
-                            result[result.length - 1].a_indices!.push(currentItem.a_index);
-                        }
-                    }
-                    // 跳过当前DELETE
-                    i++;
-                    continue;
-                } else {  // mergeDirection === 'next'
-                    // 合并到后一个MATCH，更新alignment中的后一个MATCH
-                    // 这样在后续处理时会使用更新后的值
-                    nextItem.a = currentItem.a! + nextItem.a!;
-                    nextItem.similarity = bestSimilarity;
-                    // 更新索引数组
-                    const deleteAIndices = currentItem.a_indices || [];
-                    if (deleteAIndices.length > 0) {
-                        if (!nextItem.a_indices) {
-                            nextItem.a_indices = [];
-                        }
-                        nextItem.a_indices = [...deleteAIndices, ...(nextItem.a_indices || [])];
-                    } else if (currentItem.a_index !== undefined && currentItem.a_index !== null) {
-                        if (!nextItem.a_indices) {
-                            nextItem.a_indices = [];
-                        }
-                        nextItem.a_indices = [currentItem.a_index, ...(nextItem.a_indices || [])];
-                    }
-                    // 跳过当前DELETE
-                    i++;
-                    continue;
-                }
-            }
-        }
-
-        // 其他情况，直接添加
-        result.push(currentItem);
-        i++;
-    }
-
-    return result;
-}
-
-/**
- * 后处理：将单独的INSERT项合并到相邻的MATCH组中（与 mergeDeleteIntoMatch 对称，处理 b 侧）
- * @param alignment 对齐结果
- * @param simOpts 相似度计算选项
- * @returns 优化后的对齐结果
- */
-function mergeInsertIntoMatch(
-    alignment: AlignmentItem[],
-    simOpts: JaccardSimilarityOptions = {},
-    normalizeOpts: NormalizeForSimilarityOptions = {}
-): AlignmentItem[] {
-    if (alignment.length === 0) {
-        return alignment;
-    }
-
-    const result: AlignmentItem[] = [];
-    let i = 0;
-
-    while (i < alignment.length) {
-        const currentItem = alignment[i];
-
-        // 如果是单独的INSERT项，尝试合并到相邻的MATCH
-        if (currentItem.type === 'insert' && currentItem.b) {
-            // 检查前一个和后一个项
-            const prevItem = i > 0 ? alignment[i - 1] : null;
-            const nextItem = i < alignment.length - 1 ? alignment[i + 1] : null;
-
-            let bestMatch: AlignmentItem | null = null;
-            let bestSimilarity = 0.0;
-            let mergeDirection: 'prev' | 'next' | null = null;
-
-            // 尝试合并到前一个MATCH（INSERT 的 b 追加到前一个 MATCH 的 b 后）
-            if (prevItem &&
-                prevItem.type === 'match' &&
-                prevItem.a &&
-                prevItem.b) {
-                const prevA = prevItem.a;
-                const prevB = prevItem.b;
-                const mergedB = prevB + currentItem.b;
-                const sentA = normalizeForSimilarity(prevA, normalizeOpts);
-                const sentB = normalizeForSimilarity(mergedB, normalizeOpts);
-                const newSimilarity = jaccardSimilarity(sentA, sentB, simOpts);
-
-                const prevSim = prevItem.similarity ?? 0.0;
-                // 结构条件：若归一化后 insert.b 是 prevMatch.a 的后缀，也允许合并（与“合并到下一 MATCH”的前缀条件对称）
-                const normInsertBPrev = normalizeForSimilarity(currentItem.b, normalizeOpts);
-                const insertIsSuffixOfPrevA = normInsertBPrev.length > 0 && sentA.endsWith(normInsertBPrev);
-
-                if (newSimilarity > prevSim || insertIsSuffixOfPrevA) {
-                    const simToUse = newSimilarity > prevSim ? newSimilarity : Math.max(newSimilarity, prevSim);
-                    if (insertIsSuffixOfPrevA || simToUse > bestSimilarity) {
-                        bestSimilarity = simToUse;
-                        bestMatch = prevItem;
-                        mergeDirection = 'prev';
-                    }
-                }
-            }
-
-            // 尝试合并到后一个MATCH（INSERT 的 b 拼到后一个 MATCH 的 b 前）
-            if (nextItem &&
-                nextItem.type === 'match' &&
-                nextItem.a &&
-                nextItem.b) {
-                const mergedB = currentItem.b + nextItem.b;
-                const sentA = normalizeForSimilarity(nextItem.a, normalizeOpts);
-                const sentB = normalizeForSimilarity(mergedB, normalizeOpts);
-                const newSimilarity = jaccardSimilarity(sentA, sentB, simOpts);
-
-                const nextSim = nextItem.similarity ?? 0.0;
-                // 与 DELETE 合并对称：DELETE 时下一 MATCH 的 b 已包含 delete 的 a（完整句），相似度必然高；
-                // INSERT 时下一 MATCH 的 a 已包含 insert 的 b，仅靠相似度可能不升反降。
-                // 若归一化后 insert.b 是 nextMatch.a 的前缀，则允许合并。
-                const normInsertB = normalizeForSimilarity(currentItem.b, normalizeOpts);
-                const insertIsPrefixOfNextA = normInsertB.length > 0 && sentA.startsWith(normInsertB);
-
-                if (newSimilarity > nextSim || insertIsPrefixOfNextA) {
-                    const simToUse = newSimilarity > nextSim ? newSimilarity : Math.max(newSimilarity, nextSim);
-                    if (insertIsPrefixOfNextA || simToUse > bestSimilarity) {
-                        bestSimilarity = simToUse;
-                        bestMatch = nextItem;
-                        mergeDirection = 'next';
-                    }
-                }
-            }
-
-            // 如果找到可以合并的MATCH，进行合并
-            if (bestMatch !== null && mergeDirection !== null) {
-                if (mergeDirection === 'prev') {
-                    // 合并到前一个MATCH，更新 result 中最后一个项（前一个MATCH）
-                    if (result.length > 0 && result[result.length - 1].type === 'match') {
-                        const last = result[result.length - 1];
-                        last.b = last.b! + currentItem.b!;
-                        last.similarity = bestSimilarity;
-                        const insertBIndices = currentItem.b_indices || [];
-                        if (insertBIndices.length > 0) {
-                            if (!last.b_indices) {
-                                last.b_indices = [];
-                            }
-                            last.b_indices.push(...insertBIndices);
-                        } else if (currentItem.b_index !== undefined && currentItem.b_index !== null) {
-                            if (!last.b_indices) {
-                                last.b_indices = [];
-                            }
-                            last.b_indices.push(currentItem.b_index);
-                        }
-                        // 合并 b 侧行号
-                        if (currentItem.b_line_numbers && currentItem.b_line_numbers.length > 0) {
-                            if (!last.b_line_numbers) {
-                                last.b_line_numbers = last.b_line_number !== undefined && last.b_line_number !== null
-                                    ? [last.b_line_number] : [];
-                            }
-                            last.b_line_numbers.push(...currentItem.b_line_numbers);
-                        } else if (currentItem.b_line_number !== undefined && currentItem.b_line_number !== null) {
-                            if (!last.b_line_numbers) {
-                                last.b_line_numbers = last.b_line_number !== undefined && last.b_line_number !== null
-                                    ? [last.b_line_number] : [];
-                            }
-                            last.b_line_numbers.push(currentItem.b_line_number);
-                        }
-                    }
-                    i++;
-                    continue;
-                } else {
-                    // mergeDirection === 'next'：合并到后一个MATCH
-                    nextItem.b = currentItem.b! + nextItem.b!;
-                    nextItem.similarity = bestSimilarity;
-                    const insertBIndices = currentItem.b_indices || [];
-                    if (insertBIndices.length > 0) {
-                        if (!nextItem.b_indices) {
-                            nextItem.b_indices = [];
-                        }
-                        nextItem.b_indices = [...insertBIndices, ...(nextItem.b_indices || [])];
-                    } else if (currentItem.b_index !== undefined && currentItem.b_index !== null) {
-                        if (!nextItem.b_indices) {
-                            nextItem.b_indices = [];
-                        }
-                        nextItem.b_indices = [currentItem.b_index, ...(nextItem.b_indices || [])];
-                    }
-                    // 合并 b 侧行号（prepend）
-                    if (currentItem.b_line_numbers && currentItem.b_line_numbers.length > 0) {
-                        if (!nextItem.b_line_numbers) {
-                            nextItem.b_line_numbers = nextItem.b_line_number !== undefined && nextItem.b_line_number !== null
-                                ? [nextItem.b_line_number] : [];
-                        }
-                        nextItem.b_line_numbers = [...currentItem.b_line_numbers, ...(nextItem.b_line_numbers || [])];
-                    } else if (currentItem.b_line_number !== undefined && currentItem.b_line_number !== null) {
-                        if (!nextItem.b_line_numbers) {
-                            nextItem.b_line_numbers = nextItem.b_line_number !== undefined && nextItem.b_line_number !== null
-                                ? [nextItem.b_line_number] : [];
-                        }
-                        nextItem.b_line_numbers = [currentItem.b_line_number, ...(nextItem.b_line_numbers || [])];
-                    }
-                    i++;
-                    continue;
-                }
-            }
-        }
-
-        // 其他情况，直接添加
-        result.push(currentItem);
-        i++;
-    }
-
-    return result;
-}
 
 /**
  * 后处理：检测和处理句子移动，创建movein和moveout条目（基于b侧id连续性分组）

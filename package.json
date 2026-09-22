@@ -1482,6 +1482,21 @@
           "default": true,
           "description": "词流反解检测到整句调序（同句既删又增）时，自动回退到锚点算法"
         },
+        "ai-proofread.alignment.minSentenceChars": {
+          "order": 48.7,
+          "type": "number",
+          "default": 8,
+          "minimum": 0,
+          "description": "对齐分句后处理：去空白后长度≤此值的碎片并入相邻句；0 表示不合并。用于减少 .md、罗马数字短行等碎句。"
+        },
+        "ai-proofread.alignment.gapEqualRatio": {
+          "order": 48.8,
+          "type": "number",
+          "default": 0.55,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "缺口精炼：双侧未配句拼接后，词流未改字符占比≥此值才收成一条 MATCH（默认 0.55）。过低会误并真替换段。"
+        },
         "ai-proofread.alignment.ngramGranularity": {
           "order": 49,
           "type": "string",

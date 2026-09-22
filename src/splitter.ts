@@ -862,6 +862,105 @@ function _isListItem(line: string): boolean {
     return false;
 }
 
+/** 英文句号后常见扩展名：不在此处切句（避免 `….md` 拆成两句） */
+const FILE_EXTENSION_AFTER_DOT = /^(md|markdown|json|txt|pdf|html|htm|csv|xml|yaml|yml|ts|js|tsx|jsx|py|tex|lmtx)\b/i;
+
+/**
+ * 英文 `.` 是否应跳过切分（小数、列表序号、文件扩展名、字母缩写点如 I.V. / U.S.）
+ */
+function shouldSkipEnglishPeriodSplit(text: string, matchIndex: number, endPos: number): boolean {
+    if (endPos <= 0 || endPos > text.length || text[endPos - 1] !== '.') {
+        return false;
+    }
+    const prevPos = matchIndex - 1;
+    if (prevPos >= 0 && /\d/.test(text[prevPos])) {
+        // 前一个是数字：小数点或列表序号 1. 2. —— 均不切
+        return true;
+    }
+    // . 后（可隔空白）为文件扩展名
+    let after = endPos;
+    while (after < text.length && (text[after] === ' ' || text[after] === '\t')) {
+        after++;
+    }
+    if (after < text.length && FILE_EXTENSION_AFTER_DOT.test(text.slice(after))) {
+        return true;
+    }
+    // 单字母缩写点：I.V.、U.S. —— 点前单字母且点后（可隔空白）仍为字母
+    if (prevPos >= 0 && /[A-Za-z]/.test(text[prevPos])) {
+        const beforePrev = prevPos - 1;
+        const prevIsIsolatedLetter =
+            beforePrev < 0 || /[^A-Za-z]/.test(text[beforePrev]);
+        if (prevIsIsolatedLetter) {
+            let next = endPos;
+            while (next < text.length && (text[next] === ' ' || text[next] === '\t')) {
+                next++;
+            }
+            if (next < text.length && /[A-Za-z]/.test(text[next])) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * 将过短句片段并入相邻句（对齐分句兜底，避免 `md`、`II.` 等孤立碎片）。
+ * 不去掉空白，只拼接原文片段。
+ * 以中文句末标点结尾的短句视为完整句，不合并（避免「好。」「天空是蓝色的。」被粘连）。
+ *
+ * @param sentences 分句结果
+ * @param minSentenceChars 去空白后长度上限（含），默认 8；≤0 表示不合并
+ */
+export function mergeShortSentenceFragments(
+    sentences: string[],
+    minSentenceChars: number = 8
+): string[] {
+    if (sentences.length === 0 || minSentenceChars <= 0) {
+        return sentences;
+    }
+
+    const isMdHeading = (s: string) => /^\s*#{1,6}\s/.test(s);
+    const compactLen = (s: string) => s.replace(/\s/g, '').length;
+    /** 完整中文句（有句末标点）不参与短碎片合并 */
+    const isCompleteChineseSentence = (s: string) => /[。！？…]\s*$/.test(s);
+
+    const out: string[] = [];
+    for (const s of sentences) {
+        if (!s) {
+            continue;
+        }
+        if (out.length === 0) {
+            out.push(s);
+            continue;
+        }
+        const prev = out[out.length - 1];
+        if (
+            compactLen(s) <= minSentenceChars &&
+            !isCompleteChineseSentence(s) &&
+            !isMdHeading(s) &&
+            !isMdHeading(prev)
+        ) {
+            out[out.length - 1] = prev + s;
+        } else {
+            out.push(s);
+        }
+    }
+
+    // 篇首过短碎片（非完整中文句）：并入下一句
+    if (
+        out.length >= 2 &&
+        compactLen(out[0]) <= minSentenceChars &&
+        !isCompleteChineseSentence(out[0]) &&
+        !isMdHeading(out[0]) &&
+        !isMdHeading(out[1])
+    ) {
+        out[1] = out[0] + out[1];
+        out.shift();
+    }
+
+    return out;
+}
+
 /**
  * 简化版中文句子切分（按句末标点和连续换行切分，保留所有空白字符）
  *
@@ -871,9 +970,13 @@ function _isListItem(line: string): boolean {
  * 基于Python版本的split_chinese_sentences_simple实现
  *
  * @param text 要切分的文本
+ * @param minSentenceChars 去空白后过短句合并阈值，默认 8；传 0 关闭合并
  * @returns 切分后的句子列表（保留所有空白字符，包括首尾换行符）
  */
-export function splitChineseSentencesSimple(text: string): string[] {
+export function splitChineseSentencesSimple(
+    text: string,
+    minSentenceChars: number = 8
+): string[] {
     text = normalizeLineEndings(text);
 
     // 句子结尾模式：
@@ -892,18 +995,10 @@ export function splitChineseSentencesSimple(text: string): string[] {
     while ((match = pattern.exec(text)) !== null) {
         let endPos = match.index + match[0].length;
 
-        // 检查是否是小数点、列表序号或缩写
+        // 检查是否是小数点、列表序号、扩展名或字母缩写点
         if (match[2]) {  // 英文标点
-            if (endPos > 0 && endPos <= text.length && text[endPos - 1] === '.') {
-                const prevPos = match.index - 1;
-                if (prevPos >= 0 && /\d/.test(text[prevPos])) {
-                    // 前一个是数字：可能是小数点，也可能是列表序号 1. 2.
-                    if (endPos < text.length && /\d/.test(text[endPos])) {
-                        continue;  // 后也是数字，是小数点，跳过
-                    }
-                    // 后不是数字（空格、换行、汉字等），视为列表序号，不在句号处切分
-                    continue;
-                }
+            if (shouldSkipEnglishPeriodSplit(text, match.index, endPos)) {
+                continue;
             }
         }
 
@@ -961,7 +1056,7 @@ export function splitChineseSentencesSimple(text: string): string[] {
         }
     }
 
-    return sentences;
+    return mergeShortSentenceFragments(sentences, minSentenceChars);
 }
 
 /**
@@ -1246,7 +1341,8 @@ export function splitChineseSentencesWithLineNumbers(
  */
 export function splitChineseSentencesWithOffsets(
     text: string,
-    useSimple: boolean = false
+    useSimple: boolean = false,
+    minSentenceChars: number = 8
 ): SentenceSpanInText[] {
     if (!text || !text.trim()) {
         return [];
@@ -1255,7 +1351,7 @@ export function splitChineseSentencesWithOffsets(
     text = normalizeLineEndings(text);
 
     const sentences = useSimple
-        ? splitChineseSentencesSimple(text)
+        ? splitChineseSentencesSimple(text, minSentenceChars)
         : splitChineseSentences(text);
 
     if (sentences.length === 0) {

@@ -63,8 +63,9 @@ export function alignDocuments(
     const algorithm = options.algorithm ?? 'anchor';
     const fallback = options.wordDiffFallbackToAnchor !== false;
 
-    const spansA = splitChineseSentencesWithOffsets(textA, true);
-    const spansB = splitChineseSentencesWithOffsets(textB, true);
+    const minSentenceChars = options.minSentenceChars ?? 8;
+    const spansA = splitChineseSentencesWithOffsets(textA, true, minSentenceChars);
+    const spansB = splitChineseSentencesWithOffsets(textB, true, minSentenceChars);
     const sentencesA = spansA.map(s => s.sentence);
     const sentencesB = spansB.map(s => s.sentence);
     const lineNumbersA = spansA.map(s => s.startLine);

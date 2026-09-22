@@ -26,6 +26,8 @@ const SERIALIZABLE_OPTION_KEYS = [
     'algorithm',
     'wordDiffFallbackToAnchor',
     'algorithmDisplayName',
+    'minSentenceChars',
+    'gapEqualRatio',
 ] as const satisfies readonly (keyof AlignmentOptions)[];
 
 export interface AlignmentReportJson {

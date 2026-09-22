@@ -1278,7 +1278,9 @@ export class WebviewManager {
                 removeInnerWhitespace,
                 removePunctuation: citationConfig.get<boolean>('normalizeIgnorePunctuation', false),
                 removeDigits: config.get<boolean>('normalizeIgnoreDigits', false),
-                removeLatin: config.get<boolean>('normalizeIgnoreLatin', false)
+                removeLatin: config.get<boolean>('normalizeIgnoreLatin', false),
+                minSentenceChars: config.get<number>('minSentenceChars', 8),
+                gapEqualRatio: config.get<number>('gapEqualRatio', 0.55)
             };
 
             // 显示进度

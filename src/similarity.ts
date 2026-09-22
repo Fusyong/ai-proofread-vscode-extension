@@ -200,26 +200,27 @@ function commonSuffixLength(textA: string, textB: string): number {
 
 /**
  * 头尾包含分。不改写字符。
- * 公共前缀与公共后缀合起来占较短句的比例（重叠时最多为 1）。
- * 是否配上，由调用方用相似度阈值判断这个比例。
+ * 公共前缀与公共后缀合起来占**较长句**的比例（重叠计入时分子不超过较短句长度）。
+ * 按较长侧作分母，避免短半截抢锁长句（如参考文献 1 句对 3 句的首片）。
  *
- * `<!` 与 `<！`：前缀 `<` 占 1/2，得 0.5。
- * `#一〇六一年` 与 `#一六〇一年`：前缀 `#一`、后缀 `一年` 共 4/6，得 2/3。
- * `南宋诗人。` 与 `南宋诗人、理学家。`：头尾盖住较短句全部，得 1。
+ * `<!` 与 `<！`：前缀 `<`，得 0.5。
+ * `#一〇六一年` 与 `#一六〇一年`：前缀+后缀 4/6。
+ * 长句对短半截：分母为大，分数偏低，不易过阈值。
  */
 function endContainmentScore(textA: string, textB: string): number {
-    const shorter = Math.min(textA.length, textB.length);
-    if (shorter === 0) {
+    const longer = Math.max(textA.length, textB.length);
+    if (longer === 0) {
         return 0;
     }
+    const shorter = Math.min(textA.length, textB.length);
     const prefix = commonPrefixLength(textA, textB);
     const suffix = commonSuffixLength(textA, textB);
-    return Math.min(shorter, prefix + suffix) / shorter;
+    return Math.min(shorter, prefix + suffix) / longer;
 }
 
 /**
  * 句子对齐用的多层相似度。引文核对、查重仍用 {@link jaccardSimilarity}。
- * 取 n-gram Jaccard 与头尾包含分中的较高者。头尾包含分是公共前缀与后缀合计占较短句的比例。
+ * 取 n-gram Jaccard 与头尾包含分中的较高者。头尾包含分是公共前缀与后缀合计占较长句的比例。
  */
 export function alignmentSimilarity(
     textA: string,

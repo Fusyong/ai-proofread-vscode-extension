@@ -248,3 +248,32 @@ Diff.diffWordsWithSpace(a, b, new Intl.Segmenter('zh', { granularity: 'word' }))
 - `src/alignmentUi.ts` — 算法选择 UI
 
 **适用**：长文小改、空白/微调；大段调序自动回退锚点。
+
+## 十二、碎句防护与缺口精炼（已落地）
+
+针对分句误切（`.md` / `I.V.`）、头尾包含按短侧抢配、以及一对多标点错位缺口，在**锚点主算法**上收敛为三处改动（**不以整篇词流替代主循环**）。
+
+### 12.1 分句防碎
+
+- `splitChineseSentencesSimple`：英文 `.` 后为常见扩展名、或 `I.V.` 类缩写点号时不切
+- 切完后按 `minSentenceChars`（默认 8）合并过短碎片；不以 `。！？…` 结尾的碎片才并（完整短中文句保留）；不跨 Markdown 标题边界
+- 配置：`ai-proofread.alignment.minSentenceChars`
+
+### 12.2 头尾包含分母改为较长侧
+
+- `endContainmentScore`：`min(lenA, lenB, prefix+suffix) / max(lenA, lenB)`
+- 短半截不再轻易以 ≈0.5 抢锁长参考文献句
+
+### 12.3 缺口精炼（替换多句合并类后处理）
+
+流水线：
+
+```text
+主循环 → 相邻/不相邻 1:1 rematch → refineAlignmentGaps → movements
+```
+
+- 模块：`src/alignmentGapRefine.ts`
+- 双侧连续 delete/insert 拼接后 `diffWordsWithSpace` + `Intl.Segmenter('zh')`，`equalRatio ≥ gapEqualRatio`（默认 0.55）收成一条 MATCH
+- 真替换（equalRatio 低）保持删/增，避免强行合并
+- 配置：`ai-proofread.alignment.gapEqualRatio`
+- 已移除：`mergeDeleteIntoMatch` / `mergeInsertIntoMatch` 及多句 `generateMergedCandidates` 合并路径
