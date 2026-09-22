@@ -10,11 +10,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.23
+当前版本 v1.12.24
 
-- 优化：勘误表筛选、备注自动在浏览器当前位置缓存
-- 优化：校对log增加重复提示词等关键信息
-- fix/优化分句算法、对齐算法，减少零碎句子，优化匹配的判断顺序
+- fix：恢复对齐算法中被误删的一个环节，即尝试把删除、插入句子合并到临近句子，再计算匹配度是否增加
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
