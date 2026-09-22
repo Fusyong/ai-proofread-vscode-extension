@@ -13,6 +13,8 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 当前版本 v1.12.23
 
 - 优化：勘误表筛选、备注自动在浏览器当前位置缓存
+- 优化：校对log增加重复提示词等关键信息
+- fix/优化分句算法、对齐算法，减少零碎句子，优化匹配的判断顺序
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
