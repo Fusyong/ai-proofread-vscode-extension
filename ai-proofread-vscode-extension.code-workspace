@@ -4,5 +4,35 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"editor.tokenColorCustomizations": {
+			"[Light 2026 Default Light]": {
+				"textMateRules": [
+					{
+						"scope": [
+							"meta.expr.call.typst meta.expr.call.typst markup.content.typst",
+							"meta.expr.call.typst markup.content.typst + markup.content.typst",
+							"meta.expr.call.typst markup.content.typst markup.content.typst"
+						],
+						"settings": {
+							"foreground": "#0000FF"
+						}
+					}
+				]
+			},
+			"textMateRules": [
+				{
+					"scope": [
+						"markup.editorial.secondary.typst",
+						"meta.editorial.secondary.typst",
+						"markup.note.annotation.typst",
+						"meta.note.annotation.typst"
+					],
+					"settings": {
+						"foreground": "#68559E"
+					}
+				}
+			]
+		}
+	}
 }
