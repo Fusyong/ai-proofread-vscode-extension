@@ -269,11 +269,11 @@ Diff.diffWordsWithSpace(a, b, new Intl.Segmenter('zh', { granularity: 'word' }))
 流水线：
 
 ```text
-主循环 → 相邻/不相邻 1:1 rematch → refineAlignmentGaps → movements
+主循环 → 相邻/不相邻 1:1 rematch → refineAlignmentGaps（双侧缺口 → 邻接并入）→ movements
 ```
 
 - 模块：`src/alignmentGapRefine.ts`
 - 双侧连续 delete/insert 拼接后 `diffWordsWithSpace` + `Intl.Segmenter('zh')`，`equalRatio ≥ gapEqualRatio`（默认 0.55）收成一条 MATCH
-- 真替换（equalRatio 低）保持删/增，避免强行合并
+- **邻接并入**：双侧缺口之后，将紧邻 MATCH 的 DELETE/INSERT 自近及远试并入（`absorbUnmatchedIntoMatches`）；仅当词流 equalRatio **严格高于**原相似度才吸收。覆盖「对侧无 INSERT 的 N:1 半截抢配」（旧 `mergeDeleteIntoMatch` / `mergeInsertIntoMatch`）
+- 真替换（equalRatio 低 / 并入不升分）保持删/增
 - 配置：`ai-proofread.alignment.gapEqualRatio`
-- 已移除：`mergeDeleteIntoMatch` / `mergeInsertIntoMatch` 及多句 `generateMergedCandidates` 合并路径

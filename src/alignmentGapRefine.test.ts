@@ -8,7 +8,11 @@ vi.mock('vscode', () => ({
     }
 }));
 
-import { refineAlignmentGaps, wordDiffEqualRatio } from './alignmentGapRefine';
+import {
+    absorbUnmatchedIntoMatches,
+    refineAlignmentGaps,
+    wordDiffEqualRatio
+} from './alignmentGapRefine';
 import { alignDocuments } from './documentAligner';
 import { alignSentencesAnchor } from './sentenceAligner';
 import { splitChineseSentencesSimple } from './splitter';
@@ -73,6 +77,72 @@ describe('refineAlignmentGaps', () => {
         ];
         const refined = refineAlignmentGaps(alignment, { gapEqualRatio: 0.55 });
         expect(refined.map(x => x.type)).toEqual(['delete', 'insert']);
+    });
+});
+
+describe('absorbUnmatchedIntoMatches (N:1 半截抢配)', () => {
+    it('absorbs preceding DELETE into MATCH when equalRatio rises', () => {
+        const alignment = [
+            {
+                type: 'delete' as const,
+                a: '数字技术的应用，推动了',
+                a_index: 0
+            },
+            {
+                type: 'match' as const,
+                a: '传统媒体和新兴媒体的融合发展，形成了思想文化的传播能力。',
+                b: '数字技术的应用，推动了传统媒体和新兴媒体的融合发展，提升了思想文化的传播能力。',
+                similarity: 0.57,
+                a_index: 1,
+                b_index: 0
+            }
+        ];
+        const refined = absorbUnmatchedIntoMatches(alignment);
+        expect(refined).toHaveLength(1);
+        expect(refined[0].type).toBe('match');
+        expect(refined[0].a).toContain('数字技术的应用');
+        expect(refined[0].a).toContain('传统媒体');
+        expect(refined[0].similarity!).toBeGreaterThan(0.57);
+        expect(refined[0].a_indices).toEqual([0, 1]);
+    });
+
+    it('absorbs deletes on both sides of a low-score MATCH', () => {
+        const b =
+            '媒体融合，既不是简单的传统媒体加上新兴媒体，也不是新兴媒体与传统媒体的嫁接；不是简单的“互联网+传统媒体”，也不是“传统媒体+互联网”。';
+        const alignment = [
+            { type: 'delete' as const, a: '媒体融合，既不是简单的传统媒', a_index: 0 },
+            {
+                type: 'match' as const,
+                a: '体加上新兴媒体，也不是新兴媒体与传统媒体的嫁接；',
+                b,
+                similarity: 0.41,
+                a_index: 1,
+                b_index: 0
+            },
+            { type: 'delete' as const, a: '不是简单的“互联网+传统媒体”，', a_index: 2 },
+            { type: 'delete' as const, a: '也不是“传统媒体+互联网”。', a_index: 3 }
+        ];
+        const refined = absorbUnmatchedIntoMatches(alignment);
+        expect(refined).toHaveLength(1);
+        expect(refined[0].type).toBe('match');
+        expect(refined[0].a_indices).toEqual([0, 1, 2, 3]);
+        expect(refined[0].similarity!).toBeGreaterThan(0.41);
+    });
+
+    it('does not absorb unrelated DELETE next to MATCH', () => {
+        const alignment = [
+            { type: 'delete' as const, a: '刘先生创办了学校。', a_index: 0 },
+            {
+                type: 'match' as const,
+                a: '今天天气很好。',
+                b: '今天天气很好。',
+                similarity: 1,
+                a_index: 1,
+                b_index: 0
+            }
+        ];
+        const refined = absorbUnmatchedIntoMatches(alignment);
+        expect(refined.map(x => x.type)).toEqual(['delete', 'match']);
     });
 });
 
@@ -167,5 +237,34 @@ describe('acceptance: true replace stays unmatched', () => {
         );
         expect(mid.every(x => x.type === 'delete' || x.type === 'insert')).toBe(true);
         expect(mid.some(x => x.type === 'match')).toBe(false);
+    });
+});
+
+describe('acceptance: N:1 fragment via full pipeline', () => {
+    it('数字技术前半 DELETE 并入后半 MATCH', () => {
+        const a = [
+            '数字技术的应用，推动了',
+            '',
+            '传统媒体和新兴媒体的融合发展，形成了思想文化的传播能力。',
+            '后文一句完。'
+        ].join('\n');
+        const b = [
+            '数字技术的应用，推动了传统媒体和新兴媒体的融合发展，提升了思想文化的传播能力。',
+            '后文一句完。'
+        ].join('\n');
+        const { alignment } = alignDocuments(a, b, anchorOpts);
+        expect(
+            alignment.some(
+                x =>
+                    x.type === 'delete' &&
+                    (x.a ?? '').includes('数字技术的应用') &&
+                    !(x.a ?? '').includes('传统媒体')
+            )
+        ).toBe(false);
+        const m = alignment.find(
+            x => x.type === 'match' && (x.a ?? '').includes('数字技术') && (x.b ?? '').includes('数字技术')
+        );
+        expect(m).toBeTruthy();
+        expect((m!.a ?? '').includes('传统媒体')).toBe(true);
     });
 });
