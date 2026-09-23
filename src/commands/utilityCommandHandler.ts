@@ -27,6 +27,12 @@ import {
     deleteExcessBlankLines,
     type DeleteExcessBlankLinesOptions
 } from '../excessBlankLines';
+import {
+    DEFAULT_FORM_FEED_REPLACE_OPTIONS,
+    replaceFormFeeds,
+    type FormFeedReplaceMode,
+    type FormFeedReplaceOptions,
+} from '../formFeedReplacer';
 import { showDiff } from '../differ';
 import { ErrorUtils, FilePathUtils, normalizeLineEndings } from '../utils';
 import { parseToc, markTitles, TocItem } from '../titleMarker';
@@ -806,6 +812,197 @@ export class UtilityCommandHandler {
             vscode.window.showInformationMessage('多余空行已删除！');
         } catch (error) {
             ErrorUtils.showError(error, '删除多余空行时出错：');
+        }
+    }
+
+    /**
+     * 交互式收集「替换分页符」选项
+     */
+    private async promptReplaceFormFeedsOptions(): Promise<FormFeedReplaceOptions | undefined> {
+        const modePick = await vscode.window.showQuickPick(
+            [
+                {
+                    label: '注释（带页码）',
+                    description: '前后加空行，如 <!--  page 1 -->',
+                    value: 'comment' as FormFeedReplaceMode,
+                },
+                {
+                    label: '标题（带页码）',
+                    description: '前后加空行，如 ## page 1（便于按页切分）',
+                    value: 'heading' as FormFeedReplaceMode,
+                },
+                {
+                    label: '自定义模板',
+                    description: '留空则删除；\\p 为页码；\\n 为换行',
+                    value: 'custom' as FormFeedReplaceMode,
+                },
+            ],
+            {
+                title: '替换分页符（pdftotext 插入的 \\f）',
+                placeHolder: '选择替换方式',
+                ignoreFocusOut: true,
+            }
+        );
+        if (!modePick) {
+            return undefined;
+        }
+
+        let customTemplate: string | undefined;
+        if (modePick.value === 'custom') {
+            const templateInput = await vscode.window.showInputBox({
+                title: '替换分页符 · 自定义模板',
+                prompt: '替换模板：留空=直接删除；\\p=页码；\\n=换行；\\\\=反斜杠',
+                placeHolder: '例如：\\n<!-- page \\p -->\\n  或留空删除',
+                value: '',
+                ignoreFocusOut: true,
+            });
+            if (templateInput === undefined) {
+                return undefined;
+            }
+            customTemplate = templateInput;
+        }
+
+        const removePageNumPick = await vscode.window.showQuickPick(
+            [
+                {
+                    label: '是（默认）',
+                    description: '删除 \\f 前整行仅为「空格+数字」的页脚页码（pdftotext layout 常见）',
+                    value: true,
+                },
+                {
+                    label: '否',
+                    description: '只替换分页符，保留页脚页码行',
+                    value: false,
+                },
+            ],
+            {
+                title: '替换分页符 · 页脚页码',
+                placeHolder: '是否删除分页符前的页脚页码行？',
+                ignoreFocusOut: true,
+            }
+        );
+        if (!removePageNumPick) {
+            return undefined;
+        }
+
+        const startPageInput = await vscode.window.showInputBox({
+            title: '替换分页符 · 起始页码',
+            prompt: '第一个被处理的分页符对应的页码（可为负数）。pdftotext 的 \\f 多在页脚页码之后，默认 1 常与首个页脚数字一致',
+            value: String(DEFAULT_FORM_FEED_REPLACE_OPTIONS.startPage),
+            ignoreFocusOut: true,
+            validateInput: (value) => {
+                if (!/^-?\d+$/.test(value.trim())) {
+                    return '请输入整数（可为负数）';
+                }
+                return null;
+            },
+        });
+        if (startPageInput === undefined) {
+            return undefined;
+        }
+
+        const startIndexInput = await vscode.window.showInputBox({
+            title: '替换分页符 · 起始序号',
+            prompt: '从第几个分页符开始处理（1 表示第一个）',
+            value: String(DEFAULT_FORM_FEED_REPLACE_OPTIONS.startIndex),
+            ignoreFocusOut: true,
+            validateInput: (value) => {
+                const num = Number(value);
+                if (!Number.isInteger(num) || num < 1) {
+                    return '请输入不小于 1 的整数';
+                }
+                return null;
+            },
+        });
+        if (startIndexInput === undefined) {
+            return undefined;
+        }
+
+        const everyInput = await vscode.window.showInputBox({
+            title: '替换分页符 · 间隔',
+            prompt: '每几个分页符处理一次（1 表示每个都处理）',
+            value: String(DEFAULT_FORM_FEED_REPLACE_OPTIONS.every),
+            ignoreFocusOut: true,
+            validateInput: (value) => {
+                const num = Number(value);
+                if (!Number.isInteger(num) || num < 1) {
+                    return '请输入不小于 1 的整数';
+                }
+                return null;
+            },
+        });
+        if (everyInput === undefined) {
+            return undefined;
+        }
+
+        return {
+            mode: modePick.value,
+            startPage: Number(startPageInput.trim()),
+            startIndex: Number(startIndexInput),
+            every: Number(everyInput),
+            customTemplate,
+            removePrecedingPageNumber: removePageNumPick.value,
+        };
+    }
+
+    /**
+     * 处理替换分页符（form feed）命令
+     */
+    public async handleReplaceFormFeedsCommand(editor: vscode.TextEditor): Promise<void> {
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor!');
+            return;
+        }
+
+        try {
+            const options = await this.promptReplaceFormFeedsOptions();
+            if (!options) {
+                return;
+            }
+
+            const document = editor.document;
+            const selection = editor.selection;
+            const text = selection.isEmpty ? document.getText() : document.getText(selection);
+            const { text: processedText, replacedCount, totalCount, removedPageNumberCount } =
+                replaceFormFeeds(text, options);
+
+            if (totalCount === 0) {
+                vscode.window.showInformationMessage(
+                    '未发现分页符（\\f）。活文字 PDF 经 pdftotext 转换后通常会带有此字符。'
+                );
+                return;
+            }
+
+            if (replacedCount === 0) {
+                vscode.window.showInformationMessage(
+                    `共发现 ${totalCount} 个分页符，但按当前「起始序号 / 间隔」无需处理。`
+                );
+                return;
+            }
+
+            await editor.edit((editBuilder) => {
+                if (selection.isEmpty) {
+                    const fullRange = new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(document.getText().length)
+                    );
+                    editBuilder.replace(fullRange, processedText);
+                } else {
+                    editBuilder.replace(selection, processedText);
+                }
+            });
+
+            const skipped = totalCount - replacedCount;
+            const parts = [`已处理 ${replacedCount} / ${totalCount} 个分页符`];
+            if (removedPageNumberCount > 0) {
+                parts.push(`清除 ${removedPageNumberCount} 行页脚页码`);
+            }
+            if (skipped > 0) {
+                parts.push(`另保留 ${skipped} 个未处理`);
+            }
+            vscode.window.showInformationMessage(`${parts.join('；')}。`);
+        } catch (error) {
+            ErrorUtils.showError(error, '替换分页符时出错：');
         }
     }
 

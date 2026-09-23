@@ -103,6 +103,7 @@
   "cmd.formatParagraphs.title": "Format Paragraphs",
   "cmd.deleteInlineWhitespace.title": "Delete Inline Whitespace",
   "cmd.deleteExcessBlankLines.title": "Delete Excess Blank Lines",
+  "cmd.replaceFormFeeds.title": "Replace Form Feeds",
   "cmd.markTitlesFromToc.title": "Mark Titles from Table of Contents",
   "cmd.alignHeadings.title": "Align Headings",
   "cmd.segmentFile.title": "Segment and Count File",

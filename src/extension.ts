@@ -613,6 +613,16 @@ export async function activate(context: vscode.ExtensionContext) {
             await utilityHandler.handleDeleteExcessBlankLinesCommand(editor);
         }),
 
+        // 注册替换分页符命令
+        vscode.commands.registerCommand('ai-proofread.replaceFormFeeds', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await utilityHandler.handleReplaceFormFeedsCommand(editor);
+        }),
+
         // 注册根据目录标记标题命令
         vscode.commands.registerCommand('ai-proofread.markTitlesFromToc', async () => {
             const editor = vscode.window.activeTextEditor;

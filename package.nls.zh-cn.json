@@ -103,6 +103,7 @@
   "cmd.formatParagraphs.title": "整理段落",
   "cmd.deleteInlineWhitespace.title": "删除行内空白",
   "cmd.deleteExcessBlankLines.title": "删除多余空行",
+  "cmd.replaceFormFeeds.title": "替换分页符",
   "cmd.markTitlesFromToc.title": "按目录标记标题",
   "cmd.alignHeadings.title": "对齐标题",
   "cmd.segmentFile.title": "文件分词与统计",

@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.12.24",
+  "version": "1.12.25",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -367,6 +367,11 @@
       {
         "command": "ai-proofread.deleteExcessBlankLines",
         "title": "%cmd.deleteExcessBlankLines.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.replaceFormFeeds",
+        "title": "%cmd.replaceFormFeeds.title%",
         "category": "%category%"
       },
       {
@@ -2278,6 +2283,11 @@
           "command": "ai-proofread.deleteExcessBlankLines",
           "group": "ai-proofread@13",
           "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
+        },
+        {
+          "command": "ai-proofread.replaceFormFeeds",
+          "group": "ai-proofread@13",
+          "when": "resourceLangId == markdown || resourceLangId == text || resourceLangId == plaintext || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
         },
         {
           "command": "ai-proofread.markTitlesFromToc",

@@ -48,6 +48,13 @@ const PRESET_MODES = {
             layoutMode: 'layout' as const
         }
     },
+    raw: {
+        name: 'raw 模式（内容流顺序）',
+        description: '保持内容流顺序（取决于PDF生成方式）',
+        options: {
+            layoutMode: 'raw' as const
+        }
+    },
     simple: {
         name: '简单文档模式',
         description: '适合简单单列页面',
@@ -255,6 +262,7 @@ export async function collectPdfToTextOptions(): Promise<PdfToTextOptions | unde
     // 步骤1：选择预设模式或自定义
     const presetItems = [
         { label: PRESET_MODES.default.name, description: PRESET_MODES.default.description, value: 'default' },
+        { label: PRESET_MODES.raw.name, description: PRESET_MODES.raw.description, value: 'raw' },
         { label: PRESET_MODES.simple.name, description: PRESET_MODES.simple.description, value: 'simple' },
         { label: PRESET_MODES.table.name, description: PRESET_MODES.table.description, value: 'table' },
         { label: PRESET_MODES.ocr.name, description: PRESET_MODES.ocr.description, value: 'ocr' },
@@ -334,8 +342,7 @@ export async function collectPdfToTextOptions(): Promise<PdfToTextOptions | unde
             { label: 'simple', description: '简单单列模式（适合简单单列页面）', value: 'simple' as const },
             { label: 'simple2', description: '简单单列模式（处理轻微旋转文本，如OCR输出）', value: 'simple2' as const },
             { label: 'table', description: '表格模式（优化表格数据，保持行列对齐）', value: 'table' as const },
-            { label: 'lineprinter', description: '行打印机模式（固定字符间距和行高）', value: 'lineprinter' as const },
-            { label: 'raw', description: '保持内容流顺序（取决于PDF生成方式）', value: 'raw' as const }
+            { label: 'lineprinter', description: '行打印机模式（固定字符间距和行高）', value: 'lineprinter' as const }
         ];
 
         const layoutChoice = await vscode.window.showQuickPick(layoutItems, {
