@@ -137,7 +137,7 @@
 
 == 三、AI Proofreader简介
 
-基于上述对审校工作痛点和常见“一键出结果、侧栏点标签”审校应用问题的认识，结合日常审校实践，我开发了 AI Proofreader。AI Proofreader 是 VS Code 的一个扩展，二者均为开源软件，代码库均托管在 GitHub 平台。
+基于上述对审校工作痛点和常见“一键出结果、侧栏点标签”审校应用问题的认识，结合日常审校实践，我开发了#link("https://marketplace.visualstudio.com/items?itemName=HuangFusyong.ai-proofreader")[AI Proofreader]。AI Proofreader 是目前最流行的开源文本与代码编辑器 #link("https://code.visualstudio.com/")[VS Code] 的一个扩展，二者均为开源软件，代码库均托管在 GitHub 平台。
 
 AI Proofreader 面向图书编辑，可根据稿件的具体需要，结合编辑自身的审校经验进行深度配置；当然，大多数稿件也可按默认流程和参数直接使用。
 
