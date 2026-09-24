@@ -754,7 +754,7 @@
           "order": 12,
           "type": "string",
           "default": "qwen3.7-max",
-          "description": "阿里云百炼平台模型,如纯文本模型 qwen3.7-max, 图文视频模型qwen3.8-max, qwen3.7-plus, qwen3.6-flash等, 以及旧版 deepseek-v3"
+          "description": "阿里云百炼平台模型，高档如纯文本模型 qwen3.7-max、图文视频模型qwen3.8-max；中档如qwen3.7-plus；低档如qwen3.8-flash, qwen3.6-flash, 以及旧版 deepseek-v3"
         },
         "ai-proofread.apiKeys.deepseek": {
           "order": 13,
@@ -766,7 +766,7 @@
           "order": 14,
           "type": "string",
           "default": "deepseek-v4-pro",
-          "description": "Deepseek开放平台模型: deepseek-v4-pro、deepseek-v4-flash 等"
+          "description": "Deepseek开放平台模型: deepseek-v4-pro、deepseek-flash 等"
         },
         "ai-proofread.apiKeys.google": {
           "order": 15,
@@ -1289,7 +1289,7 @@
           "type": "object",
           "default": {},
           "description": "各功能 LLM 路由覆盖。键为 referencePrep | referencePrepScope | referencePrepRerank | editorialMemory。可设 inherit、inheritFrom、platform、model、disableThinking。",
-          "markdownDescription": "各功能 LLM 路由覆盖（侧栏顺序：预筛 → 规划 → 精排）。\n\n- **referencePrep**（参考资料规划）：默认跟随校对\n- **referencePrepScope**（预筛）、**referencePrepRerank**（精排）：默认跟随 **referencePrep**；`inheritFrom` 可选 `proofread` 或 `referencePrep`\n- **editorialMemory**：默认跟随校对\n- **disableThinking**：可选；本管线是否禁用思考。可在跟随平台/模型的同时单独覆盖思考；未设置则跟随上级（最终落到 `proofread.disableThinking`，默认关思考）\n\n示例：`{ \"referencePrep\": { \"disableThinking\": false }, \"referencePrepRerank\": { \"inherit\": true, \"inheritFrom\": \"referencePrep\" } }`",
+          "markdownDescription": "各功能 LLM 路由覆盖（侧栏顺序：预筛 → 规划 → 精排）。\n\n- **referencePrep**（参考资料规划）：默认跟随校对\n- **referencePrepScope**（预筛）、**referencePrepRerank**（精排）：默认跟随 **referencePrep**；`inheritFrom` 可选 `proofread` 或 `referencePrep`\n- **editorialMemory**：默认跟随校对\n- **disableThinking**：可选；本管线是否禁用思考。可在跟随平台/模型的同时单独覆盖思考；未设置则跟随上级（最终落到 `proofread.disableThinking`，默认关思考）\n\n规划 / 预筛 / 精排等多轮调用可改用价格较低的模型（大致由低到高）：`qwen3.7-flash`、`deepseek-flash`、`qwen3.8-flash`、`qwen3.7-plus`、`deepseek-v4-pro`（实际价目以厂商为准）。\n\n示例：`{ \"referencePrep\": { \"disableThinking\": false }, \"referencePrepRerank\": { \"inherit\": true, \"inheritFrom\": \"referencePrep\" } }`",
           "additionalProperties": {
             "type": "object",
             "properties": {
@@ -1414,9 +1414,9 @@
         "ai-proofread.defaultSplitLength": {
           "order": 41,
           "type": "number",
-          "default": 600,
+          "default": 1400,
           "minimum": 50,
-          "description": "默认的文本切分长度（字符数）"
+          "description": "默认的文本切分长度（字符数）。标题加长度切分时，长度阈值与最小长度由此值乘以对应比例得出"
         },
         "ai-proofread.defaultTitleLevels": {
           "order": 42,
@@ -1431,17 +1431,20 @@
           ],
           "description": "默认的标题切分级别（例如：[1,2] 表示按一级和二级标题切分）"
         },
-        "ai-proofread.titleAndLengthSplit.threshold": {
+        "ai-proofread.titleAndLengthSplit.thresholdRatio": {
           "order": 43,
           "type": "number",
-          "default": 1000,
-          "description": "标题加长度切分：段落长度阈值，超过此长度的段落将被切分"
+          "default": 1.5,
+          "minimum": 1,
+          "description": "标题加长度切分：长度阈值 = 切分长度 × 此比例；超过阈值的段落再按切分长度切开"
         },
-        "ai-proofread.titleAndLengthSplit.minLength": {
+        "ai-proofread.titleAndLengthSplit.minLengthRatio": {
           "order": 44,
           "type": "number",
-          "default": 120,
-          "description": "标题加长度切分：最小长度。过短片段若以不深于最低切分级别的标题开头则并入后一段，否则并入前一段"
+          "default": 0.2,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "标题加长度切分：最小长度 = 切分长度 × 此比例。过短片段若以不深于最低切分级别的标题开头则并入后一段，否则并入前一段"
         },
         "ai-proofread.proofread.defaultContextLevel": {
           "order": 45,

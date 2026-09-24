@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../utils';
 import {
+    BUDGET_MODEL_HINT,
     formatThinkingHintDetail,
     getDefaultInheritFrom,
     getRouteMeta,
@@ -47,7 +48,11 @@ export class ModelRoutesCommandHandler {
 
         const actions: Array<{ label: string; id: string; description?: string; detail?: string }> = [
             { label: '$(server-environment) 选择平台', id: 'platform' },
-            { label: '$(edit) 填写模型名称', id: 'model' },
+            {
+                label: '$(edit) 填写模型名称',
+                id: 'model',
+                detail: BUDGET_MODEL_HINT,
+            },
         ];
         if (routeId !== 'proofread') {
             const inherited = isRouteInherited(routeId);
@@ -88,7 +93,7 @@ export class ModelRoutesCommandHandler {
 
         const picked = await vscode.window.showQuickPick(actions, {
             title: '模型路由：' + getRouteMeta(routeId).label,
-            placeHolder: thinkingDetail,
+            placeHolder: BUDGET_MODEL_HINT + '｜' + thinkingDetail,
             ignoreFocusOut: true,
             matchOnDescription: true,
             matchOnDetail: true,
@@ -175,6 +180,8 @@ export class ModelRoutesCommandHandler {
         const value = await vscode.window.showInputBox({
             title: '模型名称（' + platform + '）',
             value: current || fallback,
+            prompt: BUDGET_MODEL_HINT,
+            placeHolder: '例如 qwen3.7-flash、deepseek-flash、qwen3.8-flash…',
             ignoreFocusOut: true,
             validateInput: (v) => (v.trim() ? null : '请输入模型名称'),
         });

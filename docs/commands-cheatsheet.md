@@ -325,9 +325,11 @@ flowchart LR
 | **proofread.rpm** | 每分钟最大请求数；百炼 qwen-max 稳定版常为 600 |
 | **proofread.maxConcurrent** | 最大并发请求数，默认 50 |
 | **proofread.disableThinking** | 校对管线默认禁用思考（快模式）；子管线可在「模型路由」中覆盖 |
-| **modelRoutes** | 各管线平台/模型/思考覆盖；`disableThinking` 可单独覆盖，侧栏会提示收益与负担 |
+| **modelRoutes** | 各管线平台/模型/思考覆盖；`disableThinking` 可单独覆盖；规划等多轮管线可选用较低价模型（如 qwen3.7-flash、deepseek-flash、qwen3.8-flash、qwen3.7-plus、deepseek-v4-pro） |
 | **convertQuotes** | 是否在校对后自动将半角引号转为中文全角 |
-| **defaultSplitLength** | 按长度切分时的默认目标字符数，默认 600 |
+| **defaultSplitLength** | 按长度切分时的默认目标字符数，默认 1400 |
+| **titleAndLengthSplit.thresholdRatio** | 标题加长度切分：长度阈值 = 切分长度 × 此比例，默认 1.5 |
+| **titleAndLengthSplit.minLengthRatio** | 标题加长度切分：最小长度 = 切分长度 × 此比例，默认 0.2 |
 | **defaultTitleLevels** | 按标题切分时的默认标题级别，如 [2] |
 | **proofread.defaultContextLevel** | 选段校对时默认的标题级语境范围，0 表示不用 |
 

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import {
+    BUDGET_MODEL_HINT,
     formatThinkingHintDetail,
     inheritFromLabel,
     MODEL_ROUTE_METAS,
@@ -61,6 +62,8 @@ export class ModelRoutesTreeDataProvider implements vscode.TreeDataProvider<Mode
             summary +
             '\n' +
             formatThinkingHintDetail(element.routeId, formatThinkingCurrentLabel(resolved)) +
+            '\n' +
+            BUDGET_MODEL_HINT +
             '\n\n点击配置平台、模型与思考模式';
         item.contextValue = element.canInherit ? 'modelRouteInheritable' : 'modelRouteProofread';
         item.command = {

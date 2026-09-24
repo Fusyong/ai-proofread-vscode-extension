@@ -7,13 +7,43 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { normalizeLineEndings } from './utils';
 
+/** 与 package.json `ai-proofread.defaultSplitLength` 默认值保持一致 */
+export const DEFAULT_SPLIT_LENGTH = 1400;
+/** 与 package.json `ai-proofread.titleAndLengthSplit.thresholdRatio` 默认值保持一致 */
+export const DEFAULT_THRESHOLD_RATIO = 1.5;
+/** 与 package.json `ai-proofread.titleAndLengthSplit.minLengthRatio` 默认值保持一致 */
+export const DEFAULT_MIN_LENGTH_RATIO = 0.2;
+
+/**
+ * 由切分长度与比例推导标题加长度切分的绝对参数。
+ */
+export function deriveTitleAndLengthParams(
+    cutBy: number,
+    thresholdRatio: number = DEFAULT_THRESHOLD_RATIO,
+    minLengthRatio: number = DEFAULT_MIN_LENGTH_RATIO
+): { cutBy: number; threshold: number; minLength: number } {
+    const safeCutBy = Math.max(50, Math.round(cutBy));
+    const safeThresholdRatio = Math.max(1, thresholdRatio);
+    const safeMinLengthRatio = Math.max(0, Math.min(1, minLengthRatio));
+    return {
+        cutBy: safeCutBy,
+        threshold: Math.max(safeCutBy, Math.round(safeCutBy * safeThresholdRatio)),
+        minLength: Math.max(0, Math.round(safeCutBy * safeMinLengthRatio))
+    };
+}
+
+/** 默认切分长度下的长度阈值（1400 × 1.5 = 2100） */
+export const DEFAULT_THRESHOLD = deriveTitleAndLengthParams(DEFAULT_SPLIT_LENGTH).threshold;
+/** 默认切分长度下的最小长度（1400 × 0.2 = 280） */
+export const DEFAULT_MIN_LENGTH = deriveTitleAndLengthParams(DEFAULT_SPLIT_LENGTH).minLength;
+
 /**
  * 将文本大致按长度切分（在指定长度前后最近一个空行处）
  * @param text 要切分的文本
  * @param cutBy 切分长度
  * @returns 切分后的文本列表
  */
-export function splitTextByLength(text: string, cutBy: number = 600): string[] {
+export function splitTextByLength(text: string, cutBy: number = DEFAULT_SPLIT_LENGTH): string[] {
     text = normalizeLineEndings(text);
     // 如果长度小于50，则按50字切分
     cutBy = Math.max(50, cutBy);
@@ -56,7 +86,7 @@ export function splitTextByLength(text: string, cutBy: number = 600): string[] {
 export function getSegmentFromPosition(
     document: { getText: () => string; offsetAt: (p: { line: number; character: number }) => number; positionAt: (offset: number) => { line: number; character: number } },
     position: { line: number; character: number },
-    cutBy: number = 600
+    cutBy: number = DEFAULT_SPLIT_LENGTH
 ): { segment: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } } | null {
     const text = document.getText();
     const offset = document.offsetAt(position);
@@ -120,7 +150,7 @@ export function getSegmentFromPositionWithMode(
     if (mode === 'title') {
         return getSegmentFromPositionByTitle(document, position, options.levels ?? [2]);
     }
-    return getSegmentFromPosition(document, position, options.cutBy ?? 600);
+    return getSegmentFromPosition(document, position, options.cutBy ?? DEFAULT_SPLIT_LENGTH);
 }
 
 /**
@@ -180,7 +210,7 @@ export function splitMarkdownByTitle(text: string, levels: number[] = [2]): stri
 export function splitMarkdownByTitleAndLengthWithContext(
     text: string,
     levels: number[] = [2],
-    cutBy: number = 600
+    cutBy: number = DEFAULT_SPLIT_LENGTH
 ): Array<{ context: string; target: string }> {
     // 先按标题切分
     const sections = splitMarkdownByTitle(text, levels);
@@ -212,7 +242,11 @@ export function splitMarkdownByTitleAndLengthWithContext(
  * @param cutBy 拆分长段落时的目标长度
  * @returns 处理后的段落列表
  */
-export function splitTextInListByLength(textList: string[], threshold: number = 1500, cutBy: number = 800): string[] {
+export function splitTextInListByLength(
+    textList: string[],
+    threshold: number = DEFAULT_THRESHOLD,
+    cutBy: number = DEFAULT_SPLIT_LENGTH
+): string[] {
     const textListShort: string[] = [];
     for (const text of textList) {
         if (text.length > threshold) {
@@ -267,7 +301,7 @@ function lowestSplitHeadingLevel(levels: number[] | undefined): number {
  */
 export function mergeShortParagraphs(
     paragraphs: string[],
-    minLength: number = 100,
+    minLength: number = DEFAULT_MIN_LENGTH,
     levels: number[] = [2]
 ): string[] {
     const lowestSplitLevel = lowestSplitHeadingLevel(levels);
@@ -742,7 +776,7 @@ export function buildParagraphBasedContext(
  */
 export function splitMarkdownByLengthWithParagraphsAsContext(
     text: string,
-    cutBy: number = 600,
+    cutBy: number = DEFAULT_SPLIT_LENGTH,
     beforeMinLength: number = 200,
     afterMinLength: number = 200,
     includeTargetInContext: boolean = false

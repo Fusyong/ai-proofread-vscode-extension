@@ -115,6 +115,13 @@ export const MODEL_ROUTE_METAS: ModelRouteMeta[] = [
 
 export const MODEL_ROUTES_VIEW_ID = 'ai-proofread.modelRoutes';
 
+/**
+ * 提醒用户规划/预筛/精排等管线可用更低价模型（大致由低到高；各平台实际价目以厂商为准）。
+ * 供侧栏 tooltip、配置菜单与模型输入框共用。
+ */
+export const BUDGET_MODEL_HINT =
+    '可用价格较低的模型（大致由低到高）：qwen3.7-flash、deepseek-flash、qwen3.8-flash、qwen3.7-plus、deepseek-v4-pro';
+
 export function getRouteMeta(routeId: ModelRouteId): ModelRouteMeta {
     const m = MODEL_ROUTE_METAS.find((x) => x.id === routeId);
     if (!m) throw new Error('unknown route: ' + routeId);

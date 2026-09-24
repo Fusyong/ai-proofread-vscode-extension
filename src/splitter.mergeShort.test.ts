@@ -8,7 +8,39 @@ vi.mock('vscode', () => ({
     }
 }));
 
-import { getLeadingMarkdownHeadingLevel, mergeShortParagraphs, splitText } from './splitter';
+import {
+    DEFAULT_MIN_LENGTH,
+    DEFAULT_MIN_LENGTH_RATIO,
+    DEFAULT_SPLIT_LENGTH,
+    DEFAULT_THRESHOLD,
+    DEFAULT_THRESHOLD_RATIO,
+    deriveTitleAndLengthParams,
+    getLeadingMarkdownHeadingLevel,
+    mergeShortParagraphs,
+    splitText
+} from './splitter';
+
+describe('deriveTitleAndLengthParams', () => {
+    it('derives threshold and minLength from cutBy and default ratios', () => {
+        expect(deriveTitleAndLengthParams(DEFAULT_SPLIT_LENGTH)).toEqual({
+            cutBy: 1400,
+            threshold: 2100,
+            minLength: 280
+        });
+        expect(DEFAULT_THRESHOLD).toBe(2100);
+        expect(DEFAULT_MIN_LENGTH).toBe(280);
+        expect(DEFAULT_THRESHOLD_RATIO).toBe(1.5);
+        expect(DEFAULT_MIN_LENGTH_RATIO).toBe(0.2);
+    });
+
+    it('respects custom ratios and clamps cutBy to at least 50', () => {
+        expect(deriveTitleAndLengthParams(10, 2, 0.5)).toEqual({
+            cutBy: 50,
+            threshold: 100,
+            minLength: 25
+        });
+    });
+});
 
 describe('getLeadingMarkdownHeadingLevel', () => {
     it('reads ATX heading level from the first non-empty line', () => {

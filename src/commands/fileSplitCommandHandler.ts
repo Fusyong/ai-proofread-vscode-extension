@@ -4,7 +4,13 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { handleFileSplit } from '../splitter';
+import {
+    DEFAULT_MIN_LENGTH_RATIO,
+    DEFAULT_SPLIT_LENGTH,
+    DEFAULT_THRESHOLD_RATIO,
+    deriveTitleAndLengthParams,
+    handleFileSplit
+} from '../splitter';
 import { parseHeadingLevels } from '../headingAligner';
 import { ErrorUtils, FilePathUtils } from '../utils';
 import { WebviewManager, ProcessResult } from '../ui/webviewManager';
@@ -166,12 +172,28 @@ export class FileSplitCommandHandler {
         }
     }
 
+    private getTitleAndLengthRatios(config: vscode.WorkspaceConfiguration): {
+        thresholdRatio: number;
+        minLengthRatio: number;
+    } {
+        return {
+            thresholdRatio: config.get<number>(
+                'titleAndLengthSplit.thresholdRatio',
+                DEFAULT_THRESHOLD_RATIO
+            ),
+            minLengthRatio: config.get<number>(
+                'titleAndLengthSplit.minLengthRatio',
+                DEFAULT_MIN_LENGTH_RATIO
+            )
+        };
+    }
+
     /**
      * 处理按长度切分模式
      */
     private async handleLengthMode(config: vscode.WorkspaceConfiguration, options: any): Promise<any> {
         // 获取配置中的默认切分长度
-        const defaultLength = config.get<number>('defaultSplitLength', 600);
+        const defaultLength = config.get<number>('defaultSplitLength', DEFAULT_SPLIT_LENGTH);
 
         // 让用户选择切分长度
         const inputLength = await vscode.window.showInputBox({
@@ -228,7 +250,7 @@ export class FileSplitCommandHandler {
 
         if (mode === 'titleContext') {
             // 获取带上下文切分的配置
-            const defaultCutBy = config.get<number>('defaultSplitLength', 600);
+            const defaultCutBy = config.get<number>('defaultSplitLength', DEFAULT_SPLIT_LENGTH);
 
             // 让用户选择切分长度
             const inputCutBy = await vscode.window.showInputBox({
@@ -252,17 +274,19 @@ export class FileSplitCommandHandler {
             options.cutBy = parseInt(inputCutBy);
 
         } else if (mode === 'title-length') {
-            // 获取标题加长度切分的配置
-            options.threshold = config.get<number>('titleAndLengthSplit.threshold', 1000);
-            options.cutBy = config.get<number>('defaultSplitLength', 600);
-            options.minLength = config.get<number>('titleAndLengthSplit.minLength', 120);
+            const { thresholdRatio, minLengthRatio } = this.getTitleAndLengthRatios(config);
+            const defaultCutBy = config.get<number>('defaultSplitLength', DEFAULT_SPLIT_LENGTH);
+            Object.assign(
+                options,
+                deriveTitleAndLengthParams(defaultCutBy, thresholdRatio, minLengthRatio)
+            );
 
             // 让用户确认或修改参数
             const message = `将使用以下参数进行标题加长度切分：\n\n` +
                 `- 标题级别: ${options.levels.join(',')}\n` +
-                `- 长度阈值: ${options.threshold} 字符\n` +
                 `- 切分长度: ${options.cutBy} 字符\n` +
-                `- 最小长度: ${options.minLength} 字符\n\n` +
+                `- 长度阈值: ${options.threshold} 字符（切分长度 × ${thresholdRatio}）\n` +
+                `- 最小长度: ${options.minLength} 字符（切分长度 × ${minLengthRatio}）\n\n` +
                 `是否继续？`;
 
             const confirm = await vscode.window.showInformationMessage(
@@ -277,10 +301,32 @@ export class FileSplitCommandHandler {
             }
 
             if (confirm === '修改参数') {
-                // 让用户修改阈值
+                // 先改切分长度，再按比例预填阈值与最小长度
+                const inputCutBy = await vscode.window.showInputBox({
+                    prompt: '请输入切分长度（切分长段落时的目标长度）',
+                    value: options.cutBy.toString(),
+                    validateInput: (value: string) => {
+                        const num = parseInt(value);
+                        if (isNaN(num)) {
+                            return '请输入有效的数字';
+                        }
+                        if (num < 50) {
+                            return '切分长度不能小于50字符';
+                        }
+                        return null;
+                    }
+                });
+                if (!inputCutBy) return null;
+                const derived = deriveTitleAndLengthParams(
+                    parseInt(inputCutBy),
+                    thresholdRatio,
+                    minLengthRatio
+                );
+                options.cutBy = derived.cutBy;
+
                 const inputThreshold = await vscode.window.showInputBox({
-                    prompt: '请输入长度阈值（超过此长度的段落将被切分）',
-                    value: options.threshold.toString(),
+                    prompt: `请输入长度阈值（超过此长度的段落将被切分；默认 = 切分长度 × ${thresholdRatio}）`,
+                    value: derived.threshold.toString(),
                     validateInput: (value: string) => {
                         const num = parseInt(value);
                         return isNaN(num) ? '请输入有效的数字' : null;
@@ -289,22 +335,9 @@ export class FileSplitCommandHandler {
                 if (!inputThreshold) return null;
                 options.threshold = parseInt(inputThreshold);
 
-                // 让用户修改切分长度
-                const inputCutBy = await vscode.window.showInputBox({
-                    prompt: '请输入切分长度（切分长段落时的目标长度）',
-                    value: options.cutBy.toString(),
-                    validateInput: (value: string) => {
-                        const num = parseInt(value);
-                        return isNaN(num) ? '请输入有效的数字' : null;
-                    }
-                });
-                if (!inputCutBy) return null;
-                options.cutBy = parseInt(inputCutBy);
-
-                // 让用户修改最小长度
                 const inputMinLength = await vscode.window.showInputBox({
-                    prompt: '请输入最小长度（过短片段若以不深于最低切分级别的标题开头则并入后一段，否则并入前一段）',
-                    value: options.minLength.toString(),
+                    prompt: `请输入最小长度（过短片段若以不深于最低切分级别的标题开头则并入后一段，否则并入前一段；默认 = 切分长度 × ${minLengthRatio}）`,
+                    value: derived.minLength.toString(),
                     validateInput: (value: string) => {
                         const num = parseInt(value);
                         return isNaN(num) ? '请输入有效的数字' : null;
@@ -321,7 +354,7 @@ export class FileSplitCommandHandler {
      * 处理按前后文最小长度扩展上下文的切分模式
      */
     private async handleParagraphContextMode(config: vscode.WorkspaceConfiguration, options: any): Promise<any> {
-        const defaultCutBy = config.get<number>('defaultSplitLength', 600);
+        const defaultCutBy = config.get<number>('defaultSplitLength', DEFAULT_SPLIT_LENGTH);
         const defaultBeforeMinLength = config.get<number>('paragraphContextSplit.beforeMinLength', 200);
         const defaultAfterMinLength = config.get<number>('paragraphContextSplit.afterMinLength', 200);
         const defaultIncludeTarget = config.get<boolean>(

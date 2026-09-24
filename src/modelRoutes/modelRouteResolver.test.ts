@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const configStore: Record<string, unknown> = {
     'proofread.platform': 'deepseek',
-    'proofread.models.deepseek': 'deepseek-v4-flash',
+    'proofread.models.deepseek': 'deepseek-flash',
     'proofread.disableThinking': true,
     modelRoutes: {},
 };
@@ -31,7 +31,7 @@ import {
 describe('modelRouteResolver', () => {
     beforeEach(() => {
         configStore['proofread.platform'] = 'deepseek';
-        configStore['proofread.models.deepseek'] = 'deepseek-v4-flash';
+        configStore['proofread.models.deepseek'] = 'deepseek-flash';
         configStore['proofread.disableThinking'] = true;
         configStore.modelRoutes = {};
     });
@@ -39,7 +39,7 @@ describe('modelRouteResolver', () => {
     it('resolves proofread from settings', () => {
         const r = resolveProofreadModel();
         expect(r.platform).toBe('deepseek');
-        expect(r.model).toBe('deepseek-v4-flash');
+        expect(r.model).toBe('deepseek-flash');
         expect(r.disableThinking).toBe(true);
         expect(r.thinkingOverridden).toBe(false);
     });
@@ -60,7 +60,7 @@ describe('modelRouteResolver', () => {
         const r = resolveModelRoute('referencePrepRerank');
         expect(r.inherited).toBe(true);
         expect(r.inheritedFrom).toBe('referencePrep');
-        expect(r.model).toBe('deepseek-v4-flash');
+        expect(r.model).toBe('deepseek-flash');
         expect(r.disableThinking).toBe(true);
     });
 
@@ -91,7 +91,7 @@ describe('modelRouteResolver', () => {
         };
         const rerank = resolveModelRoute('referencePrepRerank');
         expect(rerank.inheritedFrom).toBe('proofread');
-        expect(rerank.model).toBe('deepseek-v4-flash');
+        expect(rerank.model).toBe('deepseek-flash');
     });
 
     it('inherits disableThinking from proofread root', () => {
@@ -132,7 +132,7 @@ describe('modelRouteResolver', () => {
         const rerank = resolveModelRoute('referencePrepRerank');
         expect(rerank.disableThinking).toBe(true);
         expect(rerank.thinkingOverridden).toBe(true);
-        expect(rerank.model).toBe('deepseek-v4-flash');
+        expect(rerank.model).toBe('deepseek-flash');
     });
 
     it('setRouteDisableThinking clears override', async () => {

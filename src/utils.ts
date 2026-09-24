@@ -276,7 +276,7 @@ export class ConfigManager {
         if (platform === resolved.platform) return resolved.model;
         return this.config.get<string>(
             `proofread.models.${platform}`,
-            FALLBACK_MODEL[platform] ?? 'deepseek-v4-flash'
+            FALLBACK_MODEL[platform] ?? 'deepseek-flash'
         );
     }
 

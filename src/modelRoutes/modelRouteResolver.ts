@@ -25,7 +25,7 @@ export interface ResolvedModelRoute {
 /** 各平台未显式配置 proofread.models.* 时的默认模型（校对与各路由解析统一使用） */
 export const FALLBACK_MODEL: Record<string, string> = {
     aliyun: 'qwen3.7-max',
-    deepseek: 'deepseek-v4-flash',
+    deepseek: 'deepseek-flash',
     google: 'gemini-2.5-pro-exp-03-25',
     ollama: 'gemma3:1b',
 };
@@ -43,7 +43,7 @@ export function resolveProofreadModel(): ResolvedModelRoute {
     const platform = config.get<string>('proofread.platform', 'deepseek');
     const model = config.get<string>(
         'proofread.models.' + platform,
-        FALLBACK_MODEL[platform] ?? 'deepseek-v4-flash'
+        FALLBACK_MODEL[platform] ?? 'deepseek-flash'
     );
     return {
         platform,
