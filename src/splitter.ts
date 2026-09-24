@@ -325,8 +325,12 @@ export interface SplitOptions {
     levels?: number[];
     threshold?: number;
     minLength?: number;
-    beforeParagraphs?: number;
-    afterParagraphs?: number;
+    /** 上文最小字符数；达到后向前找到第一个合法切分点（空行或 Markdown 标题前） */
+    beforeMinLength?: number;
+    /** 下文最小字符数；达到后向后找到第一个合法切分点（空行或 Markdown 标题前） */
+    afterMinLength?: number;
+    /** 是否在 context 中保留 target：`<before>` + `<target>` + `<after>` */
+    includeTargetInContext?: boolean;
 }
 
 /**
@@ -358,12 +362,13 @@ export function splitText(
         // 按标题和长度切分，带上下文
         segments = splitMarkdownByTitleAndLengthWithContext(text, options.levels, options.cutBy);
     } else if (options.mode === 'paragraphContext') {
-        // 按长度切分，使用前后段落作为上下文
+        // 按长度切分，以前后文（按最小长度扩展到空行）作为上下文
         segments = splitMarkdownByLengthWithParagraphsAsContext(
             text,
             options.cutBy,
-            options.beforeParagraphs,
-            options.afterParagraphs
+            options.beforeMinLength,
+            options.afterMinLength,
+            options.includeTargetInContext
         );
     } else {
         // 标题加长度切分：先按标题切分，然后处理长短段落
@@ -402,8 +407,9 @@ export async function handleFileSplit(
         levels?: number[];
         threshold?: number;
         minLength?: number;
-        beforeParagraphs?: number;
-        afterParagraphs?: number;
+        beforeMinLength?: number;
+        afterMinLength?: number;
+        includeTargetInContext?: boolean;
     }
 ): Promise<{
     jsonFilePath: string;
@@ -446,10 +452,11 @@ export async function handleFileSplit(
             `标题级别: ${options.levels!.join(',')}\n` +
             `切分长度: ${options.cutBy}\n\n`;
     } else if (options.mode === 'paragraphContext') {
-        statsMessage = `切分模式: 扩展前后段落为上下文\n` +
+        statsMessage = `切分模式: 按长度扩展前后文为上下文\n` +
             `切分长度: ${options.cutBy}\n` +
-            `前文段落数: ${options.beforeParagraphs}\n` +
-            `后文段落数: ${options.afterParagraphs}\n\n`;
+            `上文最小长度: ${options.beforeMinLength}\n` +
+            `下文最小长度: ${options.afterMinLength}\n` +
+            `上下文中保留 target: ${options.includeTargetInContext ? '是' : '否'}\n\n`;
     } else {
         statsMessage = `切分模式: 标题加长度切分\n` +
             `标题级别: ${options.levels!.join(',')}\n` +
@@ -571,224 +578,174 @@ export function buildTitleBasedContext(
 }
 
 /**
- * 构建基于前后段落的上下文（带标签格式）
+ * 上下文扩展用的合法切分点：
+ * - 空行（仅空白字符也算）
+ * - Markdown ATX 标题行之前（`# `～`###### `）
+ */
+function isBlankContextSplitLine(line: string): boolean {
+    return line.trim() === '';
+}
+
+function isMarkdownAtxHeadingLine(line: string): boolean {
+    return /^(#{1,6}) /.test(line.trimStart());
+}
+
+/**
+ * 从选区起点向前取上文：先累计至少 minLength 字符，再继续向前找到第一个合法切分点
+ *（空行，或 Markdown 标题前）。
+ */
+export function extractBeforeContextByMinLength(
+    text: string,
+    selectionStart: number,
+    minLength: number
+): string {
+    if (minLength <= 0 || selectionStart <= 0) {
+        return '';
+    }
+    const before = text.slice(0, selectionStart);
+    const lines = before.split('\n');
+    let acc = 0;
+    let reachedMin = false;
+    let startLine = 0;
+
+    for (let i = lines.length - 1; i >= 0; i--) {
+        if (reachedMin) {
+            // 已达最小长度：再向前找切分点（尚未计入本行）
+            if (isBlankContextSplitLine(lines[i])) {
+                startLine = i + 1;
+                break;
+            }
+            if (isMarkdownAtxHeadingLine(lines[i])) {
+                // 切在标题前 → 上文从该标题起
+                startLine = i;
+                break;
+            }
+        }
+
+        acc += lines[i].length;
+        if (!reachedMin && acc >= minLength) {
+            reachedMin = true;
+            if (isBlankContextSplitLine(lines[i])) {
+                startLine = i + 1;
+                break;
+            }
+            // 恰落在标题行上：标题已计入长度，继续向前找下一个切分点
+        }
+
+        if (i === 0) {
+            startLine = 0;
+        }
+    }
+
+    if (!reachedMin) {
+        startLine = 0;
+    }
+
+    return lines.slice(startLine).join('\n').replace(/\s+$/, '');
+}
+
+/**
+ * 从选区终点向后取下文：先累计至少 minLength 字符，再继续向后找到第一个合法切分点
+ *（空行，或 Markdown 标题前）。
+ */
+export function extractAfterContextByMinLength(
+    text: string,
+    selectionEnd: number,
+    minLength: number
+): string {
+    if (minLength <= 0 || selectionEnd >= text.length) {
+        return '';
+    }
+    const after = text.slice(selectionEnd);
+    const lines = after.split('\n');
+    let acc = 0;
+    let reachedMin = false;
+    let endLineExclusive = lines.length;
+
+    for (let i = 0; i < lines.length; i++) {
+        if (reachedMin) {
+            // 已达最小长度：再向后找切分点（尚未计入本行）
+            if (isBlankContextSplitLine(lines[i]) || isMarkdownAtxHeadingLine(lines[i])) {
+                endLineExclusive = i;
+                break;
+            }
+        }
+
+        acc += lines[i].length;
+        if (!reachedMin && acc >= minLength) {
+            reachedMin = true;
+            if (isBlankContextSplitLine(lines[i])) {
+                endLineExclusive = i;
+                break;
+            }
+            // 恰落在标题行上：标题已计入长度，继续向后找下一个切分点
+        }
+    }
+
+    if (!reachedMin) {
+        endLineExclusive = lines.length;
+    }
+
+    return lines
+        .slice(0, endLineExclusive)
+        .join('\n')
+        .replace(/^\s+/, '')
+        .replace(/\s+$/, '');
+}
+
+/**
+ * 构建基于前后文最小长度的上下文（带标签格式）
  * @param text 完整文本
  * @param selectionStart 选中文本起始字符位置（从0开始）
  * @param selectionEnd 选中文本结束字符位置（从0开始，不包含）
- * @param beforeParagraphs 前文段落数量
- * @param afterParagraphs 后文段落数量
- * @returns 带标签的上下文文本，格式为 <before>...</before> 和 <after>...</after>
+ * @param beforeMinLength 上文最小字符数（达到后向前找合法切分点；0 表示不要上文）
+ * @param afterMinLength 下文最小字符数（达到后向后找合法切分点；0 表示不要下文）
+ * @param includeTargetInContext 是否在 context 中间保留 `<target>...</target>`
+ * @returns 带标签的上下文文本
  */
 export function buildParagraphBasedContext(
     text: string,
     selectionStart: number,
     selectionEnd: number,
-    beforeParagraphs: number = 2,
-    afterParagraphs: number = 2
+    beforeMinLength: number = 200,
+    afterMinLength: number = 200,
+    includeTargetInContext: boolean = false
 ): string {
     text = normalizeLineEndings(text);
-    // 将文本按行分割（已统一为 LF，行间 +1 即换行符）
-    const textLines = text.split('\n');
+    const start = Math.max(0, Math.min(selectionStart, text.length));
+    const end = Math.max(start, Math.min(selectionEnd, text.length));
 
-    // 计算选中文本的行号范围
-    const beforeSelectionText = text.substring(0, selectionStart);
-    const selectionStartLine = beforeSelectionText.split('\n').length - 1;
-    const selectionText = text.substring(selectionStart, selectionEnd);
-    const selectionEndLine = selectionStartLine + selectionText.split('\n').length - 1;
+    const beforeText = extractBeforeContextByMinLength(text, start, beforeMinLength);
+    const afterText = extractAfterContextByMinLength(text, end, afterMinLength);
 
-    // 找到选中文本所在段落的边界
-    let paragraphStart = selectionStartLine;
-    let paragraphEnd = selectionEndLine;
-
-    // 如果selectionEndLine指向空行，向上找到最后一个非空行
-    while (paragraphEnd >= paragraphStart && paragraphEnd < textLines.length && textLines[paragraphEnd].trim() === '') {
-        paragraphEnd--;
-    }
-    // 确保paragraphEnd不小于paragraphStart
-    if (paragraphEnd < paragraphStart) {
-        paragraphEnd = paragraphStart;
-    }
-
-    // 向上查找段落开始
-    while (paragraphStart > 0) {
-        const prevLine = textLines[paragraphStart - 1];
-        if (prevLine.trim() === '') {
-            // 遇到空行，说明找到了段落边界
-            break;
-        }
-        paragraphStart--;
-    }
-
-    // 向下查找段落结束（确保包含所有连续的非空行）
-    while (paragraphEnd < textLines.length - 1) {
-        const nextLine = textLines[paragraphEnd + 1];
-        if (nextLine.trim() === '') {
-            // 遇到空行，说明找到了段落边界
-            break;
-        }
-        paragraphEnd++;
-    }
-
-    // 获取前文段落（排除target所在段落）
-    let beforeStart = paragraphStart;
-    let beforeCount = 0;
-    const beforeParagraphsList: string[] = [];
-
-    // 如果选中文本前面还有文字（在同一个段落内），先添加这部分作为第一个before段落
-    // 使用字符位置精确提取，而不是行号
-    if (selectionStart > 0) {
-        // 找到段落开始的字符位置
-        let paragraphStartPos = 0;
-        for (let i = 0; i < paragraphStart; i++) {
-            paragraphStartPos += textLines[i].length + 1; // +1 为换行符 \n（已统一为 LF）
-        }
-
-        // 如果选中文本开始位置大于段落开始位置，说明前面有文字
-        if (selectionStart > paragraphStartPos) {
-            const beforeText = text.substring(paragraphStartPos, selectionStart);
-            // 移除末尾的空行和空白字符
-            const trimmedBeforeText = beforeText.replace(/\s+$/, '');
-            if (trimmedBeforeText.trim().length > 0) {
-                beforeParagraphsList.push(trimmedBeforeText);
-                beforeCount++;
-            }
-        }
-    }
-
-    // 继续向上查找其他前文段落
-    while (beforeCount < beforeParagraphs && beforeStart > 0) {
-        // 向上跳过空行
-        while (beforeStart > 0 && textLines[beforeStart - 1].trim() === '') {
-            beforeStart--;
-        }
-
-        // 如果已经到文档开头，停止
-        if (beforeStart === 0) {
-            break;
-        }
-
-        // 向上查找段落开始
-        let paraStart = beforeStart;
-        while (paraStart > 0 && textLines[paraStart - 1].trim() !== '') {
-            paraStart--;
-        }
-
-        // 提取段落内容（不包含target所在段落）
-        if (paraStart < paragraphStart) {
-            const paraLines = textLines.slice(paraStart, paragraphStart);
-            // 移除末尾的空行
-            while (paraLines.length > 0 && paraLines[paraLines.length - 1].trim() === '') {
-                paraLines.pop();
-            }
-            if (paraLines.length > 0) {
-                beforeParagraphsList.unshift(paraLines.join('\n'));
-                beforeCount++;
-            }
-            // 更新beforeStart为当前段落开始，继续向上查找
-            beforeStart = paraStart;
-        } else {
-            // 没有找到前文段落，停止
-            break;
-        }
-    }
-
-    // 获取后文段落（排除target所在段落）
-    let afterCount = 0;
-    const afterParagraphsList: string[] = [];
-
-    // 如果选中文本后面还有文字（在同一个段落内），先添加这部分作为第一个after段落
-    // 使用字符位置精确提取，而不是行号
-    if (selectionEnd < text.length) {
-        // 找到段落结束的字符位置（包含段落最后一行的最后一个字符）
-        let paragraphEndPos = 0;
-        for (let i = 0; i <= paragraphEnd; i++) {
-            paragraphEndPos += textLines[i].length;
-            if (i < paragraphEnd) {
-                paragraphEndPos += 1; // +1 为换行符 \n（已统一为 LF）
-            }
-        }
-
-        // 如果选中文本结束位置小于段落结束位置，说明后面有文字
-        if (selectionEnd < paragraphEndPos) {
-            const afterText = text.substring(selectionEnd, paragraphEndPos);
-            // 移除开头的空白字符和空行
-            const trimmedAfterText = afterText.replace(/^\s+/, '');
-            // 移除末尾的空行和空白字符
-            const finalAfterText = trimmedAfterText.replace(/\s+$/, '');
-            if (finalAfterText.trim().length > 0) {
-                afterParagraphsList.push(finalAfterText);
-                afterCount++;
-            }
-        }
-    }
-
-    // 继续向下查找其他后文段落
-    // 从paragraphEnd的下一个位置开始查找（paragraphEnd是当前段落的最后一行）
-    let searchStart = paragraphEnd;
-    while (afterCount < afterParagraphs && searchStart < textLines.length - 1) {
-        // 移动到下一个位置（跳过当前段落）
-        searchStart++;
-
-        // 向下跳过空行（包括只包含空白字符的行）
-        while (searchStart < textLines.length && textLines[searchStart].trim() === '') {
-            searchStart++;
-        }
-
-        // 如果已经到文档末尾，停止
-        if (searchStart >= textLines.length) {
-            break;
-        }
-
-        // 找到下一个段落的开始位置
-        const paraStart = searchStart;
-
-        // 向下查找段落结束
-        let paraEnd = paraStart;
-        while (paraEnd < textLines.length - 1 && textLines[paraEnd + 1].trim() !== '') {
-            paraEnd++;
-        }
-
-        // 提取段落内容
-        const paraLines = textLines.slice(paraStart, paraEnd + 1);
-        // 移除开头的空行（虽然理论上不应该有，但为了安全）
-        while (paraLines.length > 0 && paraLines[0].trim() === '') {
-            paraLines.shift();
-        }
-        if (paraLines.length > 0) {
-            afterParagraphsList.push(paraLines.join('\n'));
-            afterCount++;
-        }
-        // 更新searchStart为当前段落结束，继续向下查找下一个段落
-        searchStart = paraEnd;
-    }
-
-    // 构建带标签的上下文
     const contextParts: string[] = [];
-
-    if (beforeParagraphsList.length > 0) {
-        contextParts.push(`<before>\n${beforeParagraphsList.join('\n\n')}\n</before>`);
+    if (beforeText.trim().length > 0) {
+        contextParts.push(`<before>\n${beforeText}\n</before>`);
     }
-
-    if (afterParagraphsList.length > 0) {
-        contextParts.push(`<after>\n${afterParagraphsList.join('\n\n')}\n</after>`);
+    if (includeTargetInContext) {
+        contextParts.push(`<target>\n${text.slice(start, end)}\n</target>`);
     }
-
+    if (afterText.trim().length > 0) {
+        contextParts.push(`<after>\n${afterText}\n</after>`);
+    }
     return contextParts.join('\n\n');
 }
 
 /**
- * 将markdown文本按长度切分，使用前后段落作为上下文
+ * 将markdown文本按长度切分，使用前后文（按最小长度扩展到空行）作为上下文
  * @param text markdown文本
  * @param cutBy 切分长度
- * @param beforeParagraphs 前文段落数量
- * @param afterParagraphs 后文段落数量
+ * @param beforeMinLength 上文最小字符数
+ * @param afterMinLength 下文最小字符数
+ * @param includeTargetInContext 是否在 context 中保留 target
  * @returns 切分后的文本列表，每个元素包含完整上下文和目标文本
  */
 export function splitMarkdownByLengthWithParagraphsAsContext(
     text: string,
     cutBy: number = 600,
-    beforeParagraphs: number = 1,
-    afterParagraphs: number = 1
+    beforeMinLength: number = 200,
+    afterMinLength: number = 200,
+    includeTargetInContext: boolean = false
 ): Array<{ context: string; target: string }> {
     text = normalizeLineEndings(text);
     // 按长度切分文本
@@ -797,8 +754,8 @@ export function splitMarkdownByLengthWithParagraphsAsContext(
     // 存储结果
     const result: Array<{ context: string; target: string }> = [];
 
-    // 为每个片段添加前后段落上下文
-    pieces.forEach((piece, index) => {
+    // 为每个片段添加前后文上下文
+    pieces.forEach((piece) => {
         // 找到当前片段在原文中的位置
         const pieceStart = text.indexOf(piece);
         if (pieceStart === -1) {
@@ -818,8 +775,9 @@ export function splitMarkdownByLengthWithParagraphsAsContext(
             text,
             pieceStart,
             pieceEnd,
-            beforeParagraphs,
-            afterParagraphs
+            beforeMinLength,
+            afterMinLength,
+            includeTargetInContext
         );
 
         result.push({

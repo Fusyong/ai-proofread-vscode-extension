@@ -10,6 +10,7 @@ import type { UserSourceTextCharacteristicPrompt } from './sourceTextCharacteris
 import { SourceTextCharacteristicManager } from './sourceTextCharacteristicManager';
 import type { SourceTextCharacteristicsPickResult } from './sourceTextCharacteristicsPicker';
 import { FilePathUtils } from './utils';
+import { CONTEXT_BUILD_ADJACENT_BY_LENGTH } from './proofreadSelectionLastRun';
 
 export type ContextMode = 'none' | 'adjacentParagraphs' | 'headingScope';
 
@@ -18,8 +19,12 @@ export type RepetitionMode = 'none' | 'target' | 'all';
 export interface ProofreadSelectionWithMemoryConfig {
     sourceTextHint?: string;
     contextMode: ContextMode;
-    beforeParagraphs: number;
-    afterParagraphs: number;
+    /** 上文最小字符数；达到后向前找合法切分点（空行或 Markdown 标题前） */
+    beforeMinLength: number;
+    /** 下文最小字符数；达到后向后找合法切分点（空行或 Markdown 标题前） */
+    afterMinLength: number;
+    /** 是否在 context 中间保留 `<target>...</target>` */
+    includeTargetInContext: boolean;
     /** 1–6，仅 `headingScope` 时有效 */
     headingLevel: 1 | 2 | 3 | 4 | 5 | 6;
     /** 相对工作区根路径，正斜杠；空数组表示不用参考文件 */
@@ -48,8 +53,9 @@ export function buildDefaultProofreadSelectionWithMemoryConfig(
     return {
         sourceTextHint: 'none',
         contextMode: 'none',
-        beforeParagraphs: 1,
-        afterParagraphs: 1,
+        beforeMinLength: 200,
+        afterMinLength: 200,
+        includeTargetInContext: false,
         headingLevel: 2,
         referenceFiles: [],
         temperature,
@@ -93,10 +99,19 @@ export function parseProofreadSelectionWithMemoryConfig(
         repetitionMode = raw.repetitionMode as RepetitionMode;
     }
 
-    let beforeParagraphs =
-        typeof raw.beforeParagraphs === 'number' ? clampInt(raw.beforeParagraphs, 0, 10) : defaults.beforeParagraphs;
-    let afterParagraphs =
-        typeof raw.afterParagraphs === 'number' ? clampInt(raw.afterParagraphs, 0, 10) : defaults.afterParagraphs;
+    let beforeMinLength =
+        typeof raw.beforeMinLength === 'number'
+            ? clampInt(raw.beforeMinLength, 0, 10000)
+            : defaults.beforeMinLength;
+    let afterMinLength =
+        typeof raw.afterMinLength === 'number'
+            ? clampInt(raw.afterMinLength, 0, 10000)
+            : defaults.afterMinLength;
+
+    let includeTargetInContext = defaults.includeTargetInContext;
+    if (typeof raw.includeTargetInContext === 'boolean') {
+        includeTargetInContext = raw.includeTargetInContext;
+    }
 
     let headingLevel = defaults.headingLevel;
     if (typeof raw.headingLevel === 'number') {
@@ -125,8 +140,9 @@ export function parseProofreadSelectionWithMemoryConfig(
     return {
         sourceTextHint,
         contextMode,
-        beforeParagraphs,
-        afterParagraphs,
+        beforeMinLength,
+        afterMinLength,
+        includeTargetInContext,
         headingLevel,
         referenceFiles,
         temperature,
@@ -136,23 +152,31 @@ export function parseProofreadSelectionWithMemoryConfig(
 
 export function mapConfigToSelectionContext(cfg: ProofreadSelectionWithMemoryConfig): {
     contextLevel: string | undefined;
-    beforeParagraphs: number;
-    afterParagraphs: number;
+    beforeMinLength: number;
+    afterMinLength: number;
+    includeTargetInContext: boolean;
 } {
     if (cfg.contextMode === 'none') {
-        return { contextLevel: undefined, beforeParagraphs: 0, afterParagraphs: 0 };
+        return {
+            contextLevel: undefined,
+            beforeMinLength: 0,
+            afterMinLength: 0,
+            includeTargetInContext: false
+        };
     }
     if (cfg.contextMode === 'adjacentParagraphs') {
         return {
-            contextLevel: '前后增加段落',
-            beforeParagraphs: cfg.beforeParagraphs,
-            afterParagraphs: cfg.afterParagraphs
+            contextLevel: CONTEXT_BUILD_ADJACENT_BY_LENGTH,
+            beforeMinLength: cfg.beforeMinLength,
+            afterMinLength: cfg.afterMinLength,
+            includeTargetInContext: cfg.includeTargetInContext
         };
     }
     return {
         contextLevel: getHeadingContextLevel(cfg.headingLevel),
-        beforeParagraphs: 0,
-        afterParagraphs: 0
+        beforeMinLength: 0,
+        afterMinLength: 0,
+        includeTargetInContext: false
     };
 }
 

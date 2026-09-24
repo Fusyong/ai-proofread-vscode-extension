@@ -10,33 +10,42 @@ describe('parseProofreadSelectionLastRun', () => {
 
     it('keeps valid fields and drops invalid enums', () => {
         const parsed = parseProofreadSelectionLastRun({
-            contextBuildMethod: '前后增加段落',
+            contextBuildMethod: '按长度扩展前后文',
             headingLevel: '9 级标题',
             repetitionMode: 'all',
-            beforeParagraphs: 3,
-            afterParagraphs: 0,
+            beforeMinLength: 300,
+            afterMinLength: 0,
+            includeTargetInContext: true,
             temperature: 0.4,
             useReference: true,
             referenceFilePath: '  D:\\refs\\a.md  '
         });
         expect(parsed).toEqual({
-            contextBuildMethod: '前后增加段落',
+            contextBuildMethod: '按长度扩展前后文',
             repetitionMode: 'all',
-            beforeParagraphs: 3,
-            afterParagraphs: 0,
+            beforeMinLength: 300,
+            afterMinLength: 0,
+            includeTargetInContext: true,
             temperature: 0.4,
             useReference: true,
             referenceFilePath: 'D:\\refs\\a.md'
         });
     });
 
-    it('clamps paragraph counts to [0, 10]', () => {
+    it('maps legacy contextBuildMethod「前后增加段落」', () => {
         const parsed = parseProofreadSelectionLastRun({
-            beforeParagraphs: 99,
-            afterParagraphs: -2
+            contextBuildMethod: '前后增加段落'
         });
-        expect(parsed?.beforeParagraphs).toBe(10);
-        expect(parsed?.afterParagraphs).toBe(0);
+        expect(parsed?.contextBuildMethod).toBe('按长度扩展前后文');
+    });
+
+    it('clamps min lengths to [0, 10000]', () => {
+        const parsed = parseProofreadSelectionLastRun({
+            beforeMinLength: 99999,
+            afterMinLength: -2
+        });
+        expect(parsed?.beforeMinLength).toBe(10000);
+        expect(parsed?.afterMinLength).toBe(0);
     });
 
     it('drops temperature outside [0, 2)', () => {

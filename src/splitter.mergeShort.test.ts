@@ -149,7 +149,7 @@ describe('splitText drops leading whitespace-only fragments', () => {
         ['length', { mode: 'length' as const, cutBy: 600 }],
         ['title-length', { mode: 'title-length' as const, levels: [2], threshold: 1000, cutBy: 600, minLength: 20 }],
         ['titleContext', { mode: 'titleContext' as const, levels: [2], cutBy: 600 }],
-        ['paragraphContext', { mode: 'paragraphContext' as const, cutBy: 600, beforeParagraphs: 1, afterParagraphs: 1 }],
+        ['paragraphContext', { mode: 'paragraphContext' as const, cutBy: 600, beforeMinLength: 200, afterMinLength: 200 }],
     ])('mode %s discards a blank preamble before the first heading/body', (_mode, options) => {
         const text = `\n\n   \n\n## 第一章\n\n${body}\n`;
         const { segments } = splitText(text, options);

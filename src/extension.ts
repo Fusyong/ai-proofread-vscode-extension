@@ -217,7 +217,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 { label: '按标题切分', value: 'title' },
                 { label: '按标题和长度切分', value: 'title-length' },
                 { label: '按长度切分，以标题范围为上下文', value: 'titleContext' },
-                { label: '按长度切分，以前后段落为上下文', value: 'paragraphContext' },
+                { label: '按长度切分，按长度扩展前后文为上下文', value: 'paragraphContext' },
             ], {
                 placeHolder: '请选择切分模式',
                 canPickMany: false

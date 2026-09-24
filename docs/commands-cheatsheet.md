@@ -207,7 +207,7 @@ flowchart TD
     Q2 -->|是且不太长| ByTitle["按标题切分 <br> split by title"]
     Q2 -->|长短不一| ByTitleLen["按标题+长度 <br> split by title and length"]
     Q2 -->|需要整章作语境| WithTitleCtx["带标题范围上下文 <br> split by length with title context"]
-    Q1 -->|有只需前后段语境| WithParaCtx["带前后段落上下文 <br> split by length with paragraph context"]
+    Q1 -->|有只需前后文语境| WithParaCtx["带前后文长度上下文 <br> split by length with adjacent context"]
 
     ByLen --> Out["得到 .json + .json.md"]
     ByTitle --> Out
@@ -273,7 +273,7 @@ flowchart LR
 | 按标题切分文件 | 输入标题级别（如 1,2） |
 | 按标题和长度切分文件 | 题下过长则再切、过短则合并 |
 | 按长度切分文件，以标题范围为上下文 | 为每段配上所在标题范围的上下文（注意 token 费用） |
-| 按长度切分文件，以前后段落为上下文 | 为每段配上前后段落作为上下文（注意 token 费用） |
+| 按长度切分文件，按长度扩展前后文为上下文 | 为每段按最小长度扩展前后文至空行作为上下文（注意 token 费用） |
 | 合并两个文件 | 合并两个 JSON，或把同一 Markdown 全文并入各条；可忽略当前文件指定标题级别开头的单元 |
 | **资料检索**（切分与合并的分支） | |
 | 打开资料检索面板 ⭐ | 打开 **检索面板**（配置、时间线、勾选命中、导出/合并；不做校对） |

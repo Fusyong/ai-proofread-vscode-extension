@@ -32,6 +32,7 @@ import {
 import { WebviewManager, ProcessResult } from '../ui/webviewManager';
 import { showQuickPickWithDefault } from '../ui/quickPickDefault';
 import {
+    CONTEXT_BUILD_ADJACENT_BY_LENGTH,
     loadProofreadSelectionLastRun,
     PROOFREAD_SELECTION_CONTEXT_BUILD_METHODS,
     PROOFREAD_SELECTION_HEADING_LEVELS,
@@ -507,47 +508,67 @@ export class ProofreadCommandHandler {
             const contextBuildMethod = contextBuildPick.label as ProofreadSelectionContextBuildMethod;
 
             let contextLevel: string | undefined;
-            let beforeParagraphs: number = 0;
-            let afterParagraphs: number = 0;
+            let beforeMinLength: number = 0;
+            let afterMinLength: number = 0;
+            let includeTargetInContext: boolean = false;
 
-            if (contextBuildMethod === '前后增加段落') {
+            if (contextBuildMethod === CONTEXT_BUILD_ADJACENT_BY_LENGTH) {
                 const beforeDefault =
-                    lastRun?.beforeParagraphs !== undefined ? String(lastRun.beforeParagraphs) : '1';
-                const beforeParagraphsInput = await vscode.window.showInputBox({
-                    prompt: '前文增加段落个数',
+                    lastRun?.beforeMinLength !== undefined ? String(lastRun.beforeMinLength) : '200';
+                const beforeMinLengthInput = await vscode.window.showInputBox({
+                    prompt: '上文最小长度（字符数；达到后向前找到第一个合法切分点：空行或 Markdown 标题前；0 表示不要上文）',
                     value: beforeDefault,
                     validateInput: (value: string) => {
                         const num = parseInt(value);
-                        if (isNaN(num) || num < 0 || num > 10) {
-                            return '请输入一个[0:10]之间的数字';
+                        if (isNaN(num) || num < 0 || num > 10000) {
+                            return '请输入一个[0:10000]之间的数字';
                         }
                         return null;
                     }
                 });
-                if (beforeParagraphsInput === undefined) {
+                if (beforeMinLengthInput === undefined) {
                     return;
                 }
-                beforeParagraphs = beforeParagraphsInput ? parseInt(beforeParagraphsInput) : 2;
+                beforeMinLength = parseInt(beforeMinLengthInput, 10);
 
                 const afterDefault =
-                    lastRun?.afterParagraphs !== undefined ? String(lastRun.afterParagraphs) : '1';
-                const afterParagraphsInput = await vscode.window.showInputBox({
-                    prompt: '后文增加段落个数',
+                    lastRun?.afterMinLength !== undefined ? String(lastRun.afterMinLength) : '200';
+                const afterMinLengthInput = await vscode.window.showInputBox({
+                    prompt: '下文最小长度（字符数；达到后向后找到第一个合法切分点：空行或 Markdown 标题前；0 表示不要下文）',
                     value: afterDefault,
                     validateInput: (value: string) => {
                         const num = parseInt(value);
-                        if (isNaN(num) || num < 0 || num > 10) {
-                            return '请输入一个[0:10]之间的数字';
+                        if (isNaN(num) || num < 0 || num > 10000) {
+                            return '请输入一个[0:10000]之间的数字';
                         }
                         return null;
                     }
                 });
-                if (afterParagraphsInput === undefined) {
+                if (afterMinLengthInput === undefined) {
                     return;
                 }
-                afterParagraphs = afterParagraphsInput ? parseInt(afterParagraphsInput) : 2;
+                afterMinLength = parseInt(afterMinLengthInput, 10);
 
-                contextLevel = '前后增加段落';
+                const includeTargetLast =
+                    lastRun?.includeTargetInContext === true
+                        ? '是'
+                        : lastRun?.includeTargetInContext === false
+                          ? '否'
+                          : undefined;
+                const includeTargetPick = await showQuickPickWithDefault(
+                    [{ label: '否' }, { label: '是' }],
+                    {
+                        placeHolder: '是否在上下文中间保留 target（<before>+<target>+<after>）？',
+                        ignoreFocusOut: true,
+                        lastValue: includeTargetLast
+                    }
+                );
+                if (includeTargetPick === undefined) {
+                    return;
+                }
+                includeTargetInContext = includeTargetPick.label === '是';
+
+                contextLevel = CONTEXT_BUILD_ADJACENT_BY_LENGTH;
             } else if (contextBuildMethod === '使用所在标题范围') {
                 const headingPick = await showQuickPickWithDefault(
                     PROOFREAD_SELECTION_HEADING_LEVELS.map((label) => ({ label })),
@@ -644,8 +665,9 @@ export class ProofreadCommandHandler {
                 lastRun,
                 contextBuildMethod,
                 contextLevel,
-                beforeParagraphs,
-                afterParagraphs,
+                beforeMinLength,
+                afterMinLength,
+                includeTargetInContext,
                 referenceFile,
                 temperature: parseFloat(userTemperature),
                 repetitionMode: actualRepetitionMode
@@ -667,8 +689,9 @@ export class ProofreadCommandHandler {
                 context,
                 {
                     contextLevel,
-                    beforeParagraphs,
-                    afterParagraphs,
+                    beforeMinLength,
+                    afterMinLength,
+                    includeTargetInContext,
                     referenceFile,
                     userTemperature: parseFloat(userTemperature),
                     actualRepetitionMode,
@@ -723,7 +746,8 @@ export class ProofreadCommandHandler {
             void vscode.window.showInformationMessage(`已生成默认参数文件，可按需编辑后再运行：${configPath}`);
         }
 
-        const { contextLevel, beforeParagraphs, afterParagraphs } = mapConfigToSelectionContext(config);
+        const { contextLevel, beforeMinLength, afterMinLength, includeTargetInContext } =
+            mapConfigToSelectionContext(config);
 
         let referenceFile: vscode.Uri[] | undefined;
         try {
@@ -748,8 +772,9 @@ export class ProofreadCommandHandler {
             context,
             {
                 contextLevel,
-                beforeParagraphs,
-                afterParagraphs,
+                beforeMinLength,
+                afterMinLength,
+                includeTargetInContext,
                 referenceFile,
                 userTemperature: config.temperature,
                 actualRepetitionMode: config.repetitionMode,
@@ -778,8 +803,9 @@ export class ProofreadCommandHandler {
         lastRun?: ProofreadSelectionLastRun;
         contextBuildMethod: ProofreadSelectionContextBuildMethod;
         contextLevel?: string;
-        beforeParagraphs: number;
-        afterParagraphs: number;
+        beforeMinLength: number;
+        afterMinLength: number;
+        includeTargetInContext: boolean;
         referenceFile?: vscode.Uri[];
         temperature: number;
         repetitionMode: ProofreadSelectionRepetitionMode;
@@ -791,12 +817,14 @@ export class ProofreadCommandHandler {
             (PROOFREAD_SELECTION_HEADING_LEVELS as readonly string[]).includes(params.contextLevel)
                 ? (params.contextLevel as ProofreadSelectionHeadingLevel)
                 : lastRun?.headingLevel;
+        const isAdjacent = contextBuildMethod === CONTEXT_BUILD_ADJACENT_BY_LENGTH;
         return {
             contextBuildMethod,
-            beforeParagraphs:
-                contextBuildMethod === '前后增加段落' ? params.beforeParagraphs : lastRun?.beforeParagraphs,
-            afterParagraphs:
-                contextBuildMethod === '前后增加段落' ? params.afterParagraphs : lastRun?.afterParagraphs,
+            beforeMinLength: isAdjacent ? params.beforeMinLength : lastRun?.beforeMinLength,
+            afterMinLength: isAdjacent ? params.afterMinLength : lastRun?.afterMinLength,
+            includeTargetInContext: isAdjacent
+                ? params.includeTargetInContext
+                : lastRun?.includeTargetInContext,
             headingLevel,
             useReference: !!params.referenceFile?.length,
             referenceFilePath: params.referenceFile?.[0]?.fsPath ?? lastRun?.referenceFilePath,
@@ -810,8 +838,9 @@ export class ProofreadCommandHandler {
         context: vscode.ExtensionContext,
         params: {
             contextLevel?: string;
-            beforeParagraphs: number;
-            afterParagraphs: number;
+            beforeMinLength: number;
+            afterMinLength: number;
+            includeTargetInContext: boolean;
             referenceFile?: vscode.Uri[];
             userTemperature: number;
             actualRepetitionMode: 'none' | 'target' | 'all';
@@ -824,8 +853,9 @@ export class ProofreadCommandHandler {
         const model = this.configManager.getModel(platform);
         const {
             contextLevel,
-            beforeParagraphs,
-            afterParagraphs,
+            beforeMinLength,
+            afterMinLength,
+            includeTargetInContext,
             referenceFile,
             userTemperature,
             actualRepetitionMode,
@@ -845,8 +875,9 @@ export class ProofreadCommandHandler {
             selection: sel,
             contextLevel,
             referenceFile,
-            beforeParagraphs,
-            afterParagraphs,
+            beforeMinLength,
+            afterMinLength,
+            includeTargetInContext,
             editorialMemoryForceEnabled
         });
 
@@ -932,8 +963,9 @@ export class ProofreadCommandHandler {
             referenceFile,
             userTemperature,
             context,
-            beforeParagraphs,
-            afterParagraphs,
+            beforeMinLength,
+            afterMinLength,
+            includeTargetInContext,
             actualRepetitionMode,
             sourceTextCharacteristics,
             sourceCharacteristicsDisplayTitle,

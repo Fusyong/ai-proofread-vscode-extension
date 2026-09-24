@@ -31,7 +31,7 @@
   "cmd.splitFileByTitle.title": "按标题切分文件",
   "cmd.splitFileByTitleAndLength.title": "按标题和长度切分文件",
   "cmd.splitFileWithTitleContext.title": "按长度切分文件，以标题范围为上下文",
-  "cmd.splitFileWithParagraphContext.title": "按长度切分文件，以前后段落为上下文",
+  "cmd.splitFileWithParagraphContext.title": "按长度切分文件，按长度扩展前后文为上下文",
   "cmd.mergeTwoFiles.title": "合并两个文件",
   "cmd.splitIntoSentences.title": "切分为句子",
   "cmd.prepareReferencesJson.title": "为 JSON 文件准备资料",

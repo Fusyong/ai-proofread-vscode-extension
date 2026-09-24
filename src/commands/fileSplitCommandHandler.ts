@@ -40,7 +40,7 @@ export class FileSplitCommandHandler {
             { label: '按标题切分', value: 'title' },
             { label: '按标题和长度切分', value: 'title-length' },
             { label: '按长度切分，以标题范围为上下文', value: 'titleContext' },
-            { label: '按长度切分，以前后段落为上下文', value: 'paragraphContext' },
+            { label: '按长度切分，按长度扩展前后文为上下文', value: 'paragraphContext' },
         ], { placeHolder: '请选择切分模式', canPickMany: false });
         if (!mode) return;
 
@@ -104,8 +104,9 @@ export class FileSplitCommandHandler {
                 levels?: number[];
                 threshold?: number;
                 minLength?: number;
-                beforeParagraphs?: number;
-                afterParagraphs?: number;
+                beforeMinLength?: number;
+                afterMinLength?: number;
+                includeTargetInContext?: boolean;
             } = { mode };
 
             if (mode === 'length') {
@@ -317,15 +318,17 @@ export class FileSplitCommandHandler {
     }
 
     /**
-     * 处理按段落上下文切分模式
+     * 处理按前后文最小长度扩展上下文的切分模式
      */
     private async handleParagraphContextMode(config: vscode.WorkspaceConfiguration, options: any): Promise<any> {
-        // 获取前后段落上下文切分的配置
         const defaultCutBy = config.get<number>('defaultSplitLength', 600);
-        const defaultBeforeParagraphs = config.get<number>('paragraphContextSplit.beforeParagraphs', 1);
-        const defaultAfterParagraphs = config.get<number>('paragraphContextSplit.afterParagraphs', 1);
+        const defaultBeforeMinLength = config.get<number>('paragraphContextSplit.beforeMinLength', 200);
+        const defaultAfterMinLength = config.get<number>('paragraphContextSplit.afterMinLength', 200);
+        const defaultIncludeTarget = config.get<boolean>(
+            'paragraphContextSplit.includeTargetInContext',
+            false
+        );
 
-        // 让用户选择切分长度
         const inputCutBy = await vscode.window.showInputBox({
             prompt: '请输入切分长度（字符数）',
             value: defaultCutBy.toString(),
@@ -346,10 +349,9 @@ export class FileSplitCommandHandler {
         }
         options.cutBy = parseInt(inputCutBy);
 
-        // 让用户选择前文段落数
-        const inputBeforeParagraphs = await vscode.window.showInputBox({
-            prompt: '请输入前文段落数',
-            value: defaultBeforeParagraphs.toString(),
+        const inputBeforeMinLength = await vscode.window.showInputBox({
+            prompt: '请输入上文最小长度（字符数；达到后向前找到第一个合法切分点：空行或 Markdown 标题前；0 表示不要上文）',
+            value: defaultBeforeMinLength.toString(),
             validateInput: (value: string) => {
                 const num = parseInt(value);
                 if (isNaN(num) || num < 0) {
@@ -359,15 +361,14 @@ export class FileSplitCommandHandler {
             }
         });
 
-        if (!inputBeforeParagraphs) {
+        if (inputBeforeMinLength === undefined) {
             return null;
         }
-        options.beforeParagraphs = parseInt(inputBeforeParagraphs);
+        options.beforeMinLength = parseInt(inputBeforeMinLength, 10);
 
-        // 让用户选择后文段落数
-        const inputAfterParagraphs = await vscode.window.showInputBox({
-            prompt: '请输入后文段落数',
-            value: defaultAfterParagraphs.toString(),
+        const inputAfterMinLength = await vscode.window.showInputBox({
+            prompt: '请输入下文最小长度（字符数；达到后向后找到第一个合法切分点：空行或 Markdown 标题前；0 表示不要下文）',
+            value: defaultAfterMinLength.toString(),
             validateInput: (value: string) => {
                 const num = parseInt(value);
                 if (isNaN(num) || num < 0) {
@@ -377,10 +378,25 @@ export class FileSplitCommandHandler {
             }
         });
 
-        if (!inputAfterParagraphs) {
+        if (inputAfterMinLength === undefined) {
             return null;
         }
-        options.afterParagraphs = parseInt(inputAfterParagraphs);
+        options.afterMinLength = parseInt(inputAfterMinLength, 10);
+
+        const includeTargetPick = await vscode.window.showQuickPick(
+            [
+                { label: '否', description: 'context 仅为 <before> + <after>', picked: !defaultIncludeTarget },
+                { label: '是', description: 'context 为 <before> + <target> + <after>', picked: defaultIncludeTarget }
+            ],
+            {
+                placeHolder: '是否在上下文中间保留 target？',
+                ignoreFocusOut: true
+            }
+        );
+        if (!includeTargetPick) {
+            return null;
+        }
+        options.includeTargetInContext = includeTargetPick.label === '是';
 
         return options;
     }

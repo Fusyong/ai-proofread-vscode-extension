@@ -6,14 +6,25 @@ import * as vscode from 'vscode';
 
 export const KEY_PROOFREAD_SELECTION_LAST_RUN = 'ai-proofread.proofreadSelection.lastRun';
 
+/** 按最小长度扩展前后文（合法切分点：空行或 Markdown 标题前）；旧名「前后增加段落」仍可识别 */
+export const CONTEXT_BUILD_ADJACENT_BY_LENGTH = '按长度扩展前后文';
+const CONTEXT_BUILD_ADJACENT_BY_LENGTH_LEGACY = '前后增加段落';
+
 export const PROOFREAD_SELECTION_CONTEXT_BUILD_METHODS = [
     '不使用上下文',
-    '前后增加段落',
+    CONTEXT_BUILD_ADJACENT_BY_LENGTH,
     '使用所在标题范围'
 ] as const;
 
 export type ProofreadSelectionContextBuildMethod =
     (typeof PROOFREAD_SELECTION_CONTEXT_BUILD_METHODS)[number];
+
+export function isAdjacentLengthContext(contextLevel: string | undefined): boolean {
+    return (
+        contextLevel === CONTEXT_BUILD_ADJACENT_BY_LENGTH ||
+        contextLevel === CONTEXT_BUILD_ADJACENT_BY_LENGTH_LEGACY
+    );
+}
 
 export const PROOFREAD_SELECTION_HEADING_LEVELS = [
     '1 级标题',
@@ -32,8 +43,9 @@ export type ProofreadSelectionRepetitionMode = (typeof PROOFREAD_SELECTION_REPET
 
 export interface ProofreadSelectionLastRun {
     contextBuildMethod?: ProofreadSelectionContextBuildMethod;
-    beforeParagraphs?: number;
-    afterParagraphs?: number;
+    beforeMinLength?: number;
+    afterMinLength?: number;
+    includeTargetInContext?: boolean;
     headingLevel?: ProofreadSelectionHeadingLevel;
     useReference?: boolean;
     referenceFilePath?: string;
@@ -72,7 +84,13 @@ export function parseProofreadSelectionLastRun(raw: unknown): ProofreadSelection
     }
 
     const parsed: ProofreadSelectionLastRun = {};
-    const contextBuildMethod = asEnum(raw.contextBuildMethod, PROOFREAD_SELECTION_CONTEXT_BUILD_METHODS);
+    let contextBuildMethod = asEnum(raw.contextBuildMethod, PROOFREAD_SELECTION_CONTEXT_BUILD_METHODS);
+    if (
+        !contextBuildMethod &&
+        raw.contextBuildMethod === CONTEXT_BUILD_ADJACENT_BY_LENGTH_LEGACY
+    ) {
+        contextBuildMethod = CONTEXT_BUILD_ADJACENT_BY_LENGTH;
+    }
     if (contextBuildMethod) {
         parsed.contextBuildMethod = contextBuildMethod;
     }
@@ -84,13 +102,16 @@ export function parseProofreadSelectionLastRun(raw: unknown): ProofreadSelection
     if (repetitionMode) {
         parsed.repetitionMode = repetitionMode;
     }
-    const beforeParagraphs = clampInt(raw.beforeParagraphs, 0, 10);
-    if (beforeParagraphs !== undefined) {
-        parsed.beforeParagraphs = beforeParagraphs;
+    const beforeMinLength = clampInt(raw.beforeMinLength, 0, 10000);
+    if (beforeMinLength !== undefined) {
+        parsed.beforeMinLength = beforeMinLength;
     }
-    const afterParagraphs = clampInt(raw.afterParagraphs, 0, 10);
-    if (afterParagraphs !== undefined) {
-        parsed.afterParagraphs = afterParagraphs;
+    const afterMinLength = clampInt(raw.afterMinLength, 0, 10000);
+    if (afterMinLength !== undefined) {
+        parsed.afterMinLength = afterMinLength;
+    }
+    if (typeof raw.includeTargetInContext === 'boolean') {
+        parsed.includeTargetInContext = raw.includeTargetInContext;
     }
     const temperature = clampTemperature(raw.temperature);
     if (temperature !== undefined) {

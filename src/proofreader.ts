@@ -11,6 +11,7 @@ import { GoogleGenAI } from "@google/genai";
 import { ConfigManager, Logger } from './utils';
 import { convertQuotes } from './quoteConverter';
 import { buildTitleBasedContext, buildParagraphBasedContext } from './splitter';
+import { isAdjacentLengthContext } from './proofreadSelectionLastRun';
 import { buildEditorialMemoryXml } from './editorialMemory/service';
 import { ProgressTracker, ProgressUpdateCallback } from './progressTracker';
 import { parseItemOutput, type ProofreadItem } from './itemOutputParser';
@@ -1490,14 +1491,15 @@ export async function processJsonFileAsync(
  * @param referenceFile 参考文件
  * @param userTemperature 用户指定的温度
  * @param context 扩展上下文
- * @param beforeParagraphs 前文段落数
- * @param afterParagraphs 后文段落数
+ * @param beforeMinLength 上文最小字符数
+ * @param afterMinLength 下文最小字符数
  * @param repetitionMode 提示词重复模式（可选，覆盖配置）
  * @param sourceTextCharacteristics 源文本特性提示词注入正文（仅内置全文/条目模板提示词时生效；空字符串表示不注入）
  * @param sourceCharacteristicsDisplayTitle 注入项在日志/完成摘要中的展示标题（如预设名称）
  * @param onItemItems 条目式输出时回调解析出的条目（如条目式提示词场景的后续处理）
  * @param onRawItemOutput 条目式输出时回调 LLM 原始返回（供日志等写入原始结果，不写替换后文本）
  * @param editorialMemoryForceEnabled 为 true 时在请求中拼接编辑记忆注入（仅用「Proofread Selection with Memory」时使用）
+ * @param includeTargetInContext 是否在 context 中间保留 target
  * @returns 校对后的文本
  */
 /** 选区校对组装结果（与实际发送字段一致，供体量确认与 API 调用共用） */
@@ -1521,8 +1523,9 @@ export async function assembleProofreadSelectionInput(params: {
     selection: vscode.Selection;
     contextLevel?: string;
     referenceFile?: vscode.Uri[];
-    beforeParagraphs?: number;
-    afterParagraphs?: number;
+    beforeMinLength?: number;
+    afterMinLength?: number;
+    includeTargetInContext?: boolean;
     editorialMemoryForceEnabled?: boolean;
     inlineReferenceText?: string;
 }): Promise<ProofreadSelectionAssembled> {
@@ -1531,8 +1534,9 @@ export async function assembleProofreadSelectionInput(params: {
         selection,
         contextLevel,
         referenceFile,
-        beforeParagraphs,
-        afterParagraphs,
+        beforeMinLength,
+        afterMinLength,
+        includeTargetInContext,
         editorialMemoryForceEnabled,
         inlineReferenceText
     } = params;
@@ -1563,15 +1567,16 @@ export async function assembleProofreadSelectionInput(params: {
         const selectionStartLine = selection.start.line;
         const selectionEndLine = selection.end.line;
 
-        if (contextLevel === '前后增加段落') {
+        if (isAdjacentLengthContext(contextLevel)) {
             const selectionStart = editor.document.offsetAt(selection.start);
             const selectionEnd = editor.document.offsetAt(selection.end);
             contextText = buildParagraphBasedContext(
                 fullText,
                 selectionStart,
                 selectionEnd,
-                beforeParagraphs || 1,
-                afterParagraphs || 1
+                beforeMinLength ?? 200,
+                afterMinLength ?? 200,
+                includeTargetInContext ?? false
             );
         } else {
             contextText = buildTitleBasedContext(
@@ -1642,8 +1647,9 @@ export async function proofreadSelection(
     referenceFile?: vscode.Uri[],
     userTemperature?: number,
     context?: vscode.ExtensionContext,
-    beforeParagraphs?: number,
-    afterParagraphs?: number,
+    beforeMinLength?: number,
+    afterMinLength?: number,
+    includeTargetInContext?: boolean,
     repetitionMode?: PromptRepetitionMode,
     sourceTextCharacteristics: string = '',
     sourceCharacteristicsDisplayTitle?: string,
@@ -1661,8 +1667,9 @@ export async function proofreadSelection(
             selection,
             contextLevel,
             referenceFile,
-            beforeParagraphs,
-            afterParagraphs,
+            beforeMinLength,
+            afterMinLength,
+            includeTargetInContext,
             editorialMemoryForceEnabled,
             inlineReferenceText
         }));

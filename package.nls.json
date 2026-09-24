@@ -31,7 +31,7 @@
   "cmd.splitFileByTitle.title": "Split File by Title",
   "cmd.splitFileByTitleAndLength.title": "Split File by Title and Length",
   "cmd.splitFileWithTitleContext.title": "Split File by Length, with Title Range as Context",
-  "cmd.splitFileWithParagraphContext.title": "Split File by Length, with Surrounding Paragraphs as Context",
+  "cmd.splitFileWithParagraphContext.title": "Split File by Length, with Adjacent Context by Min Length",
   "cmd.mergeTwoFiles.title": "Merge Two Files",
   "cmd.splitIntoSentences.title": "Split into Sentences",
   "cmd.prepareReferencesJson.title": "Prepare References for JSON File",

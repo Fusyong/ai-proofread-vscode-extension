@@ -1449,17 +1449,23 @@
           "default": 0,
           "description": "校对选中文本时，默认使用的标题级别作为上下文范围（0表示不使用）"
         },
-        "ai-proofread.paragraphContextSplit.beforeParagraphs": {
+        "ai-proofread.paragraphContextSplit.beforeMinLength": {
           "order": 46,
           "type": "number",
-          "default": 1,
-          "description": "段落上下文切分模式：前文段落数"
+          "default": 200,
+          "description": "按长度扩展前后文为上下文：上文最小字符数（达到后向前找到第一个合法切分点：空行或 Markdown 标题前；0 表示不要上文）"
         },
-        "ai-proofread.paragraphContextSplit.afterParagraphs": {
+        "ai-proofread.paragraphContextSplit.afterMinLength": {
           "order": 47,
           "type": "number",
-          "default": 1,
-          "description": "段落上下文切分模式：后文段落数"
+          "default": 200,
+          "description": "按长度扩展前后文为上下文：下文最小字符数（达到后向后找到第一个合法切分点：空行或 Markdown 标题前；0 表示不要下文）"
+        },
+        "ai-proofread.paragraphContextSplit.includeTargetInContext": {
+          "order": 47.5,
+          "type": "boolean",
+          "default": false,
+          "description": "按长度扩展前后文为上下文：是否在 context 中间保留 target（<before>+<target>+<after>）"
         },
         "ai-proofread.alignment.windowSize": {
           "order": 48,

@@ -150,7 +150,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 4. **按长度切分，以标题范围为上下文** (Split File with Title Based Context)，会给每一个片段配上所在标题范围的正文作为上下文，适合对上下文语境要求高的情景。可输入切分长度、题级级别。
     > !!! caution 费用警告
     >     这样有可能极大地增加token数，增加输入服务费用——尽管在Deepseek等平台中，重复提交的上下文会记为“缓存命中”，并降低费率。注意查看切分后的JSON文档的字符数，以权衡利弊。
-5. **按长度切分，扩展前后段落为上下文** (Split File with Paragraph Based Context)，即在片段基础上添加前后段落，用作上下文。适合关注局部语境一致性的情形。可输入切分长度、前文段落数和后文段落数。
+5. **按长度切分，按长度扩展前后文为上下文** (Split File with Adjacent Context by Min Length)：在按长度切分的片段上，按上文/下文最小字符数向外扩展到最近合法切分点（空行，或 Markdown 标题前），作为 context。可输入切分长度、上文/下文最小长度，以及是否在 context 中间保留 target（`<before>+<target>+<after>`）。
     > !!! caution 费用警告
     >     这样可能较大地增加token数，增加输入服务费用。这样生成的上下文是变动的，因此无法享受“缓存命中”的低费率。注意查看切分后的JSON文档的字符数，以权衡利弊。
 
@@ -313,8 +313,9 @@ JSON 批量校对的按钮在 **切分与合并** 区块（「LLM 校对 JSON」
 2. 与普通 `Proofread Selection` 不同，本命令从工作区配置文件 `<工作区根>/.proofread/proofread-selection-with-memory.json` 读取设置。若文件不存在，扩展会生成一份默认模板
    - `contextMode`（字符串，三选一）
     - `"none"` — 不使用上下文
-    - `"adjacentParagraphs"` — 前后邻段，须配合以下参数：
-        - `beforeParagraphs` / `afterParagraphs`（整数）：取值 `0`～`10`
+    - `"adjacentParagraphs"` — 按最小长度扩展前后文（合法切分点：空行或 Markdown 标题前），须配合以下参数：
+        - `beforeMinLength` / `afterMinLength`（整数）：取值 `0`～`10000`；达到该长度后继续向该侧找到第一个合法切分点；`0` 表示不要该侧
+        - `includeTargetInContext`（布尔）：是否在 context 中间保留 `<target>...</target>`（即 `<before>+<target>+<after>`）
     - `"headingScope"` — 按 Markdown 标题包裹范围，须配合以下参数：
         - `headingLevel`（整数）： `1`～`6`，对应一级～六级标题上下文
    - `referenceFiles`（字符串数组）：相对工作区根的路径，建议正斜杠（如 `"notes/ref.md"`）；空数组 `[]` 表示不用参考文件；若有多项仅第一项参与注入
