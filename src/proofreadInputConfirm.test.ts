@@ -50,6 +50,16 @@ describe('evaluateProofreadInputConfirm', () => {
         expect(r.reasons).toEqual([{ kind: 'always' }]);
     });
 
+    it('always still attaches threshold reasons for tip display', () => {
+        const r = evaluateProofreadInputConfirm(
+            largeTarget,
+            baseSettings({ mode: 'always', aboveChars: 100 })
+        );
+        expect(r.shouldConfirm).toBe(true);
+        expect(r.reasons[0]).toEqual({ kind: 'always' });
+        expect(r.reasons.some((x) => x.kind === 'total')).toBe(true);
+    });
+
     it('aboveThreshold triggers on total', () => {
         const r = evaluateProofreadInputConfirm(
             largeTarget,

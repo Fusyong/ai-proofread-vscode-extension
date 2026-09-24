@@ -10,10 +10,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.26
+当前版本 v1.12.27
 
-- 优化：把按长度切分的默认长度从600改为1400，再切阈值改为1.5倍，合并阈值改为0.2倍
-- 优化：增加参考资料和编辑记忆处理用思考模型的提示，按价格由低到高列出
+- 优化：恢复JSON校对时始终提示汇总信息，选段校对时可配置
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 

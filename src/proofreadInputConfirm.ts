@@ -1,5 +1,7 @@
 /**
  * 校对 LLM 调用前的输入体量确认：设置读取、阈值判定、模态弹窗。
+ * confirmMode 仅控制选段是否弹窗；JSON 批量由调用方强制 always。
+ * 合计/分字段阈值在选段与 JSON 确认框中均可体现（超限写入「触发确认原因」等）。
  */
 
 import * as vscode from 'vscode';
@@ -98,22 +100,12 @@ export function getProofreadInputConfirmSettings(): ProofreadInputConfirmSetting
     };
 }
 
-/**
- * 判定是否需要弹出确认。
- * aboveThreshold：合计（含 additionalChars）或任一分字段达到对应阈值（阈值为 0 表示该项禁用）。
- */
-export function evaluateProofreadInputConfirm(
+/** 按合计 / 分字段阈值收集超限原因（不决定是否弹窗） */
+export function collectThresholdConfirmReasons(
     contentStats: JsonBatchContentStats,
-    settings: ProofreadInputConfirmSettings,
+    settings: Pick<ProofreadInputConfirmSettings, 'aboveChars' | 'byField'>,
     options?: { additionalChars?: number }
-): ProofreadInputConfirmEvaluation {
-    if (settings.mode === 'never') {
-        return { shouldConfirm: false, reasons: [] };
-    }
-    if (settings.mode === 'always') {
-        return { shouldConfirm: true, reasons: [{ kind: 'always' }] };
-    }
-
+): ConfirmTriggerReason[] {
     const reasons: ConfirmTriggerReason[] = [];
     const additional = Math.max(0, options?.additionalChars ?? 0);
     const totalChars = contentStats.total.chars + additional;
@@ -134,7 +126,33 @@ export function evaluateProofreadInputConfirm(
         }
     }
 
-    return { shouldConfirm: reasons.length > 0, reasons };
+    return reasons;
+}
+
+/**
+ * 判定是否需要弹出确认。
+ * aboveThreshold：合计（含 additionalChars）或任一分字段达到对应阈值（阈值为 0 表示该项禁用）。
+ * always：始终确认，但仍附带阈值超限原因，供确认框「触发确认原因」展示。
+ */
+export function evaluateProofreadInputConfirm(
+    contentStats: JsonBatchContentStats,
+    settings: ProofreadInputConfirmSettings,
+    options?: { additionalChars?: number }
+): ProofreadInputConfirmEvaluation {
+    if (settings.mode === 'never') {
+        return { shouldConfirm: false, reasons: [] };
+    }
+
+    const thresholdReasons = collectThresholdConfirmReasons(contentStats, settings, options);
+
+    if (settings.mode === 'always') {
+        return {
+            shouldConfirm: true,
+            reasons: [{ kind: 'always' }, ...thresholdReasons]
+        };
+    }
+
+    return { shouldConfirm: thresholdReasons.length > 0, reasons: thresholdReasons };
 }
 
 export function formatConfirmTriggerReasons(reasons: ConfirmTriggerReason[]): string[] {

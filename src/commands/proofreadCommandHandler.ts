@@ -1053,7 +1053,7 @@ export class ProofreadCommandHandler {
     }
 
     /**
-     * JSON 批量校对：按 confirmMode / 阈值决定是否弹出参数确认
+     * JSON 批量校对：始终弹出参数确认（confirmMode 仅控制选段校对）
      */
     private async showJsonBatchConfirmation(params: {
         jsonFilePath: string;
@@ -1140,7 +1140,8 @@ export class ProofreadCommandHandler {
             platform,
             model,
             temperature,
-            settings: confirmSettings,
+            // JSON 批量始终确认；confirmMode 仅控制选段。合计/分字段阈值仍写入确认框提示
+            settings: { ...confirmSettings, mode: 'always' },
             batch: {
                 rpm,
                 maxConcurrent,

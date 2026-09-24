@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.12.26",
+  "version": "1.12.27",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -866,19 +866,19 @@
             "never"
           ],
           "enumDescriptions": [
-            "每次校对（选区与 JSON 批量）均弹出确认",
-            "仅当输入体量达到阈值时弹出确认",
-            "从不弹出体量确认"
+            "每次选段校对均弹出确认",
+            "仅当选段输入体量达到阈值时弹出确认",
+            "选段校对从不弹出体量确认"
           ],
           "default": "aboveThreshold",
-          "description": "调用校对 LLM 前的输入体量确认模式。适用于选中文本校对与 JSON 批量校对。"
+          "description": "选段校对调用 LLM 前是否弹出体量确认。JSON / 重叠校对始终弹出参数确认，不受本项控制。"
         },
         "ai-proofread.proofread.confirmAboveChars": {
           "order": 29,
           "type": "number",
           "default": 10000,
           "minimum": 0,
-          "description": "合计字符阈值（target + reference + context，选区带记忆时另含编辑记忆）。0 表示不按合计触发。仅 confirmMode 为 aboveThreshold 时生效。"
+          "description": "合计字符阈值（target + reference + context，选段带记忆时另含编辑记忆）。0 表示不按合计判定。选段在 confirmMode 为 aboveThreshold 时用于是否弹窗；选段与 JSON 确认框超限时均会在「触发确认原因」中体现。"
         },
         "ai-proofread.proofread.confirmAboveCharsByField": {
           "order": 30,
@@ -889,19 +889,19 @@
               "type": "number",
               "default": 5000,
               "minimum": 0,
-              "description": "target 字段字符阈值；0 表示该字段不单独触发"
+              "description": "target 字段字符阈值；0 表示该字段不单独判定。亦用作确认框中「单次 target 超限」警示参考。"
             },
             "reference": {
               "type": "number",
               "default": 0,
               "minimum": 0,
-              "description": "reference 字段字符阈值；0 表示该字段不单独触发"
+              "description": "reference 字段字符阈值；0 表示该字段不单独判定"
             },
             "context": {
               "type": "number",
               "default": 0,
               "minimum": 0,
-              "description": "context 字段字符阈值；0 表示该字段不单独触发"
+              "description": "context 字段字符阈值；0 表示该字段不单独判定"
             }
           },
           "default": {
@@ -909,7 +909,7 @@
             "reference": 0,
             "context": 0
           },
-          "description": "分字段字符阈值。与合计阈值为 OR：任一达到即确认。仅 confirmMode 为 aboveThreshold 时生效。"
+          "description": "分字段字符阈值。与合计阈值为 OR。选段在 confirmMode 为 aboveThreshold 时用于是否弹窗；选段与 JSON 确认框超限时均会在「触发确认原因」中体现。"
         },
         "ai-proofread.localDicts": {
           "order": 31,
