@@ -10,10 +10,10 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.25
+当前版本 v1.12.26
 
-- 特性：新增「替换分页符」命令（针对 pdftotext 插入的 `\f`）：可换成带页码注释/标题或自定义模板；默认可清除页脚页码行；支持起始页码、从第 x 个起每 y 个处理
-- 优化：把pdftotext的raw模式提到第一层中
+- 优化：把按长度切分的默认长度从600改为1400，再切阈值改为1.5倍，合并阈值改为0.2倍
+- 优化：增加参考资料和编辑记忆处理用思考模型的提示，按价格由低到高列出
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
