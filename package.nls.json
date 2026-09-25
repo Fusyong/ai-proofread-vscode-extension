@@ -82,6 +82,7 @@
   "cmd.proofreadSelection.title": "Proofread Selection",
   "cmd.proofreadSelectionWithMemory.title": "Proofread Selection with Memory",
   "cmd.diffItWithAnotherFile.title": "Compare with Another File",
+  "cmd.mergeAlignmentReports.title": "Merge Alignment JSON Reports",
   "cmd.openProofreadingPanel.title": "Open Proofreading Panel",
   "cmd.reopenResultPanel.title": "Reopen Result Panel",
   "cmd.editorialMemory.clear.title": "Clear Editorial Memory",

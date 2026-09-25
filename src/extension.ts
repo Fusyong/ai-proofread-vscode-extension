@@ -11,6 +11,7 @@ import { WebviewManager } from './ui/webviewManager';
 import { FileSplitCommandHandler } from './commands/fileSplitCommandHandler';
 import { ProofreadCommandHandler } from './commands/proofreadCommandHandler';
 import { FileCompareCommandHandler } from './commands/fileCompareCommandHandler';
+import { MultiAlignmentCommandHandler } from './commands/multiAlignmentCommandHandler';
 import { SplitIntoSentencesCommandHandler } from './commands/splitIntoSentencesCommandHandler';
 import { DocumentConvertCommandHandler } from './commands/documentConvertCommandHandler';
 import { UtilityCommandHandler } from './commands/utilityCommandHandler';
@@ -132,6 +133,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const fileSplitHandler = new FileSplitCommandHandler(webviewManager);
     const proofreadHandler = new ProofreadCommandHandler(webviewManager);
     const fileCompareHandler = new FileCompareCommandHandler(context);
+    const multiAlignmentHandler = new MultiAlignmentCommandHandler(context);
     const splitIntoSentencesHandler = new SplitIntoSentencesCommandHandler();
     const documentConvertHandler = new DocumentConvertCommandHandler();
     const utilityHandler = new UtilityCommandHandler();
@@ -526,6 +528,10 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await fileCompareHandler.handleDiffItWithAnotherFileCommand(editor);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.mergeAlignmentReports', async () => {
+            await multiAlignmentHandler.handleMergeAlignmentReportsCommand();
         }),
 
         // 注册docx转markdown命令

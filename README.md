@@ -10,9 +10,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.27
+当前版本 v1.12.28
 
-- 优化：恢复JSON校对时始终提示汇总信息，选段校对时可配置
+- 特性：增加对齐多个勘误JSON的功能，可用于统计、比较各校差异，测量相对效果，以优化参数
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 

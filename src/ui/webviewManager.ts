@@ -762,6 +762,9 @@ export class WebviewManager {
                     await runWithWorkingEditor(cmdMap[command]);
                     break;
                 }
+                case 'mergeAlignmentReports':
+                    await vscode.commands.executeCommand('ai-proofread.mergeAlignmentReports');
+                    break;
                 case 'citationRebuildIndex':
                     await vscode.commands.executeCommand('ai-proofread.citation.rebuildIndex');
                     break;
@@ -878,6 +881,7 @@ export class WebviewManager {
                     <button class="action-button" onclick="handleAction('splitIntoSentences')" title="${commandHoverTitle('切分为句子', 'ai-proofread.splitIntoSentences')}">切分为句子</button>
                     <button class="action-button" onclick="handleAction('segmentFile')" title="${commandHoverTitle('分词、词频与字频统计', 'ai-proofread.segmentFile')}">分词与统计</button>
                     <button class="action-button" onclick="handleAction('diffItWithAnotherFile')" title="${commandHoverTitle('与另一文件比较差异', 'ai-proofread.diffItWithAnotherFile')}">与另一文件比较</button>
+                    <button class="action-button" onclick="handleAction('mergeAlignmentReports')" title="${commandHoverTitle('合并多份勘误 JSON', 'ai-proofread.mergeAlignmentReports')}">合并多份勘误 JSON</button>
                 </div>
             </div>
         `;
