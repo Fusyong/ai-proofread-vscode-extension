@@ -96,6 +96,7 @@ function escapeHtml(text: string): string {
  * @param titleB 校对后文件名
  * @param options 对齐参数
  * @param runtime 运行时间（秒）
+ * @param writeJson 是否旁路写入 alignment JSON（默认 true，供评测；交互流程可关掉）
  */
 export function generateHtmlReport(
     alignment: AlignmentItem[],
@@ -103,7 +104,8 @@ export function generateHtmlReport(
     titleA: string = '',
     titleB: string = '',
     options: AlignmentOptions = {},
-    runtime: number = 0
+    runtime: number = 0,
+    writeJson: boolean = true
 ): void {
     // 如果文件名为空，使用默认值
     if (!titleA) titleA = '原文';
@@ -1315,8 +1317,10 @@ export function generateHtmlReport(
 </body>
 </html>`);
 
-    // 写入文件。JSON 与 HTML 同目录，供评测读取，不替代给人看的勘误表。
+    // 写入 HTML。可选旁路 JSON 与 HTML 同目录，供评测读取，不替代给人看的勘误表。
     fs.writeFileSync(outputPath, htmlLines.join(''), 'utf8');
-    const report = buildAlignmentReportJson(alignment, titleA, titleB, options, runtime);
-    fs.writeFileSync(alignmentJsonPath(outputPath), JSON.stringify(report, null, 2), 'utf8');
+    if (writeJson) {
+        const report = buildAlignmentReportJson(alignment, titleA, titleB, options, runtime);
+        fs.writeFileSync(alignmentJsonPath(outputPath), JSON.stringify(report, null, 2), 'utf8');
+    }
 }

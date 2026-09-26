@@ -10,9 +10,9 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v1.12.28
+当前版本 v1.12.29
 
-- 特性：增加对齐多个勘误JSON的功能，可用于统计、比较各校差异，测量相对效果，以优化参数
+- 优化：对齐多个勘误JSON的功能改为对齐多个Markdown，挂载到比较文件命令中，并优化命令名称使得名副其实
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 

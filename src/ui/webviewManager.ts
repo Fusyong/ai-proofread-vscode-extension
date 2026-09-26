@@ -762,9 +762,6 @@ export class WebviewManager {
                     await runWithWorkingEditor(cmdMap[command]);
                     break;
                 }
-                case 'mergeAlignmentReports':
-                    await vscode.commands.executeCommand('ai-proofread.mergeAlignmentReports');
-                    break;
                 case 'citationRebuildIndex':
                     await vscode.commands.executeCommand('ai-proofread.citation.rebuildIndex');
                     break;
@@ -880,8 +877,7 @@ export class WebviewManager {
                     ${sep}
                     <button class="action-button" onclick="handleAction('splitIntoSentences')" title="${commandHoverTitle('切分为句子', 'ai-proofread.splitIntoSentences')}">切分为句子</button>
                     <button class="action-button" onclick="handleAction('segmentFile')" title="${commandHoverTitle('分词、词频与字频统计', 'ai-proofread.segmentFile')}">分词与统计</button>
-                    <button class="action-button" onclick="handleAction('diffItWithAnotherFile')" title="${commandHoverTitle('与另一文件比较差异', 'ai-proofread.diffItWithAnotherFile')}">与另一文件比较</button>
-                    <button class="action-button" onclick="handleAction('mergeAlignmentReports')" title="${commandHoverTitle('合并多份勘误 JSON', 'ai-proofread.mergeAlignmentReports')}">合并多份勘误 JSON</button>
+                    <button class="action-button" onclick="handleAction('diffItWithAnotherFile')" title="${commandHoverTitle('比较与对齐文件（diff / 勘误表 / 多校次）', 'ai-proofread.diffItWithAnotherFile')}">比较与对齐文件</button>
                 </div>
             </div>
         `;
@@ -959,7 +955,7 @@ export class WebviewManager {
                     ${this.filePathRowWithOpenButtonIfExists('参考资料日志:', referencePrepLogPath, 'showReferencePrepLog')}
                 </div>
                 <div class="section-actions">
-                    ${mainPath && jsonMdPath ? '<button class="action-button" onclick="handleAction(\'showSplitDiff\')">比较前后差异</button>' : ''}
+                    ${mainPath && jsonMdPath ? `<button class="action-button" onclick="handleAction('showSplitDiff')" title="${commandHoverTitle('主稿与切分 Markdown 的内置 diff（任意两文件亦可）', 'ai-proofread.diffItWithAnotherFile')}">比较前后差异</button>` : ''}
                     <button class="action-button" onclick="handleAction('mergeContext')" title="${commandHoverTitle('合并 JSON', 'ai-proofread.mergeTwoFiles')}">合并 JSON</button>
                     <button class="action-button" onclick="handleAction('referencePrepJson')" title="${commandHoverTitle('打开切分 JSON 并打开检索面板', 'ai-proofread.prepareReferencesJson')}">准备参考资料</button>
                     <button class="action-button" onclick="handleAction('proofreadJson')" title="${llmTitle}"${llmDisabled}>${llmLabel}</button>
@@ -978,8 +974,8 @@ export class WebviewManager {
                 </div>
                 ` : ''}
                 <div class="section-actions section-actions--between">
-                    <button class="action-button" onclick="handleAction('selectMainFile')">${mainPath ? '更换主文件' : '选择主文件'}</button>
-                    <button class="action-button" onclick="handleAction('selectMainFileFromWorkspace')">从工作区选择</button>
+                    <button class="action-button" onclick="handleAction('selectMainFile')" title="为本轮切分/校对选定主稿（面板专用）">${mainPath ? '更换主文件' : '选择主文件'}</button>
+                    <button class="action-button" onclick="handleAction('selectMainFileFromWorkspace')" title="从工作区列表中选定主稿（面板专用）">从工作区选择</button>
                     <button class="action-button" onclick="handleAction('splitDocument')" title="${commandHoverTitle('切分文档', 'ai-proofread.splitFile')}"${mainPath ? '' : ' disabled'}>${hasJson ? '重新切分' : '切分文档'}</button>
                 </div>
                 ${companionBlock}
@@ -1187,10 +1183,10 @@ export class WebviewManager {
                     ${this.filePathRowWithOpenButtonIfExists('校对日志:', proofreadResult.logFilePath, 'showProofreadLog')}
                 </div>
                 <div class="section-actions">
-                ${hasMain && hasMd ? `<button class="action-button" onclick="handleAction('showProofreadDiff')">比较前后差异（原稿 vs ${roundLabel || '最新一轮'}）</button>` : ''}
+                ${hasMain && hasMd ? `<button class="action-button" onclick="handleAction('showProofreadDiff')" title="${commandHoverTitle('主稿与校对 Markdown 的内置 diff（任意两文件亦可）', 'ai-proofread.diffItWithAnotherFile')}">比较前后差异（原稿 vs ${roundLabel || '最新一轮'}）</button>` : ''}
                     ${proofreadResult.outputFilePath ? `<button class="action-button" onclick="handleAction('showProofreadItemsTree')" title="${commandHoverTitle('查看校对条目', 'ai-proofread.showProofreadItemsTree')}">查看校对条目</button>` : ''}
-                    ${proofreadResult.outputFilePath ? '<button class="action-button" onclick="handleAction(\'generateDiff\')">生成差异文件</button>' : ''}
-                    ${hasMain && hasMd ? '<button class="action-button" onclick="handleAction(\'generateAlignment\')">生成勘误表</button>' : ''}
+                    ${proofreadResult.outputFilePath ? `<button class="action-button" onclick="handleAction('generateDiff')" title="${commandHoverTitle('切分 JSON 与校对 JSON 生成 jsDiff HTML（任意两文件亦可）', 'ai-proofread.diffItWithAnotherFile')}">生成差异文件</button>` : ''}
+                    ${hasMain && hasMd ? `<button class="action-button" onclick="handleAction('generateAlignment')" title="${commandHoverTitle('原稿与校对结果逐句对齐生成勘误表（任意两文件亦可）', 'ai-proofread.diffItWithAnotherFile')}">生成勘误表</button>` : ''}
                 </div>
         `;
     }

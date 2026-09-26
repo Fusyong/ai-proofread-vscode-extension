@@ -120,19 +120,22 @@ export function multiAlignmentCsvPath(htmlPath: string): string {
 }
 
 /**
- * 生成多校次勘误 HTML，并旁路写入 JSON 与 CSV。
+ * 生成多校次勘误 HTML，并旁路写入 CSV；JSON 可选（默认写入）。
  */
 export function generateMultiAlignmentReport(
     table: MultiAlignmentTable,
     outputHtmlPath: string,
-    runtime = 0
+    runtime = 0,
+    writeJson = true
 ): { htmlPath: string; jsonPath: string; csvPath: string } {
     const report = buildMultiAlignmentReportJson(table, runtime);
     const jsonPath = multiAlignmentJsonPath(outputHtmlPath);
     const csvPath = multiAlignmentCsvPath(outputHtmlPath);
 
     fs.mkdirSync(path.dirname(outputHtmlPath), { recursive: true });
-    fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2), 'utf8');
+    if (writeJson) {
+        fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2), 'utf8');
+    }
     fs.writeFileSync(csvPath, formatMultiAlignmentCsv(table), 'utf8');
     fs.writeFileSync(outputHtmlPath, buildMultiAlignmentHtml(report), 'utf8');
 
@@ -141,7 +144,6 @@ export function generateMultiAlignmentReport(
 
 function buildMultiAlignmentHtml(report: MultiAlignmentReportJson): string {
     const sources = report.sources;
-    const sourceLabels = sources.map(s => escapeHtml(s.label)).join(' / ');
     const dataJson = JSON.stringify(report).replace(/</g, '\\u003c');
 
     const classButtons: MultiRowClass[] = [
@@ -178,7 +180,7 @@ function buildMultiAlignmentHtml(report: MultiAlignmentReportJson): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>多校次对齐勘误表</title>
+<title>多校次句子对齐（加工记录/勘误表）</title>
 <style>
 :root {
     --bg: #f7f6f3;
@@ -294,8 +296,8 @@ input[type="text"].index-filter { width: 140px; }
 </head>
 <body>
 <div class="wrap">
-    <h1>多校次对齐勘误表</h1>
-    <div class="sub">校次：${sourceLabels} · 共 ${report.statistics.total} 行 · 耗时 ${report.runtime.toFixed(2)}s</div>
+    <h1>多校次句子对齐（加工记录/勘误表）</h1>
+    <div class="sub">共 ${report.statistics.total} 行 · 耗时 ${report.runtime.toFixed(2)}s</div>
     <div class="toolbar">
         <div class="toolbar-row">
             <label>显示校次</label>

@@ -3,6 +3,8 @@
  */
 
 import type { AlignmentReportJson } from './alignmentReportGenerator';
+import { buildAlignmentReportJson } from './alignmentReportGenerator';
+import { alignDocuments } from './documentAligner';
 import {
     alignSentencesAnchor,
     type AlignmentItem,
@@ -597,6 +599,45 @@ export function mergeAlignmentReports(
         table = addAlignmentReport(table, reports[i].report, reports[i].source, options);
     }
     return table;
+}
+
+export interface MarkdownProofreadInput {
+    /** 校对稿全文 */
+    text: string;
+    /** 列显示名（常用文件名） */
+    label: string;
+    /** 溯源路径 */
+    path: string;
+}
+
+/**
+ * 原文 Markdown 分别与各校次 Markdown 做句子对齐，再逐步合并为多列表。
+ * 每次对齐使用 options 的浅拷贝，避免 algorithmDisplayName 等互相覆盖。
+ */
+export function mergeMarkdownProofreads(
+    textA: string,
+    titleA: string,
+    proofreads: MarkdownProofreadInput[],
+    options: MultiAlignmentMergeOptions = {}
+): MultiAlignmentTable {
+    if (proofreads.length === 0) {
+        return { sources: [], rows: [] };
+    }
+    const bundles = proofreads.map((p, i) => {
+        const pairOpts: AlignmentOptions = { ...options };
+        const { alignment } = alignDocuments(textA, p.text, pairOpts);
+        const report = buildAlignmentReportJson(alignment, titleA, p.label, pairOpts, 0);
+        const source: MultiAlignmentSource = {
+            id: `run${i}`,
+            label: p.label,
+            path: p.path,
+            titleA,
+            titleB: p.label,
+            options: report.options,
+        };
+        return { report, source };
+    });
+    return mergeAlignmentReports(bundles, options);
 }
 
 export function classStats(rows: MultiAlignmentRow[]): Record<MultiRowClass, number> {

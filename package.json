@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.12.28",
+  "version": "1.12.29",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -294,11 +294,6 @@
       {
         "command": "ai-proofread.diffItWithAnotherFile",
         "title": "%cmd.diffItWithAnotherFile.title%",
-        "category": "%category%"
-      },
-      {
-        "command": "ai-proofread.mergeAlignmentReports",
-        "title": "%cmd.mergeAlignmentReports.title%",
         "category": "%category%"
       },
       {
@@ -2322,11 +2317,6 @@
           "command": "ai-proofread.diffItWithAnotherFile",
           "group": "ai-proofread@14",
           "when": "resourceLangId == json || resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex"
-        },
-        {
-          "command": "ai-proofread.mergeAlignmentReports",
-          "group": "ai-proofread@14a",
-          "when": "resourceLangId == json || resourceLangId == markdown"
         },
         {
           "command": "ai-proofread.splitFile",
