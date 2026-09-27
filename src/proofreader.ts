@@ -28,6 +28,7 @@ import {
     SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM,
     SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL,
     SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL,
+    SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL,
 } from './promptManager';
 import { getExtensionContext } from './extensionContextHolder';
 import { formatSourceCharacteristicsBlock } from './sourceTextCharacteristics';
@@ -37,6 +38,10 @@ import {
     PINYIN_PROOFREAD_OUTPUT_FORMAT,
     PINYIN_ANNOTATION_OUTPUT_FORMAT,
 } from './pinyinPrompt';
+import {
+    BOOK_TRANSLATE_OUTPUT_FORMAT,
+    BOOK_TRANSLATE_SYSTEM_PROMPT,
+} from './translationMemory/bookTranslatePrompt';
 import { resolveProofreadModel } from './modelRoutes/modelRouteResolver';
 import { proofreadItemPathFromOutput } from './proofreadRoundLayout';
 
@@ -396,7 +401,8 @@ export function getOutputType(context?: vscode.ExtensionContext): OutputType {
             currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL ||
             currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL ||
             currentPromptName === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL ||
-            currentPromptName === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL
+            currentPromptName === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL ||
+            currentPromptName === SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL
         ) {
             return 'full';
         }
@@ -498,6 +504,14 @@ export function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCha
                 DEFAULT_OUTPUT_FORMAT,
                 sourceTextCharacteristics,
                 KNOWLEDGE_VERIFY_SYSTEM_PROMPT_TEMPLATE
+            );
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL) {
+            logger.info('使用预置提示词：图书翻译（过程输出）');
+            return buildSystemPromptFromTemplate(
+                BOOK_TRANSLATE_OUTPUT_FORMAT,
+                sourceTextCharacteristics,
+                BOOK_TRANSLATE_SYSTEM_PROMPT
             );
         }
 

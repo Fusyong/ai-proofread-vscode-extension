@@ -354,7 +354,7 @@ function dropLeadingWhitespaceOnlySegments(
 }
 
 export interface SplitOptions {
-    mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext';
+    mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext' | 'paragraph';
     cutBy?: number;
     levels?: number[];
     threshold?: number;
@@ -365,6 +365,61 @@ export interface SplitOptions {
     afterMinLength?: number;
     /** 是否在 context 中保留 target：`<before>` + `<target>` + `<after>` */
     includeTargetInContext?: boolean;
+}
+
+/**
+ * 翻译用：按 Markdown 段落/标题等切成「一项一单元」。
+ * - ATX 标题单独成单元
+ * - 围栏代码整块一单元
+ * - 其余按空行分段
+ */
+export function splitIntoTranslationUnits(text: string): string[] {
+    const normalized = normalizeLineEndings(text);
+    const lines = normalized.split('\n');
+    const units: string[] = [];
+    let buf: string[] = [];
+    let inFence = false;
+
+    const flush = () => {
+        const block = buf.join('\n').replace(/^\n+/, '').replace(/\n+$/, '');
+        buf = [];
+        if (block.trim()) {
+            units.push(block);
+        }
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const fence = line.match(/^(`{3,}|~{3,})/);
+        if (fence) {
+            if (!inFence) {
+                flush();
+                inFence = true;
+                buf.push(line);
+            } else {
+                buf.push(line);
+                flush();
+                inFence = false;
+            }
+            continue;
+        }
+        if (inFence) {
+            buf.push(line);
+            continue;
+        }
+        if (/^#{1,6}\s+\S/.test(line)) {
+            flush();
+            units.push(line.trimEnd());
+            continue;
+        }
+        if (/^\s*$/.test(line)) {
+            flush();
+            continue;
+        }
+        buf.push(line);
+    }
+    flush();
+    return units;
 }
 
 /**
@@ -404,6 +459,9 @@ export function splitText(
             options.afterMinLength,
             options.includeTargetInContext
         );
+    } else if (options.mode === 'paragraph') {
+        // 翻译用：一项一单元（段/标题/代码块）
+        segments = splitIntoTranslationUnits(text).map((x) => ({ target: x }));
     } else {
         // 标题加长度切分：先按标题切分，然后处理长短段落
         let textList = splitMarkdownByTitle(text, options.levels);
@@ -436,7 +494,7 @@ export function splitText(
 export async function handleFileSplit(
     filePath: string,
     options: {
-        mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext';
+        mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext' | 'paragraph';
         cutBy?: number;
         levels?: number[];
         threshold?: number;
@@ -491,6 +549,8 @@ export async function handleFileSplit(
             `上文最小长度: ${options.beforeMinLength}\n` +
             `下文最小长度: ${options.afterMinLength}\n` +
             `上下文中保留 target: ${options.includeTargetInContext ? '是' : '否'}\n\n`;
+    } else if (options.mode === 'paragraph') {
+        statsMessage = `切分模式: 按段落（翻译单元，一项一单元）\n\n`;
     } else {
         statsMessage = `切分模式: 标题加长度切分\n` +
             `标题级别: ${options.levels!.join(',')}\n` +

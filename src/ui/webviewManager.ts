@@ -20,6 +20,13 @@ import {
     inspectProofreadRounds,
     parseProofreadRound,
 } from '../proofreadRoundLayout';
+import { getTranslatePanelButtons } from '../translationMemory/translateRoundLayout';
+import {
+    getWorkbenchMode,
+    setWorkbenchMode,
+    workbenchModeLabel,
+    type WorkbenchMode,
+} from '../workbenchMode';
 import { focusWorkingTextEditor } from './lastActiveTextEditor';
 import { setProofreadItemsVisible } from './sidebarViewVisibility';
 import { commandHoverTitle } from './commandHover';
@@ -196,9 +203,13 @@ export class WebviewManager {
             this.currentPanel.dispose();
         }
 
+        const panelTitle =
+            result.title === 'AI Proofreader Result Panel' || result.title === 'Proofreading panel'
+                ? '工作面板'
+                : result.title || '工作面板';
         const panel = vscode.window.createWebviewPanel(
             'processResult',
-            result.title === 'AI Proofreader Result Panel' ? 'Proofreading panel' : result.title,
+            panelTitle,
             vscode.ViewColumn.Beside,
             {
                 enableScripts: true,
@@ -239,7 +250,7 @@ export class WebviewManager {
     }
 
     /**
-     * 打开校对面板（支持空面板）
+     * 打开工作面板（支持空面板；默认任务为校对）
      */
     public openProofreadingPanel(context: vscode.ExtensionContext): void {
         this.extensionContext = context;
@@ -274,10 +285,10 @@ export class WebviewManager {
         const hasMain = !!this.mainFilePath;
         const companions = this.mainFilePath ? detectCompanionFiles(this.mainFilePath) : undefined;
         return {
-            title: 'Proofreading panel',
+            title: '工作面板',
             message: hasMain
-                ? `校对项目：${this.getRelativePath(this.mainFilePath!)}`
-                : '整理当前文档，或选择主文件后切分、校对。',
+                ? `项目：${this.getRelativePath(this.mainFilePath!)}（默认任务：校对）`
+                : '工作面板（默认任务：校对）。整理当前文档，或选择主文件后切分、处理。',
             mainFilePath: this.mainFilePath,
             companionFiles: companions,
             actions: {}
@@ -377,7 +388,7 @@ export class WebviewManager {
         const runWithWorkingEditor = async (cmd: string): Promise<void> => {
             const ed = await focusWorkingTextEditor();
             if (!ed) {
-                vscode.window.showWarningMessage('请先打开目标文档，再使用此按钮（焦点可留在校对面板上）。');
+                vscode.window.showWarningMessage('请先打开目标文档，再使用此按钮（焦点可留在工作面板上）。');
                 return;
             }
             await vscode.commands.executeCommand(cmd);
@@ -385,6 +396,14 @@ export class WebviewManager {
 
         try {
             switch (command) {
+                case 'setWorkbenchModeProofread':
+                case 'setWorkbenchModeTranslate': {
+                    const mode: WorkbenchMode =
+                        command === 'setWorkbenchModeTranslate' ? 'translate' : 'proofread';
+                    await setWorkbenchMode(context, mode);
+                    this.refreshPanelContent(context);
+                    break;
+                }
                 case 'showMainFile': {
                     const mainPath = this.mainFilePath ?? this.getMainFilePath();
                     if (!mainPath) {
@@ -475,6 +494,12 @@ export class WebviewManager {
                 case 'proofreadSelectionWithMemory':
                     await runWithWorkingEditor('ai-proofread.proofreadSelectionWithMemory');
                     break;
+                case 'translateSelectionWithMemory':
+                    await runWithWorkingEditor('ai-proofread.translateSelectionWithMemory');
+                    break;
+                case 'cleanTranslationProcessOutput':
+                    await runWithWorkingEditor('ai-proofread.cleanTranslationProcessOutput');
+                    break;
                 case 'convertDocxToMarkdown':
                     await vscode.commands.executeCommand('ai-proofread.convertDocxToMarkdown');
                     break;
@@ -547,14 +572,24 @@ export class WebviewManager {
                 }
                 case 'proofreadJson': {
                     const jsonPath = this.getSplitJsonPath();
-                    if (jsonPath) {
-                        if ((this as any).proofreadJsonCallback) {
-                            await (this as any).proofreadJsonCallback(jsonPath, context);
+                    if (!jsonPath) {
+                        break;
+                    }
+                    const mode = getWorkbenchMode(context);
+                    if (mode === 'translate') {
+                        if ((this as any).translateJsonCallback) {
+                            await (this as any).translateJsonCallback(jsonPath, context);
                         }
+                    } else if ((this as any).proofreadJsonCallback) {
+                        await (this as any).proofreadJsonCallback(jsonPath, context);
                     }
                     break;
                 }
                 case 'proofreadJsonOverlay': {
+                    if (getWorkbenchMode(context) === 'translate') {
+                        vscode.window.showInformationMessage('翻译模式不使用重叠校对；请用「LLM 翻译 JSON」或续跑。');
+                        break;
+                    }
                     const jsonPath = this.getSplitJsonPath();
                     if (jsonPath) {
                         if ((this as any).proofreadJsonOverlayCallback) {
@@ -799,6 +834,11 @@ export class WebviewManager {
         (this as any).proofreadJsonOverlayCallback = callback;
     }
 
+    /** 设置翻译 JSON 的回调（顺序批译） */
+    public setTranslateJsonCallback(callback: (jsonFilePath: string, context: vscode.ExtensionContext) => Promise<void>): void {
+        (this as any).translateJsonCallback = callback;
+    }
+
     /** 设置切分文档的回调（按主文件路径切分） */
     public setSplitCallback(callback: (mainFilePath: string, context: vscode.ExtensionContext) => Promise<void>): void {
         (this as any).splitCallback = callback;
@@ -831,21 +871,36 @@ export class WebviewManager {
     }
 
     /**
-     * 生成完整 HTML：文档整理 → 切分与合并（含主文件）→ 校对结果 → 专项检查
+     * 生成完整 HTML：模式 → 文档整理 → 切分与合并 → 结果 → 专项检查
      */
     private generateFullHtml(result: ProcessResult, context?: vscode.ExtensionContext): string {
+        const mode = context ? getWorkbenchMode(context) : 'proofread';
         return this.getBaseHtml(`
             <div class="header">
-                <div class="message">${result.message}</div>
+                <div class="message">${escapeHtml(result.message || '工作面板（默认任务：校对）')}</div>
+                ${this.generateWorkbenchModeHtml(mode)}
             </div>
             ${this.generateDocumentPrepHtml()}
-            ${this.generateSplitSectionHtml(result)}
+            ${this.generateSplitSectionHtml(result, mode)}
             ${this.generateProofreadSectionHtml(result)}
             ${this.generateSpecialChecksHtml()}
             <div class="panel-footer-commands">
-                ${this.generatePanelFooterHtml()}
+                ${this.generatePanelFooterHtml(mode)}
             </div>
         `, true);
+    }
+
+    private generateWorkbenchModeHtml(mode: WorkbenchMode): string {
+        const proofreadActive = mode === 'proofread' ? ' mode-btn--active' : '';
+        const translateActive = mode === 'translate' ? ' mode-btn--active' : '';
+        return `
+            <div class="workbench-mode" role="group" aria-label="工作台模式">
+                <span class="mode-label">模式</span>
+                <button type="button" class="mode-btn${proofreadActive}" onclick="handleAction('setWorkbenchModeProofread')" title="校对（默认主业）">校对</button>
+                <button type="button" class="mode-btn${translateActive}" onclick="handleAction('setWorkbenchModeTranslate')" title="图书翻译">翻译</button>
+                <span class="mode-hint">当前：${workbenchModeLabel(mode)} · 品牌仍为 AI 校对</span>
+            </div>
+        `;
     }
 
     private readonly buttonGroupSep = '<span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>';
@@ -883,8 +938,8 @@ export class WebviewManager {
         `;
     }
 
-    /** 切分与合并：上部选主文件；有 JSON 后再露出配套文件与合并/检索/校对 */
-    private generateSplitSectionHtml(result: ProcessResult): string {
+    /** 切分与合并：上部选主文件；有 JSON 后再露出配套文件与合并/检索/校对或翻译 */
+    private generateSplitSectionHtml(result: ProcessResult, mode: WorkbenchMode = 'proofread'): string {
         const mainPath =
             result.mainFilePath ??
             result.splitResult?.originalFilePath ??
@@ -911,34 +966,61 @@ export class WebviewManager {
             ? FilePathUtils.getFilePath(jsonPath, '.referenceprep', '.log')
             : '';
 
+        const taskVerb = mode === 'translate' ? '翻译' : '校对';
         const mainFileBlock = mainPath
             ? `<div class="file-paths-compact">
                     ${this.filePathRowWithOpenButton('主文件:', mainPath, 'showMainFile')}
                 </div>`
-            : `<p class="hint">尚未选择主文件。切分、合并 JSON、校对 JSON 需要先选定主稿。</p>`;
+            : `<p class="hint">尚未选择主文件。切分、合并 JSON、${taskVerb} JSON 需要先选定主稿。</p>`;
 
-        const proofreadButtons = jsonPath
-            ? getProofreadPanelButtons(path.dirname(jsonPath), path.basename(jsonPath, '.json'))
-            : undefined;
-        const llmDisabled = proofreadButtons && !proofreadButtons.llmEnabled ? ' disabled' : '';
-        const overlayDisabled = !proofreadButtons || !proofreadButtons.overlayEnabled ? ' disabled' : '';
-        const llmLabel = proofreadButtons?.llmLabel ?? 'LLM 校对 JSON';
-        const overlayLabel = proofreadButtons?.overlayLabel ?? '重叠校对 JSON';
-        const llmTitle = commandHoverTitle(
-            proofreadButtons?.llmHint ?? 'LLM 校对 JSON',
-            'ai-proofread.proofreadFile'
-        );
-        const overlayTitle = commandHoverTitle(
-            proofreadButtons?.overlayHint ?? '重叠校对 JSON',
-            'ai-proofread.proofreadFileOverlay'
-        );
-        const proofreadHint = proofreadButtons && (!proofreadButtons.llmEnabled || !proofreadButtons.overlayEnabled)
-            ? `<p class="hint">${escapeHtml(
-                [proofreadButtons.llmHint, proofreadButtons.overlayHint]
-                    .filter((h, i, arr) => !!h && arr.indexOf(h) === i)
-                    .join(' ')
-            )}</p>`
-            : '';
+        const dir = jsonPath ? path.dirname(jsonPath) : '';
+        const base = jsonPath ? path.basename(jsonPath, '.json') : '';
+        const proofreadButtons = jsonPath ? getProofreadPanelButtons(dir, base) : undefined;
+        const translateButtons = jsonPath ? getTranslatePanelButtons(dir, base) : undefined;
+
+        let llmDisabled = '';
+        let overlayDisabled = ' disabled';
+        let llmLabel = 'LLM 校对 JSON';
+        let overlayLabel = '重叠校对 JSON';
+        let llmTitle = commandHoverTitle('LLM 校对 JSON', 'ai-proofread.proofreadFile');
+        let overlayTitle = commandHoverTitle('重叠校对 JSON', 'ai-proofread.proofreadFileOverlay');
+        let actionHint = '';
+
+        if (mode === 'translate') {
+            llmDisabled = translateButtons && !translateButtons.llmEnabled ? ' disabled' : '';
+            overlayDisabled = ' disabled';
+            llmLabel = translateButtons?.llmLabel ?? 'LLM 翻译 JSON';
+            overlayLabel = '重叠校对 JSON';
+            llmTitle = commandHoverTitle(
+                translateButtons?.llmHint ?? '顺序翻译 JSON（带翻译记忆）',
+                'ai-proofread.translateJsonFile'
+            );
+            overlayTitle = commandHoverTitle('翻译模式不使用重叠校对', 'ai-proofread.proofreadFileOverlay');
+            actionHint = translateButtons?.llmHint
+                ? `<p class="hint">${escapeHtml(translateButtons.llmHint)}</p>`
+                : '';
+        } else {
+            llmDisabled = proofreadButtons && !proofreadButtons.llmEnabled ? ' disabled' : '';
+            overlayDisabled = !proofreadButtons || !proofreadButtons.overlayEnabled ? ' disabled' : '';
+            llmLabel = proofreadButtons?.llmLabel ?? 'LLM 校对 JSON';
+            overlayLabel = proofreadButtons?.overlayLabel ?? '重叠校对 JSON';
+            llmTitle = commandHoverTitle(
+                proofreadButtons?.llmHint ?? 'LLM 校对 JSON',
+                'ai-proofread.proofreadFile'
+            );
+            overlayTitle = commandHoverTitle(
+                proofreadButtons?.overlayHint ?? '重叠校对 JSON',
+                'ai-proofread.proofreadFileOverlay'
+            );
+            actionHint =
+                proofreadButtons && (!proofreadButtons.llmEnabled || !proofreadButtons.overlayEnabled)
+                    ? `<p class="hint">${escapeHtml(
+                          [proofreadButtons.llmHint, proofreadButtons.overlayHint]
+                              .filter((h, i, arr) => !!h && arr.indexOf(h) === i)
+                              .join(' ')
+                      )}</p>`
+                    : '';
+        }
 
         const companionBlock = hasJson && jsonPath
             ? `
@@ -961,20 +1043,20 @@ export class WebviewManager {
                     <button class="action-button" onclick="handleAction('proofreadJson')" title="${llmTitle}"${llmDisabled}>${llmLabel}</button>
                     <button class="action-button" onclick="handleAction('proofreadJsonOverlay')" title="${overlayTitle}"${overlayDisabled}>${overlayLabel}</button>
                 </div>
-                ${proofreadHint}`
+                ${actionHint}`
             : '';
 
         return `
             <div class="process-section">
-                <h3>✂️ 切分 → (合并 →) 校对</h3>
+                <h3>✂️ 切分 → (合并 →) ${taskVerb}</h3>
                 ${mainFileBlock}
-                ${lengthMismatch ? `
+                ${lengthMismatch && mode === 'proofread' ? `
                 <div class="warning-box">
                     ⚠️ JSON 与校对结果条目数不一致（${jsonLen} vs ${proofreadLen}），请检查或删除校对结果后重新校对。
                 </div>
                 ` : ''}
                 <div class="section-actions section-actions--between">
-                    <button class="action-button" onclick="handleAction('selectMainFile')" title="为本轮切分/校对选定主稿（面板专用）">${mainPath ? '更换主文件' : '选择主文件'}</button>
+                    <button class="action-button" onclick="handleAction('selectMainFile')" title="为本轮切分/${taskVerb}选定主稿（面板专用）">${mainPath ? '更换主文件' : '选择主文件'}</button>
                     <button class="action-button" onclick="handleAction('selectMainFileFromWorkspace')" title="从工作区列表中选定主稿（面板专用）">从工作区选择</button>
                     <button class="action-button" onclick="handleAction('splitDocument')" title="${commandHoverTitle('切分文档', 'ai-proofread.splitFile')}"${mainPath ? '' : ' disabled'}>${hasJson ? '重新切分' : '切分文档'}</button>
                 </div>
@@ -1009,9 +1091,19 @@ export class WebviewManager {
         `;
     }
 
-    /** 底部仅保留选段校对 */
-    private generatePanelFooterHtml(): string {
+    /** 底部选段动作（随工作台模式切换文案） */
+    private generatePanelFooterHtml(mode: WorkbenchMode = 'proofread'): string {
         const sep = '<span class="cmd-sep" aria-hidden="true">|</span>';
+        if (mode === 'translate') {
+            return `
+            <p class="header-commands-hint">选段翻译</p>
+            <div class="header-actions">
+                <button type="button" class="link-button" onclick="handleAction('translateSelectionWithMemory')" title="${commandHoverTitle('翻译选中文本（带翻译记忆）', 'ai-proofread.translateSelectionWithMemory')}">翻译选中文本</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('cleanTranslationProcessOutput')" title="${commandHoverTitle('清理翻译过程输出', 'ai-proofread.cleanTranslationProcessOutput')}">清理过程输出</button>
+            </div>
+        `;
+        }
         return `
             <p class="header-commands-hint">选段校对</p>
             <div class="header-actions">
@@ -1049,12 +1141,21 @@ export class WebviewManager {
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Proofreading panel</title>
+                <title>工作面板</title>
                 <style>
                     body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground);
                         background-color: var(--vscode-editor-background); padding: 10px 12px; line-height: 1.3; }
                     .header { margin-bottom: 8px; padding-bottom: 0; width: 100%; min-width: 0; box-sizing: border-box; }
                     .message { font-size: 14px; margin: 0; color: #6B8E9A; font-weight: 500; line-height: 1.3; }
+                    .workbench-mode { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+                    .mode-label { font-size: 12px; color: #6B8E9A; font-weight: 500; }
+                    .mode-btn { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+                        margin: 0; padding: 3px 10px; background-color: transparent; color: #4A6B7A;
+                        border: 1px solid #8BACB8; border-radius: 4px; cursor: pointer; font-family: inherit;
+                        font-size: 12px; line-height: 1; font-weight: 500; }
+                    .mode-btn:hover { background-color: #E8F0F2; }
+                    .mode-btn--active { background-color: #8BACB8; color: white; border-color: #8BACB8; }
+                    .mode-hint { font-size: 11px; color: #8A9BA0; }
                     .process-section { margin-bottom: 8px; padding: 8px 10px; background-color: var(--vscode-editor-background);
                         border: 1px solid var(--vscode-panel-border); border-radius: 5px; }
                     .process-section:last-of-type { margin-bottom: 0; }

@@ -193,6 +193,11 @@ export function resolveSegmentsJsonPath(filePath: string): string | undefined {
     }
     if (/\.json$/i.test(filePath)) {
         const stem = path.basename(filePath, '.json');
+        // 翻译结果：foo.translate.1 / foo.translate.1-process
+        const translateStem = stem.match(/^(.*)\.translate\.(\d+)(-process)?$/i);
+        if (translateStem) {
+            return path.join(path.dirname(filePath), `${translateStem[1]}.json`);
+        }
         if (/\.(proofread|referenceprep|dictprep)$/i.test(stem)) {
             return undefined;
         }

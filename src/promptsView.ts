@@ -1,6 +1,5 @@
 /**
- * 提示词 TreeView：单选（当前）、新建、编辑、删除
- * 仿照字词检查的检查项目管理，仅能选一条为当前。
+ * 提示词 TreeView：按 task 分组；单选当前、新建、编辑、删除
  */
 
 import * as vscode from 'vscode';
@@ -17,8 +16,10 @@ import {
     SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM,
     SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL,
     SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL,
+    SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL,
 } from './promptManager';
 import type { Prompt } from './promptManager';
+import { PROMPT_TASK_LABELS, resolvePromptTask, type PromptTask } from './promptTask';
 
 export const PROMPTS_VIEW_ID = 'ai-proofread.prompts';
 
@@ -27,17 +28,107 @@ const SYSTEM_FULL_ITEM_ID = '__system__';
 /** 系统默认（条目式）在树中的 id */
 const SYSTEM_ITEM_ITEM_ID = '__system_item__';
 
-export interface PromptTreeItem {
-    /** 系统项为 __system__ / __system_item__，否则为 prompt.name */
+type PromptLeaf = {
+    kind: 'prompt';
     id: string;
     label: string;
     prompt?: Prompt;
-    /** 系统全文 / 系统条目，用于 description */
     systemOutputType?: 'full' | 'item';
+    task: PromptTask;
+};
+
+type PromptGroup = {
+    kind: 'group';
+    id: string;
+    label: string;
+    task: PromptTask;
+};
+
+export type PromptTreeItem = PromptLeaf | PromptGroup;
+
+const PRESET_LEAVES: PromptLeaf[] = [
+    { kind: 'prompt', id: SYSTEM_FULL_ITEM_ID, label: '系统默认提示词（full）', systemOutputType: 'full', task: 'proofread' },
+    { kind: 'prompt', id: SYSTEM_ITEM_ITEM_ID, label: '系统默认提示词（item）', systemOutputType: 'item', task: 'proofread' },
+    {
+        kind: 'prompt',
+        id: SYSTEM_PROMPT_NAME_NORMALIZATION_FULL,
+        label: '表述正常化（full）',
+        systemOutputType: 'full',
+        task: 'proofread',
+    },
+    {
+        kind: 'prompt',
+        id: SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM,
+        label: '表述正常化（item）',
+        systemOutputType: 'item',
+        task: 'proofread',
+    },
+    {
+        kind: 'prompt',
+        id: SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL,
+        label: '段内重组与重述（full）',
+        systemOutputType: 'full',
+        task: 'restructure',
+    },
+    {
+        kind: 'prompt',
+        id: SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL,
+        label: '图书翻译（过程输出）',
+        systemOutputType: 'full',
+        task: 'translate',
+    },
+    {
+        kind: 'prompt',
+        id: SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM,
+        label: '知识核查（item）',
+        systemOutputType: 'item',
+        task: 'proofread',
+    },
+    {
+        kind: 'prompt',
+        id: SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL,
+        label: '知识核查（full）',
+        systemOutputType: 'full',
+        task: 'proofread',
+    },
+    {
+        kind: 'prompt',
+        id: SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM,
+        label: '硬伤发现（item）',
+        systemOutputType: 'item',
+        task: 'proofread',
+    },
+    {
+        kind: 'prompt',
+        id: SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM,
+        label: '对应关系核对（item）',
+        systemOutputType: 'item',
+        task: 'proofread',
+    },
+    {
+        kind: 'prompt',
+        id: SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL,
+        label: '拼音审校（full）',
+        systemOutputType: 'full',
+        task: 'proofread',
+    },
+    {
+        kind: 'prompt',
+        id: SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL,
+        label: '拼音加注（full）',
+        systemOutputType: 'full',
+        task: 'annotate',
+    },
+];
+
+function storageNameFromLeafId(id: string): string {
+    if (id === SYSTEM_FULL_ITEM_ID) return SYSTEM_PROMPT_NAME_FULL;
+    if (id === SYSTEM_ITEM_ITEM_ID) return SYSTEM_PROMPT_NAME_ITEM;
+    return id;
 }
 
 export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTreeItem> {
-    private _onDidChangeTreeData = new vscode.EventEmitter<void>();
+    private _onDidChangeTreeData = new vscode.EventEmitter<PromptTreeItem | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
     constructor(
@@ -49,97 +140,67 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
         this._onDidChangeTreeData.fire();
     }
 
-    getChildren(_element?: PromptTreeItem): PromptTreeItem[] {
-        const prompts = this.promptManager.getPrompts();
-        const items: PromptTreeItem[] = [
-            { id: SYSTEM_FULL_ITEM_ID, label: '系统默认提示词（full）', systemOutputType: 'full' },
-            { id: SYSTEM_ITEM_ITEM_ID, label: '系统默认提示词（item）', systemOutputType: 'item' },
-            {
-                id: SYSTEM_PROMPT_NAME_NORMALIZATION_FULL,
-                label: '表述正常化（full）',
-                systemOutputType: 'full',
-            },
-            {
-                id: SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM,
-                label: '表述正常化（item）',
-                systemOutputType: 'item',
-            },
-            {
-                id: SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL,
-                label: '段内重组与重述（full）',
-                systemOutputType: 'full',
-            },
-            {
-                id: SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM,
-                label: '知识核查（item）',
-                systemOutputType: 'item',
-            },
-            {
-                id: SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL,
-                label: '知识核查（full）',
-                systemOutputType: 'full',
-            },
-            {
-                id: SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM,
-                label: '硬伤发现（item）',
-                systemOutputType: 'item',
-            },
-            {
-                id: SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM,
-                label: '对应关系核对（item）',
-                systemOutputType: 'item',
-            },
-            {
-                id: SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL,
-                label: '拼音审校（full）',
-                systemOutputType: 'full',
-            },
-            {
-                id: SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL,
-                label: '拼音加注（full）',
-                systemOutputType: 'full',
-            },
-            ...prompts.map((p) => ({ id: p.name, label: p.name, prompt: p })),
-        ];
-        return items;
+    getChildren(element?: PromptTreeItem): PromptTreeItem[] {
+        const userPrompts = this.promptManager.getPrompts().map(
+            (p): PromptLeaf => ({
+                kind: 'prompt',
+                id: p.name,
+                label: p.name,
+                prompt: p,
+                task: resolvePromptTask(p.name),
+            })
+        );
+        const allLeaves = [...PRESET_LEAVES, ...userPrompts];
+
+        if (!element) {
+            const order: PromptTask[] = ['proofread', 'translate', 'annotate', 'restructure', 'other'];
+            return order
+                .filter((task) => allLeaves.some((l) => l.task === task))
+                .map(
+                    (task): PromptGroup => ({
+                        kind: 'group',
+                        id: `group:${task}`,
+                        label: PROMPT_TASK_LABELS[task],
+                        task,
+                    })
+                );
+        }
+        if (element.kind === 'group') {
+            return allLeaves.filter((l) => l.task === element.task);
+        }
+        return [];
     }
 
     getTreeItem(element: PromptTreeItem): vscode.TreeItem {
+        if (element.kind === 'group') {
+            const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.Expanded);
+            item.id = element.id;
+            item.contextValue = 'promptGroup';
+            return item;
+        }
+
         const current = this.promptManager.getCurrentPromptName();
-        const isCurrent =
-            (element.id === SYSTEM_FULL_ITEM_ID && current === SYSTEM_PROMPT_NAME_FULL) ||
-            (element.id === SYSTEM_ITEM_ITEM_ID && current === SYSTEM_PROMPT_NAME_ITEM) ||
-            (element.id === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL && current === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) ||
-            (element.id === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM && current === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) ||
-            (element.id === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL && current === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL) ||
-            (element.id === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM && current === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM) ||
-            (element.id === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL && current === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL) ||
-            (element.id === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM && current === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) ||
-            (element.id === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM && current === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) ||
-            (element.id === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL && current === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL) ||
-            (element.id === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL && current === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL) ||
-            (!!element.prompt && current === element.id);
+        const storage = storageNameFromLeafId(element.id);
+        const isCurrent = current === storage;
         const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
         item.id = element.id;
-        const systemLabel = element.systemOutputType === 'full' ? '全文' : element.systemOutputType === 'item' ? '条目' : undefined;
+        const systemLabel =
+            element.systemOutputType === 'full' ? '全文' : element.systemOutputType === 'item' ? '条目' : undefined;
         const userOutputLabel =
             element.prompt?.outputType === 'item' ? '条目' : element.prompt?.outputType === 'other' ? '其他' : '全文';
         const outputTypeLabel = systemLabel ?? userOutputLabel;
-        item.description = [outputTypeLabel, isCurrent ? '当前' : undefined].filter(Boolean).join(' · ') || undefined;
+        item.description = [outputTypeLabel, PROMPT_TASK_LABELS[element.task], isCurrent ? '当前' : undefined]
+            .filter(Boolean)
+            .join(' · ');
         item.contextValue = element.prompt ? 'promptUser' : 'promptSystem';
         if (element.prompt?.content) {
             const preview = element.prompt.content.slice(0, 60).replace(/\s+/g, ' ');
-            let tooltip = preview + (element.prompt.content.length > 60 ? '…' : '');
-            tooltip += `\n输出类型: ${outputTypeLabel}`;
-            item.tooltip = tooltip;
-        } else if (element.systemOutputType) {
-            if (element.id === SYSTEM_FULL_ITEM_ID) {
-                item.tooltip = '系统默认提示词（full）';
-            } else if (element.id === SYSTEM_ITEM_ITEM_ID) {
-                item.tooltip = '系统默认提示词（item）';
-            } else {
-                item.tooltip = element.label;
-            }
+            item.tooltip =
+                preview +
+                (element.prompt.content.length > 60 ? '…' : '') +
+                `\n输出类型: ${outputTypeLabel}\n任务: ${PROMPT_TASK_LABELS[element.task]}`;
+        } else {
+            item.tooltip = `${element.label}\n任务: ${PROMPT_TASK_LABELS[element.task]}`;
         }
         return item;
     }
@@ -165,33 +226,8 @@ export function registerPromptsView(
         treeView,
         treeView.onDidChangeSelection(async (e) => {
             const sel = e.selection[0];
-            if (!sel) return;
-            const id = (sel.id ?? '') as string;
-            const labelText = typeof sel.label === 'string' ? sel.label : (sel.label as { label?: string }).label ?? '';
-            let name: string;
-            if (id === SYSTEM_FULL_ITEM_ID) name = SYSTEM_PROMPT_NAME_FULL;
-            else if (id === SYSTEM_ITEM_ITEM_ID) name = SYSTEM_PROMPT_NAME_ITEM;
-            else if (id === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) name = SYSTEM_PROMPT_NAME_NORMALIZATION_FULL;
-            else if (id === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) name = SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM;
-            else if (id === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL) name = SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL;
-            else if (id === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM) name = SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM;
-            else if (id === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL) name = SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL;
-            else if (id === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) name = SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM;
-            else if (id === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) name = SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM;
-            else if (id === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL) name = SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL;
-            else if (id === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL) name = SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL;
-            else if (labelText === '系统默认提示词（full）') name = SYSTEM_PROMPT_NAME_FULL;
-            else if (labelText === '系统默认提示词（item）') name = SYSTEM_PROMPT_NAME_ITEM;
-            else if (labelText === '表述正常化（full）') name = SYSTEM_PROMPT_NAME_NORMALIZATION_FULL;
-            else if (labelText === '表述正常化（item）') name = SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM;
-            else if (labelText === '段内重组与重述（full）') name = SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL;
-            else if (labelText === '知识核查（item）') name = SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM;
-            else if (labelText === '知识核查（full）') name = SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL;
-            else if (labelText === '硬伤发现（item）') name = SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM;
-            else if (labelText === '对应关系核对（item）') name = SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM;
-            else if (labelText === '拼音审校（full）') name = SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL;
-            else if (labelText === '拼音加注（full）') name = SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL;
-            else name = id;
+            if (!sel || sel.kind !== 'prompt') return;
+            const name = storageNameFromLeafId(sel.id);
             await promptManager.setCurrentPrompt(name);
             provider.refresh();
         })

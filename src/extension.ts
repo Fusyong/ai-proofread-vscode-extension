@@ -10,6 +10,8 @@ import { TempFileManager, ConfigManager, Logger, FilePathUtils } from './utils';
 import { WebviewManager } from './ui/webviewManager';
 import { FileSplitCommandHandler } from './commands/fileSplitCommandHandler';
 import { ProofreadCommandHandler } from './commands/proofreadCommandHandler';
+import { TranslateCommandHandler } from './commands/translateCommandHandler';
+import { assertPromptMatchesEntry } from './promptTask';
 import { FileCompareCommandHandler } from './commands/fileCompareCommandHandler';
 import { SplitIntoSentencesCommandHandler } from './commands/splitIntoSentencesCommandHandler';
 import { DocumentConvertCommandHandler } from './commands/documentConvertCommandHandler';
@@ -131,6 +133,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const webviewManager = WebviewManager.getInstance();
     const fileSplitHandler = new FileSplitCommandHandler(webviewManager);
     const proofreadHandler = new ProofreadCommandHandler(webviewManager);
+    const translateHandler = new TranslateCommandHandler(webviewManager);
     const fileCompareHandler = new FileCompareCommandHandler(context);
     const splitIntoSentencesHandler = new SplitIntoSentencesCommandHandler();
     const documentConvertHandler = new DocumentConvertCommandHandler();
@@ -184,6 +187,9 @@ export async function activate(context: vscode.ExtensionContext) {
     webviewManager.setProofreadJsonOverlayCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
         return proofreadHandler.handleOverlayProofreadJsonFile(jsonFilePath, ctx);
     });
+    webviewManager.setTranslateJsonCallback((jsonFilePath: string, ctx: vscode.ExtensionContext) => {
+        return translateHandler.handleTranslateJsonFile(jsonFilePath, ctx);
+    });
     webviewManager.setSplitCallback((mainFilePath: string, ctx: vscode.ExtensionContext) => {
         return fileSplitHandler.handleFileSplitByPath(mainFilePath, ctx);
     });
@@ -218,6 +224,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 { label: '按标题和长度切分', value: 'title-length' },
                 { label: '按长度切分，以标题范围为上下文', value: 'titleContext' },
                 { label: '按长度切分，按长度扩展前后文为上下文', value: 'paragraphContext' },
+                { label: '按段落切分（翻译用，一项一单元）', value: 'paragraph' },
             ], {
                 placeHolder: '请选择切分模式',
                 canPickMany: false
@@ -228,7 +235,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
 
             await fileSplitHandler.handleFileSplitCommand(
-                mode.value as 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext',
+                mode.value as 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext' | 'paragraph',
                 editor,
                 editor.document,
                 context
@@ -280,6 +287,56 @@ export async function activate(context: vscode.ExtensionContext) {
             await fileSplitHandler.handleFileSplitCommand('title-length', editor, editor.document, context);
         }),
 
+        vscode.commands.registerCommand('ai-proofread.splitFileByParagraph', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await fileSplitHandler.handleFileSplitCommand('paragraph', editor, editor.document, context);
+        }),
+
+        vscode.commands.registerCommand('ai-proofread.translateSelectionWithMemory', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await translateHandler.handleTranslateSelectionWithMemory(editor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.translateJsonFile', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await translateHandler.handleTranslateFileCommand(editor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.cleanTranslationProcessOutput', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await translateHandler.handleCleanTranslationProcessOutput(editor);
+        }),
+        vscode.commands.registerCommand('ai-proofread.translationMemory.approveCandidates', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await translateHandler.handleApproveTranslationMemoryCandidates(editor);
+        }),
+        vscode.commands.registerCommand('ai-proofread.translationMemory.clear', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await translateHandler.handleClearTranslationMemory(editor);
+        }),
+
         vscode.commands.registerCommand('ai-proofread.proofreadFile', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
@@ -304,12 +361,18 @@ export async function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('No active editor!');
                 return;
             }
+            if (!(await assertPromptMatchesEntry(context, 'proofread'))) {
+                return;
+            }
             await proofreadHandler.handleProofreadSelectionCommand(editor, context);
         }),
         vscode.commands.registerCommand('ai-proofread.proofreadSelectionWithMemory', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            if (!(await assertPromptMatchesEntry(context, 'proofread'))) {
                 return;
             }
             await proofreadHandler.handleProofreadSelectionWithMemoryCommand(editor, context);
@@ -339,13 +402,13 @@ export async function activate(context: vscode.ExtensionContext) {
             promptsTreeProvider.refresh();
         }),
         vscode.commands.registerCommand('ai-proofread.prompts.edit', async (el: PromptTreeItem) => {
-            if (el?.prompt) {
+            if (el?.kind === 'prompt' && el.prompt) {
                 await promptManager.editPrompt(el.prompt);
                 promptsTreeProvider.refresh();
             }
         }),
         vscode.commands.registerCommand('ai-proofread.prompts.delete', async (el: PromptTreeItem) => {
-            if (el?.id && el.prompt) {
+            if (el?.kind === 'prompt' && el.id && el.prompt) {
                 await promptManager.deletePrompt(el.id);
                 promptsTreeProvider.refresh();
             }

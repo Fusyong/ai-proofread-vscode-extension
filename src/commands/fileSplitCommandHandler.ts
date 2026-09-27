@@ -47,6 +47,7 @@ export class FileSplitCommandHandler {
             { label: '按标题和长度切分', value: 'title-length' },
             { label: '按长度切分，以标题范围为上下文', value: 'titleContext' },
             { label: '按长度切分，按长度扩展前后文为上下文', value: 'paragraphContext' },
+            { label: '按段落切分（翻译用，一项一单元）', value: 'paragraph' },
         ], { placeHolder: '请选择切分模式', canPickMany: false });
         if (!mode) return;
 
@@ -57,6 +58,8 @@ export class FileSplitCommandHandler {
             options = await this.handleTitleMode(config, mode.value, options);
         } else if (mode.value === 'paragraphContext') {
             options = await this.handleParagraphContextMode(config, options);
+        } else if (mode.value === 'paragraph') {
+            options = { mode: 'paragraph' };
         }
         if (!options) return;
 
@@ -96,7 +99,7 @@ export class FileSplitCommandHandler {
      * 处理文件切分命令
      */
     public async handleFileSplitCommand(
-        mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext',
+        mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext' | 'paragraph',
         editor: vscode.TextEditor,
         document: vscode.TextDocument,
         context: vscode.ExtensionContext
@@ -105,7 +108,7 @@ export class FileSplitCommandHandler {
 
         try {
             let options: {
-                mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext';
+                mode: 'length' | 'title' | 'title-length' | 'titleContext' | 'paragraphContext' | 'paragraph';
                 cutBy?: number;
                 levels?: number[];
                 threshold?: number;
@@ -124,6 +127,8 @@ export class FileSplitCommandHandler {
             } else if (mode === 'paragraphContext') {
                 options = await this.handleParagraphContextMode(config, options);
                 if (!options) return;
+            } else if (mode === 'paragraph') {
+                options = { mode: 'paragraph' };
             }
 
             // 调用splitter模块中的handleFileSplit函数

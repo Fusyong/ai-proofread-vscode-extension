@@ -3,6 +3,7 @@
  */
 
 import * as vscode from 'vscode';
+import { normalizePromptTask, PROMPT_TASK_LABELS, resolvePromptTask, type PromptTask } from './promptTask';
 
 export type PromptOutputType = 'full' | 'item' | 'other';
 
@@ -28,6 +29,10 @@ export const SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM = '__preset_knowledge_veri
 export const SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL = '__preset_knowledge_verify_full__';
 /** 预置「段内重组与重述（full）」在 globalState 中的存值 */
 export const SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL = '__preset_para_restructure_full__';
+/** 预置「图书翻译（过程输出）」在 globalState 中的存值 */
+export const SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL = '__preset_book_translate_full__';
+
+const CURRENT_PROMPT_BY_TASK_KEY = 'currentPromptByTask';
 
 function isReservedPromptStorageName(name: string): boolean {
     return (
@@ -40,7 +45,8 @@ function isReservedPromptStorageName(name: string): boolean {
         name === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL ||
         name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM ||
         name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL ||
-        name === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL
+        name === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL ||
+        name === SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL
     );
 }
 
@@ -57,6 +63,7 @@ export function getPromptDisplayName(name: string): string {
     if (name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM) return '知识核查（item）';
     if (name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL) return '知识核查（full）';
     if (name === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL) return '段内重组与重述（full）';
+    if (name === SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL) return '图书翻译（过程输出）';
     return name || '系统默认提示词（full）';
 }
 
@@ -64,6 +71,8 @@ export interface Prompt {
     name: string;
     content: string;
     outputType?: PromptOutputType;
+    /** 任务类别；默认 proofread */
+    task?: PromptTask;
 }
 
 export class PromptManager {
@@ -93,27 +102,55 @@ export class PromptManager {
 
     /** 当前提示词的显示名称（用于日志、消息等） */
     public getCurrentPromptDisplayName(): string {
-        const name = this.getCurrentPromptName();
-        if (name === SYSTEM_PROMPT_NAME_FULL) return '系统默认提示词（full）';
-        if (name === SYSTEM_PROMPT_NAME_ITEM) return '系统默认提示词（item）';
-        if (name === SYSTEM_PROMPT_NAME_NORMALIZATION_FULL) return '表述正常化（full）';
-        if (name === SYSTEM_PROMPT_NAME_NORMALIZATION_ITEM) return '表述正常化（item）';
-        if (name === SYSTEM_PROMPT_NAME_HARD_ISSUE_ITEM) return '硬伤发现（item）';
-        if (name === SYSTEM_PROMPT_NAME_CORRESPONDENCE_CHECK_ITEM) return '对应关系核对（item）';
-        if (name === SYSTEM_PROMPT_NAME_PINYIN_PROOFREAD_FULL) return '拼音审校（full）';
-        if (name === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL) return '拼音加注（full）';
-        if (name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM) return '知识核查（item）';
-        if (name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL) return '知识核查（full）';
-        if (name === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL) return '段内重组与重述（full）';
-        return name;
+        return getPromptDisplayName(this.getCurrentPromptName());
     }
 
-    /** 设为当前使用的提示词；空串为系统默认全文，__system_item__ 为系统默认条目，__preset_*__ 为其他预置 */
+    private getPromptByTaskMap(): Record<string, string> {
+        const raw = this.context.globalState.get<Record<string, string>>(CURRENT_PROMPT_BY_TASK_KEY, {});
+        return raw && typeof raw === 'object' ? { ...raw } : {};
+    }
+
+    /** 某任务上次选用的提示词存值 */
+    public getCurrentPromptNameForTask(task: PromptTask): string {
+        const map = this.getPromptByTaskMap();
+        const hit = map[task];
+        if (typeof hit === 'string') {
+            return hit;
+        }
+        return task === 'translate' ? SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL : SYSTEM_PROMPT_NAME_FULL;
+    }
+
+    /**
+     * 切换到指定任务对应的当前提示词（翻译入口等使用）。
+     */
+    public async activatePromptForTask(task: PromptTask): Promise<void> {
+        await this.setCurrentPrompt(this.getCurrentPromptNameForTask(task));
+    }
+
+    /** 设为当前使用的提示词；并写入 currentPromptByTask */
     public async setCurrentPrompt(name: string): Promise<void> {
         await this.context.globalState.update('currentPrompt', name);
+        const task = resolvePromptTask(name);
+        const map = this.getPromptByTaskMap();
+        map[task] = name;
+        await this.context.globalState.update(CURRENT_PROMPT_BY_TASK_KEY, map);
     }
 
-    /** 新建提示词（弹窗输入名称、内容与输出类型），并设为当前 */
+    private async pickTask(current?: PromptTask): Promise<PromptTask | undefined> {
+        const items = (Object.keys(PROMPT_TASK_LABELS) as PromptTask[]).map((value) => ({
+            label: PROMPT_TASK_LABELS[value],
+            value,
+            description: value,
+            picked: value === (current ?? 'proofread'),
+        }));
+        const pick = await vscode.window.showQuickPick(items, {
+            placeHolder: '选择任务类别（task）',
+            ignoreFocusOut: true,
+        });
+        return pick?.value;
+    }
+
+    /** 新建提示词（弹窗输入名称、内容、输出类型与任务），并设为当前 */
     public async addPrompt(): Promise<void> {
         const prompts = this.getPrompts();
         const name = await vscode.window.showInputBox({
@@ -127,7 +164,7 @@ export class PromptManager {
         }
         const content = await vscode.window.showInputBox({
             prompt: '请输入提示词内容',
-            placeHolder: '请输入完整的提示词内容，内容必须对要校对的"目标文本（target）""参考资料（reference）""上下文（context）"进行说明',
+            placeHolder: '请输入完整的提示词内容，内容必须对要处理的"目标文本（target）""参考资料（reference）""上下文（context）"进行说明',
         });
         if (!content) return;
         const outputTypePick = await vscode.window.showQuickPick(
@@ -139,13 +176,14 @@ export class PromptManager {
             { placeHolder: '选择输出类型', ignoreFocusOut: true }
         );
         const outputType = outputTypePick?.value ?? 'full';
-        prompts.push({ name, content, outputType });
+        const task = (await this.pickTask('proofread')) ?? 'proofread';
+        prompts.push({ name, content, outputType, task: normalizePromptTask(task) });
         await this.savePrompts(prompts);
-        await this.context.globalState.update('currentPrompt', name);
+        await this.setCurrentPrompt(name);
         vscode.window.showInformationMessage(`提示词「${name}」已添加并设为当前`);
     }
 
-    /** 编辑指定提示词（弹窗修改名称、内容与输出类型），并设为当前 */
+    /** 编辑指定提示词（弹窗修改名称、内容、输出类型与任务），并设为当前 */
     public async editPrompt(prompt: Prompt): Promise<void> {
         const prompts = this.getPrompts();
         const index = prompts.findIndex((p) => p.name === prompt.name);
@@ -163,7 +201,7 @@ export class PromptManager {
         const content = await vscode.window.showInputBox({
             prompt: '请输入提示词内容',
             value: prompt.content,
-            placeHolder: '请输入完整的提示词内容，内容必须对要校对的"目标文本（target）""参考资料（reference）""上下文（context）"进行说明',
+            placeHolder: '请输入完整的提示词内容，内容必须对要处理的"目标文本（target）""参考资料（reference）""上下文（context）"进行说明',
         });
         if (!content) return;
         const currentOutputType = prompt.outputType ?? 'full';
@@ -176,9 +214,10 @@ export class PromptManager {
             { placeHolder: '选择输出类型', ignoreFocusOut: true, title: '输出类型' }
         );
         const outputType = outputTypePick?.value ?? currentOutputType;
-        prompts[index] = { name, content, outputType };
+        const task = (await this.pickTask(normalizePromptTask(prompt.task))) ?? normalizePromptTask(prompt.task);
+        prompts[index] = { name, content, outputType, task };
         await this.savePrompts(prompts);
-        await this.context.globalState.update('currentPrompt', name);
+        await this.setCurrentPrompt(name);
         vscode.window.showInformationMessage(`提示词「${name}」已修改并设为当前`);
     }
 
@@ -188,7 +227,7 @@ export class PromptManager {
         await this.savePrompts(prompts);
         const current = this.context.globalState.get<string>('currentPrompt', '');
         if (current === name) {
-            await this.context.globalState.update('currentPrompt', SYSTEM_PROMPT_NAME_FULL);
+            await this.setCurrentPrompt(SYSTEM_PROMPT_NAME_FULL);
         }
         vscode.window.showInformationMessage(`已删除提示词「${name}」`);
     }
@@ -202,7 +241,7 @@ export class PromptManager {
         );
         if (result === '确定') {
             await this.savePrompts([]);
-            await this.context.globalState.update('currentPrompt', SYSTEM_PROMPT_NAME_FULL);
+            await this.setCurrentPrompt(SYSTEM_PROMPT_NAME_FULL);
             vscode.window.showInformationMessage('已清空所有提示词并切换回系统默认');
         }
     }

@@ -117,6 +117,36 @@
         "category": "%category%"
       },
       {
+        "command": "ai-proofread.splitFileByParagraph",
+        "title": "%cmd.splitFileByParagraph.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.translateSelectionWithMemory",
+        "title": "%cmd.translateSelectionWithMemory.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.translateJsonFile",
+        "title": "%cmd.translateJsonFile.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.cleanTranslationProcessOutput",
+        "title": "%cmd.cleanTranslationProcessOutput.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.translationMemory.approveCandidates",
+        "title": "%cmd.translationMemory.approveCandidates.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.translationMemory.clear",
+        "title": "%cmd.translationMemory.clear.title%",
+        "category": "%category%"
+      },
+      {
         "command": "ai-proofread.mergeTwoFiles",
         "title": "%cmd.mergeTwoFiles.title%",
         "category": "%category%"
@@ -1354,6 +1384,25 @@
                   "其他"
                 ],
                 "description": "输出类型，默认 full"
+              },
+              "task": {
+                "type": "string",
+                "enum": [
+                  "proofread",
+                  "translate",
+                  "annotate",
+                  "restructure",
+                  "other"
+                ],
+                "enumDescriptions": [
+                  "校对",
+                  "翻译",
+                  "注释/加注",
+                  "重组",
+                  "其他"
+                ],
+                "default": "proofread",
+                "description": "任务类别（与 outputType 正交）；用于侧栏分组与入口校验"
               }
             },
             "required": [
@@ -1362,6 +1411,29 @@
             ]
           },
           "description": "设置给大语言模型提示词及其名称。提示词中应对要处理的目标文本（target）、参考资料（reference）、上下文（context）进行说明。也可以通过命令管理"
+        },
+        "ai-proofread.translationMemory.backupBeforeWrite": {
+          "type": "boolean",
+          "default": true,
+          "description": "写入 translation-memory.json / archive 前若文件已存在则生成带时间戳的 .bak 备份。"
+        },
+        "ai-proofread.translationMemory.termsActiveMax": {
+          "type": "number",
+          "default": 80,
+          "minimum": 1,
+          "description": "翻译记忆活跃术语条数上限；超员时低 weight 先入存档。"
+        },
+        "ai-proofread.translationMemory.recentRoundsMax": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "description": "翻译记忆最近轮次保留条数。"
+        },
+        "ai-proofread.translationMemory.injectTermsTopN": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "description": "注入时术语条数上限（命中优先，其余按 weight）。"
         },
         "ai-proofread.sourceTextCharacteristicPrompts": {
           "order": 28.5,
@@ -2179,6 +2251,11 @@
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
+          "command": "ai-proofread.translateSelectionWithMemory",
+          "group": "ai-proofread@11.06",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
           "command": "ai-proofread.searchSelectionInPDF",
           "group": "ai-proofread-tools@12",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
@@ -2336,6 +2413,11 @@
         {
           "command": "ai-proofread.proofreadFile",
           "group": "ai-proofread@31",
+          "when": "resourceLangId == json"
+        },
+        {
+          "command": "ai-proofread.translateJsonFile",
+          "group": "ai-proofread@31.2",
           "when": "resourceLangId == json"
         },
         {
