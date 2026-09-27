@@ -29,6 +29,7 @@ import {
     SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL,
     SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL,
     SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL,
+    SYSTEM_PROMPT_NAME_TERM_CHECK_FULL,
 } from './promptManager';
 import { getExtensionContext } from './extensionContextHolder';
 import { formatSourceCharacteristicsBlock } from './sourceTextCharacteristics';
@@ -42,6 +43,10 @@ import {
     BOOK_TRANSLATE_OUTPUT_FORMAT,
     BOOK_TRANSLATE_SYSTEM_PROMPT,
 } from './translationMemory/bookTranslatePrompt';
+import {
+    TERM_CONSISTENCY_CHECK_OUTPUT_FORMAT,
+    TERM_CONSISTENCY_CHECK_SYSTEM_PROMPT,
+} from './translationMemory/termCheckPrompt';
 import { resolveProofreadModel } from './modelRoutes/modelRouteResolver';
 import { proofreadItemPathFromOutput } from './proofreadRoundLayout';
 
@@ -402,7 +407,8 @@ export function getOutputType(context?: vscode.ExtensionContext): OutputType {
             currentPromptName === SYSTEM_PROMPT_NAME_PINYIN_ANNOTATION_FULL ||
             currentPromptName === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL ||
             currentPromptName === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL ||
-            currentPromptName === SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL
+            currentPromptName === SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL ||
+            currentPromptName === SYSTEM_PROMPT_NAME_TERM_CHECK_FULL
         ) {
             return 'full';
         }
@@ -512,6 +518,14 @@ export function getSystemPrompt(context?: vscode.ExtensionContext, sourceTextCha
                 BOOK_TRANSLATE_OUTPUT_FORMAT,
                 sourceTextCharacteristics,
                 BOOK_TRANSLATE_SYSTEM_PROMPT
+            );
+        }
+        if (currentPromptName === SYSTEM_PROMPT_NAME_TERM_CHECK_FULL) {
+            logger.info('使用预置提示词：译名一致核对（full）');
+            return buildSystemPromptFromTemplate(
+                TERM_CONSISTENCY_CHECK_OUTPUT_FORMAT,
+                sourceTextCharacteristics,
+                TERM_CONSISTENCY_CHECK_SYSTEM_PROMPT
             );
         }
 

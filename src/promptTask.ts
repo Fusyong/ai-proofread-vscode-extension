@@ -30,6 +30,7 @@ const PRESET_TASK: Record<string, PromptTask> = {
     __preset_knowledge_verify_full__: 'proofread',
     __preset_para_restructure_full__: 'restructure',
     __preset_book_translate_full__: 'translate',
+    __preset_term_check_full__: 'translate',
 };
 
 export function normalizePromptTask(raw: unknown): PromptTask {

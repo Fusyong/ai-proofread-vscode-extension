@@ -31,6 +31,8 @@ export const SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL = '__preset_knowledge_veri
 export const SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL = '__preset_para_restructure_full__';
 /** 预置「图书翻译（过程输出）」在 globalState 中的存值 */
 export const SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL = '__preset_book_translate_full__';
+/** 预置「译名一致核对（full）」 */
+export const SYSTEM_PROMPT_NAME_TERM_CHECK_FULL = '__preset_term_check_full__';
 
 const CURRENT_PROMPT_BY_TASK_KEY = 'currentPromptByTask';
 
@@ -46,7 +48,8 @@ function isReservedPromptStorageName(name: string): boolean {
         name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_ITEM ||
         name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL ||
         name === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL ||
-        name === SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL
+        name === SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL ||
+        name === SYSTEM_PROMPT_NAME_TERM_CHECK_FULL
     );
 }
 
@@ -64,6 +67,7 @@ export function getPromptDisplayName(name: string): string {
     if (name === SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL) return '知识核查（full）';
     if (name === SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL) return '段内重组与重述（full）';
     if (name === SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL) return '图书翻译（过程输出）';
+    if (name === SYSTEM_PROMPT_NAME_TERM_CHECK_FULL) return '译名一致核对（full）';
     return name || '系统默认提示词（full）';
 }
 

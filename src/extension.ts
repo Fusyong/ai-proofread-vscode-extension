@@ -42,6 +42,7 @@ import {
     togglePromptsViewsVisible,
     toggleReferenceHitVisible,
     toggleWordCheckConfigVisible,
+    toggleTranslateReviewVisible,
 } from './ui/sidebarViewVisibility';
 import { NumberingTreeDataProvider } from './numbering/numberingTreeProvider';
 import { registerNumberingView } from './numbering/numberingView';
@@ -53,6 +54,10 @@ import { registerPromptsView, type PromptTreeItem } from './promptsView';
 import { SourceTextCharacteristicManager } from './sourceTextCharacteristicManager';
 import { registerSourceTextCharacteristicsView, type SourceCharacteristicTreeItem } from './sourceTextCharacteristicsView';
 import { registerProofreadItemsView, WS_KEY_LAST_ITEM_JSON } from './proofreadItemsView';
+import {
+    registerTranslateReviewView,
+    openTranslateReviewUnit,
+} from './translationMemory/translationReviewView';
 import {
     proofreadItemPathToSegmentsJsonPath,
     proofreadJsonPathToSegmentsJsonPath,
@@ -176,6 +181,7 @@ export async function activate(context: vscode.ExtensionContext) {
         sourceTextCharacteristicManager
     );
     registerProofreadItemsView(context);
+    registerTranslateReviewView(context);
 
     // numbering / proofreadItems 由侧栏开关或相关命令控制显示
     // （激活时由 restoreSidebarToggleStateOnActivate 统一恢复）
@@ -335,6 +341,31 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await translateHandler.handleClearTranslationMemory(editor);
+        }),
+        vscode.commands.registerCommand('ai-proofread.translation.auditTerms', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await translateHandler.handleAuditTranslationTerms(editor);
+        }),
+        vscode.commands.registerCommand('ai-proofread.translateReview.open', async (filePath?: string) => {
+            await translateHandler.handleOpenTranslateReview(
+                context,
+                typeof filePath === 'string' ? filePath : undefined
+            );
+        }),
+        vscode.commands.registerCommand('ai-proofread.translateReview.openUnit', async (index?: number) => {
+            if (typeof index === 'number') {
+                await openTranslateReviewUnit(index);
+            }
+        }),
+        vscode.commands.registerCommand('ai-proofread.translateReview.toggleView', () =>
+            toggleTranslateReviewVisible()
+        ),
+        vscode.commands.registerCommand('ai-proofread.translation.activateTermCheckPrompt', async () => {
+            await translateHandler.handleActivateTermCheckPrompt(context);
         }),
 
         vscode.commands.registerCommand('ai-proofread.proofreadFile', async () => {

@@ -17,6 +17,7 @@ import {
     SYSTEM_PROMPT_NAME_KNOWLEDGE_VERIFY_FULL,
     SYSTEM_PROMPT_NAME_PARA_RESTRUCTURE_FULL,
     SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL,
+    SYSTEM_PROMPT_NAME_TERM_CHECK_FULL,
 } from './promptManager';
 import type { Prompt } from './promptManager';
 import { PROMPT_TASK_LABELS, resolvePromptTask, type PromptTask } from './promptTask';
@@ -74,6 +75,13 @@ const PRESET_LEAVES: PromptLeaf[] = [
         kind: 'prompt',
         id: SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL,
         label: '图书翻译（过程输出）',
+        systemOutputType: 'full',
+        task: 'translate',
+    },
+    {
+        kind: 'prompt',
+        id: SYSTEM_PROMPT_NAME_TERM_CHECK_FULL,
+        label: '译名一致核对（full）',
         systemOutputType: 'full',
         task: 'translate',
     },

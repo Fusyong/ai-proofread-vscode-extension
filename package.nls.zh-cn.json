@@ -38,6 +38,11 @@
   "cmd.cleanTranslationProcessOutput.title": "清理翻译过程输出",
   "cmd.translationMemory.approveCandidates.title": "批准翻译记忆候选",
   "cmd.translationMemory.clear.title": "清除翻译记忆",
+  "cmd.translation.auditTerms.title": "翻译术语审计",
+  "cmd.translateReview.open.title": "打开翻译审核",
+  "cmd.translateReview.openUnit.title": "打开翻译单元对照",
+  "cmd.translateReview.toggleView.title": "显示或隐藏翻译审核",
+  "cmd.translation.activateTermCheckPrompt.title": "切换到译名一致核对提示词",
   "cmd.mergeTwoFiles.title": "合并两个文件",
   "cmd.splitIntoSentences.title": "切分为句子",
   "cmd.prepareReferencesJson.title": "为 JSON 文件准备资料",
@@ -202,5 +207,6 @@
   "view.numbering": "标题树",
   "view.numberingSegments": "段内序号",
   "view.proofreadItems": "校对条目",
+  "view.translateReview": "翻译审核",
   "view.referencePrepResults": "资料检索"
 }

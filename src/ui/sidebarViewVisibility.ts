@@ -23,7 +23,8 @@ export type SidebarResultKey =
     | 'duplicates'
     | 'numbering'
     | 'numberingSegments'
-    | 'proofreadItems';
+    | 'proofreadItems'
+    | 'translateReview';
 
 export interface SidebarResultState {
     wordCheck: boolean;
@@ -33,6 +34,7 @@ export interface SidebarResultState {
     numbering: boolean;
     numberingSegments: boolean;
     proofreadItems: boolean;
+    translateReview: boolean;
 }
 
 export interface SidebarToggleState extends SidebarConfigState, SidebarResultState {}
@@ -50,6 +52,7 @@ const state: SidebarToggleState = {
     numbering: false,
     numberingSegments: false,
     proofreadItems: false,
+    translateReview: false,
 };
 
 type StateListener = (state: SidebarToggleState) => void;
@@ -120,6 +123,9 @@ async function hideOtherResultViews(keep: SidebarResultKey): Promise<void> {
     if (keep !== 'proofreadItems' && state.proofreadItems) {
         await setProofreadItemsVisible(false, hideOpts);
     }
+    if (keep !== 'translateReview' && state.translateReview) {
+        await setTranslateReviewVisible(false, hideOpts);
+    }
 }
 
 /** 收起全部结果树（配置类视图不动） */
@@ -132,6 +138,7 @@ export async function hideAllResultViews(): Promise<void> {
     await setNumberingVisible(false, hideOpts);
     await setNumberingSegmentsVisible(false, hideOpts);
     await setProofreadItemsVisible(false, hideOpts);
+    await setTranslateReviewVisible(false, hideOpts);
 }
 
 /** 扩展激活时：默认隐藏所有按需视图 */
@@ -356,4 +363,21 @@ export async function setProofreadItemsVisible(visible: boolean, options?: SetVi
 export async function toggleProofreadItemsVisible(): Promise<boolean> {
     await setProofreadItemsVisible(!state.proofreadItems);
     return state.proofreadItems;
+}
+
+export async function setTranslateReviewVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
+    if (visible && options?.exclusive !== false) {
+        await hideOtherResultViews('translateReview');
+    }
+    state.translateReview = visible;
+    await vscode.commands.executeCommand('setContext', 'aiProofread.showTranslateReviewView', visible);
+    if (visible) {
+        await tryFocus('ai-proofread.translateReview.focus');
+    }
+    notify();
+}
+
+export async function toggleTranslateReviewVisible(): Promise<boolean> {
+    await setTranslateReviewVisible(!state.translateReview);
+    return state.translateReview;
 }

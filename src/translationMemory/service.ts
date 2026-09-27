@@ -1,5 +1,11 @@
 import * as vscode from 'vscode';
 import type { ParseBitextResult } from './bitextCodec';
+import { appendUnitToBitextIndex, buildSimilarBitextXml, clearBitextIndex } from './bitextIndex';
+import {
+    clipInjectText,
+    buildDirectionHintXml,
+    readTranslateInjectConfig,
+} from './injectConfig';
 import { loadTranslationMemory, saveTranslationMemory } from './persist';
 import {
     createEmptyActiveTm,
@@ -15,26 +21,6 @@ import {
     type TmTerm,
 } from './schema';
 
-const INJECT_TERMS_MAX = 4_000;
-const INJECT_EXAMPLES_MAX = 6_000;
-
-function clip(s: string, max: number): string {
-    const t = s.trim();
-    if (t.length <= max) {
-        return t;
-    }
-    return t.slice(0, max) + '…';
-}
-
-function readTmConfig() {
-    const c = vscode.workspace.getConfiguration('ai-proofread');
-    return {
-        termsActiveMax: c.get<number>('translationMemory.termsActiveMax', 80),
-        recentRoundsMax: c.get<number>('translationMemory.recentRoundsMax', 3),
-        termsTopN: c.get<number>('translationMemory.injectTermsTopN', 20),
-    };
-}
-
 function termHitsUnit(term: TmTerm, unit: string): boolean {
     if (!unit.includes(term.source)) {
         return false;
@@ -42,10 +28,10 @@ function termHitsUnit(term: TmTerm, unit: string): boolean {
     return true;
 }
 
-/** 注入翻译记忆 XML（拼在 preText） */
+/** 注入翻译记忆 XML（拼在 preText）；含可选相似句侧车 */
 export function buildTranslationMemoryXml(anchorUri: vscode.Uri, targetUnit: string): string {
+    const cfg = readTranslateInjectConfig();
     const { active } = loadTranslationMemory(anchorUri);
-    const cfg = readTmConfig();
     const approved = active.terms.filter((t) => t.status === 'approved');
     const hit = approved.filter((t) => termHitsUnit(t, targetUnit));
     const rest = approved
@@ -53,19 +39,27 @@ export function buildTranslationMemoryXml(anchorUri: vscode.Uri, targetUnit: str
         .sort((a, b) => b.weight - a.weight)
         .slice(0, Math.max(0, cfg.termsTopN - hit.length));
     const terms = [...hit, ...rest].slice(0, cfg.termsTopN);
-    const termBlock = clip(terms.map(formatTermLine).join('\n'), INJECT_TERMS_MAX);
+    const termBlock = clipInjectText(terms.map(formatTermLine).join('\n'), cfg.injectTermsMaxChars);
 
     const approvedEx = active.examples.filter((e) => e.status === 'approved').sort((a, b) => b.weight - a.weight);
     const recent = formatRecentRounds(active.recentRounds.slice(0, cfg.recentRoundsMax));
     const exLines = [...approvedEx.slice(0, 8).map(formatExampleLine), recent].filter(Boolean).join('\n');
-    const exBlock = clip(exLines, INJECT_EXAMPLES_MAX);
+    const exBlock = clipInjectText(exLines, cfg.injectExamplesMaxChars);
 
-    let out = '';
+    let out = buildDirectionHintXml(cfg);
     if (termBlock) {
         out += `\n<translation_memory_terms>\n${termBlock}\n</translation_memory_terms>`;
     }
     if (exBlock.trim()) {
         out += `\n<translation_memory_examples>\n${exBlock.trim()}\n</translation_memory_examples>`;
+    }
+    const similar = buildSimilarBitextXml(anchorUri, targetUnit, {
+        topK: cfg.similarTopK,
+        threshold: cfg.similarThreshold,
+        maxChars: cfg.injectSimilarMaxChars,
+    });
+    if (similar) {
+        out += similar;
     }
     return out;
 }
@@ -77,13 +71,15 @@ export interface MergeTranslateMemoryArgs {
     parsed: ParseBitextResult;
     /** 选段接受：术语/译例直接 approved；批译用 candidate */
     approve: boolean;
+    /** 写入句对侧车用的源单元；默认用 parsed.sourcePlain */
+    sourceUnit?: string;
 }
 
-/** 从过程解析结果合并进翻译记忆 */
+/** 从过程解析结果合并进翻译记忆，并派生句对侧车 */
 export function mergeTranslationMemoryFromParsed(args: MergeTranslateMemoryArgs): void {
-    const { documentUri, parsed, approve } = args;
+    const { documentUri, parsed, approve, finalTranslation } = args;
     const status = approve ? 'approved' : 'candidate';
-    const cfg = readTmConfig();
+    const cfg = readTranslateInjectConfig();
     let { active, archive } = loadTranslationMemory(documentUri);
     const now = new Date().toISOString();
 
@@ -182,10 +178,25 @@ export function mergeTranslationMemoryFromParsed(args: MergeTranslateMemoryArgs)
 
     evictTermsToArchive(active, archive, cfg.termsActiveMax);
     saveTranslationMemory(documentUri, active, archive);
+
+    const sourceUnit = (args.sourceUnit ?? parsed.sourcePlain ?? '').trim();
+    const targetUnit = (finalTranslation || parsed.targetPlain || '').trim();
+    if (sourceUnit && targetUnit) {
+        try {
+            appendUnitToBitextIndex(documentUri, sourceUnit, targetUnit);
+        } catch {
+            /* 侧车失败不影响记忆 */
+        }
+    }
 }
 
 export function clearTranslationMemory(anchorUri: vscode.Uri): void {
     saveTranslationMemory(anchorUri, createEmptyActiveTm(), createEmptyArchiveTm());
+    try {
+        clearBitextIndex(anchorUri);
+    } catch {
+        /* ignore */
+    }
 }
 
 /** 批准全部 candidate 术语与关键译例 */

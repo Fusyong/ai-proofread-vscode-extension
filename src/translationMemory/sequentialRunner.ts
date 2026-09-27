@@ -201,7 +201,8 @@ export async function processTranslateJsonSequential(
         const progressInfo =
             `顺序翻译 No. ${index + 1}/${totalCount}, Len ${targetText.length}` +
             `${prevUnit ? ' +prev_unit' : ''}` +
-            `${tmXml ? ' +tm' : ''}` +
+            `${tmXml.includes('translation_memory') ? ' +tm' : ''}` +
+            `${tmXml.includes('<similar_bitext>') ? ' +similar' : ''}` +
             `\n${targetText.slice(0, 30)} ...\n${'-'.repeat(40)}\n`;
         logger.info(progressInfo);
         onProgress?.(progressInfo);
@@ -240,6 +241,7 @@ export async function processTranslateJsonSequential(
                     finalTranslation: delivery,
                     parsed,
                     approve: false,
+                    sourceUnit: targetText,
                 });
             } catch (e) {
                 logger.error('翻译记忆合并失败（已保留译文）', e);

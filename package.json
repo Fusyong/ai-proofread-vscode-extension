@@ -147,6 +147,31 @@
         "category": "%category%"
       },
       {
+        "command": "ai-proofread.translation.auditTerms",
+        "title": "%cmd.translation.auditTerms.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.translateReview.open",
+        "title": "%cmd.translateReview.open.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.translateReview.openUnit",
+        "title": "%cmd.translateReview.openUnit.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.translateReview.toggleView",
+        "title": "%cmd.translateReview.toggleView.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.translation.activateTermCheckPrompt",
+        "title": "%cmd.translation.activateTermCheckPrompt.title%",
+        "category": "%category%"
+      },
+      {
         "command": "ai-proofread.mergeTwoFiles",
         "title": "%cmd.mergeTwoFiles.title%",
         "category": "%category%"
@@ -1435,6 +1460,65 @@
           "minimum": 1,
           "description": "注入时术语条数上限（命中优先，其余按 weight）。"
         },
+        "ai-proofread.translationMemory.injectTermsMaxChars": {
+          "type": "number",
+          "default": 4000,
+          "minimum": 200,
+          "description": "翻译记忆术语注入块最大字符数。"
+        },
+        "ai-proofread.translationMemory.injectExamplesMaxChars": {
+          "type": "number",
+          "default": 6000,
+          "minimum": 200,
+          "description": "翻译记忆关键译例/最近轮次注入块最大字符数。"
+        },
+        "ai-proofread.translationMemory.injectSimilarMaxChars": {
+          "type": "number",
+          "default": 3000,
+          "minimum": 0,
+          "description": "相似句（句对侧车）注入块最大字符数；0 表示不注入。"
+        },
+        "ai-proofread.translationMemory.similarTopK": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "description": "相似句检索返回条数上限。"
+        },
+        "ai-proofread.translationMemory.similarThreshold": {
+          "type": "number",
+          "default": 0.45,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "相似句 Jaccard 阈值（字级 bigram，归一化后）。"
+        },
+        "ai-proofread.translationMemory.bitextIndexMaxPairs": {
+          "type": "number",
+          "default": 8000,
+          "minimum": 100,
+          "description": "句对侧车 translation-bitext-index.json 最大条数。"
+        },
+        "ai-proofread.translate.temperature": {
+          "type": ["number", "null"],
+          "default": null,
+          "minimum": 0,
+          "maximum": 1.99,
+          "description": "翻译任务专用温度；null 表示沿用 ai-proofread.proofread.temperature。"
+        },
+        "ai-proofread.translate.sourceLang": {
+          "type": "string",
+          "default": "",
+          "description": "翻译源语言标签（如 en、ja）；空则不强制写入译向提示。"
+        },
+        "ai-proofread.translate.targetLang": {
+          "type": "string",
+          "default": "zh-Hans",
+          "description": "翻译目标语言标签（默认简体中文 zh-Hans）。"
+        },
+        "ai-proofread.translate.warnIfNoStyleSample": {
+          "type": "boolean",
+          "default": true,
+          "description": "翻译前若未配置试译样张（styleSamplePath）则弹出警告。"
+        },
         "ai-proofread.sourceTextCharacteristicPrompts": {
           "order": 28.5,
           "type": "array",
@@ -1944,6 +2028,11 @@
           "id": "ai-proofread.proofreadItems",
           "name": "%view.proofreadItems%",
           "when": "aiProofread.showProofreadItemsView"
+        },
+        {
+          "id": "ai-proofread.translateReview",
+          "name": "%view.translateReview%",
+          "when": "aiProofread.showTranslateReviewView"
         },
         {
           "id": "ai-proofread.referencePrepResults",

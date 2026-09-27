@@ -5,7 +5,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { PromptManager, SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL, getPromptDisplayName } from '../promptManager';
+import { PromptManager, SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL, SYSTEM_PROMPT_NAME_TERM_CHECK_FULL, getPromptDisplayName } from '../promptManager';
 import { assertPromptMatchesEntry } from '../promptTask';
 import { parseTranslateProcessOutput, cleanTranslateDelivery } from '../translationMemory/bitextCodec';
 import {
@@ -18,6 +18,9 @@ import { processTranslateJsonSequential } from '../translationMemory/sequentialR
 import {
     guardTranslateFileCommand,
     segmentsJsonDirAndBaseFromPath,
+    inspectTranslateRounds,
+    translateProcessJsonPath,
+    readJsonStringArray,
 } from '../translationMemory/translateRoundLayout';
 import { FilePathUtils, ConfigManager, ErrorUtils } from '../utils';
 import { showSelectionProofreadDiffWithApply } from '../differ';
@@ -26,31 +29,56 @@ import { loadTranslateSelectionWithMemoryConfig } from '../translateSelectionWit
 import { ProgressTracker } from '../progressTracker';
 import { WebviewManager, ProcessResult } from '../ui/webviewManager';
 import { asOverlaySourceItems, resolveSegmentsJsonPath } from '../proofreadRoundLayout';
+import { readTranslateInjectConfig } from '../translationMemory/injectConfig';
+import { loadTranslationMemory } from '../translationMemory/persist';
+import { buildTermAuditReport, formatTermAuditMarkdown } from '../translationMemory/termAudit';
+import { loadTranslateReviewFromEditorOrPath } from '../translationMemory/translationReviewView';
 
-function loadStyleSampleText(anchorUri: vscode.Uri): string {
+function loadStyleSampleText(anchorUri: vscode.Uri): { text: string; configuredPath: string } {
     try {
         const root = FilePathUtils.getProofreadWorkspaceRoot(anchorUri);
         const configPath = path.join(root, '.proofread', 'translate-selection-with-memory.json');
         if (!fs.existsSync(configPath)) {
-            return '';
+            return { text: '', configuredPath: '' };
         }
         const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as { styleSamplePath?: string };
         const stylePath = String(parsed.styleSamplePath ?? '').trim();
         if (!stylePath) {
-            return '';
+            return { text: '', configuredPath: '' };
         }
         const folder = vscode.workspace.getWorkspaceFolder(anchorUri);
         const abs = path.isAbsolute(stylePath)
             ? stylePath
             : path.join(folder?.uri.fsPath ?? root, stylePath);
         if (fs.existsSync(abs)) {
-            return fs.readFileSync(abs, 'utf8');
+            return { text: fs.readFileSync(abs, 'utf8'), configuredPath: stylePath };
         }
         vscode.window.showWarningMessage(`试译样张未找到：${stylePath}（将继续翻译）`);
+        return { text: '', configuredPath: stylePath };
     } catch {
         /* ignore */
     }
-    return '';
+    return { text: '', configuredPath: '' };
+}
+
+/** 未配置样张时警告；返回 false 表示用户取消 */
+async function confirmStyleSampleOrContinue(hasStyleSample: boolean): Promise<boolean> {
+    const inj = readTranslateInjectConfig();
+    if (hasStyleSample || !inj.warnIfNoStyleSample) {
+        return true;
+    }
+    const pick = await vscode.window.showWarningMessage(
+        '未配置试译样张（.proofread/translate-selection-with-memory.json 的 styleSamplePath）。建议先填写样张以稳住文风。',
+        { modal: true },
+        '仍继续',
+        '取消'
+    );
+    return pick === '仍继续';
+}
+
+function resolveTranslateTemperature(fallback: number): number {
+    const inj = readTranslateInjectConfig();
+    return inj.temperature ?? fallback;
 }
 
 export class TranslateCommandHandler {
@@ -104,6 +132,11 @@ export class TranslateCommandHandler {
                 vscode.window.showWarningMessage(`试译样张未找到：${stylePath}（将继续翻译）`);
             }
         }
+        if (!(await confirmStyleSampleOrContinue(!!styleRef))) {
+            return;
+        }
+
+        const temperature = resolveTranslateTemperature(cfg.temperature);
 
         const tmXml = buildTranslationMemoryXml(editor.document.uri, originalText);
         const assembled = await assembleProofreadSelectionInput({
@@ -132,7 +165,7 @@ export class TranslateCommandHandler {
             model,
             cfg.contextLevel,
             undefined,
-            cfg.temperature,
+            temperature,
             context,
             cfg.beforeMinLength,
             cfg.afterMinLength,
@@ -185,6 +218,7 @@ export class TranslateCommandHandler {
                     finalTranslation: diffRes.finalText,
                     parsed,
                     approve: true,
+                    sourceUnit: originalText,
                 });
                 vscode.window.showInformationMessage('翻译已写回，翻译记忆已更新。');
             } catch {
@@ -251,7 +285,7 @@ export class TranslateCommandHandler {
             const platform = this.configManager.getPlatform();
             const model = this.configManager.getModel(platform);
             const rpm = this.configManager.getRpm();
-            const temperature = this.configManager.getTemperature();
+            const temperature = resolveTranslateTemperature(this.configManager.getTemperature());
 
             const apiKey = this.configManager.getApiKey(platform);
             if (!apiKey && platform !== 'ollama') {
@@ -266,7 +300,12 @@ export class TranslateCommandHandler {
                 return;
             }
 
-            const styleSampleText = loadStyleSampleText(vscode.Uri.file(jsonFilePath));
+            const styleLoaded = loadStyleSampleText(vscode.Uri.file(jsonFilePath));
+            const styleSampleText = styleLoaded.text;
+            if (!(await confirmStyleSampleOrContinue(!!styleSampleText))) {
+                return;
+            }
+            const inj = readTranslateInjectConfig();
             const currentPromptName = getPromptDisplayName(
                 context.globalState.get<string>('currentPrompt', SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL) ??
                     SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL
@@ -279,9 +318,12 @@ export class TranslateCommandHandler {
                     `输出：${path.basename(outputFilePath)}`,
                     `过程：${path.basename(processOutPath)}`,
                     `模型：${platform} / ${model}，T=${temperature}，RPM=${rpm}`,
+                    `译向：${inj.sourceLang || '（未设）'} → ${inj.targetLang || '（未设）'}`,
                     `提示词：${currentPromptName}`,
-                    styleSampleText ? '已加载试译样张' : '无试译样张（可在 translate-selection-with-memory.json 配置）',
-                    '将逐项翻译并写入候选翻译记忆（candidate）。是否开始？',
+                    styleSampleText
+                        ? `已加载试译样张（${styleLoaded.configuredPath}）`
+                        : '无试译样张（可在 translate-selection-with-memory.json 配置 styleSamplePath）',
+                    '将逐项翻译、写入候选翻译记忆，并更新句对侧车。是否开始？',
                 ].join('\n'),
                 { modal: true },
                 '开始'
@@ -551,7 +593,7 @@ export class TranslateCommandHandler {
 
     public async handleClearTranslationMemory(editor: vscode.TextEditor): Promise<void> {
         const confirm = await vscode.window.showWarningMessage(
-            '将清空工作区 translation-memory.json 与 archive（可先备份），是否继续？',
+            '将清空工作区 translation-memory.json、archive 与句对侧车 translation-bitext-index.json（可先备份），是否继续？',
             { modal: true },
             '继续'
         );
@@ -560,5 +602,54 @@ export class TranslateCommandHandler {
         }
         clearTranslationMemory(editor.document.uri);
         vscode.window.showInformationMessage('翻译记忆已清空。');
+    }
+
+    /** 术语冲突审计报告（记忆 + 可选过程 JSON） */
+    public async handleAuditTranslationTerms(editor: vscode.TextEditor): Promise<void> {
+        const uri = editor.document.uri;
+        const { active, archive } = loadTranslationMemory(uri);
+        let processRawItems: (string | null)[] | undefined;
+        const resolved = resolveSegmentsJsonPath(uri.fsPath);
+        if (resolved && fs.existsSync(resolved)) {
+            const { dir, base } = segmentsJsonDirAndBaseFromPath(resolved);
+            const inspected = inspectTranslateRounds(dir, base);
+            if (inspected.maxRound >= 1) {
+                const procPath = translateProcessJsonPath(dir, base, inspected.maxRound);
+                const srcLen = asOverlaySourceItems(JSON.parse(fs.readFileSync(resolved, 'utf8')))?.length;
+                processRawItems = readJsonStringArray(procPath, srcLen) ?? undefined;
+            }
+        }
+        const report = buildTermAuditReport(active, { archive, processRawItems });
+        const md = formatTermAuditMarkdown(report);
+        const outPath = path.join(
+            FilePathUtils.getProofreadWorkspaceRoot(uri),
+            '.proofread',
+            `term-audit-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.md`
+        );
+        FilePathUtils.ensureDirExists(path.dirname(outPath));
+        fs.writeFileSync(outPath, md, 'utf8');
+        const doc = await vscode.workspace.openTextDocument(outPath);
+        await vscode.window.showTextDocument(doc, { preview: false });
+        vscode.window.showInformationMessage(
+            report.conflictCount > 0
+                ? `术语审计：发现 ${report.conflictCount} 处冲突 → ${path.basename(outPath)}`
+                : `术语审计：未发现冲突 → ${path.basename(outPath)}`
+        );
+    }
+
+    public async handleOpenTranslateReview(
+        context: vscode.ExtensionContext,
+        filePath?: string
+    ): Promise<void> {
+        await loadTranslateReviewFromEditorOrPath(context, filePath);
+    }
+
+    /** 激活「译名一致核对」提示词，便于选段/JSON 专项核对 */
+    public async handleActivateTermCheckPrompt(context: vscode.ExtensionContext): Promise<void> {
+        const pm = PromptManager.getInstance(context);
+        await pm.setCurrentPrompt(SYSTEM_PROMPT_NAME_TERM_CHECK_FULL);
+        vscode.window.showInformationMessage(
+            '已切换提示词为「译名一致核对」。可对双语文稿选段或 JSON 跑 LLM；程序审计请用「翻译术语审计」。'
+        );
     }
 }

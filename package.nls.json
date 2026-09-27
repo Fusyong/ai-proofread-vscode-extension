@@ -38,6 +38,11 @@
   "cmd.cleanTranslationProcessOutput.title": "Clean Translation Process Output",
   "cmd.translationMemory.approveCandidates.title": "Approve Translation Memory Candidates",
   "cmd.translationMemory.clear.title": "Clear Translation Memory",
+  "cmd.translation.auditTerms.title": "Audit Translation Terms",
+  "cmd.translateReview.open.title": "Open Translation Review",
+  "cmd.translateReview.openUnit.title": "Open Translation Unit Bitext",
+  "cmd.translateReview.toggleView.title": "Toggle Translation Review",
+  "cmd.translation.activateTermCheckPrompt.title": "Activate Term Consistency Check Prompt",
   "cmd.mergeTwoFiles.title": "Merge Two Files",
   "cmd.splitIntoSentences.title": "Split into Sentences",
   "cmd.prepareReferencesJson.title": "Prepare References for JSON File",
@@ -202,5 +207,6 @@
   "view.numbering": "Title Tree",
   "view.numberingSegments": "In-Paragraph Numbering",
   "view.proofreadItems": "Proofread Items",
+  "view.translateReview": "Translation Review",
   "view.referencePrepResults": "Reference Search"
 }

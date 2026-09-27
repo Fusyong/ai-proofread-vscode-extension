@@ -500,6 +500,31 @@ export class WebviewManager {
                 case 'cleanTranslationProcessOutput':
                     await runWithWorkingEditor('ai-proofread.cleanTranslationProcessOutput');
                     break;
+                case 'translationAuditTerms':
+                    await runWithWorkingEditor('ai-proofread.translation.auditTerms');
+                    break;
+                case 'approveTmCandidates':
+                    await runWithWorkingEditor('ai-proofread.translationMemory.approveCandidates');
+                    break;
+                case 'activateTermCheckPrompt':
+                    await vscode.commands.executeCommand('ai-proofread.translation.activateTermCheckPrompt');
+                    break;
+                case 'translateReviewOpen': {
+                    const jsonPath = this.getSplitJsonPath() ?? this.getProofreadJsonPath();
+                    await vscode.commands.executeCommand('ai-proofread.translateReview.open', jsonPath);
+                    break;
+                }
+                case 'splitByParagraph': {
+                    const mainPath = this.mainFilePath ?? this.getMainFilePath();
+                    if (!mainPath) {
+                        vscode.window.showWarningMessage('请先选择主文件');
+                        break;
+                    }
+                    const doc = await vscode.workspace.openTextDocument(mainPath);
+                    await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+                    await vscode.commands.executeCommand('ai-proofread.splitFileByParagraph');
+                    break;
+                }
                 case 'convertDocxToMarkdown':
                     await vscode.commands.executeCommand('ai-proofread.convertDocxToMarkdown');
                     break;
@@ -882,8 +907,8 @@ export class WebviewManager {
             </div>
             ${this.generateDocumentPrepHtml()}
             ${this.generateSplitSectionHtml(result, mode)}
-            ${this.generateProofreadSectionHtml(result)}
-            ${this.generateSpecialChecksHtml()}
+            ${this.generateProofreadSectionHtml(result, mode)}
+            ${this.generateSpecialChecksHtml(mode)}
             <div class="panel-footer-commands">
                 ${this.generatePanelFooterHtml(mode)}
             </div>
@@ -1065,9 +1090,29 @@ export class WebviewManager {
         `;
     }
 
-    /** 专项检查：结果进入左侧对应列表 */
-    private generateSpecialChecksHtml(): string {
+    /** 专项检查：校对向工具为主；翻译模式挂翻译专用能力 */
+    private generateSpecialChecksHtml(mode: WorkbenchMode = 'proofread'): string {
         const sep = this.buttonGroupSep;
+        if (mode === 'translate') {
+            return `
+            <div class="process-section">
+                <h3>🔍 翻译专项</h3>
+                <p class="hint">翻译记忆、术语审计与段级审核。校对向专项仍可在「校对」模式使用。</p>
+                <div class="section-actions">
+                    <button class="action-button" onclick="handleAction('splitByParagraph')" title="${commandHoverTitle('按段落切分（翻译用）', 'ai-proofread.splitFileByParagraph')}">按段落切分</button>
+                    ${sep}
+                    <button class="action-button" onclick="handleAction('translationAuditTerms')" title="${commandHoverTitle('翻译术语审计', 'ai-proofread.translation.auditTerms')}">术语审计</button>
+                    <button class="action-button" onclick="handleAction('translateReviewOpen')" title="${commandHoverTitle('打开翻译审核', 'ai-proofread.translateReview.open')}">翻译审核</button>
+                    <button class="action-button" onclick="handleAction('activateTermCheckPrompt')" title="${commandHoverTitle('切换到译名一致核对提示词', 'ai-proofread.translation.activateTermCheckPrompt')}">译名核对提示词</button>
+                    ${sep}
+                    <button class="action-button" onclick="handleAction('approveTmCandidates')" title="${commandHoverTitle('批准翻译记忆候选', 'ai-proofread.translationMemory.approveCandidates')}">批准 candidate</button>
+                    <button class="action-button" onclick="handleAction('cleanTranslationProcessOutput')" title="${commandHoverTitle('清理翻译过程输出', 'ai-proofread.cleanTranslationProcessOutput')}">清理过程输出</button>
+                    ${sep}
+                    <button class="action-button" onclick="handleAction('alignHeadings')" title="${commandHoverTitle('对齐标题', 'ai-proofread.alignHeadings')}">对齐标题</button>
+                </div>
+            </div>
+        `;
+        }
         return `
             <div class="process-section">
                 <h3>🔍 专项检查</h3>
@@ -1240,16 +1285,19 @@ export class WebviewManager {
     /**
      * 生成校对结果板块 HTML（进度条嵌入其中，校对进行中即显示）
      */
-    private generateProofreadSectionHtml(result: ProcessResult): string {
+    private generateProofreadSectionHtml(result: ProcessResult, mode: WorkbenchMode = 'proofread'): string {
         const proofreadResult = this.resolveProofreadResult(result);
         if (!result.progressTracker && !proofreadResult) {
             return '';
         }
         const progressHtml = result.progressTracker ? result.progressTracker.generateProgressBarHtml() : '';
-        const proofreadContent = proofreadResult ? this.generateProofreadResultContent(proofreadResult) : '';
+        const proofreadContent = proofreadResult
+            ? this.generateProofreadResultContent(proofreadResult, mode)
+            : '';
+        const title = mode === 'translate' ? '🌐 翻译结果' : '✏️ 校对结果';
         return `
             <div class="process-section">
-                <h3>✏️ 校对结果</h3>
+                <h3>${title}</h3>
                 ${progressHtml}
                 ${proofreadContent}
             </div>
@@ -1257,9 +1305,12 @@ export class WebviewManager {
     }
 
     /**
-     * 生成校对结果内容（文件列表与按钮，不含外框）
+     * 生成校对/翻译结果内容（文件列表与按钮，不含外框）
      */
-    private generateProofreadResultContent(proofreadResult: ProofreadResult): string {
+    private generateProofreadResultContent(
+        proofreadResult: ProofreadResult,
+        mode: WorkbenchMode = 'proofread'
+    ): string {
         const nullCount = proofreadResult.outputFilePath
             ? getProofreadNullCount(proofreadResult.outputFilePath)
             : undefined;
@@ -1271,23 +1322,29 @@ export class WebviewManager {
         const resultFileName = proofreadResult.outputFilePath
             ? path.basename(proofreadResult.outputFilePath)
             : '';
+        const unfinishedLabel = mode === 'translate' ? '未完成翻译' : '未完成校对';
+        const logLabel = mode === 'translate' ? '翻译日志:' : '校对日志:';
         return `
                 ${hasUnfinished ? `
                 <div class="warning-box">
-                    ⚠️ 有 <strong>${nullCount}</strong> 条未完成校对（${escapeHtml(resultFileName)} 中为 null）。续跑时将只处理未完成的条目。
+                    ⚠️ 有 <strong>${nullCount}</strong> 条${unfinishedLabel}（${escapeHtml(resultFileName)} 中为 null）。续跑时将只处理未完成的条目。
                 </div>
                 ` : ''}
-                ${roundLabel ? `<p class="hint">当前校对结果：${escapeHtml(roundLabel)}（${escapeHtml(resultFileName)}）。比较前后差异为 <strong>原稿 vs ${escapeHtml(roundLabel)}</strong>。</p>` : ''}
+                ${roundLabel ? `<p class="hint">当前结果：${escapeHtml(roundLabel)}（${escapeHtml(resultFileName)}）。</p>` : ''}
                 <div class="file-paths-compact">
                     ${this.filePathRowWithOpenButtonIfExists('JSON:', proofreadResult.outputFilePath, 'showProofreadJson')}
                     ${this.filePathRowWithOpenButtonIfExists('JSON.md:', proofreadResult.markdownFilePath, 'showProofreadJsonMd')}
-                    ${this.filePathRowWithOpenButtonIfExists('校对日志:', proofreadResult.logFilePath, 'showProofreadLog')}
+                    ${this.filePathRowWithOpenButtonIfExists(logLabel, proofreadResult.logFilePath, 'showProofreadLog')}
                 </div>
                 <div class="section-actions">
-                ${hasMain && hasMd ? `<button class="action-button" onclick="handleAction('showProofreadDiff')" title="${commandHoverTitle('主稿与校对 Markdown 的内置 diff（任意两文件亦可）', 'ai-proofread.diffItWithAnotherFile')}">比较前后差异（原稿 vs ${roundLabel || '最新一轮'}）</button>` : ''}
-                    ${proofreadResult.outputFilePath ? `<button class="action-button" onclick="handleAction('showProofreadItemsTree')" title="${commandHoverTitle('查看校对条目', 'ai-proofread.showProofreadItemsTree')}">查看校对条目</button>` : ''}
-                    ${proofreadResult.outputFilePath ? `<button class="action-button" onclick="handleAction('generateDiff')" title="${commandHoverTitle('切分 JSON 与校对 JSON 生成 jsDiff HTML（任意两文件亦可）', 'ai-proofread.diffItWithAnotherFile')}">生成差异文件</button>` : ''}
-                    ${hasMain && hasMd ? `<button class="action-button" onclick="handleAction('generateAlignment')" title="${commandHoverTitle('原稿与校对结果逐句对齐生成勘误表（任意两文件亦可）', 'ai-proofread.diffItWithAnotherFile')}">生成勘误表</button>` : ''}
+                ${hasMain && hasMd ? `<button class="action-button" onclick="handleAction('showProofreadDiff')" title="${commandHoverTitle('主稿与结果 Markdown 的内置 diff', 'ai-proofread.diffItWithAnotherFile')}">比较前后差异</button>` : ''}
+                    ${mode === 'translate' && proofreadResult.outputFilePath
+                        ? `<button class="action-button" onclick="handleAction('translateReviewOpen')" title="${commandHoverTitle('打开翻译审核', 'ai-proofread.translateReview.open')}">翻译审核</button>`
+                        : ''}
+                    ${mode === 'proofread' && proofreadResult.outputFilePath ? `<button class="action-button" onclick="handleAction('showProofreadItemsTree')" title="${commandHoverTitle('查看校对条目', 'ai-proofread.showProofreadItemsTree')}">查看校对条目</button>` : ''}
+                    ${mode === 'proofread' && proofreadResult.outputFilePath ? `<button class="action-button" onclick="handleAction('generateDiff')" title="${commandHoverTitle('生成差异文件', 'ai-proofread.diffItWithAnotherFile')}">生成差异文件</button>` : ''}
+                    ${mode === 'proofread' && hasMain && hasMd ? `<button class="action-button" onclick="handleAction('generateAlignment')" title="${commandHoverTitle('生成勘误表', 'ai-proofread.diffItWithAnotherFile')}">生成勘误表</button>` : ''}
+                    ${mode === 'translate' ? `<button class="action-button" onclick="handleAction('translationAuditTerms')" title="${commandHoverTitle('翻译术语审计', 'ai-proofread.translation.auditTerms')}">术语审计</button>` : ''}
                 </div>
         `;
     }

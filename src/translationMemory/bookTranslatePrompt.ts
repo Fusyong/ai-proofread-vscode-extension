@@ -44,6 +44,8 @@ export const BOOK_TRANSLATE_SYSTEM_PROMPT = `你是一位专业译者。用户�
 - reference：文风样张、术语表等，须遵守。
 - context：邻段语境，用于连贯与指代，不要把 context 译进 <t>。
 - 若出现 <translation_memory_terms> / <translation_memory_examples>，优先遵循。
+- 若出现 <similar_bitext>，为已译相似句参考（临时注入，仅供参考译法，勿整段照抄）。
+- 若出现 <translation_direction>，按其中 source_lang / target_lang 译向执行。
 
 {{output_format}}
 `;
