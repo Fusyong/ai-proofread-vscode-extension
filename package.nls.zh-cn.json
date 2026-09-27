@@ -93,7 +93,7 @@
   "cmd.proofreadSelection.title": "校对选区",
   "cmd.proofreadSelectionWithMemory.title": "校对选区（带记忆）",
   "cmd.diffItWithAnotherFile.title": "比较与对齐文件（diff / 勘误表 / 多校次）",
-  "cmd.openProofreadingPanel.title": "打开校对面板",
+  "cmd.openProofreadingPanel.title": "打开工作面板",
   "cmd.reopenResultPanel.title": "重新打开结果面板",
   "cmd.editorialMemory.clear.title": "清除编辑记忆",
   "cmd.showProofreadItemsTree.title": "显示校对条目",

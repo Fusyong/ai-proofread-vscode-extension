@@ -809,7 +809,7 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.window.showInformationMessage(`OpenCC selection：已转换（${from} → ${to}）`);
         }),
 
-        // 打开校对面板（支持空面板）
+        // 打开工作面板（支持空面板）
         vscode.commands.registerCommand('ai-proofread.openProofreadingPanel', () => {
             webviewManager.openProofreadingPanel(context);
         }),

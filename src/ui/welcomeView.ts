@@ -112,7 +112,7 @@ function getHtml(): string {
 </head>
 <body>
     <div class="btn-row">
-        <button type="button" class="btn-primary" data-action="openPanel" title="打开工作面板（默认任务：校对） (openProofreadingPanel)">工作面板</button>
+        <button type="button" class="btn-primary" data-action="openPanel" title="打开工作面板（默认工作流：并行） (openProofreadingPanel)">工作面板</button>
         <button type="button" class="btn-primary" data-action="openSearchConsole" title="打开参考资料检索控制台 (referencePrep.openConsole)">检索面板</button>
     </div>
     <div class="action-grid">
@@ -147,7 +147,7 @@ function getHtml(): string {
     <div class="hint">
         使用本扩展的三个途径：
         <ol>
-            <li>打开校对面板 / 检索面板，使用按钮</li>
+            <li>打开工作面板 / 检索面板，使用按钮</li>
             <li>打开命令面板 (Ctrl+Shift+P)，输入 AI Proofreader ... 查找并运行命令</li>
             <li>在编辑窗口使用鼠标右键菜单</li>
         </ol>

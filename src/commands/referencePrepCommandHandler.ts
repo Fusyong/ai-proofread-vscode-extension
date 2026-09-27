@@ -224,7 +224,7 @@ export class ReferencePrepCommandHandler {
 
     /**
      * JSON：准备参考资料（只写过程文件，不自动写入源 JSON 的 reference）。
-     * 校对请另用校对面板；命中勾选导出/合并请在检索面板完成。
+     * 校对请另用工作面板；命中勾选导出/合并请在检索面板完成。
      */
     async handlePrepareReferencesJson(
         jsonFilePath: string,

@@ -1,7 +1,7 @@
 # 统一参考资料准备（referencePrep）
 
 > **文档定位**：实现/设计说明。用户入门请先看 [README §3.2.3](../README.md) 与 [命令速查](commands-cheatsheet.md)。  
-> **「知识核查」**：仅为预置校对提示词（item / full），在校对面板选用；不是独立命令或工作流名。
+> **「知识核查」**：仅为预置校对提示词（item / full），在工作面板选用；不是独立命令或工作流名。
 
 ## 概述
 
@@ -10,14 +10,14 @@
 1. **阶段 0 — 资源范围**（`ResourceScope`）：目录缓存、条件式 LLM 预筛词典/文件/标题；命中不足时 `fallbackWiden`
 2. **阶段 A — 资料准备**（`referencePrep`）：多轮 LLM 规划 + 多通道检索（dict / grep / BM25 / 轻量向量 / 可选 wikipedia）
 3. **阶段 A′ — LLM 精排**：`refTag` 标注候选，打分、去重、裁剪
-4. **阶段 B — 校对**（可选，在**校对面板**）：选用「知识核查」等提示词，复用 `proofreadSelection` / `processJsonFileAsync`
+4. **阶段 B — 校对**（可选，在**工作面板**）：选用「知识核查」等提示词，复用 `proofreadSelection` / `processJsonFileAsync`
 
 ## 命令
 
 | 命令 | 共用流程 | 规划提示词（targetKind） | 是否校对 |
 |------|----------|--------------------------|----------|
 | `Prepare References for Selection（资料准备·选段）` | 预筛 → 规划 → 检索 → 精排 → TreeView / 检索面板 | `manuscript` | 否 |
-| `Prepare References for JSON File（资料准备·JSON）` / 校对面板 **准备参考资料** | 同上（批量；**只写过程文件，不自动写源 JSON**） | `manuscript` | 否 |
+| `Prepare References for JSON File（资料准备·JSON）` / 工作面板 **准备参考资料** | 同上（批量；**只写过程文件，不自动写源 JSON**） | `manuscript` | 否 |
 | `Intent Search（意图检索）` | 同上 | `search_intent` | 否 |
 | 单源：`search.dictPrep` / `search.refsGrep` / `refsBm25` / `refsVector` / `wikipedia` / `web` | 固定 `enabledSources` 跑同一流水线 | `search_intent` | 否 |
 | `Open Reference Search Panel（检索面板）` | Webview：配置多源、执行、展示规划过程与命中 | — | — |
@@ -48,7 +48,7 @@
 - **选段准备**：与命令面板一致，可续跑本选区 / 新建 / 切换同文档其它选区
 - **JSON 批量**：每条 `target` 独立 `json_item` 记录；**不自动改写源 JSON 的 `reference`**；结束后面板按条目分组；用户勾选后「合并选中到源 JSON」（可按 target 写入对应条目）是写回源文件的唯一正式路径
 - **JSON 续跑**：「继续未完成部分」按过程记录（`jsonItemIndex` 已有 corpus/rounds）跳过，不依赖源 JSON 是否已有 `reference`
-- 导出：选段结果 → md；JSON 结果 → json / 合并到源 JSON（由「当前结果来源」决定按钮）。校对请到校对面板
+- 导出：选段结果 → md；JSON 结果 → json / 合并到源 JSON（由「当前结果来源」决定按钮）。校对请到工作面板
 
 ## 配置（节选）
 

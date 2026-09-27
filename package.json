@@ -1427,7 +1427,7 @@
                   "其他"
                 ],
                 "default": "proofread",
-                "description": "任务类别（与 outputType 正交）；用于侧栏分组与入口校验"
+                "description": "调度细项（与 outputType 正交）。界面只展示并行/串行：translate=串行，其余=并行。用于入口校验与按 task 记忆当前提示词。"
               }
             },
             "required": [

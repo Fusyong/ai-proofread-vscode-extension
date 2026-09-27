@@ -1,5 +1,6 @@
 /**
- * 提示词 TreeView：按 task 分组；单选当前、新建、编辑、删除
+ * 提示词 TreeView：扁平列表；单选当前、新建、编辑、删除。
+ * 叶子标注并行/串行（与工作流对齐），不按 task 分组。
  */
 
 import * as vscode from 'vscode';
@@ -20,7 +21,7 @@ import {
     SYSTEM_PROMPT_NAME_TERM_CHECK_FULL,
 } from './promptManager';
 import type { Prompt } from './promptManager';
-import { PROMPT_TASK_LABELS, resolvePromptTask, type PromptTask } from './promptTask';
+import { promptExecutionLabel, resolvePromptTask, type PromptTask } from './promptTask';
 
 export const PROMPTS_VIEW_ID = 'ai-proofread.prompts';
 
@@ -38,14 +39,7 @@ type PromptLeaf = {
     task: PromptTask;
 };
 
-type PromptGroup = {
-    kind: 'group';
-    id: string;
-    label: string;
-    task: PromptTask;
-};
-
-export type PromptTreeItem = PromptLeaf | PromptGroup;
+export type PromptTreeItem = PromptLeaf;
 
 const PRESET_LEAVES: PromptLeaf[] = [
     { kind: 'prompt', id: SYSTEM_FULL_ITEM_ID, label: '系统默认提示词（full）', systemOutputType: 'full', task: 'proofread' },
@@ -149,6 +143,9 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
     }
 
     getChildren(element?: PromptTreeItem): PromptTreeItem[] {
+        if (element) {
+            return [];
+        }
         const userPrompts = this.promptManager.getPrompts().map(
             (p): PromptLeaf => ({
                 kind: 'prompt',
@@ -158,35 +155,10 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
                 task: resolvePromptTask(p.name),
             })
         );
-        const allLeaves = [...PRESET_LEAVES, ...userPrompts];
-
-        if (!element) {
-            const order: PromptTask[] = ['proofread', 'translate', 'annotate', 'restructure', 'other'];
-            return order
-                .filter((task) => allLeaves.some((l) => l.task === task))
-                .map(
-                    (task): PromptGroup => ({
-                        kind: 'group',
-                        id: `group:${task}`,
-                        label: PROMPT_TASK_LABELS[task],
-                        task,
-                    })
-                );
-        }
-        if (element.kind === 'group') {
-            return allLeaves.filter((l) => l.task === element.task);
-        }
-        return [];
+        return [...PRESET_LEAVES, ...userPrompts];
     }
 
     getTreeItem(element: PromptTreeItem): vscode.TreeItem {
-        if (element.kind === 'group') {
-            const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.Expanded);
-            item.id = element.id;
-            item.contextValue = 'promptGroup';
-            return item;
-        }
-
         const current = this.promptManager.getCurrentPromptName();
         const storage = storageNameFromLeafId(element.id);
         const isCurrent = current === storage;
@@ -197,18 +169,28 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
         const userOutputLabel =
             element.prompt?.outputType === 'item' ? '条目' : element.prompt?.outputType === 'other' ? '其他' : '全文';
         const outputTypeLabel = systemLabel ?? userOutputLabel;
-        item.description = [outputTypeLabel, PROMPT_TASK_LABELS[element.task], isCurrent ? '当前' : undefined]
-            .filter(Boolean)
-            .join(' · ');
+        const execLabel = promptExecutionLabel(element.task);
+        if (isCurrent) {
+            item.description = `★ 当前 · ${outputTypeLabel} · ${execLabel}`;
+            item.iconPath = new vscode.ThemeIcon(
+                'pass-filled',
+                new vscode.ThemeColor('charts.green')
+            );
+        } else {
+            item.description = `${outputTypeLabel} · ${execLabel}`;
+            item.iconPath = new vscode.ThemeIcon('symbol-text');
+        }
         item.contextValue = element.prompt ? 'promptUser' : 'promptSystem';
         if (element.prompt?.content) {
             const preview = element.prompt.content.slice(0, 60).replace(/\s+/g, ' ');
             item.tooltip =
+                (isCurrent ? '【当前选用】\n' : '') +
                 preview +
                 (element.prompt.content.length > 60 ? '…' : '') +
-                `\n输出类型: ${outputTypeLabel}\n任务: ${PROMPT_TASK_LABELS[element.task]}`;
+                `\n输出类型: ${outputTypeLabel}\n调度: ${execLabel}`;
         } else {
-            item.tooltip = `${element.label}\n任务: ${PROMPT_TASK_LABELS[element.task]}`;
+            item.tooltip =
+                (isCurrent ? '【当前选用】\n' : '') + `${element.label}\n调度: ${execLabel}`;
         }
         return item;
     }

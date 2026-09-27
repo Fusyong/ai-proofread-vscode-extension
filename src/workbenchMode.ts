@@ -1,9 +1,11 @@
 /**
- * 工作台模式：校对（默认）| 翻译。影响面板按钮文案与 JSON 动作路由。
+ * 工作台工作流：并行（校对等，默认）| 串行（翻译等）。
+ * 影响面板按钮文案与 JSON 动作路由（并行校对 vs 顺序翻译）。
  */
 
 import * as vscode from 'vscode';
 
+/** 内部仍用 proofread|translate；语义 = 并行|串行 */
 export type WorkbenchMode = 'proofread' | 'translate';
 
 const STATE_KEY = 'workbenchMode';
@@ -26,6 +28,11 @@ export async function toggleWorkbenchMode(context: vscode.ExtensionContext): Pro
     return next;
 }
 
+/** 用户可见：并行（校对等）| 串行（翻译等） */
 export function workbenchModeLabel(mode: WorkbenchMode): string {
-    return mode === 'translate' ? '翻译' : '校对';
+    return mode === 'translate' ? '串行（翻译等）' : '并行（校对等）';
+}
+
+export function workbenchModeShortLabel(mode: WorkbenchMode): string {
+    return mode === 'translate' ? '串行' : '并行';
 }

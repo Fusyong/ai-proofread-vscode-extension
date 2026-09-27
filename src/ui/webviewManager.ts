@@ -250,7 +250,7 @@ export class WebviewManager {
     }
 
     /**
-     * 打开工作面板（支持空面板；默认任务为校对）
+     * 打开工作面板（支持空面板；默认工作流为并行）
      */
     public openProofreadingPanel(context: vscode.ExtensionContext): void {
         this.extensionContext = context;
@@ -287,8 +287,8 @@ export class WebviewManager {
         return {
             title: '工作面板',
             message: hasMain
-                ? `项目：${this.getRelativePath(this.mainFilePath!)}（默认任务：校对）`
-                : '工作面板（默认任务：校对）。整理当前文档，或选择主文件后切分、处理。',
+                ? `项目：${this.getRelativePath(this.mainFilePath!)}（默认工作流：并行）`
+                : '整理当前文档，或选择主文件后切分、处理',
             mainFilePath: this.mainFilePath,
             companionFiles: companions,
             actions: {}
@@ -612,7 +612,7 @@ export class WebviewManager {
                 }
                 case 'proofreadJsonOverlay': {
                     if (getWorkbenchMode(context) === 'translate') {
-                        vscode.window.showInformationMessage('翻译模式不使用重叠校对；请用「LLM 翻译 JSON」或续跑。');
+                        vscode.window.showInformationMessage('串行（翻译等）工作流不使用重叠校对；请用「LLM 翻译 JSON」或续跑。');
                         break;
                     }
                     const jsonPath = this.getSplitJsonPath();
@@ -896,13 +896,13 @@ export class WebviewManager {
     }
 
     /**
-     * 生成完整 HTML：模式 → 文档整理 → 切分与合并 → 结果 → 专项检查
+     * 生成完整 HTML：工作流 → 文档整理 → 切分→(合并→)交 LLM → 结果 → 专项
      */
     private generateFullHtml(result: ProcessResult, context?: vscode.ExtensionContext): string {
         const mode = context ? getWorkbenchMode(context) : 'proofread';
         return this.getBaseHtml(`
             <div class="header">
-                <div class="message">${escapeHtml(result.message || '工作面板（默认任务：校对）')}</div>
+                <div class="message">${escapeHtml(result.message || '工作面板（默认工作流：并行）')}</div>
                 ${this.generateWorkbenchModeHtml(mode)}
             </div>
             ${this.generateDocumentPrepHtml()}
@@ -919,11 +919,11 @@ export class WebviewManager {
         const proofreadActive = mode === 'proofread' ? ' mode-btn--active' : '';
         const translateActive = mode === 'translate' ? ' mode-btn--active' : '';
         return `
-            <div class="workbench-mode" role="group" aria-label="工作台模式">
-                <span class="mode-label">模式</span>
-                <button type="button" class="mode-btn${proofreadActive}" onclick="handleAction('setWorkbenchModeProofread')" title="校对（默认主业）">校对</button>
-                <button type="button" class="mode-btn${translateActive}" onclick="handleAction('setWorkbenchModeTranslate')" title="图书翻译">翻译</button>
-                <span class="mode-hint">当前：${workbenchModeLabel(mode)} · 品牌仍为 AI 校对</span>
+            <div class="workbench-mode" role="group" aria-label="工作流">
+                <span class="mode-label">工作流</span>
+                <button type="button" class="mode-btn${proofreadActive}" onclick="handleAction('setWorkbenchModeProofread')" title="并行调度：校对等（JSON 可并发）">并行（校对等）</button>
+                <button type="button" class="mode-btn${translateActive}" onclick="handleAction('setWorkbenchModeTranslate')" title="串行调度：翻译等（顺序执行并写翻译记忆）">串行（翻译等）</button>
+                <span class="mode-hint">当前：${workbenchModeLabel(mode)} · 并行流并发处理（校对等）分块；串行流顺序处理（翻译等）分块和记忆</span>
             </div>
         `;
     }
@@ -963,7 +963,7 @@ export class WebviewManager {
         `;
     }
 
-    /** 切分与合并：上部选主文件；有 JSON 后再露出配套文件与合并/检索/校对或翻译 */
+    /** 切分→(合并→)交 LLM：上部选主文件；有 JSON 后再露出配套与合并/检索/处理 */
     private generateSplitSectionHtml(result: ProcessResult, mode: WorkbenchMode = 'proofread'): string {
         const mainPath =
             result.mainFilePath ??
@@ -1020,7 +1020,7 @@ export class WebviewManager {
                 translateButtons?.llmHint ?? '顺序翻译 JSON（带翻译记忆）',
                 'ai-proofread.translateJsonFile'
             );
-            overlayTitle = commandHoverTitle('翻译模式不使用重叠校对', 'ai-proofread.proofreadFileOverlay');
+            overlayTitle = commandHoverTitle('串行工作流不使用重叠校对', 'ai-proofread.proofreadFileOverlay');
             actionHint = translateButtons?.llmHint
                 ? `<p class="hint">${escapeHtml(translateButtons.llmHint)}</p>`
                 : '';
@@ -1073,7 +1073,7 @@ export class WebviewManager {
 
         return `
             <div class="process-section">
-                <h3>✂️ 切分 → (合并 →) ${taskVerb}</h3>
+                <h3>✂️ 切分 → (合并 →) 交 LLM 处理(${taskVerb}等)</h3>
                 ${mainFileBlock}
                 ${lengthMismatch && mode === 'proofread' ? `
                 <div class="warning-box">
@@ -1090,14 +1090,14 @@ export class WebviewManager {
         `;
     }
 
-    /** 专项检查：校对向工具为主；翻译模式挂翻译专用能力 */
+    /** 专项检查：并行工作流挂校对向工具；串行工作流挂翻译专用能力 */
     private generateSpecialChecksHtml(mode: WorkbenchMode = 'proofread'): string {
         const sep = this.buttonGroupSep;
         if (mode === 'translate') {
             return `
             <div class="process-section">
                 <h3>🔍 翻译专项</h3>
-                <p class="hint">翻译记忆、术语审计与段级审核。校对向专项仍可在「校对」模式使用。</p>
+                <p class="hint">翻译记忆、术语审计与段级审核。校对向专项请切到「并行（校对等）」工作流。</p>
                 <div class="section-actions">
                     <button class="action-button" onclick="handleAction('splitByParagraph')" title="${commandHoverTitle('按段落切分（翻译用）', 'ai-proofread.splitFileByParagraph')}">按段落切分</button>
                     ${sep}
@@ -1136,7 +1136,7 @@ export class WebviewManager {
         `;
     }
 
-    /** 底部选段动作（随工作台模式切换文案） */
+    /** 底部选段动作（随工作流切换文案） */
     private generatePanelFooterHtml(mode: WorkbenchMode = 'proofread'): string {
         const sep = '<span class="cmd-sep" aria-hidden="true">|</span>';
         if (mode === 'translate') {

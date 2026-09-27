@@ -823,7 +823,7 @@ export class ReferencePrepWebview {
         }
     }
 
-    /** 常用检索命令：先聚焦文稿编辑器，再执行（与校对面板快捷栏一致） */
+    /** 常用检索命令：先聚焦文稿编辑器，再执行（与工作面板快捷栏一致） */
     private async runQuickSearchCommand(commandId?: string): Promise<void> {
         if (!commandId || typeof commandId !== 'string') return;
         const allowed = new Set([
@@ -1698,7 +1698,7 @@ function updateExportBarMode() {
   document.body.classList.toggle('mode-json', targetModeEl.value === 'json');
   if (resultOriginHintEl) {
     if (resultOrigin === 'selection') {
-      resultOriginHintEl.textContent = '当前结果：Markdown 选段（可导出 md；校对请到校对面板）';
+      resultOriginHintEl.textContent = '当前结果：Markdown 选段（可导出 md；校对请到工作面板）';
     } else if (resultOrigin === 'json') {
       resultOriginHintEl.textContent = '当前结果：JSON 条目（可导出 JSON / 勾选后合并到源 JSON；不自动写入）';
     } else {

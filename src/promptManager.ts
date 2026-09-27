@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import { normalizePromptTask, PROMPT_TASK_LABELS, resolvePromptTask, type PromptTask } from './promptTask';
+import { normalizePromptTask, promptExecutionOf, resolvePromptTask, type PromptTask } from './promptTask';
 
 export type PromptOutputType = 'full' | 'item' | 'other';
 
@@ -75,7 +75,7 @@ export interface Prompt {
     name: string;
     content: string;
     outputType?: PromptOutputType;
-    /** 任务类别；默认 proofread */
+    /** 调度细项（内部）；展示为并行/串行。默认 proofread */
     task?: PromptTask;
 }
 
@@ -141,14 +141,23 @@ export class PromptManager {
     }
 
     private async pickTask(current?: PromptTask): Promise<PromptTask | undefined> {
-        const items = (Object.keys(PROMPT_TASK_LABELS) as PromptTask[]).map((value) => ({
-            label: PROMPT_TASK_LABELS[value],
-            value,
-            description: value,
-            picked: value === (current ?? 'proofread'),
-        }));
+        const currentExec = promptExecutionOf(current ?? 'proofread');
+        const items = [
+            {
+                label: '并行（校对/加注/重组等）',
+                value: 'proofread' as PromptTask,
+                description: 'parallel',
+                picked: currentExec === 'parallel',
+            },
+            {
+                label: '串行（翻译等）',
+                value: 'translate' as PromptTask,
+                description: 'serial',
+                picked: currentExec === 'serial',
+            },
+        ];
         const pick = await vscode.window.showQuickPick(items, {
-            placeHolder: '选择任务类别（task）',
+            placeHolder: '选择调度方式（与工作流并行/串行对齐）',
             ignoreFocusOut: true,
         });
         return pick?.value;
@@ -180,8 +189,9 @@ export class PromptManager {
             { placeHolder: '选择输出类型', ignoreFocusOut: true }
         );
         const outputType = outputTypePick?.value ?? 'full';
-        const task = (await this.pickTask('proofread')) ?? 'proofread';
-        prompts.push({ name, content, outputType, task: normalizePromptTask(task) });
+        const picked = (await this.pickTask('proofread')) ?? 'proofread';
+        const task = promptExecutionOf(picked) === 'serial' ? 'translate' : 'proofread';
+        prompts.push({ name, content, outputType, task });
         await this.savePrompts(prompts);
         await this.setCurrentPrompt(name);
         vscode.window.showInformationMessage(`提示词「${name}」已添加并设为当前`);
@@ -218,7 +228,16 @@ export class PromptManager {
             { placeHolder: '选择输出类型', ignoreFocusOut: true, title: '输出类型' }
         );
         const outputType = outputTypePick?.value ?? currentOutputType;
-        const task = (await this.pickTask(normalizePromptTask(prompt.task))) ?? normalizePromptTask(prompt.task);
+        const picked = await this.pickTask(normalizePromptTask(prompt.task));
+        let task = normalizePromptTask(prompt.task);
+        if (picked) {
+            if (promptExecutionOf(picked) === 'serial') {
+                task = 'translate';
+            } else if (promptExecutionOf(task) === 'serial') {
+                task = 'proofread';
+            }
+            // 已是并行族则保留原细项（annotate/restructure/other/proofread）
+        }
         prompts[index] = { name, content, outputType, task };
         await this.savePrompts(prompts);
         await this.setCurrentPrompt(name);

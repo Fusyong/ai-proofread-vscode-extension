@@ -93,7 +93,7 @@
   "cmd.proofreadSelection.title": "Proofread Selection",
   "cmd.proofreadSelectionWithMemory.title": "Proofread Selection with Memory",
   "cmd.diffItWithAnotherFile.title": "Compare / Align Files (Diff, Errata, Multi-run)",
-  "cmd.openProofreadingPanel.title": "Open Proofreading Panel",
+  "cmd.openProofreadingPanel.title": "Open Work Panel",
   "cmd.reopenResultPanel.title": "Reopen Result Panel",
   "cmd.editorialMemory.clear.title": "Clear Editorial Memory",
   "cmd.showProofreadItemsTree.title": "Show Proofread Items",
