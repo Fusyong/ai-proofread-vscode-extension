@@ -21,11 +21,17 @@ function isMarkdownPath(filePath: string): boolean {
     return ext === '.md' || ext === '.markdown';
 }
 
-async function confirmProofreadOrder(paths: string[]): Promise<string[] | undefined> {
+/** pair：原文 + 1 份校对稿 → 勘误表；multi：原文 + 一份或多份校对稿 → 多校次对照表 */
+export type ErrataMode = 'pair' | 'multi';
+
+async function confirmProofreadOrder(
+    paths: string[],
+    minCount: number = 1
+): Promise<string[] | undefined> {
     if (paths.length === 0) {
         return undefined;
     }
-    if (paths.length === 1) {
+    if (paths.length === 1 && minCount <= 1) {
         return paths;
     }
 
@@ -56,8 +62,10 @@ async function confirmProofreadOrder(paths: string[]): Promise<string[] | undefi
             return undefined;
         }
         if (picked.action === 'done') {
-            if (order.length < 1) {
-                vscode.window.showWarningMessage('请至少保留 1 份校对稿');
+            if (order.length < minCount) {
+                vscode.window.showWarningMessage(
+                    `请至少保留 ${minCount} 份校对稿`
+                );
                 continue;
             }
             return order;
@@ -96,8 +104,8 @@ async function confirmProofreadOrder(paths: string[]): Promise<string[] | undefi
             order[idx + 1] = order[idx];
             order[idx] = t;
         } else if (move.action === 'remove') {
-            if (order.length <= 1) {
-                vscode.window.showWarningMessage('至少需保留 1 份校对稿');
+            if (order.length <= minCount) {
+                vscode.window.showWarningMessage(`至少需保留 ${minCount} 份校对稿`);
                 continue;
             }
             order.splice(idx, 1);
@@ -128,26 +136,42 @@ export class FileCompareCommandHandler {
         if (currentLanguageId === 'json' && !currentIsMd) {
             diffMethod = '生成jsDiff结果文件';
         } else {
-            const options = currentIsMd
+            const methodItems: Array<vscode.QuickPickItem & { id: string }> = currentIsMd
                 ? [
-                      '使用diff编辑器比较',
-                      '生成jsDiff结果文件',
-                      '对齐句子生成勘误表（可多选校次 Markdown）',
+                      { label: '使用diff编辑器比较', id: 'diffEditor' },
+                      { label: '生成jsDiff结果文件', id: 'jsDiff' },
+                      {
+                          label: '两份对齐生成勘误表',
+                          description: '原文 + 一份校对稿 Markdown',
+                          id: 'errataPair',
+                      },
+                      {
+                          label: '生成多校次对照表',
+                          description: '原文 + 一份或多份校对稿 Markdown',
+                          id: 'errataMulti',
+                      },
                   ]
-                : ['使用diff编辑器比较', '生成jsDiff结果文件'];
+                : [
+                      { label: '使用diff编辑器比较', id: 'diffEditor' },
+                      { label: '生成jsDiff结果文件', id: 'jsDiff' },
+                  ];
 
-            const selectedMethod = await vscode.window.showQuickPick(options, {
+            const selectedMethod = await vscode.window.showQuickPick(methodItems, {
                 placeHolder: '请选择比较方式',
             });
 
             if (!selectedMethod) {
                 return;
             }
-            diffMethod = selectedMethod;
+            diffMethod = selectedMethod.id;
         }
 
-        if (diffMethod.startsWith('对齐句子生成勘误表')) {
-            await this.handleSentenceAlignment(currentFile);
+        if (diffMethod === 'errataPair') {
+            await this.handleGenerateErrata(currentFile, undefined, 'pair');
+            return;
+        }
+        if (diffMethod === 'errataMulti') {
+            await this.handleGenerateErrata(currentFile, undefined, 'multi');
             return;
         }
 
@@ -183,7 +207,7 @@ export class FileCompareCommandHandler {
 
         let segmentCount = 0;
         if (currentLanguageId === 'json' && anotherLanguageId === 'json' && !currentIsMd) {
-            if (diffMethod === '生成jsDiff结果文件') {
+            if (diffMethod === 'jsDiff' || diffMethod === '生成jsDiff结果文件') {
                 const segmentInput = await vscode.window.showInputBox({
                     prompt: '请输入每次比较的片段数量（0表示所有片段）',
                     value: '0',
@@ -204,7 +228,7 @@ export class FileCompareCommandHandler {
         }
 
         try {
-            if (diffMethod === '使用diff编辑器比较') {
+            if (diffMethod === 'diffEditor' || diffMethod === '使用diff编辑器比较') {
                 await showFileDiff(currentFile, anotherFile);
             } else {
                 const outputFile = FilePathUtils.getFilePath(currentFile, '.diff', '.html');
@@ -222,32 +246,77 @@ export class FileCompareCommandHandler {
     }
 
     /**
-     * 句子对齐：当前文件为原文，多选校对稿 Markdown（任意 .md 后缀均可）。
-     * 1 份校次 → 单份勘误表；多份 → 多校次对照表。
+     * 生成勘误表（句子对齐）。
+     * - pair：原文 + 1 份校对稿 → 单份勘误表
+     * - multi：原文 + 一份或多份校对稿 → 多校次对照表（份数不限）
+     * - 工作面板「生成勘误表」：传入主稿 + 校对结果，默认按 pair
      */
-    private async handleSentenceAlignment(fileA: string): Promise<void> {
+    public async handleGenerateErrata(
+        fileA: string,
+        preselectedProofreads?: string[],
+        mode: ErrataMode = 'pair'
+    ): Promise<void> {
         try {
-            const fileUrisB = await vscode.window.showOpenDialog({
-                canSelectMany: true,
-                filters: {
-                    'Markdown文件': ['md', 'markdown'],
-                },
-                title: '选择校对稿 Markdown（可多选校次；任意 .md 文件名均可）',
-            });
+            let ordered: string[];
+            if (preselectedProofreads && preselectedProofreads.length > 0) {
+                const selected = preselectedProofreads.filter(isMarkdownPath);
+                if (selected.length === 0) {
+                    vscode.window.showWarningMessage('请提供 Markdown（.md / .markdown）校对稿');
+                    return;
+                }
+                ordered =
+                    mode === 'pair' && selected.length === 1
+                        ? selected
+                        : (await confirmProofreadOrder(selected, 1)) ?? [];
+                if (ordered.length === 0) {
+                    return;
+                }
+                if (mode === 'pair' && ordered.length > 1) {
+                    mode = 'multi';
+                }
+            } else if (mode === 'pair') {
+                const fileUrisB = await vscode.window.showOpenDialog({
+                    canSelectMany: false,
+                    filters: {
+                        'Markdown文件': ['md', 'markdown'],
+                    },
+                    title: '选择一份校对稿 Markdown',
+                });
 
-            if (!fileUrisB || fileUrisB.length === 0) {
-                return;
-            }
+                if (!fileUrisB || fileUrisB.length === 0) {
+                    return;
+                }
 
-            const selected = fileUrisB.map(u => u.fsPath).filter(isMarkdownPath);
-            if (selected.length === 0) {
-                vscode.window.showWarningMessage('请选择 Markdown（.md / .markdown）文件');
-                return;
-            }
+                const selected = fileUrisB.map(u => u.fsPath).filter(isMarkdownPath);
+                if (selected.length === 0) {
+                    vscode.window.showWarningMessage('请选择 Markdown（.md / .markdown）文件');
+                    return;
+                }
+                ordered = [selected[0]];
+            } else {
+                const fileUrisB = await vscode.window.showOpenDialog({
+                    canSelectMany: true,
+                    filters: {
+                        'Markdown文件': ['md', 'markdown'],
+                    },
+                    title: '选择校对稿 Markdown（可多选；一份亦可）',
+                });
 
-            const ordered = await confirmProofreadOrder(selected);
-            if (!ordered || ordered.length === 0) {
-                return;
+                if (!fileUrisB || fileUrisB.length === 0) {
+                    return;
+                }
+
+                const selected = fileUrisB.map(u => u.fsPath).filter(isMarkdownPath);
+                if (selected.length === 0) {
+                    vscode.window.showWarningMessage('请选择 Markdown（.md / .markdown）文件');
+                    return;
+                }
+
+                const confirmed = await confirmProofreadOrder(selected, 1);
+                if (!confirmed || confirmed.length === 0) {
+                    return;
+                }
+                ordered = confirmed;
             }
 
             const config = vscode.workspace.getConfiguration('ai-proofread.alignment');
@@ -293,7 +362,7 @@ export class FileCompareCommandHandler {
                 return;
             }
 
-            const isMulti = ordered.length > 1;
+            const isMulti = mode === 'multi' || ordered.length > 1;
 
             const writeJsonChoice = await vscode.window.showQuickPick(
                 isMulti
@@ -405,7 +474,7 @@ export class FileCompareCommandHandler {
         await vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
-                title: '正在对齐句子...',
+                title: '正在生成勘误表...',
                 cancellable: false,
             },
             async progress => {
@@ -452,7 +521,7 @@ export class FileCompareCommandHandler {
                     ? `${path.basename(outputFile)}、${path.basename(alignmentJsonPath(outputFile))}`
                     : path.basename(outputFile);
                 vscode.window.showInformationMessage(
-                    `对齐完成！${fallbackNote}\n` +
+                    `勘误表生成完成！${fallbackNote}\n` +
                         `算法: ${options.algorithmDisplayName ?? algorithm}\n` +
                         `总计: ${stats.total}\n` +
                         `匹配: ${stats.match}\n` +

@@ -8,12 +8,7 @@ import * as path from 'path';
 import { showFileDiff, jsDiffJsonFiles } from '../differ';
 import { ErrorUtils, FilePathUtils } from '../utils';
 import { ProgressTracker } from '../progressTracker';
-import { getAlignmentStatistics, AlignmentOptions } from '../sentenceAligner';
-import { alignDocuments } from '../documentAligner';
-import { promptAlignmentAlgorithm } from '../alignmentUi';
-import { alignmentJsonPath, generateHtmlReport } from '../alignmentReportGenerator';
-import { getJiebaWasm } from '../jiebaLoader';
-import { collectWordErrors, formatWordErrors, parseDelimitersFromConfig } from '../wordErrorCollector';
+import { FileCompareCommandHandler } from '../commands/fileCompareCommandHandler';
 import { proofreadJsonPathToSegmentsJsonPath, segmentsJsonPathToSplitMarkdownPath } from '../proofreadSplitLayout';
 import {
     getProofreadPanelButtons,
@@ -749,7 +744,12 @@ export class WebviewManager {
                     const alignmentMarkdownPath = this.getProofreadMarkdownPath();
 
                     if (alignmentOriginalPath && alignmentMarkdownPath) {
-                        await this.handleSentenceAlignment(alignmentOriginalPath, alignmentMarkdownPath, context);
+                        // 与命令 →「两份对齐生成勘误表」共用同一流程
+                        await new FileCompareCommandHandler(context).handleGenerateErrata(
+                            alignmentOriginalPath,
+                            [alignmentMarkdownPath],
+                            'pair'
+                        );
                     } else {
                         vscode.window.showErrorMessage('无法找到原始文件或校对后的Markdown文件！');
                     }
@@ -1347,174 +1347,5 @@ export class WebviewManager {
                     ${mode === 'translate' ? `<button class="action-button" onclick="handleAction('translationAuditTerms')" title="${commandHoverTitle('翻译术语审计', 'ai-proofread.translation.auditTerms')}">术语审计</button>` : ''}
                 </div>
         `;
-    }
-
-    /**
-     * 处理句子对齐（生成勘误表）
-     */
-    private async handleSentenceAlignment(fileA: string, fileB: string, context: vscode.ExtensionContext): Promise<void> {
-        try {
-            // 读取对齐参数配置
-            const config = vscode.workspace.getConfiguration('ai-proofread.alignment');
-            const defaultSimilarityThreshold = config.get<number>('similarityThreshold', 0.6);
-
-            // 让用户输入相似度阈值
-            const similarityThresholdInput = await vscode.window.showInputBox({
-                prompt: '请输入相似度阈值（0-1之间，用于判断句子是否匹配）',
-                value: defaultSimilarityThreshold.toString(),
-                validateInput: (value: string) => {
-                    const num = parseFloat(value);
-                    if (isNaN(num)) {
-                        return '请输入有效的数字';
-                    }
-                    if (num < 0 || num > 1) {
-                        return '相似度阈值必须在0-1之间';
-                    }
-                    return null;
-                }
-            });
-
-            if (similarityThresholdInput === undefined) {
-                return; // 用户取消
-            }
-
-            const similarityThreshold = parseFloat(similarityThresholdInput);
-
-            // 让用户选择相似度计算时是否忽略句中空白字符
-            const removeInnerWhitespaceChoice = await vscode.window.showQuickPick(
-                [
-                    { label: '是（默认）', description: '忽略句中空白，仅用字面比较', value: true },
-                    { label: '否', description: '保留句中空白参与比较', value: false }
-                ],
-                {
-                    placeHolder: '相似度计算时是否忽略句中空白字符？',
-                    title: '句中空白',
-                    ignoreFocusOut: true
-                }
-            );
-            const removeInnerWhitespace = removeInnerWhitespaceChoice?.value ?? true;
-
-            const configuredAlgo = config.get<'anchor' | 'wordDiff'>('algorithm', 'anchor');
-            const algorithm = await promptAlignmentAlgorithm(configuredAlgo);
-            if (!algorithm) {
-                return;
-            }
-
-            const collectWordErrorsChoice = await vscode.window.showQuickPick(
-                [
-                    { label: '否', description: '仅生成勘误表（默认）', value: false },
-                    { label: '是', description: '同时收集常用词语错误', value: true }
-                ],
-                {
-                    placeHolder: '是否同时收集常用词语错误？',
-                    title: '常用词语错误',
-                    ignoreFocusOut: true
-                }
-            );
-            const shouldCollectWordErrors = collectWordErrorsChoice?.value ?? false;
-
-            const citationConfig = vscode.workspace.getConfiguration('ai-proofread.citation');
-            const ngramGranularity = config.get<'word' | 'char'>('ngramGranularity', 'word');
-            let jieba: import('../jiebaLoader').JiebaWasmModule | undefined;
-            if (ngramGranularity === 'word' || shouldCollectWordErrors) {
-                try {
-                    const customDictPath = vscode.workspace.getConfiguration('ai-proofread.jieba').get<string>('customDictPath', '');
-                    jieba = getJiebaWasm(path.join(context.extensionPath, 'dist'), customDictPath || undefined);
-                } catch (e) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    vscode.window.showErrorMessage(`jieba 加载失败，${shouldCollectWordErrors ? '词语错误收集需要 jieba；' : ''}${ngramGranularity === 'word' ? '当前配置为词级相似度，需要 jieba；' : ''}已中止：${msg}`);
-                    return;
-                }
-            }
-            const options: AlignmentOptions = {
-                algorithm,
-                wordDiffFallbackToAnchor: config.get<boolean>('wordDiffFallbackToAnchor', true),
-                windowSize: config.get<number>('windowSize', 10),
-                similarityThreshold: similarityThreshold,
-                ngramSize: config.get<number>('ngramSize', 1),
-                ngramGranularity: jieba ? 'word' : 'char',
-                cutMode: vscode.workspace.getConfiguration('ai-proofread.jieba').get<'default' | 'search'>('cutMode', 'default'),
-                jieba,
-                offset: config.get<number>('offset', 1),
-                maxWindowExpansion: config.get<number>('maxWindowExpansion', 3),
-                consecutiveFailThreshold: config.get<number>('consecutiveFailThreshold', 3),
-                removeInnerWhitespace,
-                removePunctuation: citationConfig.get<boolean>('normalizeIgnorePunctuation', false),
-                removeDigits: config.get<boolean>('normalizeIgnoreDigits', false),
-                removeLatin: config.get<boolean>('normalizeIgnoreLatin', false),
-                minSentenceChars: config.get<number>('minSentenceChars', 8),
-                gapEqualRatio: config.get<number>('gapEqualRatio', 0.55)
-            };
-
-            // 显示进度
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: '正在生成勘误表...',
-                cancellable: false
-            }, async (progress) => {
-                const startTime = Date.now();
-
-                progress.report({ increment: 0, message: '读取文件...' });
-
-                const textA = fs.readFileSync(fileA, 'utf8');
-                const textB = fs.readFileSync(fileB, 'utf8');
-
-                progress.report({ increment: 40, message: '执行对齐算法...' });
-
-                const { alignment, fellBackToAnchor } = alignDocuments(textA, textB, options);
-
-                progress.report({ increment: 85, message: '生成报告...' });
-
-                const endTime = Date.now();
-                const runtime = (endTime - startTime) / 1000;
-
-                const stats = getAlignmentStatistics(alignment);
-                const titleA = path.basename(fileA);
-                const titleB = path.basename(fileB);
-                const outputFile = FilePathUtils.getFilePath(fileA, '.alignment', '.html');
-
-                generateHtmlReport(alignment, outputFile, titleA, titleB, options, runtime);
-
-                let wordErrorsMessage = '';
-                if (shouldCollectWordErrors && jieba) {
-                    progress.report({ increment: 95, message: '收集词语错误...' });
-                    const weConfig = vscode.workspace.getConfiguration('ai-proofread.wordErrorCollector');
-                    const delimitersStr = weConfig.get<string>('delimiters', '，；。？！');
-                    const delimiters = parseDelimitersFromConfig(delimitersStr);
-                    const clauseThreshold = weConfig.get<number>('clauseSimilarityThreshold', 0.4);
-                    const cutMode = vscode.workspace.getConfiguration('ai-proofread.jieba').get<'default' | 'search'>('cutMode', 'default');
-                    const entries = collectWordErrors(alignment, {
-                        jieba,
-                        cutMode,
-                        delimiters,
-                        clauseSimilarityThreshold: clauseThreshold
-                    });
-                    const wordErrorsPath = FilePathUtils.getFilePath(fileA, '.word-errors', '.csv');
-                    fs.writeFileSync(wordErrorsPath, formatWordErrors(entries), 'utf8');
-                    wordErrorsMessage = `\n词语错误已保存至: ${path.basename(wordErrorsPath)}（${entries.length} 条）`;
-                }
-
-                progress.report({ increment: 100, message: '完成' });
-
-                const fallbackNote = fellBackToAnchor ? '\n（检测到调序，已回退锚点算法）' : '';
-                const statsMessage = `勘误表生成完成！${fallbackNote}\n` +
-                    `算法: ${options.algorithmDisplayName ?? algorithm}\n` +
-                    `总计: ${stats.total}\n` +
-                    `匹配: ${stats.match}\n` +
-                    `删除: ${stats.delete}\n` +
-                    `新增: ${stats.insert}\n` +
-                    `移出: ${stats.moveout}\n` +
-                    `移入: ${stats.movein}`;
-
-                vscode.window.showInformationMessage(
-                    statsMessage +
-                    `\n报告已保存至: ${path.basename(outputFile)}、${path.basename(alignmentJsonPath(outputFile))}` +
-                    wordErrorsMessage
-                );
-            });
-
-        } catch (error) {
-            ErrorUtils.showError(error, '生成勘误表时出错：');
-        }
     }
 }

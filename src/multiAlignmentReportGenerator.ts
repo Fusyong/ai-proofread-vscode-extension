@@ -235,12 +235,21 @@ h1 { font-size: 1.2rem; margin: 0 0 2px; font-weight: 650; }
 }
 .run-toggle { margin-right: 4px; font-size: 0.8rem; }
 .apply-index-filter { display: inline-flex; align-items: center; gap: 3px; font-size: 0.8rem; color: var(--muted); }
+.print-option { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem; color: var(--muted); cursor: pointer; user-select: none; }
+.print-option input { cursor: pointer; }
+.cache-status { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+.cache-status.ok { color: #2a7; }
 .stats {
     font-size: 0.8rem;
     color: var(--muted);
     margin-bottom: 6px;
 }
-.table-scroll { overflow: auto; max-height: calc(100vh - 180px); border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
+.table-wrap {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    overflow-x: auto;
+}
 table.multi-align {
     border-collapse: collapse;
     width: max-content;
@@ -265,6 +274,29 @@ table.multi-align thead th {
 .col-class { width: 88px; }
 .col-metric { width: 72px; }
 .col-a, .col-run { width: 280px; min-width: 200px; }
+.col-remark {
+    width: 160px;
+    min-width: 120px;
+    padding: 4px 6px;
+}
+.remark-input {
+    display: block;
+    width: 100%;
+    min-width: 80px;
+    min-height: 2em;
+    margin: 0;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    box-sizing: border-box;
+    resize: none;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background: #fff;
+}
 tr.hidden-row { display: none; }
 th.hidden-col, td.hidden-col { display: none; }
 tr.class-all_identical { background: var(--identical); }
@@ -292,6 +324,13 @@ input[type="number"], input[type="search"], input[type="text"].index-filter {
 }
 input[type="search"] { width: 160px; }
 input[type="text"].index-filter { width: 140px; }
+@media print {
+    body { background: #fff; }
+    .toolbar { break-inside: avoid; }
+    body.print-no-repeat-header table.multi-align thead {
+        display: table-row-group;
+    }
+}
 </style>
 </head>
 <body>
@@ -302,6 +341,15 @@ input[type="text"].index-filter { width: 140px; }
         <div class="toolbar-row">
             <label>显示校次</label>
             ${hideChecks}
+            <span class="sep"></span>
+            <label>列显示</label>
+            <button type="button" class="filter-btn" data-col="remark" onclick="toggleRemarkColumn()">备注</button>
+            <span class="sep"></span>
+            <label class="print-option" title="打印或导出为 PDF 时，表头是否在每一页重复显示">
+                <input type="checkbox" id="printRepeatHeader" checked onchange="togglePrintRepeatHeader()">
+                <span>分页加表头</span>
+            </label>
+            <span class="cache-status" id="cacheStatus" title="筛选与备注自动写入本机浏览器缓存">自动缓存</span>
         </div>
         <div class="toolbar-row">
             <label>Diff</label>
@@ -317,18 +365,18 @@ input[type="text"].index-filter { width: 140px; }
             <label>校同 ≤</label>
             <input type="number" id="maxRunAgreement" min="0" max="1" step="0.05" value="1" oninput="applyFilters()">
             <label>序号</label>
-            <input type="text" class="index-filter" id="indexFilter" placeholder="如: 1,2,5-20,80-" oninput="applyFilters()" title="支持: 1,2,5-20,80-">
+            <input type="text" class="index-filter" id="indexFilter" placeholder="如: 1,2,5-20,80-" oninput="applyFilters()" title="支持: 1,2,5-20,80-；会自动缓存到本机浏览器">
             <label class="apply-index-filter" title="取消勾选后保留序号内容，但不做序号筛选">
                 <input type="checkbox" id="applyIndexFilter" checked onchange="applyFilters()">
                 <span>应用</span>
             </label>
             <label>搜索</label>
-            <input type="search" id="searchText" placeholder="原文或校次文本…" oninput="applyFilters()">
+            <input type="search" id="searchText" placeholder="原文或校次文本…" oninput="applyFilters()" title="会自动缓存到本机浏览器">
             <button type="button" class="filter-btn" onclick="resetFilters()">重置</button>
         </div>
     </div>
     <div class="stats" id="filterStats"></div>
-    <div class="table-scroll">
+    <div class="table-wrap">
         <table class="multi-align" id="multiTable">
             <thead>
                 <tr>
@@ -338,6 +386,7 @@ input[type="text"].index-filter { width: 140px; }
                     <th class="col-metric">校同</th>
                     <th class="col-a">原文</th>
                     ${thRuns}
+                    <th class="col-remark hidden-col">备注</th>
                 </tr>
             </thead>
             <tbody id="tableBody"></tbody>
@@ -354,6 +403,12 @@ const CLASS_LABELS = {
     divergent: '校次分歧',
     structural: '结构空缺'
 };
+
+const REPORT_CACHE_KEY = 'ai-proofread.multi-alignment.cache:' + (location.pathname || location.href);
+let cacheSaveTimer = null;
+let cacheStatusTimer = null;
+let isRestoringCache = false;
+let remarkVisible = false;
 
 let diffMode = 'vsSource';
 let classEnabled = {
@@ -477,7 +532,205 @@ function cellSpan(row, sourceId) {
     return cell && cell.span === 'cont' ? 'cont' : 'start';
 }
 
-function renderBody() {
+function collectRemarks() {
+    const remarks = {};
+    document.querySelectorAll('#tableBody .remark-input').forEach(function(ta) {
+        const v = ta.value;
+        if (v) remarks[ta.getAttribute('data-row-idx')] = v;
+    });
+    return remarks;
+}
+
+function restoreRemarks(remarks) {
+    if (!remarks || typeof remarks !== 'object') return;
+    document.querySelectorAll('#tableBody .remark-input').forEach(function(ta) {
+        const key = ta.getAttribute('data-row-idx');
+        if (typeof remarks[key] === 'string') {
+            ta.value = remarks[key];
+            resizeRemarkInput(ta);
+        }
+    });
+}
+
+function resizeRemarkInput(ta) {
+    ta.style.height = '0px';
+    var oneLine = 26;
+    var h = ta.scrollHeight > 0 ? ta.scrollHeight : oneLine;
+    ta.style.height = Math.max(h, oneLine) + 'px';
+}
+
+function setupRemarkInputs() {
+    document.querySelectorAll('#tableBody .remark-input').forEach(function(ta) {
+        resizeRemarkInput(ta);
+        ta.addEventListener('input', function() {
+            resizeRemarkInput(ta);
+            scheduleReportCacheSave();
+        });
+    });
+}
+
+function flashCacheStatus(ok) {
+    const el = document.getElementById('cacheStatus');
+    if (!el) return;
+    el.textContent = ok ? '已缓存' : '缓存失败';
+    el.classList.toggle('ok', !!ok);
+    if (cacheStatusTimer) clearTimeout(cacheStatusTimer);
+    cacheStatusTimer = setTimeout(function() {
+        el.textContent = '自动缓存';
+        el.classList.remove('ok');
+    }, 1200);
+}
+
+function saveReportCache() {
+    if (isRestoringCache) return;
+    try {
+        const runVisible = {};
+        document.querySelectorAll('.run-visible').forEach(function(el) {
+            runVisible[el.dataset.sourceId] = !!el.checked;
+        });
+        const payload = {
+            version: 1,
+            diffMode: diffMode,
+            classEnabled: Object.assign({}, classEnabled),
+            remarkVisible: remarkVisible,
+            runVisible: runVisible,
+            minSourceChange: document.getElementById('minSourceChange')?.value || '',
+            maxRunAgreement: document.getElementById('maxRunAgreement')?.value || '',
+            searchText: document.getElementById('searchText')?.value || '',
+            indexFilter: document.getElementById('indexFilter')?.value || '',
+            applyIndexFilter: document.getElementById('applyIndexFilter')?.checked !== false,
+            printRepeatHeader: document.getElementById('printRepeatHeader')?.checked !== false,
+            remarks: collectRemarks(),
+            savedAt: new Date().toISOString()
+        };
+        localStorage.setItem(REPORT_CACHE_KEY, JSON.stringify(payload));
+        flashCacheStatus(true);
+    } catch (e) {
+        flashCacheStatus(false);
+    }
+}
+
+function scheduleReportCacheSave() {
+    if (isRestoringCache) return;
+    if (cacheSaveTimer) clearTimeout(cacheSaveTimer);
+    cacheSaveTimer = setTimeout(function() {
+        cacheSaveTimer = null;
+        saveReportCache();
+    }, 300);
+}
+
+function flushReportCacheSave() {
+    if (cacheSaveTimer) {
+        clearTimeout(cacheSaveTimer);
+        cacheSaveTimer = null;
+    }
+    saveReportCache();
+}
+
+function applyRemarkColumnUI() {
+    const btn = document.querySelector('[data-col="remark"]');
+    if (btn) btn.classList.toggle('active', remarkVisible);
+    document.querySelectorAll('th.col-remark, td.col-remark').forEach(function(el) {
+        el.classList.toggle('hidden-col', !remarkVisible);
+    });
+}
+
+function loadReportCache() {
+    let data = null;
+    try {
+        const raw = localStorage.getItem(REPORT_CACHE_KEY);
+        if (raw) data = JSON.parse(raw);
+    } catch (e) {
+        data = null;
+    }
+    if (!data) return null;
+
+    isRestoringCache = true;
+    try {
+        if (typeof data.diffMode === 'string' && (data.diffMode === 'vsSource' || data.diffMode === 'vsAdjacent')) {
+            diffMode = data.diffMode;
+            document.querySelectorAll('.mode-btn').forEach(function(btn) {
+                btn.classList.toggle('active', btn.dataset.mode === diffMode);
+            });
+        }
+        if (data.classEnabled && typeof data.classEnabled === 'object') {
+            Object.keys(classEnabled).forEach(function(k) {
+                if (typeof data.classEnabled[k] === 'boolean') classEnabled[k] = data.classEnabled[k];
+            });
+            document.querySelectorAll('.class-btn').forEach(function(btn) {
+                btn.classList.toggle('active', !!classEnabled[btn.dataset.class]);
+            });
+        }
+        if (typeof data.remarkVisible === 'boolean') {
+            remarkVisible = data.remarkVisible;
+        }
+        if (data.runVisible && typeof data.runVisible === 'object') {
+            document.querySelectorAll('.run-visible').forEach(function(el) {
+                const id = el.dataset.sourceId;
+                if (typeof data.runVisible[id] === 'boolean') el.checked = data.runVisible[id];
+            });
+        }
+        const minEl = document.getElementById('minSourceChange');
+        const maxEl = document.getElementById('maxRunAgreement');
+        const searchEl = document.getElementById('searchText');
+        const indexEl = document.getElementById('indexFilter');
+        const applyEl = document.getElementById('applyIndexFilter');
+        const printEl = document.getElementById('printRepeatHeader');
+        if (minEl && typeof data.minSourceChange === 'string') minEl.value = data.minSourceChange;
+        if (maxEl && typeof data.maxRunAgreement === 'string') maxEl.value = data.maxRunAgreement;
+        if (searchEl && typeof data.searchText === 'string') searchEl.value = data.searchText;
+        if (indexEl && typeof data.indexFilter === 'string') indexEl.value = data.indexFilter;
+        if (applyEl && typeof data.applyIndexFilter === 'boolean') applyEl.checked = data.applyIndexFilter;
+        if (printEl && typeof data.printRepeatHeader === 'boolean') {
+            printEl.checked = data.printRepeatHeader;
+            document.body.classList.toggle('print-no-repeat-header', !printEl.checked);
+        }
+        return data.remarks && typeof data.remarks === 'object' ? data.remarks : {};
+    } finally {
+        isRestoringCache = false;
+    }
+}
+
+function setupReportCache() {
+    window.addEventListener('beforeunload', flushReportCacheSave);
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'hidden') flushReportCacheSave();
+    });
+}
+
+function showFilterWarning() {
+    if (sessionStorage.getItem('multiFilterWarningShown') === 'true') return;
+    const warningDiv = document.createElement('div');
+    warningDiv.style.cssText = 'background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-bottom: 10px; color: #856404; font-size: 13px;';
+    warningDiv.innerHTML = '<strong>提示：</strong>筛选条件与备注会自动缓存到本机浏览器，同一文件再次打开可恢复；换浏览器或清除浏览器数据后失效。重要内容建议另行备份，或复制结果到 Word，或打印为 PDF。';
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '×';
+    closeBtn.style.cssText = 'float: right; background: none; border: none; font-size: 20px; cursor: pointer; color: #856404; padding: 0 5px;';
+    closeBtn.onclick = function() {
+        warningDiv.remove();
+        sessionStorage.setItem('multiFilterWarningShown', 'true');
+    };
+    warningDiv.insertBefore(closeBtn, warningDiv.firstChild);
+    const toolbar = document.querySelector('.toolbar');
+    if (toolbar && toolbar.parentNode) {
+        toolbar.parentNode.insertBefore(warningDiv, toolbar);
+    }
+}
+
+function togglePrintRepeatHeader() {
+    var cb = document.getElementById('printRepeatHeader');
+    document.body.classList.toggle('print-no-repeat-header', !cb.checked);
+    scheduleReportCacheSave();
+}
+
+function toggleRemarkColumn() {
+    remarkVisible = !remarkVisible;
+    applyRemarkColumnUI();
+    scheduleReportCacheSave();
+}
+
+function renderBody(preservedRemarks) {
+    const savedRemarks = preservedRemarks || collectRemarks();
     const ids = visibleSourceIds();
     const tbody = document.getElementById('tableBody');
     const sources = REPORT.sources;
@@ -508,6 +761,7 @@ function renderBody() {
             }
             runCells += '<td class="col-run' + spanCls + '" data-source-id="' + escapeHtml(s.id) + '">' + inner + '</td>';
         });
+        const remarkHidden = remarkVisible ? '' : ' hidden-col';
         html += '<tr class="class-' + c.class + '" data-row-idx="' + (idx + 1) + '"'
             + ' data-class="' + c.class + '"'
             + ' data-source-change="' + c.sourceChange.toFixed(4) + '"'
@@ -519,10 +773,14 @@ function renderBody() {
             + '<td class="col-metric metric">' + c.runAgreement.toFixed(2) + '</td>'
             + '<td class="col-a">' + aHtml + '</td>'
             + runCells
+            + '<td class="col-remark' + remarkHidden + '"><textarea class="remark-input" placeholder="备注" data-row-idx="' + (idx + 1) + '" title="备注会自动缓存到本机浏览器" rows="1"></textarea></td>'
             + '</tr>';
     });
     tbody.innerHTML = html;
+    restoreRemarks(savedRemarks);
+    setupRemarkInputs();
     updateColumnVisibility();
+    applyRemarkColumnUI();
     applyFilters();
 }
 
@@ -541,6 +799,7 @@ function setDiffMode(mode) {
         btn.classList.toggle('active', btn.dataset.mode === mode);
     });
     renderBody();
+    scheduleReportCacheSave();
 }
 
 function toggleClassFilter(cls) {
@@ -629,6 +888,7 @@ function applyFilters() {
         + ' · 空缺 ' + counts.structural
         + ' · 均源变 ' + avgSC
         + ' · 均校同 ' + avgRA;
+    scheduleReportCacheSave();
 }
 
 function resetFilters() {
@@ -648,14 +908,49 @@ function resetFilters() {
     document.getElementById('applyIndexFilter').checked = true;
     document.getElementById('searchText').value = '';
     document.querySelectorAll('.run-visible').forEach(el => { el.checked = true; });
+    remarkVisible = false;
     renderBody();
+    scheduleReportCacheSave();
 }
 
 document.querySelectorAll('.run-visible').forEach(el => {
-    el.addEventListener('change', () => renderBody());
+    el.addEventListener('change', () => {
+        renderBody();
+        scheduleReportCacheSave();
+    });
 });
 
-renderBody();
+document.addEventListener('paste', function(e) {
+    const el = e.target;
+    if (!el || !el.classList || !el.classList.contains('remark-input')) return;
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (!text) return;
+    var lines = text.split(/\\r\\n|\\n|\\r/).map(function(s) { return s.trim(); });
+    if (lines.length <= 1) return;
+    e.preventDefault();
+    var rowIdx = parseInt(el.getAttribute('data-row-idx'), 10);
+    var allInputs = Array.prototype.slice.call(document.querySelectorAll('#tableBody td.col-remark .remark-input'));
+    var visibleInputs = allInputs.filter(function(inp) { return !inp.closest('tr').classList.contains('hidden-row'); });
+    visibleInputs.sort(function(a, b) { return parseInt(a.getAttribute('data-row-idx'), 10) - parseInt(b.getAttribute('data-row-idx'), 10); });
+    var start = visibleInputs.findIndex(function(inp) { return parseInt(inp.getAttribute('data-row-idx'), 10) === rowIdx; });
+    if (start < 0) return;
+    for (var i = 0; i < lines.length && start + i < visibleInputs.length; i++) {
+        visibleInputs[start + i].value = lines[i];
+        resizeRemarkInput(visibleInputs[start + i]);
+    }
+    scheduleReportCacheSave();
+});
+
+(function init() {
+    var cb = document.getElementById('printRepeatHeader');
+    if (cb) document.body.classList.toggle('print-no-repeat-header', !cb.checked);
+    var cachedRemarks = loadReportCache();
+    showFilterWarning();
+    setupReportCache();
+    isRestoringCache = true;
+    renderBody(cachedRemarks || {});
+    isRestoringCache = false;
+})();
 </script>
 </body>
 </html>`;
