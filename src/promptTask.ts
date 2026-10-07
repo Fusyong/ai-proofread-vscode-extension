@@ -1,18 +1,25 @@
 /**
- * 提示词调度标注（与 outputType 正交）：并行 / 串行，用于入口过滤与侧栏展示。
- * 内部仍保留细粒度 PromptTask；展示层只区分并行|串行。
- * 注意：本模块不依赖 PromptManager，避免循环引用。
+ * 提示词细项 PromptTask（业务预置标签）与调度兼容层。
+ * 批处理调度（并行/串行）与对齐语义（编辑/转换）见 promptAlignment.ts；
+ * 本模块保留 PromptTask 与旧入口校验，缺省时由 task 推断 execution。
  */
 
 import type { ExtensionContext } from 'vscode';
 import * as vscode from 'vscode';
+import {
+    assertExecutionMatchesEntry,
+    executionFromTask,
+    executionModeLabel,
+    resolveExecutionMode,
+    type ExecutionMode,
+} from './promptAlignment';
 
 export type PromptTask = 'proofread' | 'translate' | 'annotate' | 'restructure' | 'other';
 
-/** 调度方式：并行=校对管线；串行=翻译管线 */
-export type PromptExecution = 'parallel' | 'serial';
+/** @deprecated 使用 ExecutionMode（promptAlignment）；保留别名以免大范围改 import */
+export type PromptExecution = ExecutionMode;
 
-/** @deprecated 仅兼容旧代码；用户可见请用 promptExecutionLabel */
+/** @deprecated 仅兼容旧代码；用户可见请用 executionModeLabel / promptExecutionLabel */
 export const PROMPT_TASK_LABELS: Record<PromptTask, string> = {
     proofread: '并行',
     translate: '串行',
@@ -46,16 +53,20 @@ export function normalizePromptTask(raw: unknown): PromptTask {
     return 'proofread';
 }
 
-export function promptExecutionOf(task: PromptTask): PromptExecution {
-    return task === 'translate' ? 'serial' : 'parallel';
+/**
+ * 由 task 推断批处理调度（迁移缺省）。
+ * 自定义提示词若配置了 execution，请用 resolveExecutionMode(storageName)。
+ */
+export function promptExecutionOf(task: PromptTask): ExecutionMode {
+    return executionFromTask(task);
 }
 
-/** 用户可见：并行 | 串行 */
+/** 用户可见：并行 | 串行（由 task 推断；优先用 resolveExecutionMode） */
 export function promptExecutionLabel(task: PromptTask): '并行' | '串行' {
-    return promptExecutionOf(task) === 'serial' ? '串行' : '并行';
+    return executionModeLabel(promptExecutionOf(task));
 }
 
-export function entryExecutionOf(entryTask: PromptTask): PromptExecution {
+export function entryExecutionOf(entryTask: PromptTask): ExecutionMode {
     return promptExecutionOf(entryTask);
 }
 
@@ -80,8 +91,8 @@ export function getCurrentPromptTask(context: ExtensionContext): PromptTask {
 }
 
 /**
- * 入口工作流与当前提示词调度（并行/串行）不一致时警告。
- * 并行族（proofread/annotate/restructure/other）互认；串行仅 translate。
+ * 入口工作流与当前提示词批处理调度不一致时警告。
+ * 优先按提示词的 execution（含显式配置）；不再仅用 translate≡串行硬绑。
  * @returns true 表示可继续；false 表示用户取消
  */
 export async function assertPromptMatchesEntry(
@@ -89,28 +100,11 @@ export async function assertPromptMatchesEntry(
     entryTask: PromptTask,
     options?: { hard?: boolean }
 ): Promise<boolean> {
-    const currentName = context.globalState.get<string>('currentPrompt', '') ?? '';
-    const currentTask = resolvePromptTask(currentName);
-    if (executionsMatch(currentTask, entryTask)) {
-        return true;
-    }
-    const curExec = promptExecutionLabel(currentTask);
-    const entryExec = promptExecutionLabel(entryTask);
-    const promptLabel = currentName || '系统默认提示词（full）';
-    const workflowHint =
-        entryExec === '串行' ? '串行（翻译等）工作流' : '并行（校对等）工作流';
-    if (options?.hard) {
-        await vscode.window.showWarningMessage(
-            `当前提示词「${promptLabel}」为「${curExec}」，本入口属于「${workflowHint}」（须「${entryExec}」提示词）。请先在提示词侧栏选择匹配的提示词。`,
-            { modal: true }
-        );
-        return false;
-    }
-    const choice = await vscode.window.showWarningMessage(
-        `当前提示词「${promptLabel}」为「${curExec}」，与「${workflowHint}」不一致。仍要继续吗？`,
-        { modal: true },
-        '继续',
-        '取消'
-    );
-    return choice === '继续';
+    const entryMode = promptExecutionOf(entryTask);
+    return assertExecutionMatchesEntry(context, entryMode, options);
+}
+
+/** 供侧栏等：按存值解析展示用调度标签 */
+export function promptExecutionLabelForStorage(promptStorageName: string): '并行' | '串行' {
+    return executionModeLabel(resolveExecutionMode(promptStorageName));
 }

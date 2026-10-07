@@ -96,6 +96,36 @@ function fallbackTruncatedArrow(original: string, final: string, maxBody: number
 }
 
 /**
+ * 抽取实质改动句对（供记忆历史等）；无实质差异时返回空数组。
+ */
+export function extractSubstantiveEditPairs(
+    original: string,
+    finalSelected: string
+): Array<{ before: string; after: string }> {
+    const rawA = normalizeLineEndings(original);
+    const rawB = normalizeLineEndings(finalSelected);
+    const naTrim = normalizeForSimilarity(rawA, NORM);
+    const nbTrim = normalizeForSimilarity(rawB, NORM);
+    if (!rawA.trim() && !rawB.trim()) {
+        return [];
+    }
+    if (rawA === rawB || naTrim === nbTrim) {
+        return [];
+    }
+    const sentsA = splitChineseSentences(rawA).filter((s) => s.trim().length > 0);
+    const sentsB = splitChineseSentences(rawB).filter((s) => s.trim().length > 0);
+    if (sentsA.length === 0 && sentsB.length === 0) {
+        return [{ before: rawA, after: rawB }];
+    }
+    const alignment = alignSentencesAnchor(sentsA, sentsB, MEMORY_ALIGN_OPTS);
+    const pairs = extractSubstantivePairs(alignment);
+    if (pairs.length === 0) {
+        return [{ before: rawA, after: rawB }];
+    }
+    return pairs;
+}
+
+/**
  * 生成本轮校对的一句摘要（句式级「忌→宜」，忽略归一化后相同的纯空白改动）
  */
 export function summarizeRoundSentenceAligned(original: string, finalSelected: string, roundMaxChars: number): string {
@@ -114,15 +144,7 @@ export function summarizeRoundSentenceAligned(original: string, finalSelected: s
     }
 
     const maxBody = Math.max(120, Math.min(roundMaxChars, SUMMARY_HARD_CAP));
-    const sentsA = splitChineseSentences(rawA).filter((s) => s.trim().length > 0);
-    const sentsB = splitChineseSentences(rawB).filter((s) => s.trim().length > 0);
-
-    if (sentsA.length === 0 && sentsB.length === 0) {
-        return fallbackTruncatedArrow(rawA, rawB, maxBody);
-    }
-
-    const alignment = alignSentencesAnchor(sentsA, sentsB, MEMORY_ALIGN_OPTS);
-    const pairs = extractSubstantivePairs(alignment);
+    const pairs = extractSubstantiveEditPairs(rawA, rawB);
 
     if (pairs.length === 0) {
         return fallbackTruncatedArrow(rawA, rawB, maxBody);

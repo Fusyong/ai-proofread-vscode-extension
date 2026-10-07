@@ -1,6 +1,6 @@
 /**
  * 提示词 TreeView：扁平列表；单选当前、新建、编辑、删除。
- * 叶子标注并行/串行（与工作流对齐），不按 task 分组。
+ * 叶子标注「编辑|转换」与「并行|串行」，不按 task 分组。
  */
 
 import * as vscode from 'vscode';
@@ -21,7 +21,13 @@ import {
     SYSTEM_PROMPT_NAME_TERM_CHECK_FULL,
 } from './promptManager';
 import type { Prompt } from './promptManager';
-import { promptExecutionLabel, resolvePromptTask, type PromptTask } from './promptTask';
+import {
+    alignmentKindLabel,
+    executionModeLabel,
+    resolveAlignmentKind,
+    resolveExecutionMode,
+} from './promptAlignment';
+import { resolvePromptTask, type PromptTask } from './promptTask';
 
 export const PROMPTS_VIEW_ID = 'ai-proofread.prompts';
 
@@ -169,15 +175,18 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
         const userOutputLabel =
             element.prompt?.outputType === 'item' ? '条目' : element.prompt?.outputType === 'other' ? '其他' : '全文';
         const outputTypeLabel = systemLabel ?? userOutputLabel;
-        const execLabel = promptExecutionLabel(element.task);
+        const alignLabel = alignmentKindLabel(resolveAlignmentKind(storage));
+        const execLabel = executionModeLabel(resolveExecutionMode(storage));
+        const execNote = execLabel === '串行' ? '串行·实验' : execLabel;
+        const meta = `${outputTypeLabel} · ${alignLabel} · ${execNote}`;
         if (isCurrent) {
-            item.description = `★ 当前 · ${outputTypeLabel} · ${execLabel}`;
+            item.description = `★ 当前 · ${meta}`;
             item.iconPath = new vscode.ThemeIcon(
                 'pass-filled',
                 new vscode.ThemeColor('charts.green')
             );
         } else {
-            item.description = `${outputTypeLabel} · ${execLabel}`;
+            item.description = meta;
             item.iconPath = new vscode.ThemeIcon('symbol-text');
         }
         item.contextValue = element.prompt ? 'promptUser' : 'promptSystem';
@@ -187,10 +196,11 @@ export class PromptsTreeDataProvider implements vscode.TreeDataProvider<PromptTr
                 (isCurrent ? '【当前选用】\n' : '') +
                 preview +
                 (element.prompt.content.length > 60 ? '…' : '') +
-                `\n输出类型: ${outputTypeLabel}\n调度: ${execLabel}`;
+                `\n输出类型: ${outputTypeLabel}\n对齐: ${alignLabel}\n调度: ${execNote}`;
         } else {
             item.tooltip =
-                (isCurrent ? '【当前选用】\n' : '') + `${element.label}\n调度: ${execLabel}`;
+                (isCurrent ? '【当前选用】\n' : '') +
+                `${element.label}\n对齐: ${alignLabel}\n调度: ${execNote}`;
         }
         return item;
     }

@@ -9,6 +9,7 @@ import { summarizeRoundSentenceAligned } from './recentSentenceSummary';
 import type { MemoryRoundContext } from './schemaV2';
 import { clipText, createEmptyActiveV2, createEmptyArchiveV2, formatCurrentRoundsForPrompt, formatMemoryEntryLine } from './schemaV2';
 import { resolveModelRoute } from '../modelRoutes/modelRouteResolver';
+import { recordEditAcceptHistory } from '../workUnits/recordAcceptHistory';
 
 const INJECT_GLOBAL_MAX_CHARS = 5_500;
 const INJECT_CURRENT_ROUNDS_MAX_CHARS = 16_000;
@@ -177,6 +178,17 @@ export async function runEditorialMemoryAfterAccept(args: AfterAcceptArgs): Prom
         active,
         archive,
     });
+
+    try {
+        recordEditAcceptHistory({
+            documentUri: args.documentUri,
+            original: args.originalSelected,
+            finalText: args.finalSelected,
+            origin: 'em_accept',
+        });
+    } catch {
+        /* history 失败不阻断 */
+    }
 }
 
 /** 重置活跃与存档为空白（与用户「清空记忆」交互一致）。 */

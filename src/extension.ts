@@ -11,7 +11,15 @@ import { WebviewManager } from './ui/webviewManager';
 import { FileSplitCommandHandler } from './commands/fileSplitCommandHandler';
 import { ProofreadCommandHandler } from './commands/proofreadCommandHandler';
 import { TranslateCommandHandler } from './commands/translateCommandHandler';
-import { assertPromptMatchesEntry } from './promptTask';
+import { SelectionCommandHandler } from './commands/selectionCommandHandler';
+import { assertExecutionMatchesEntry } from './promptAlignment';
+import {
+    clusterMemoryHistory,
+    formatClusterReportMarkdown,
+    readMemoryHistory,
+} from './memoryHistory';
+import { promptApplyParallelRoundHistory } from './workUnits/applyParallelRoundHistory';
+import { resolveSegmentsJsonPath } from './proofreadRoundLayout';
 import { FileCompareCommandHandler } from './commands/fileCompareCommandHandler';
 import { SplitIntoSentencesCommandHandler } from './commands/splitIntoSentencesCommandHandler';
 import { DocumentConvertCommandHandler } from './commands/documentConvertCommandHandler';
@@ -139,6 +147,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const fileSplitHandler = new FileSplitCommandHandler(webviewManager);
     const proofreadHandler = new ProofreadCommandHandler(webviewManager);
     const translateHandler = new TranslateCommandHandler(webviewManager);
+    const selectionHandler = new SelectionCommandHandler(proofreadHandler, translateHandler);
     const fileCompareHandler = new FileCompareCommandHandler(context);
     const splitIntoSentencesHandler = new SplitIntoSentencesCommandHandler();
     const documentConvertHandler = new DocumentConvertCommandHandler();
@@ -386,27 +395,98 @@ export async function activate(context: vscode.ExtensionContext) {
             await proofreadHandler.handleOverlayProofreadFileCommand(editor, context);
         }),
 
+        vscode.commands.registerCommand('ai-proofread.editSelection', () =>
+            selectionHandler.handleEditSelection(context)
+        ),
+        vscode.commands.registerCommand('ai-proofread.convertSelection', () =>
+            selectionHandler.handleConvertSelection(context)
+        ),
+        vscode.commands.registerCommand('ai-proofread.editSelectionWithMemory', () =>
+            selectionHandler.handleEditSelectionWithMemory(context)
+        ),
+        vscode.commands.registerCommand('ai-proofread.convertSelectionWithMemory', () =>
+            selectionHandler.handleConvertSelectionWithMemory(context)
+        ),
+        /** @deprecated alias → editSelection */
         vscode.commands.registerCommand('ai-proofread.proofreadSelection', async () => {
-            const editor = vscode.window.activeTextEditor;
-            if (!editor) {
-                vscode.window.showInformationMessage('No active editor!');
-                return;
-            }
-            if (!(await assertPromptMatchesEntry(context, 'proofread'))) {
-                return;
-            }
-            await proofreadHandler.handleProofreadSelectionCommand(editor, context);
+            await selectionHandler.handleEditSelection(context);
         }),
+        /** @deprecated alias → editSelectionWithMemory */
         vscode.commands.registerCommand('ai-proofread.proofreadSelectionWithMemory', async () => {
+            await selectionHandler.handleEditSelectionWithMemory(context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.processJsonParallel', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showInformationMessage('No active editor!');
                 return;
             }
-            if (!(await assertPromptMatchesEntry(context, 'proofread'))) {
+            if (!(await assertExecutionMatchesEntry(context, 'parallel'))) {
                 return;
             }
-            await proofreadHandler.handleProofreadSelectionWithMemoryCommand(editor, context);
+            await proofreadHandler.handleProofreadFileCommand(editor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.processJsonSerial', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showInformationMessage('No active editor!');
+                return;
+            }
+            await translateHandler.handleTranslateFileCommand(editor, context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.checkMemoryConsistency', async () => {
+            const editor = vscode.window.activeTextEditor;
+            const uri =
+                editor?.document.uri ??
+                vscode.workspace.workspaceFolders?.[0]?.uri;
+            if (!uri) {
+                vscode.window.showWarningMessage('请先打开工作区或文档。');
+                return;
+            }
+            const scope = await vscode.window.showQuickPick(
+                [
+                    { label: '编辑历史', value: 'edit' as const },
+                    { label: '转换历史', value: 'convert' as const },
+                    { label: '两者', value: 'both' as const },
+                ],
+                { placeHolder: '选择记忆历史范围（实验 · memo）' }
+            );
+            if (!scope) {
+                return;
+            }
+            const reports = [];
+            if (scope.value === 'edit' || scope.value === 'both') {
+                reports.push(clusterMemoryHistory('edit', readMemoryHistory(uri, 'edit')));
+            }
+            if (scope.value === 'convert' || scope.value === 'both') {
+                reports.push(clusterMemoryHistory('convert', readMemoryHistory(uri, 'convert')));
+            }
+            const md = reports.map((r) => formatClusterReportMarkdown(r)).join('\n\n---\n\n');
+            const outPath = path.join(
+                FilePathUtils.getProofreadWorkspaceRoot(uri),
+                '.proofread',
+                'memory-consistency-report.md'
+            );
+            FilePathUtils.ensureDirExists(path.dirname(outPath));
+            fs.writeFileSync(outPath, md, 'utf8');
+            const doc = await vscode.workspace.openTextDocument(outPath);
+            await vscode.window.showTextDocument(doc, { preview: true });
+            const total = reports.reduce((s, r) => s + r.conflictCount, 0);
+            vscode.window.showInformationMessage(
+                total > 0 ? `发现 ${total} 个冲突簇（已写入报告）` : '未发现冲突（已写入报告）'
+            );
+        }),
+        vscode.commands.registerCommand('ai-proofread.applyParallelRoundHistory', async () => {
+            const editor = vscode.window.activeTextEditor;
+            let defaultSeg: string | undefined;
+            if (editor) {
+                try {
+                    defaultSeg = resolveSegmentsJsonPath(editor.document.uri.fsPath) ?? undefined;
+                } catch {
+                    /* ignore */
+                }
+            }
+            await promptApplyParallelRoundHistory(defaultSeg);
         }),
         vscode.commands.registerCommand('ai-proofread.splitIntoSentences', async () => {
             await splitIntoSentencesHandler.handleSplitIntoSentencesCommand();
@@ -809,9 +889,15 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.window.showInformationMessage(`OpenCC selection：已转换（${from} → ${to}）`);
         }),
 
-        // 打开工作面板（支持空面板）
+        // 并行工作台（默认）
         vscode.commands.registerCommand('ai-proofread.openProofreadingPanel', () => {
             webviewManager.openProofreadingPanel(context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.openParallelWorkbenchPanel', () => {
+            webviewManager.openProofreadingPanel(context);
+        }),
+        vscode.commands.registerCommand('ai-proofread.openSerialWorkbenchPanel', () => {
+            webviewManager.openSerialWorkbenchPanel(context);
         }),
         // 兼容旧命令
         vscode.commands.registerCommand('ai-proofread.reopenResultPanel', () => {

@@ -6,8 +6,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { PromptManager, SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL, SYSTEM_PROMPT_NAME_TERM_CHECK_FULL, getPromptDisplayName } from '../promptManager';
-import { assertPromptMatchesEntry } from '../promptTask';
-import { parseTranslateProcessOutput, cleanTranslateDelivery } from '../translationMemory/bitextCodec';
+import {
+    assertAlignmentMatchesEntry,
+    assertExecutionMatchesEntry,
+    resolveAlignmentKind,
+    resolveConvertPolicy,
+} from '../promptAlignment';
+import { parseConvertProcessOutput } from '../convertCodec';
+import { cleanTranslateDelivery, parseTranslateProcessOutput } from '../translationMemory/bitextCodec';
 import {
     approveAllCandidates,
     buildTranslationMemoryXml,
@@ -91,15 +97,19 @@ export class TranslateCommandHandler {
     }
 
     /**
-     * 翻译选区（带翻译记忆）：激活 translate 提示词，注入 TM，解析过程输出后写回译文。
+     * 转换选区（带转换/翻译记忆）：须 alignmentKind=convert；注入 TM，解析过程输出后写回。
+     * 批处理调度不在此强制（可在并行台做转换选区）；串行 JSON 另校验 execution。
      */
     public async handleTranslateSelectionWithMemory(
         editor: vscode.TextEditor,
         context: vscode.ExtensionContext
     ): Promise<void> {
         const promptManager = PromptManager.getInstance(context);
-        await promptManager.activatePromptForTask('translate');
-        const ok = await assertPromptMatchesEntry(context, 'translate', { hard: true });
+        const current = promptManager.getCurrentPromptName();
+        if (resolveAlignmentKind(current) !== 'convert') {
+            await promptManager.activatePromptForTask('translate');
+        }
+        const ok = await assertAlignmentMatchesEntry(context, 'convert');
         if (!ok) {
             return;
         }
@@ -185,7 +195,15 @@ export class TranslateCommandHandler {
             return;
         }
 
-        const parsed = parseTranslateProcessOutput(result, originalText);
+        const policy = resolveConvertPolicy(
+            context.globalState.get<string>('currentPrompt', SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL) ??
+                SYSTEM_PROMPT_NAME_BOOK_TRANSLATE_FULL
+        );
+        const parsed = parseConvertProcessOutput({
+            raw: result,
+            inputSource: originalText,
+            policy,
+        });
         if (parsed.warnings.length) {
             vscode.window.showWarningMessage(`过程输出提示：${parsed.warnings.slice(0, 2).join('；')}`);
         }
@@ -256,8 +274,12 @@ export class TranslateCommandHandler {
 
             const promptManager = PromptManager.getInstance(context);
             await promptManager.activatePromptForTask('translate');
-            const ok = await assertPromptMatchesEntry(context, 'translate', { hard: true });
-            if (!ok) {
+            const okAlign = await assertAlignmentMatchesEntry(context, 'convert');
+            if (!okAlign) {
+                return;
+            }
+            const okExec = await assertExecutionMatchesEntry(context, 'serial', { hard: true });
+            if (!okExec) {
                 return;
             }
 

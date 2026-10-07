@@ -3,9 +3,24 @@
  */
 
 import * as vscode from 'vscode';
-import { normalizePromptTask, promptExecutionOf, resolvePromptTask, type PromptTask } from './promptTask';
+import {
+    alignmentKindFromTask,
+    alignmentKindLabel,
+    BOOK_TRANSLATE_CONVERT_POLICY,
+    DEFAULT_CONVERT_POLICY,
+    executionFromTask,
+    executionModeLabel,
+    normalizeAlignmentKind,
+    normalizeConvertPolicy,
+    normalizeExecutionMode,
+    type AlignmentKind,
+    type ConvertAlignPolicy,
+    type ExecutionMode,
+} from './promptAlignment';
+import { normalizePromptTask, resolvePromptTask, type PromptTask } from './promptTask';
 
 export type PromptOutputType = 'full' | 'item' | 'other';
+export type { AlignmentKind, ConvertAlignPolicy, ExecutionMode };
 
 /** 当前选中的为「系统默认提示词（full）」时，globalState 中 currentPrompt 的值 */
 export const SYSTEM_PROMPT_NAME_FULL = '';
@@ -75,8 +90,14 @@ export interface Prompt {
     name: string;
     content: string;
     outputType?: PromptOutputType;
-    /** 调度细项（内部）；展示为并行/串行。默认 proofread */
+    /** 业务细项预置标签（内部记忆槽等）；默认 proofread */
     task?: PromptTask;
+    /** 对齐语义：编辑 | 转换（与 task/execution 正交） */
+    alignmentKind?: AlignmentKind;
+    /** 批处理默认调度：并行 | 串行 */
+    execution?: ExecutionMode;
+    /** 转换类辅助对齐策略（alignmentKind=convert 时有意义） */
+    convertPolicy?: ConvertAlignPolicy;
 }
 
 export class PromptManager {
@@ -125,7 +146,8 @@ export class PromptManager {
     }
 
     /**
-     * 切换到指定任务对应的当前提示词（翻译入口等使用）。
+     * 切换到指定业务细项上次选用的提示词（如转换入口）。
+     * task 仅为记忆槽键，不表示并行/串行调度。
      */
     public async activatePromptForTask(task: PromptTask): Promise<void> {
         await this.setCurrentPrompt(this.getCurrentPromptNameForTask(task));
@@ -140,30 +162,98 @@ export class PromptManager {
         await this.context.globalState.update(CURRENT_PROMPT_BY_TASK_KEY, map);
     }
 
-    private async pickTask(current?: PromptTask): Promise<PromptTask | undefined> {
-        const currentExec = promptExecutionOf(current ?? 'proofread');
-        const items = [
-            {
-                label: '并行（校对/加注/重组等）',
-                value: 'proofread' as PromptTask,
-                description: 'parallel',
-                picked: currentExec === 'parallel',
-            },
-            {
-                label: '串行（翻译等）',
-                value: 'translate' as PromptTask,
-                description: 'serial',
-                picked: currentExec === 'serial',
-            },
-        ];
-        const pick = await vscode.window.showQuickPick(items, {
-            placeHolder: '选择调度方式（与工作流并行/串行对齐）',
-            ignoreFocusOut: true,
-        });
+    private async pickExecution(current?: ExecutionMode): Promise<ExecutionMode | undefined> {
+        const cur = current ?? 'parallel';
+        const pick = await vscode.window.showQuickPick(
+            [
+                {
+                    label: '并行',
+                    value: 'parallel' as ExecutionMode,
+                    description: '批处理可并发；默认工作台',
+                    picked: cur === 'parallel',
+                },
+                {
+                    label: '串行（实验）',
+                    value: 'serial' as ExecutionMode,
+                    description: '顺序执行并写记忆',
+                    picked: cur === 'serial',
+                },
+            ],
+            { placeHolder: '选择批处理默认调度（并行/串行）', ignoreFocusOut: true }
+        );
         return pick?.value;
     }
 
-    /** 新建提示词（弹窗输入名称、内容、输出类型与任务），并设为当前 */
+    private async pickAlignmentKind(current?: AlignmentKind): Promise<AlignmentKind | undefined> {
+        const cur = current ?? 'edit';
+        const pick = await vscode.window.showQuickPick(
+            [
+                {
+                    label: '编辑',
+                    value: 'edit' as AlignmentKind,
+                    description: '改动小，可 diff/句对齐（如校对）',
+                    picked: cur === 'edit',
+                },
+                {
+                    label: '转换',
+                    value: 'convert' as AlignmentKind,
+                    description: '改动大；可输出/回填原文与转换标记（如翻译）',
+                    picked: cur === 'convert',
+                },
+            ],
+            { placeHolder: '选择对齐语义（编辑/转换）', ignoreFocusOut: true }
+        );
+        return pick?.value;
+    }
+
+    private async pickConvertPolicy(current?: ConvertAlignPolicy): Promise<ConvertAlignPolicy> {
+        const base = current ?? { ...DEFAULT_CONVERT_POLICY };
+        const emitSource = await vscode.window.showQuickPick(
+            [
+                { label: '不输出原文（程序回填）', value: false, picked: !base.emitSource },
+                { label: '模型输出原文', value: true, picked: base.emitSource },
+            ],
+            { placeHolder: '转换：是否输出原文', ignoreFocusOut: true }
+        );
+        const emitConvertMarkers = await vscode.window.showQuickPick(
+            [
+                { label: '不输出转换标记', value: false, picked: !base.emitConvertMarkers },
+                { label: '输出转换标记（如术语对）', value: true, picked: base.emitConvertMarkers },
+            ],
+            { placeHolder: '转换：是否输出标记', ignoreFocusOut: true }
+        );
+        const programBackfillSource = await vscode.window.showQuickPick(
+            [
+                { label: '允许程序回填原文（默认）', value: true, picked: base.programBackfillSource },
+                { label: '关闭程序回填', value: false, picked: !base.programBackfillSource },
+            ],
+            { placeHolder: '转换：程序回填原文', ignoreFocusOut: true }
+        );
+        return {
+            emitSource: emitSource?.value ?? base.emitSource,
+            emitConvertMarkers: emitConvertMarkers?.value ?? base.emitConvertMarkers,
+            programBackfillSource: programBackfillSource?.value ?? base.programBackfillSource,
+        };
+    }
+
+    private taskFromAxes(alignmentKind: AlignmentKind, execution: ExecutionMode, prev?: PromptTask): PromptTask {
+        if (execution === 'serial' && alignmentKind === 'convert') {
+            return 'translate';
+        }
+        if (alignmentKind === 'convert' && prev === 'annotate') {
+            return 'annotate';
+        }
+        if (alignmentKind === 'convert') {
+            return execution === 'serial' ? 'translate' : 'annotate';
+        }
+        const p = normalizePromptTask(prev);
+        if (p === 'restructure' || p === 'other' || p === 'proofread') {
+            return p;
+        }
+        return 'proofread';
+    }
+
+    /** 新建提示词（输出类型、对齐类、调度；转换时再问策略），并设为当前 */
     public async addPrompt(): Promise<void> {
         const prompts = this.getPrompts();
         const name = await vscode.window.showInputBox({
@@ -189,15 +279,22 @@ export class PromptManager {
             { placeHolder: '选择输出类型', ignoreFocusOut: true }
         );
         const outputType = outputTypePick?.value ?? 'full';
-        const picked = (await this.pickTask('proofread')) ?? 'proofread';
-        const task = promptExecutionOf(picked) === 'serial' ? 'translate' : 'proofread';
-        prompts.push({ name, content, outputType, task });
+        const alignmentKind = (await this.pickAlignmentKind('edit')) ?? 'edit';
+        const execution = (await this.pickExecution('parallel')) ?? 'parallel';
+        let convertPolicy: ConvertAlignPolicy | undefined;
+        if (alignmentKind === 'convert') {
+            convertPolicy = await this.pickConvertPolicy(DEFAULT_CONVERT_POLICY);
+        }
+        const task = this.taskFromAxes(alignmentKind, execution);
+        prompts.push({ name, content, outputType, task, alignmentKind, execution, convertPolicy });
         await this.savePrompts(prompts);
         await this.setCurrentPrompt(name);
-        vscode.window.showInformationMessage(`提示词「${name}」已添加并设为当前`);
+        vscode.window.showInformationMessage(
+            `提示词「${name}」已添加（${alignmentKindLabel(alignmentKind)} · ${executionModeLabel(execution)}）并设为当前`
+        );
     }
 
-    /** 编辑指定提示词（弹窗修改名称、内容、输出类型与任务），并设为当前 */
+    /** 编辑指定提示词，并设为当前 */
     public async editPrompt(prompt: Prompt): Promise<void> {
         const prompts = this.getPrompts();
         const index = prompts.findIndex((p) => p.name === prompt.name);
@@ -228,20 +325,27 @@ export class PromptManager {
             { placeHolder: '选择输出类型', ignoreFocusOut: true, title: '输出类型' }
         );
         const outputType = outputTypePick?.value ?? currentOutputType;
-        const picked = await this.pickTask(normalizePromptTask(prompt.task));
-        let task = normalizePromptTask(prompt.task);
-        if (picked) {
-            if (promptExecutionOf(picked) === 'serial') {
-                task = 'translate';
-            } else if (promptExecutionOf(task) === 'serial') {
-                task = 'proofread';
-            }
-            // 已是并行族则保留原细项（annotate/restructure/other/proofread）
+        const prevTask = normalizePromptTask(prompt.task);
+        const curAlign =
+            normalizeAlignmentKind(prompt.alignmentKind) ?? alignmentKindFromTask(prevTask);
+        const curExec = normalizeExecutionMode(prompt.execution) ?? executionFromTask(prevTask);
+        const alignmentKind = (await this.pickAlignmentKind(curAlign)) ?? curAlign;
+        const execution = (await this.pickExecution(curExec)) ?? curExec;
+        let convertPolicy: ConvertAlignPolicy | undefined = prompt.convertPolicy;
+        if (alignmentKind === 'convert') {
+            convertPolicy = await this.pickConvertPolicy(
+                normalizeConvertPolicy(prompt.convertPolicy, DEFAULT_CONVERT_POLICY)
+            );
+        } else {
+            convertPolicy = undefined;
         }
-        prompts[index] = { name, content, outputType, task };
+        const task = this.taskFromAxes(alignmentKind, execution, prevTask);
+        prompts[index] = { name, content, outputType, task, alignmentKind, execution, convertPolicy };
         await this.savePrompts(prompts);
         await this.setCurrentPrompt(name);
-        vscode.window.showInformationMessage(`提示词「${name}」已修改并设为当前`);
+        vscode.window.showInformationMessage(
+            `提示词「${name}」已修改（${alignmentKindLabel(alignmentKind)} · ${executionModeLabel(execution)}）并设为当前`
+        );
     }
 
     /** 删除指定名称的提示词；若其为当前则切回系统默认（全文） */

@@ -16,6 +16,8 @@ import { showSelectionProofreadDiffWithApply } from '../differ';
 import { runEditorialMemoryAfterAccept } from '../editorialMemory/service';
 import { FilePathUtils, ErrorUtils, ConfigManager } from '../utils';
 import { getPromptDisplayName } from '../promptManager';
+import { getCurrentAlignmentKind } from '../promptAlignment';
+import { recordEditAcceptHistory } from '../workUnits/recordAcceptHistory';
 import { isUsingSystemDefaultPrompt, pickSourceTextCharacteristicsInjection } from '../sourceTextCharacteristicsPicker';
 import {
     formatSourceCharacteristicsForLog,
@@ -396,6 +398,12 @@ export class ProofreadCommandHandler {
         editor: vscode.TextEditor,
         context: vscode.ExtensionContext
     ): Promise<void> {
+        if (getCurrentAlignmentKind(context) === 'convert') {
+            vscode.window.showWarningMessage(
+                '重叠校对仅适用于编辑类提示词；当前为转换类，请改用并行处理 JSON 或切换提示词。'
+            );
+            return;
+        }
         const jsonFilePath = this.resolveProofreadSourceJsonPath(editor);
         if (!jsonFilePath) {
             return;
@@ -1028,23 +1036,36 @@ export class ProofreadCommandHandler {
                 result,
                 fileExt
             );
-            if (diffRes.applied && editorialMemoryForceEnabled === true) {
-                try {
-                    await runEditorialMemoryAfterAccept({
-                        documentUri: editor.document.uri,
-                        fullText: editor.document.getText(),
-                        selectionStartLine: range.start.line,
-                        selectionRangeLabel: `L${range.start.line + 1}C${range.start.character}–L${range.end.line + 1}C${range.end.character}`,
-                        originalSelected: originalText,
-                        finalSelected: diffRes.finalText,
-                        modelOutput: result,
-                        platform,
-                        model,
-                        items: itemChanges,
-                        editorialMemoryForceEnabled: true
-                    });
-                } catch {
-                    /* 记忆更新失败不阻断 */
+            if (diffRes.applied) {
+                if (editorialMemoryForceEnabled === true) {
+                    try {
+                        await runEditorialMemoryAfterAccept({
+                            documentUri: editor.document.uri,
+                            fullText: editor.document.getText(),
+                            selectionStartLine: range.start.line,
+                            selectionRangeLabel: `L${range.start.line + 1}C${range.start.character}–L${range.end.line + 1}C${range.end.character}`,
+                            originalSelected: originalText,
+                            finalSelected: diffRes.finalText,
+                            modelOutput: result,
+                            platform,
+                            model,
+                            items: itemChanges,
+                            editorialMemoryForceEnabled: true
+                        });
+                    } catch {
+                        /* 记忆更新失败不阻断 */
+                    }
+                } else {
+                    try {
+                        recordEditAcceptHistory({
+                            documentUri: editor.document.uri,
+                            original: originalText,
+                            finalText: diffRes.finalText,
+                            origin: 'selection_accept',
+                        });
+                    } catch {
+                        /* history 失败不阻断 */
+                    }
                 }
             }
         } else {

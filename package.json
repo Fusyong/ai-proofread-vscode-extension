@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.12.29",
+  "version": "2.0.0",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -342,6 +342,51 @@
         "category": "%category%"
       },
       {
+        "command": "ai-proofread.editSelection",
+        "title": "%cmd.editSelection.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.convertSelection",
+        "title": "%cmd.convertSelection.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.editSelectionWithMemory",
+        "title": "%cmd.editSelectionWithMemory.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.convertSelectionWithMemory",
+        "title": "%cmd.convertSelectionWithMemory.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.processJsonParallel",
+        "title": "%cmd.processJsonParallel.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.processJsonSerial",
+        "title": "%cmd.processJsonSerial.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.openSerialWorkbenchPanel",
+        "title": "%cmd.openSerialWorkbenchPanel.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.checkMemoryConsistency",
+        "title": "%cmd.checkMemoryConsistency.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.applyParallelRoundHistory",
+        "title": "%cmd.applyParallelRoundHistory.title%",
+        "category": "%category%"
+      },
+      {
         "command": "ai-proofread.splitIntoSentences",
         "title": "%cmd.splitIntoSentences.title%",
         "category": "%category%"
@@ -457,6 +502,11 @@
       {
         "command": "ai-proofread.openProofreadingPanel",
         "title": "%cmd.openProofreadingPanel.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.openParallelWorkbenchPanel",
+        "title": "%cmd.openParallelWorkbenchPanel.title%",
         "category": "%category%"
       },
       {
@@ -1381,6 +1431,17 @@
           "default": 0.85,
           "description": "条目式替换时相似度匹配阈值（0–1）"
         },
+        "ai-proofread.memoryHistory.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否写入记忆全量历史（jsonl，不注入 LLM；供聚类一致性检查）。"
+        },
+        "ai-proofread.memoryHistory.maxRecords": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 100,
+          "description": "单份记忆历史 jsonl 最大条数；超限轮转最旧段到 .jsonl.1。"
+        },
         "ai-proofread.prompts": {
           "order": 28,
           "type": "array",
@@ -1420,14 +1481,59 @@
                   "other"
                 ],
                 "enumDescriptions": [
-                  "校对",
-                  "翻译",
+                  "校对（业务细项）",
+                  "翻译（业务细项）",
                   "注释/加注",
                   "重组",
                   "其他"
                 ],
                 "default": "proofread",
-                "description": "调度细项（与 outputType 正交）。界面只展示并行/串行：translate=串行，其余=并行。用于入口校验与按 task 记忆当前提示词。"
+                "description": "业务细项标签（与 outputType 正交）。调度请用 execution；对齐语义请用 alignmentKind。缺省时可由 task 推断：translate→串行+转换，annotate→转换+并行，其余→编辑+并行。"
+              },
+              "alignmentKind": {
+                "type": "string",
+                "enum": [
+                  "edit",
+                  "convert"
+                ],
+                "enumDescriptions": [
+                  "编辑：改动小，可 diff/句对齐",
+                  "转换：改动大；可输出/回填原文与转换标记"
+                ],
+                "description": "对齐语义（与 execution、task 正交）。缺省由 task 推断。"
+              },
+              "execution": {
+                "type": "string",
+                "enum": [
+                  "parallel",
+                  "serial"
+                ],
+                "enumDescriptions": [
+                  "并行批处理",
+                  "串行批处理（实验）"
+                ],
+                "description": "批处理默认调度（与 alignmentKind、task 正交）。缺省由 task 推断：仅 translate→serial。"
+              },
+              "convertPolicy": {
+                "type": "object",
+                "description": "转换类辅助对齐策略（alignmentKind=convert 时）。",
+                "properties": {
+                  "emitSource": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "模型是否输出原文；图书翻译默认 true。"
+                  },
+                  "emitConvertMarkers": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "是否输出转换标记（如术语对）；图书翻译默认 true。"
+                  },
+                  "programBackfillSource": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "未输出原文时是否用输入回填以帮助对齐。"
+                  }
+                }
               }
             },
             "required": [
@@ -2330,18 +2436,38 @@
       ],
       "editor/context": [
         {
-          "command": "ai-proofread.proofreadSelection",
+          "command": "ai-proofread.editSelection",
           "group": "ai-proofread@11.0",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
-          "command": "ai-proofread.proofreadSelectionWithMemory",
+          "command": "ai-proofread.convertSelection",
+          "group": "ai-proofread@11.01",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.editSelectionWithMemory",
           "group": "ai-proofread@11.05",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
-          "command": "ai-proofread.translateSelectionWithMemory",
+          "command": "ai-proofread.convertSelectionWithMemory",
           "group": "ai-proofread@11.06",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.proofreadSelection",
+          "group": "ai-proofread@11.07",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.proofreadSelectionWithMemory",
+          "group": "ai-proofread@11.08",
+          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        },
+        {
+          "command": "ai-proofread.translateSelectionWithMemory",
+          "group": "ai-proofread@11.09",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {

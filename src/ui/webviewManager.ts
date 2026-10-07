@@ -17,11 +17,13 @@ import {
 } from '../proofreadRoundLayout';
 import { getTranslatePanelButtons } from '../translationMemory/translateRoundLayout';
 import {
+    getWorkbenchExecution,
     getWorkbenchMode,
-    setWorkbenchMode,
-    workbenchModeLabel,
+    setWorkbenchExecution,
+    workbenchExecutionLabel,
     type WorkbenchMode,
 } from '../workbenchMode';
+import type { ExecutionMode } from '../promptAlignment';
 import { focusWorkingTextEditor } from './lastActiveTextEditor';
 import { setProofreadItemsVisible } from './sidebarViewVisibility';
 import { commandHoverTitle } from './commandHover';
@@ -245,16 +247,31 @@ export class WebviewManager {
     }
 
     /**
-     * 打开工作面板（支持空面板；默认工作流为并行）
+     * 打开并行工作台（默认主路径；调度固定 parallel）
      */
     public openProofreadingPanel(context: vscode.ExtensionContext): void {
+        void this.openWorkbenchPanel(context, 'parallel');
+    }
+
+    /**
+     * 打开串行工作台（实验；调度固定 serial）
+     */
+    public openSerialWorkbenchPanel(context: vscode.ExtensionContext): void {
+        void this.openWorkbenchPanel(context, 'serial');
+    }
+
+    private async openWorkbenchPanel(
+        context: vscode.ExtensionContext,
+        execution: ExecutionMode
+    ): Promise<void> {
         this.extensionContext = context;
+        await setWorkbenchExecution(context, execution);
         if (this.currentPanel) {
+            this.currentPanel.title = execution === 'serial' ? '串行工作台（实验）' : '并行工作台';
             this.currentPanel.reveal();
             this.refreshPanelContent(context);
             return;
         }
-        // 无处理结果时，尝试恢复上次选择的主文件
         if (!this.currentProcessResult && !this.mainFilePath) {
             const last = context.workspaceState.get<string>('aiProofread.lastMainFile');
             if (last && fs.existsSync(last)) {
@@ -263,6 +280,7 @@ export class WebviewManager {
         }
         const result = this.currentProcessResult ?? this.buildEmptyOrMainFileResult();
         const panel = this.createOrRevealPanel(result, context);
+        panel.title = execution === 'serial' ? '串行工作台（实验）' : '并行工作台';
         panel.webview.onDidReceiveMessage(
             (message) => this.handleWebviewMessage(message, panel, context),
             undefined,
@@ -282,7 +300,7 @@ export class WebviewManager {
         return {
             title: '工作面板',
             message: hasMain
-                ? `项目：${this.getRelativePath(this.mainFilePath!)}（默认工作流：并行）`
+                ? `项目：${this.getRelativePath(this.mainFilePath!)}`
                 : '整理当前文档，或选择主文件后切分、处理',
             mainFilePath: this.mainFilePath,
             companionFiles: companions,
@@ -391,12 +409,36 @@ export class WebviewManager {
 
         try {
             switch (command) {
-                case 'setWorkbenchModeProofread':
-                case 'setWorkbenchModeTranslate': {
-                    const mode: WorkbenchMode =
-                        command === 'setWorkbenchModeTranslate' ? 'translate' : 'proofread';
-                    await setWorkbenchMode(context, mode);
-                    this.refreshPanelContent(context);
+                case 'openSerialWorkbench': {
+                    await vscode.commands.executeCommand('ai-proofread.openSerialWorkbenchPanel');
+                    break;
+                }
+                case 'openParallelWorkbench': {
+                    await vscode.commands.executeCommand('ai-proofread.openProofreadingPanel');
+                    break;
+                }
+                case 'checkMemoryConsistency': {
+                    await vscode.commands.executeCommand('ai-proofread.checkMemoryConsistency');
+                    break;
+                }
+                case 'applyParallelRoundHistory': {
+                    await vscode.commands.executeCommand('ai-proofread.applyParallelRoundHistory');
+                    break;
+                }
+                case 'editSelection': {
+                    await runWithWorkingEditor('ai-proofread.editSelection');
+                    break;
+                }
+                case 'convertSelection': {
+                    await runWithWorkingEditor('ai-proofread.convertSelection');
+                    break;
+                }
+                case 'editSelectionWithMemory': {
+                    await runWithWorkingEditor('ai-proofread.editSelectionWithMemory');
+                    break;
+                }
+                case 'convertSelectionWithMemory': {
+                    await runWithWorkingEditor('ai-proofread.convertSelectionWithMemory');
                     break;
                 }
                 case 'showMainFile': {
@@ -595,8 +637,8 @@ export class WebviewManager {
                     if (!jsonPath) {
                         break;
                     }
-                    const mode = getWorkbenchMode(context);
-                    if (mode === 'translate') {
+                    // 串行台 → 顺序批处理；并行台 → 并发批处理（codec 随当前提示词 AlignmentKind）
+                    if (getWorkbenchExecution(context) === 'serial') {
                         if ((this as any).translateJsonCallback) {
                             await (this as any).translateJsonCallback(jsonPath, context);
                         }
@@ -606,8 +648,8 @@ export class WebviewManager {
                     break;
                 }
                 case 'proofreadJsonOverlay': {
-                    if (getWorkbenchMode(context) === 'translate') {
-                        vscode.window.showInformationMessage('串行（翻译等）工作流不使用重叠校对；请用「LLM 翻译 JSON」或续跑。');
+                    if (getWorkbenchExecution(context) === 'serial') {
+                        vscode.window.showInformationMessage('串行工作台不使用重叠校对；请用「串行处理 JSON」或续跑。');
                         break;
                     }
                     const jsonPath = this.getSplitJsonPath();
@@ -896,14 +938,16 @@ export class WebviewManager {
     }
 
     /**
-     * 生成完整 HTML：工作流 → 文档整理 → 切分→(合并→)交 LLM → 结果 → 专项
+     * 生成完整 HTML：工作台标题 → 文档整理 → 切分→(合并→)交 LLM → 结果 → 专项
+     * 调度由当前工作台固定（并行台 / 串行实验台），不再顶栏切换。
      */
     private generateFullHtml(result: ProcessResult, context?: vscode.ExtensionContext): string {
-        const mode = context ? getWorkbenchMode(context) : 'proofread';
+        const execution: ExecutionMode = context ? getWorkbenchExecution(context) : 'parallel';
+        const mode: WorkbenchMode = execution === 'serial' ? 'translate' : 'proofread';
         return this.getBaseHtml(`
             <div class="header">
-                <div class="message">${escapeHtml(result.message || '工作面板（默认工作流：并行）')}</div>
-                ${this.generateWorkbenchModeHtml(mode)}
+                <div class="message">${escapeHtml(result.message || workbenchExecutionLabel(execution))}</div>
+                ${this.generateWorkbenchBannerHtml(execution)}
             </div>
             ${this.generateDocumentPrepHtml()}
             ${this.generateSplitSectionHtml(result, mode)}
@@ -915,15 +959,21 @@ export class WebviewManager {
         `, true);
     }
 
-    private generateWorkbenchModeHtml(mode: WorkbenchMode): string {
-        const proofreadActive = mode === 'proofread' ? ' mode-btn--active' : '';
-        const translateActive = mode === 'translate' ? ' mode-btn--active' : '';
+    /** 工作台标识条（无并行/串行切换按钮） */
+    private generateWorkbenchBannerHtml(execution: ExecutionMode): string {
+        if (execution === 'serial') {
+            return `
+            <div class="workbench-mode" role="status" aria-label="串行工作台">
+                <span class="mode-label">实验功能 · 串行工作台</span>
+                <span class="mode-hint">顺序处理分块并写记忆；编辑/转换随当前提示词。打开并行工作台请用命令或下方链接。</span>
+                <button type="button" class="link-button" onclick="handleAction('openParallelWorkbench')" title="打开并行工作台">打开并行工作台</button>
+            </div>
+        `;
+        }
         return `
-            <div class="workbench-mode" role="group" aria-label="工作流">
-                <span class="mode-label">工作流</span>
-                <button type="button" class="mode-btn${proofreadActive}" onclick="handleAction('setWorkbenchModeProofread')" title="并行调度：校对等（JSON 可并发）">并行（校对等）</button>
-                <button type="button" class="mode-btn${translateActive}" onclick="handleAction('setWorkbenchModeTranslate')" title="串行调度：翻译等（顺序执行并写翻译记忆）">串行（翻译等）</button>
-                <span class="mode-hint">当前：${workbenchModeLabel(mode)} · 并行流并发处理（校对等）分块；串行流顺序处理（翻译等）分块和记忆</span>
+            <div class="workbench-mode" role="status" aria-label="并行工作台">
+                <span class="mode-label">并行工作台</span>
+                <span class="mode-hint">分块可并发；编辑/转换随当前提示词。一致性靠记忆历史聚类（实验 · memo）。</span>
             </div>
         `;
     }
@@ -1090,23 +1140,27 @@ export class WebviewManager {
         `;
     }
 
-    /** 专项检查：并行工作流挂校对向工具；串行工作流挂翻译专用能力 */
+    /** 专项：并行台挂校对向工具 + memo 聚类；串行台挂转换记忆专项 + 聚类 */
     private generateSpecialChecksHtml(mode: WorkbenchMode = 'proofread'): string {
         const sep = this.buttonGroupSep;
+        const memoCluster = `
+                    <button class="action-button" onclick="handleAction('checkMemoryConsistency')" title="${commandHoverTitle('记忆历史一致性聚类（实验 · memo）', 'ai-proofread.checkMemoryConsistency')}">记忆一致性聚类（实验）</button>`;
         if (mode === 'translate') {
             return `
             <div class="process-section">
-                <h3>🔍 翻译专项</h3>
-                <p class="hint">翻译记忆、术语审计与段级审核。校对向专项请切到「并行（校对等）」工作流。</p>
+                <h3>🔍 串行专项（实验）</h3>
+                <p class="hint">转换记忆、术语审计与段级审核（实验 · memo）。校对向专项请打开并行工作台。</p>
                 <div class="section-actions">
-                    <button class="action-button" onclick="handleAction('splitByParagraph')" title="${commandHoverTitle('按段落切分（翻译用）', 'ai-proofread.splitFileByParagraph')}">按段落切分</button>
+                    <button class="action-button" onclick="handleAction('splitByParagraph')" title="${commandHoverTitle('按段落切分', 'ai-proofread.splitFileByParagraph')}">按段落切分</button>
                     ${sep}
-                    <button class="action-button" onclick="handleAction('translationAuditTerms')" title="${commandHoverTitle('翻译术语审计', 'ai-proofread.translation.auditTerms')}">术语审计</button>
-                    <button class="action-button" onclick="handleAction('translateReviewOpen')" title="${commandHoverTitle('打开翻译审核', 'ai-proofread.translateReview.open')}">翻译审核</button>
+                    <button class="action-button" onclick="handleAction('translationAuditTerms')" title="${commandHoverTitle('术语审计（实验 · memo）', 'ai-proofread.translation.auditTerms')}">术语审计（实验）</button>
+                    <button class="action-button" onclick="handleAction('translateReviewOpen')" title="${commandHoverTitle('打开转换过程审核', 'ai-proofread.translateReview.open')}">过程审核</button>
                     <button class="action-button" onclick="handleAction('activateTermCheckPrompt')" title="${commandHoverTitle('切换到译名一致核对提示词', 'ai-proofread.translation.activateTermCheckPrompt')}">译名核对提示词</button>
                     ${sep}
-                    <button class="action-button" onclick="handleAction('approveTmCandidates')" title="${commandHoverTitle('批准翻译记忆候选', 'ai-proofread.translationMemory.approveCandidates')}">批准 candidate</button>
-                    <button class="action-button" onclick="handleAction('cleanTranslationProcessOutput')" title="${commandHoverTitle('清理翻译过程输出', 'ai-proofread.cleanTranslationProcessOutput')}">清理过程输出</button>
+                    <button class="action-button" onclick="handleAction('approveTmCandidates')" title="${commandHoverTitle('批准翻译记忆候选（实验 · memo）', 'ai-proofread.translationMemory.approveCandidates')}">批准 candidate（实验）</button>
+                    <button class="action-button" onclick="handleAction('cleanTranslationProcessOutput')" title="${commandHoverTitle('清理转换过程输出', 'ai-proofread.cleanTranslationProcessOutput')}">清理过程输出</button>
+                    ${sep}
+                    ${memoCluster}
                     ${sep}
                     <button class="action-button" onclick="handleAction('alignHeadings')" title="${commandHoverTitle('对齐标题', 'ai-proofread.alignHeadings')}">对齐标题</button>
                 </div>
@@ -1131,30 +1185,45 @@ export class WebviewManager {
                     ${sep}
                     <button class="action-button" onclick="handleAction('citationOpenView')" title="${commandHoverTitle('核对全文引文', 'ai-proofread.citation.openView')}">核对全文引文</button>
                     <button class="action-button" onclick="handleAction('citationVerifySelection')" title="${commandHoverTitle('对选中文本做与全文相同的相似度核对（去掉行首 >）', 'ai-proofread.citation.verifySelection')}">核对选中引文</button>
+                    ${sep}
+                    ${memoCluster}
+                    ${sep}
+                    <button class="action-button" onclick="handleAction('applyParallelRoundHistory')" title="${commandHoverTitle('采纳并行轮次并记入记忆历史（实验 · memo）', 'ai-proofread.applyParallelRoundHistory')}">采纳轮次记入历史（实验）</button>
                 </div>
             </div>
         `;
     }
 
-    /** 底部选段动作（随工作流切换文案） */
+    /** 底部选段：方案 A 四条；并行台另附串行入口 */
     private generatePanelFooterHtml(mode: WorkbenchMode = 'proofread'): string {
         const sep = '<span class="cmd-sep" aria-hidden="true">|</span>';
+        const selectionLinks = `
+            <p class="header-commands-hint">选区处理（编辑/转换须匹配当前提示词）</p>
+            <div class="header-actions">
+                <button type="button" class="link-button" onclick="handleAction('editSelection')" title="${commandHoverTitle('编辑选区', 'ai-proofread.editSelection')}">编辑选区</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('convertSelection')" title="${commandHoverTitle('转换选区', 'ai-proofread.convertSelection')}">转换选区</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('editSelectionWithMemory')" title="${commandHoverTitle('编辑选区（带记忆 · 实验）', 'ai-proofread.editSelectionWithMemory')}">编辑选区（带记忆 · 实验）</button>
+                ${sep}
+                <button type="button" class="link-button" onclick="handleAction('convertSelectionWithMemory')" title="${commandHoverTitle('转换选区（带记忆 · 实验）', 'ai-proofread.convertSelectionWithMemory')}">转换选区（带记忆 · 实验）</button>
+            </div>`;
         if (mode === 'translate') {
             return `
-            <p class="header-commands-hint">选段翻译</p>
+            ${selectionLinks}
+            <p class="header-commands-hint" style="margin-top:8px">其它</p>
             <div class="header-actions">
-                <button type="button" class="link-button" onclick="handleAction('translateSelectionWithMemory')" title="${commandHoverTitle('翻译选中文本（带翻译记忆）', 'ai-proofread.translateSelectionWithMemory')}">翻译选中文本</button>
+                <button type="button" class="link-button" onclick="handleAction('cleanTranslationProcessOutput')" title="${commandHoverTitle('清理转换过程输出', 'ai-proofread.cleanTranslationProcessOutput')}">清理过程输出</button>
                 ${sep}
-                <button type="button" class="link-button" onclick="handleAction('cleanTranslationProcessOutput')" title="${commandHoverTitle('清理翻译过程输出', 'ai-proofread.cleanTranslationProcessOutput')}">清理过程输出</button>
+                <button type="button" class="link-button" onclick="handleAction('openParallelWorkbench')" title="打开并行工作台">打开并行工作台</button>
             </div>
         `;
         }
         return `
-            <p class="header-commands-hint">选段校对</p>
+            ${selectionLinks}
+            <p class="header-commands-hint" style="margin-top:8px">实验</p>
             <div class="header-actions">
-                <button type="button" class="link-button" onclick="handleAction('proofreadSelection')" title="${commandHoverTitle('校对选中文本', 'ai-proofread.proofreadSelection')}">校对选中文本</button>
-                ${sep}
-                <button type="button" class="link-button" onclick="handleAction('proofreadSelectionWithMemory')" title="${commandHoverTitle('校对选中（带编辑记忆）', 'ai-proofread.proofreadSelectionWithMemory')}">校对选中（带编辑记忆）</button>
+                <button type="button" class="link-button" onclick="handleAction('openSerialWorkbench')" title="${commandHoverTitle('打开串行工作台（实验）', 'ai-proofread.openSerialWorkbenchPanel')}">打开串行工作台（实验功能）</button>
             </div>
         `;
     }

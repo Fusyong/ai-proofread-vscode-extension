@@ -242,6 +242,7 @@ export async function processTranslateJsonSequential(
                     parsed,
                     approve: false,
                     sourceUnit: targetText,
+                    historyOrigin: 'serial_segment',
                 });
             } catch (e) {
                 logger.error('翻译记忆合并失败（已保留译文）', e);

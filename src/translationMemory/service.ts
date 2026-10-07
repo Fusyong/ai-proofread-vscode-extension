@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { recordConvertAcceptHistory } from '../workUnits/recordAcceptHistory';
 import type { ParseBitextResult } from './bitextCodec';
 import { appendUnitToBitextIndex, buildSimilarBitextXml, clearBitextIndex } from './bitextIndex';
 import {
@@ -73,6 +74,8 @@ export interface MergeTranslateMemoryArgs {
     approve: boolean;
     /** 写入句对侧车用的源单元；默认用 parsed.sourcePlain */
     sourceUnit?: string;
+    /** 记忆历史 origin；默认 approve→selection_with_memory，否则 tm_merge */
+    historyOrigin?: import('../memoryHistory').MemoryHistoryOrigin;
 }
 
 /** 从过程解析结果合并进翻译记忆，并派生句对侧车 */
@@ -186,6 +189,19 @@ export function mergeTranslationMemoryFromParsed(args: MergeTranslateMemoryArgs)
             appendUnitToBitextIndex(documentUri, sourceUnit, targetUnit);
         } catch {
             /* 侧车失败不影响记忆 */
+        }
+        try {
+            recordConvertAcceptHistory({
+                documentUri,
+                sourceUnit,
+                finalTranslation: targetUnit,
+                terms: parsed.terms,
+                origin:
+                    args.historyOrigin ??
+                    (args.approve ? 'selection_with_memory' : 'tm_merge'),
+            });
+        } catch {
+            /* history 失败不阻断 */
         }
     }
 }
