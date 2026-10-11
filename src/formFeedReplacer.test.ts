@@ -188,7 +188,26 @@ describe('replaceFormFeeds', () => {
         expect(text).toBe('a[1]b');
     });
 
-    it('removes pdftotext footer page number line before form feed by default', () => {
+    it('keeps footer page number line when the option is omitted', () => {
+        const input =
+            '传统审校软件……\n' +
+            '                                                        1\n' +
+            '\f' +
+            '       本扩展安装在 VS Code 中';
+        const { text, replacedCount, removedPageNumberCount } = replaceFormFeeds(input, {
+            mode: 'heading',
+            startPage: 1,
+            startIndex: 1,
+            every: 1,
+        });
+        expect(replacedCount).toBe(1);
+        expect(removedPageNumberCount).toBe(0);
+        expect(text).toContain('                                                        1\n');
+        expect(text).toContain('## page 1');
+        expect(text).not.toContain('\f');
+    });
+
+    it('removes pdftotext footer page number line before form feed when asked', () => {
         // 形态同大赛投稿 md：页脚「空格+页码」+ \n + \f + 下页正文
         const input =
             '传统审校软件……\n' +
@@ -200,6 +219,7 @@ describe('replaceFormFeeds', () => {
             startPage: 1,
             startIndex: 1,
             every: 1,
+            removePrecedingPageNumber: true,
         });
         expect(replacedCount).toBe(1);
         expect(removedPageNumberCount).toBe(1);
@@ -231,6 +251,7 @@ describe('replaceFormFeeds', () => {
             startPage: 17,
             startIndex: 1,
             every: 1,
+            removePrecedingPageNumber: true,
         });
         expect(replacedCount).toBe(1);
         expect(removedPageNumberCount).toBe(1);

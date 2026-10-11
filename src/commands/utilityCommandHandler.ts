@@ -865,14 +865,14 @@ export class UtilityCommandHandler {
         const removePageNumPick = await vscode.window.showQuickPick(
             [
                 {
-                    label: '是（默认）',
-                    description: '删除 \\f 前整行仅为「空格+数字」的页脚页码（pdftotext layout 常见）',
-                    value: true,
-                },
-                {
-                    label: '否',
+                    label: '否（默认）',
                     description: '只替换分页符，保留页脚页码行',
                     value: false,
+                },
+                {
+                    label: '是',
+                    description: '删除 \\f 前整行仅为「空格+数字」的页脚页码（pdftotext layout 常见）',
+                    value: true,
                 },
             ],
             {

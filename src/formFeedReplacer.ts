@@ -24,7 +24,7 @@ export interface FormFeedReplaceOptions {
     customTemplate?: string;
     /**
      * 是否删除紧挨在分页符前、整行仅为空白+阿拉伯数字的页脚页码行
-     *（pdftotext layout 常见形态）。默认 true。
+     *（pdftotext layout 常见形态）。默认 false（保留页码行）。
      */
     removePrecedingPageNumber?: boolean;
 }
@@ -34,7 +34,7 @@ export const DEFAULT_FORM_FEED_REPLACE_OPTIONS: FormFeedReplaceOptions = {
     startPage: 1,
     startIndex: 1,
     every: 1,
-    removePrecedingPageNumber: true,
+    removePrecedingPageNumber: false,
 };
 
 export interface FormFeedReplaceResult {
@@ -160,7 +160,7 @@ export function replaceFormFeeds(
     const startPage = Math.trunc(options.startPage);
     const startIndex = Math.max(1, Math.floor(options.startIndex));
     const every = Math.max(1, Math.floor(options.every));
-    const removePrecedingPageNumber = options.removePrecedingPageNumber !== false;
+    const removePrecedingPageNumber = options.removePrecedingPageNumber === true;
     const eol = detectEol(text);
 
     const ffIndices: number[] = [];
