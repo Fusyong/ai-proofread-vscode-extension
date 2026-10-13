@@ -14,7 +14,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 - 新的架构与抽象：业务分为编辑和转换两类，前者处理前后变动小，可对齐diff，如编辑；后者处理前后变动大，不可对齐diff，如翻译）两类。流程分为并行（此前的主要形态）和串行（带memo history）两类；抽象、统一memo history业务逻辑，提供聚类以分析一致性的工具。串行和memo history相关功能均处于实验状态，有待验证和改进
 - 特性：翻译业务相关支持
-- 特性：增加校对词表4种
+- 特性：增加校对词表
 - 优化：优化句子对齐报告UI和工作流
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。

@@ -29,7 +29,6 @@ import {
     isPresetGjtg,
     isPresetHai7Person,
     isPresetHai7Era,
-    isPresetJd30,
     type CustomPresetId,
 } from '../xh7/tableLoader';
 import { scanDocumentHai7Person, scanDocumentHai7Era } from '../xh7/documentScannerHai7';
@@ -48,7 +47,7 @@ import {
     type DictCheckTypesTreeDataProvider,
     type TgsccCheckTypesTreeDataProvider,
 } from '../xh7/checkTypesView';
-import { scanDocument, scanDocumentUnsegmented, scanDocumentWithSegmentation, scanDocumentLightToneSingle } from '../xh7/documentScanner';
+import { scanDocument, scanDocumentWithSegmentation, scanDocumentLightToneSingle } from '../xh7/documentScanner';
 import { scanDocumentTgsccSpecial, isTgsccSpecialType } from '../xh7/documentScannerTgscc';
 import { scanDocumentGjtg } from '../xh7/documentScannerGjtg';
 import { getJiebaWasm } from '../jiebaLoader';
@@ -448,8 +447,6 @@ export class WordCheckCommandHandler {
                                 if (Object.keys(dict).length === 0) continue;
                                 if (isPresetRequiringSegmentation(presetId) && jiebaForPreset) {
                                     list = scanDocumentWithSegmentation(editor.document, dict, jiebaForPreset, cancelToken, scanRange);
-                                } else if (isPresetJd30(presetId)) {
-                                    list = scanDocumentUnsegmented(editor.document, dict, cancelToken, scanRange);
                                 } else {
                                     list = scanDocument(editor.document, dict, cancelToken, scanRange);
                                 }
@@ -593,8 +590,6 @@ export class WordCheckCommandHandler {
                             if (Object.keys(dict).length === 0) continue;
                             if (isPresetRequiringSegmentation(presetId) && jiebaForPreset) {
                                 list = scanDocumentWithSegmentation(editor.document, dict, jiebaForPreset, cancelToken, scanRange);
-                            } else if (isPresetJd30(presetId)) {
-                                list = scanDocumentUnsegmented(editor.document, dict, cancelToken, scanRange);
                             } else {
                                 list = scanDocument(editor.document, dict, cancelToken, scanRange);
                             }

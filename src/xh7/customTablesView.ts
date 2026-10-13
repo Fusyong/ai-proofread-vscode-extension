@@ -107,7 +107,7 @@ export class CustomTablesTreeDataProvider implements vscode.TreeDataProvider<Cus
         item.checkboxState = checked ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
         item.contextValue = element.isPreset ? 'customTablePreset' : 'customTableUser';
         if (element.isPreset) {
-            item.description = isPresetJd30(element.id as CustomPresetId) ? '预置 · 不分词' : '预置';
+            item.description = isPresetJd30(element.id as CustomPresetId) ? '预置 · 分词' : '预置';
         } else {
             const table = getCustomTables().find((t) => t.id === element.id);
             if (table) {

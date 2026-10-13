@@ -68,7 +68,7 @@ let cachedGjtgSet: Set<string> | null = null;
 let cachedHai7: Hai7Json | null = null;
 let hai7LoadFailed = false;
 let contextForPath: ExtensionContext | null = null;
-/** data/jd30 校对词表：查找串 → 建议串。正文不分词。 */
+/** data/校对词-绝对优势-不成词.txt：查找串 → 建议串。匹配前先分词，仅整词命中。 */
 const cachedJd30 = new Map<Jd30PresetId, Record<string, string>>();
 
 /** data/hai7.json 行结构 */
@@ -261,20 +261,12 @@ function sliceToDict(arr: string[], start: number, end: number, value: string): 
     return out;
 }
 
-/** data/jd30 校对词表。匹配正文时不分词。 */
-export const JD30_PRESET_IDS = [
-    'preset_jd30_window_both',
-    'preset_jd30_window_prefix',
-    'preset_jd30_window_suffix',
-    'preset_jd30_dominant',
-] as const;
+/** 校对词表「绝对优势-不成词」。匹配前先分词。 */
+export const JD30_PRESET_IDS = ['preset_jd30_dominant'] as const;
 
 export type Jd30PresetId = (typeof JD30_PRESET_IDS)[number];
 
 const JD30_FILES: Record<Jd30PresetId, string> = {
-    preset_jd30_window_both: '校对词-扩窗-前后词.txt',
-    preset_jd30_window_prefix: '校对词-扩窗-前词.txt',
-    preset_jd30_window_suffix: '校对词-扩窗-后词.txt',
     preset_jd30_dominant: '校对词-绝对优势-不成词.txt',
 };
 
@@ -297,9 +289,6 @@ const CUSTOM_PRESET_LABELS: Record<CustomPresetId, string> = {
     preset_gjtg: '非古籍通规字形',
     preset_hai7_person: '人名信息',
     preset_hai7_era: '年号信息',
-    preset_jd30_window_both: '校对词·扩窗-前后词',
-    preset_jd30_window_prefix: '校对词·扩窗-前词',
-    preset_jd30_window_suffix: '校对词·扩窗-后词',
     preset_jd30_dominant: '校对词·绝对优势-不成词',
 };
 
@@ -311,7 +300,7 @@ export function isPresetHai7Era(presetId: CustomPresetId): boolean {
     return presetId === 'preset_hai7_era';
 }
 
-/** jd30 校对词表：对正文做字面匹配，不先分词。 */
+/** jd30 校对词表：先分词，仅当查找串被切成一个词时命中。 */
 export function isPresetJd30(presetId: CustomPresetId): presetId is Jd30PresetId {
     return (JD30_PRESET_IDS as readonly string[]).includes(presetId);
 }
@@ -331,9 +320,9 @@ export const CUSTOM_PRESET_IDS: CustomPresetId[] = [
     ...JD30_PRESET_IDS,
 ];
 
-/** 是否需要分词后再匹配（多字词表）。jd30 校对词表不在此列。 */
+/** 是否需要分词后再匹配（多字词表，以及 jd30 校对词表）。 */
 export function isPresetRequiringSegmentation(presetId: CustomPresetId): boolean {
-    return presetId === 'preset_fswv';
+    return presetId === 'preset_fswv' || isPresetJd30(presetId);
 }
 
 /** 是否为「非古籍通规字形」预置（使用 gjtg.txt 逐字扫描，不走字典） */
@@ -346,7 +335,7 @@ function ensureJd30Dict(presetId: Jd30PresetId): Record<string, string> {
     if (cached) return cached;
     const empty: Record<string, string> = {};
     if (!contextForPath) return empty;
-    const txtPath = contextForPath.asAbsolutePath(path.join('data', 'jd30', JD30_FILES[presetId]));
+    const txtPath = contextForPath.asAbsolutePath(path.join('data', JD30_FILES[presetId]));
     if (!fs.existsSync(txtPath)) {
         cachedJd30.set(presetId, empty);
         return empty;
