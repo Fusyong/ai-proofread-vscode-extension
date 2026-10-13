@@ -9,6 +9,7 @@
 import * as vscode from 'vscode';
 import type { WordCheckEntry } from './types';
 import type { JiebaWasmModule } from '../jiebaLoader';
+import { findLiteralMatches } from './literalScan';
 
 /** 正则元字符转义，用于字面匹配 */
 function escapeRegex(s: string): string {
@@ -123,6 +124,36 @@ function scanDocumentSingleCharDict(
             }
         }
         offset += ch.length;
+    }
+    return Array.from(entryMap.values());
+}
+
+/**
+ * 正文不分词：字面匹配词表。先长后短占用区间，不调用分词。
+ * 词条很多时走自动机，避免逐条全文正则。
+ */
+export function scanDocumentUnsegmented(
+    document: vscode.TextDocument,
+    dict: Record<string, string>,
+    cancelToken?: vscode.CancellationToken,
+    range?: vscode.Range
+): WordCheckEntry[] {
+    const scanRange = range ?? new vscode.Range(0, 0, document.lineCount, 0);
+    const text = document.getText(scanRange);
+    const rangeStartOffset = document.offsetAt(scanRange.start);
+    const found = findLiteralMatches(text, dict, () => cancelToken?.isCancellationRequested === true);
+    const entryMap = new Map<string, WordCheckEntry>();
+    for (const m of found) {
+        const startOffset = rangeStartOffset + m.start;
+        const endOffset = rangeStartOffset + m.end;
+        const rangeObj = new vscode.Range(document.positionAt(startOffset), document.positionAt(endOffset));
+        const key = `${m.variant}|${m.preferred}`;
+        const existing = entryMap.get(key);
+        if (existing) {
+            existing.ranges.push(rangeObj);
+        } else {
+            entryMap.set(key, { variant: m.variant, preferred: m.preferred, ranges: [rangeObj] });
+        }
     }
     return Array.from(entryMap.values());
 }

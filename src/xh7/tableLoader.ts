@@ -8,6 +8,7 @@ import * as path from 'path';
 import type { ExtensionContext } from 'vscode';
 import type { CheckType } from './types';
 import type { WordCheckNotes } from './types';
+import { parseCustomTableFile } from './customTableParser';
 
 /** dict7 / xh7_tables 结构 */
 interface Xh7TablesJson {
@@ -67,6 +68,8 @@ let cachedGjtgSet: Set<string> | null = null;
 let cachedHai7: Hai7Json | null = null;
 let hai7LoadFailed = false;
 let contextForPath: ExtensionContext | null = null;
+/** data/jd30 校对词表：查找串 → 建议串。正文不分词。 */
+const cachedJd30 = new Map<Jd30PresetId, Record<string, string>>();
 
 /** data/hai7.json 行结构 */
 export interface Hai7Row {
@@ -90,6 +93,7 @@ export function initTableLoader(context: ExtensionContext): void {
     cachedGjtgSet = null;
     cachedHai7 = null;
     hai7LoadFailed = false;
+    cachedJd30.clear();
 }
 
 /**
@@ -257,7 +261,24 @@ function sliceToDict(arr: string[], start: number, end: number, value: string): 
     return out;
 }
 
-/** 自定义替换表检查：预置「表」id（使用 tgscc / fswv / gjtg / hai7 数据与逻辑） */
+/** data/jd30 校对词表。匹配正文时不分词。 */
+export const JD30_PRESET_IDS = [
+    'preset_jd30_window_both',
+    'preset_jd30_window_prefix',
+    'preset_jd30_window_suffix',
+    'preset_jd30_dominant',
+] as const;
+
+export type Jd30PresetId = (typeof JD30_PRESET_IDS)[number];
+
+const JD30_FILES: Record<Jd30PresetId, string> = {
+    preset_jd30_window_both: '校对词-扩窗-前后词.txt',
+    preset_jd30_window_prefix: '校对词-扩窗-前词.txt',
+    preset_jd30_window_suffix: '校对词-扩窗-后词.txt',
+    preset_jd30_dominant: '校对词-绝对优势-不成词.txt',
+};
+
+/** 自定义替换表检查：预置「表」id（使用 tgscc / fswv / gjtg / hai7 / jd30 数据与逻辑） */
 export type CustomPresetId =
     | 'preset_traditional'
     | 'preset_variant'
@@ -265,7 +286,8 @@ export type CustomPresetId =
     | 'preset_fswv'
     | 'preset_gjtg'
     | 'preset_hai7_person'
-    | 'preset_hai7_era';
+    | 'preset_hai7_era'
+    | Jd30PresetId;
 
 const CUSTOM_PRESET_LABELS: Record<CustomPresetId, string> = {
     preset_traditional: '通规繁体字→规范字',
@@ -275,6 +297,10 @@ const CUSTOM_PRESET_LABELS: Record<CustomPresetId, string> = {
     preset_gjtg: '非古籍通规字形',
     preset_hai7_person: '人名信息',
     preset_hai7_era: '年号信息',
+    preset_jd30_window_both: '校对词·扩窗-前后词',
+    preset_jd30_window_prefix: '校对词·扩窗-前词',
+    preset_jd30_window_suffix: '校对词·扩窗-后词',
+    preset_jd30_dominant: '校对词·绝对优势-不成词',
 };
 
 export function isPresetHai7Person(presetId: CustomPresetId): boolean {
@@ -283,6 +309,11 @@ export function isPresetHai7Person(presetId: CustomPresetId): boolean {
 
 export function isPresetHai7Era(presetId: CustomPresetId): boolean {
     return presetId === 'preset_hai7_era';
+}
+
+/** jd30 校对词表：对正文做字面匹配，不先分词。 */
+export function isPresetJd30(presetId: CustomPresetId): presetId is Jd30PresetId {
+    return (JD30_PRESET_IDS as readonly string[]).includes(presetId);
 }
 
 export function getCustomPresetLabel(id: CustomPresetId): string {
@@ -297,9 +328,10 @@ export const CUSTOM_PRESET_IDS: CustomPresetId[] = [
     'preset_gjtg',
     'preset_hai7_person',
     'preset_hai7_era',
+    ...JD30_PRESET_IDS,
 ];
 
-/** 是否需要分词后再匹配（多字词表） */
+/** 是否需要分词后再匹配（多字词表）。jd30 校对词表不在此列。 */
 export function isPresetRequiringSegmentation(presetId: CustomPresetId): boolean {
     return presetId === 'preset_fswv';
 }
@@ -309,10 +341,33 @@ export function isPresetGjtg(presetId: CustomPresetId): boolean {
     return presetId === 'preset_gjtg';
 }
 
-/**
- * 获取自定义检查预置「表」的字典（用于扫描）；无数据时返回空对象。
- */
+function ensureJd30Dict(presetId: Jd30PresetId): Record<string, string> {
+    const cached = cachedJd30.get(presetId);
+    if (cached) return cached;
+    const empty: Record<string, string> = {};
+    if (!contextForPath) return empty;
+    const txtPath = contextForPath.asAbsolutePath(path.join('data', 'jd30', JD30_FILES[presetId]));
+    if (!fs.existsSync(txtPath)) {
+        cachedJd30.set(presetId, empty);
+        return empty;
+    }
+    try {
+        const rules = parseCustomTableFile(fs.readFileSync(txtPath, 'utf8'));
+        const dict: Record<string, string> = {};
+        for (const rule of rules) {
+            if (dict[rule.find] === undefined) dict[rule.find] = rule.replace;
+        }
+        cachedJd30.set(presetId, dict);
+        return dict;
+    } catch {
+        cachedJd30.set(presetId, empty);
+        return empty;
+    }
+}
+
+/** 获取自定义检查预置「表」的字典（用于扫描）；无数据时返回空对象。 */
 export function getCustomPresetDict(presetId: CustomPresetId): Record<string, string> {
+    if (isPresetJd30(presetId)) return ensureJd30Dict(presetId);
     try {
         const data = ensureTgsccLoaded();
         if (presetId === 'preset_traditional') {
