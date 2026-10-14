@@ -5,7 +5,7 @@
 
 import * as vscode from 'vscode';
 import { getCustomTables } from './customTableCache';
-import { getCustomPresetLabel, CUSTOM_PRESET_IDS, isPresetJd30, type CustomPresetId } from './tableLoader';
+import { getCustomPresetLabel, CUSTOM_PRESET_IDS, type CustomPresetId } from './tableLoader';
 
 export const CUSTOM_TABLES_VIEW_ID = 'ai-proofread.customTables';
 
@@ -107,7 +107,7 @@ export class CustomTablesTreeDataProvider implements vscode.TreeDataProvider<Cus
         item.checkboxState = checked ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
         item.contextValue = element.isPreset ? 'customTablePreset' : 'customTableUser';
         if (element.isPreset) {
-            item.description = isPresetJd30(element.id as CustomPresetId) ? '预置 · 分词' : '预置';
+            item.description = '预置';
         } else {
             const table = getCustomTables().find((t) => t.id === element.id);
             if (table) {

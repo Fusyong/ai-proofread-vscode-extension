@@ -129,7 +129,7 @@ function scanDocumentSingleCharDict(
 
 /**
  * 分词后再检查：仅当 jieba 分词结果为完整词时，才与字典匹配。
- * 用于需分词的预置表（一异表、绝对优势-不成词等），整词匹配，减少误报。
+ * 用于 dict7 的异形词表及未儿化→儿化词表（variant_to_*、non_erhua_to_erhua_single、non_erhua_to_erhua_multi），整词匹配，减少误报。
  */
 export function scanDocumentWithSegmentation(
     document: vscode.TextDocument,

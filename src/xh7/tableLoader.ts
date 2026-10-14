@@ -8,7 +8,6 @@ import * as path from 'path';
 import type { ExtensionContext } from 'vscode';
 import type { CheckType } from './types';
 import type { WordCheckNotes } from './types';
-import { parseCustomTableFile } from './customTableParser';
 
 /** dict7 / xh7_tables 结构 */
 interface Xh7TablesJson {
@@ -68,8 +67,6 @@ let cachedGjtgSet: Set<string> | null = null;
 let cachedHai7: Hai7Json | null = null;
 let hai7LoadFailed = false;
 let contextForPath: ExtensionContext | null = null;
-/** data/校对词-绝对优势-不成词.txt：查找串 → 建议串。匹配前先分词，仅整词命中。 */
-const cachedJd30 = new Map<Jd30PresetId, Record<string, string>>();
 
 /** data/hai7.json 行结构 */
 export interface Hai7Row {
@@ -93,7 +90,6 @@ export function initTableLoader(context: ExtensionContext): void {
     cachedGjtgSet = null;
     cachedHai7 = null;
     hai7LoadFailed = false;
-    cachedJd30.clear();
 }
 
 /**
@@ -261,16 +257,7 @@ function sliceToDict(arr: string[], start: number, end: number, value: string): 
     return out;
 }
 
-/** 校对词表「绝对优势-不成词」。匹配前先分词。 */
-export const JD30_PRESET_IDS = ['preset_jd30_dominant'] as const;
-
-export type Jd30PresetId = (typeof JD30_PRESET_IDS)[number];
-
-const JD30_FILES: Record<Jd30PresetId, string> = {
-    preset_jd30_dominant: '校对词-绝对优势-不成词.txt',
-};
-
-/** 自定义替换表检查：预置「表」id（使用 tgscc / fswv / gjtg / hai7 / jd30 数据与逻辑） */
+/** 自定义替换表检查：预置「表」id（使用 tgscc / fswv / gjtg / hai7 数据与逻辑） */
 export type CustomPresetId =
     | 'preset_traditional'
     | 'preset_variant'
@@ -278,8 +265,7 @@ export type CustomPresetId =
     | 'preset_fswv'
     | 'preset_gjtg'
     | 'preset_hai7_person'
-    | 'preset_hai7_era'
-    | Jd30PresetId;
+    | 'preset_hai7_era';
 
 const CUSTOM_PRESET_LABELS: Record<CustomPresetId, string> = {
     preset_traditional: '通规繁体字→规范字',
@@ -289,7 +275,6 @@ const CUSTOM_PRESET_LABELS: Record<CustomPresetId, string> = {
     preset_gjtg: '非古籍通规字形',
     preset_hai7_person: '人名信息',
     preset_hai7_era: '年号信息',
-    preset_jd30_dominant: '校对词·绝对优势-不成词',
 };
 
 export function isPresetHai7Person(presetId: CustomPresetId): boolean {
@@ -298,11 +283,6 @@ export function isPresetHai7Person(presetId: CustomPresetId): boolean {
 
 export function isPresetHai7Era(presetId: CustomPresetId): boolean {
     return presetId === 'preset_hai7_era';
-}
-
-/** jd30 校对词表：先分词，仅当查找串被切成一个词时命中。 */
-export function isPresetJd30(presetId: CustomPresetId): presetId is Jd30PresetId {
-    return (JD30_PRESET_IDS as readonly string[]).includes(presetId);
 }
 
 export function getCustomPresetLabel(id: CustomPresetId): string {
@@ -317,12 +297,11 @@ export const CUSTOM_PRESET_IDS: CustomPresetId[] = [
     'preset_gjtg',
     'preset_hai7_person',
     'preset_hai7_era',
-    ...JD30_PRESET_IDS,
 ];
 
-/** 是否需要分词后再匹配（多字词表，以及 jd30 校对词表）。 */
+/** 是否需要分词后再匹配（多字词表） */
 export function isPresetRequiringSegmentation(presetId: CustomPresetId): boolean {
-    return presetId === 'preset_fswv' || isPresetJd30(presetId);
+    return presetId === 'preset_fswv';
 }
 
 /** 是否为「非古籍通规字形」预置（使用 gjtg.txt 逐字扫描，不走字典） */
@@ -330,33 +309,10 @@ export function isPresetGjtg(presetId: CustomPresetId): boolean {
     return presetId === 'preset_gjtg';
 }
 
-function ensureJd30Dict(presetId: Jd30PresetId): Record<string, string> {
-    const cached = cachedJd30.get(presetId);
-    if (cached) return cached;
-    const empty: Record<string, string> = {};
-    if (!contextForPath) return empty;
-    const txtPath = contextForPath.asAbsolutePath(path.join('data', JD30_FILES[presetId]));
-    if (!fs.existsSync(txtPath)) {
-        cachedJd30.set(presetId, empty);
-        return empty;
-    }
-    try {
-        const rules = parseCustomTableFile(fs.readFileSync(txtPath, 'utf8'));
-        const dict: Record<string, string> = {};
-        for (const rule of rules) {
-            if (dict[rule.find] === undefined) dict[rule.find] = rule.replace;
-        }
-        cachedJd30.set(presetId, dict);
-        return dict;
-    } catch {
-        cachedJd30.set(presetId, empty);
-        return empty;
-    }
-}
-
-/** 获取自定义检查预置「表」的字典（用于扫描）；无数据时返回空对象。 */
+/**
+ * 获取自定义检查预置「表」的字典（用于扫描）；无数据时返回空对象。
+ */
 export function getCustomPresetDict(presetId: CustomPresetId): Record<string, string> {
-    if (isPresetJd30(presetId)) return ensureJd30Dict(presetId);
     try {
         const data = ensureTgsccLoaded();
         if (presetId === 'preset_traditional') {
