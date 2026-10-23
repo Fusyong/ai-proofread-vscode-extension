@@ -4,6 +4,7 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 import { convertDocxToMarkdown, convertMarkdownToDocx, convertPdfToMarkdown, collectPdfToTextOptions } from '../docConverter';
 import { FilePathUtils, ErrorUtils } from '../utils';
 
@@ -153,54 +154,123 @@ export class DocumentConvertCommandHandler {
     }
 
     /**
-     * 处理PDF转markdown命令
+     * 处理PDF转markdown命令。可一次选择多个 PDF，参数只询问一次，再按相同参数逐一转换。
      */
     public async handleConvertPdfToMarkdownCommand(): Promise<void> {
-        // 让用户选择文件
-        const fileUri = await vscode.window.showOpenDialog({
+        const fileUris = await vscode.window.showOpenDialog({
             canSelectFiles: true,
             canSelectFolders: false,
-            canSelectMany: false,
+            canSelectMany: true,
+            title: '选择 PDF 文件（可多选）',
             filters: {
                 'PDF文件': ['pdf']
             }
         });
 
-        if (!fileUri || fileUri.length === 0) {
+        if (!fileUris || fileUris.length === 0) {
             return;
         }
 
-        // 收集用户选择的参数
-        const options = await collectPdfToTextOptions();
+        const options = await collectPdfToTextOptions(fileUris.length);
         if (!options) {
-            // 用户取消了参数选择
             return;
         }
 
-        // 生成输出文件路径
-        const outputPath = FilePathUtils.getFilePath(fileUri[0].fsPath, '', '.md');
-        // 如果输出文件已存在，备份旧文件为.bak，并删除原文件以确保 pdftotext 能写入新文件
-        FilePathUtils.backupFileIfExists(outputPath, true);
+        const total = fileUris.length;
+        const failures: string[] = [];
+        let completed = 0;
+        let cancelled = false;
 
-        // 等待文件写入完成的辅助函数
-        async function waitForFile(filePath: string, maxTries = 50, interval = 200): Promise<boolean> {
-            for (let i = 0; i < maxTries; i++) {
-                if (fs.existsSync(filePath)) return true;
-                await new Promise(res => setTimeout(res, interval));
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: total === 1 ? 'PDF 转 Markdown' : `PDF 转 Markdown（共 ${total} 个）`,
+            cancellable: true
+        }, async (progress, token) => {
+            for (let i = 0; i < fileUris.length; i++) {
+                if (token.isCancellationRequested) {
+                    cancelled = true;
+                    break;
+                }
+
+                const pdfPath = fileUris[i].fsPath;
+                const fileName = path.basename(pdfPath);
+                progress.report({
+                    message: `(${i + 1}/${total}) ${fileName}`
+                });
+
+                const outputPath = FilePathUtils.getFilePath(pdfPath, '', '.md');
+                FilePathUtils.backupFileIfExists(outputPath, true);
+
+                try {
+                    await convertPdfToMarkdown(pdfPath, outputPath, options, token);
+                    completed++;
+                    progress.report({ increment: 100 / total });
+                } catch (error) {
+                    if (error instanceof vscode.CancellationError || token.isCancellationRequested) {
+                        cancelled = true;
+                        this.removePartialPdfOutput(outputPath);
+                        break;
+                    }
+                    const message = error instanceof Error ? error.message : String(error);
+                    failures.push(message);
+                    progress.report({ increment: 100 / total });
+                }
             }
-            return false;
-        }
+        });
 
+        this.showPdfConvertSummary(total, completed, failures, cancelled);
+    }
+
+    /** 取消时删掉尚未写完的输出，避免把半成品当成转换结果。 */
+    private removePartialPdfOutput(outputPath: string): void {
+        if (!fs.existsSync(outputPath)) {
+            return;
+        }
         try {
-            await convertPdfToMarkdown(fileUri[0].fsPath, outputPath, options);
-
-            // 等待文件写入完成
-            const fileReady = await waitForFile(outputPath, 50, 200);
-            if (!fileReady) throw new Error('文件写入超时（10秒）');
-
-            vscode.window.showInformationMessage('转换完成！');
-        } catch (error) {
-            ErrorUtils.showError(error, '转换文件时出错：');
+            fs.unlinkSync(outputPath);
+        } catch {
+            // 文件仍被占用时保留现场，用户可从输出面板查看取消记录。
         }
+    }
+
+    private showPdfConvertSummary(
+        total: number,
+        completed: number,
+        failures: string[],
+        cancelled: boolean
+    ): void {
+        if (cancelled) {
+            if (failures.length > 0) {
+                vscode.window.showInformationMessage(
+                    `已取消，已完成 ${completed}/${total} 个，${failures.length} 个失败。详情见输出面板「PDF转换」。`
+                );
+            } else {
+                vscode.window.showInformationMessage(
+                    completed > 0 ? `已取消，已完成 ${completed}/${total} 个。` : '已取消。'
+                );
+            }
+            return;
+        }
+
+        if (failures.length === 0) {
+            vscode.window.showInformationMessage(
+                total === 1 ? '转换完成！' : `转换完成！共 ${total} 个文件。`
+            );
+            return;
+        }
+
+        if (completed === 0 && total === 1) {
+            ErrorUtils.showError(failures[0], '转换文件时出错：');
+            return;
+        }
+
+        const detail = '详情见输出面板「PDF转换」。';
+        if (completed === 0) {
+            vscode.window.showErrorMessage(`${total} 个文件均转换失败。${detail}`);
+            return;
+        }
+        vscode.window.showWarningMessage(
+            `已转换 ${completed}/${total} 个文件，${failures.length} 个失败。${detail}`
+        );
     }
 }

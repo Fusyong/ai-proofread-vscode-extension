@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { FilePathUtils, ErrorUtils, CommandBuilder } from './utils';
+import { FilePathUtils, CommandBuilder } from './utils';
 import { ensurePdfToTextAvailable } from './pdfToTextPath';
 
 const execAsync = promisify(exec);
@@ -188,77 +188,145 @@ export async function convertMarkdownToDocx(mdPath: string, outputPath?: string 
     }
 }
 
+let pdfConvertOutput: vscode.OutputChannel | undefined;
+
+function getPdfConvertOutput(): vscode.OutputChannel {
+    if (!pdfConvertOutput) {
+        pdfConvertOutput = vscode.window.createOutputChannel('PDF转换');
+    }
+    return pdfConvertOutput;
+}
+
 /**
- * 构建 pdftotext 命令
- * @param pdfPath PDF文件路径
- * @param outputPath 输出文件路径
- * @param options 参数选项
- * @returns 完整的命令字符串
+ * 组装 pdftotext 参数。路径使用调用方传入的原样字符串，便于直接交给 spawn。
  */
-function buildPdfToTextCommand(
+export function buildPdfToTextArgs(
     pdfPath: string,
     outputPath: string,
-    options: PdfToTextOptions,
-    pdfToTextExe: string
-): string {
-    const args: string[] = [];
+    options: PdfToTextOptions
+): string[] {
+    const args: string[] = [`-${options.layoutMode}`, '-enc', 'UTF-8'];
 
-    // 布局模式（必选）
-    args.push(`-${options.layoutMode}`);
-
-    // 编码（固定为 UTF-8）
-    args.push('-enc UTF-8');
-
-    // 页码范围
     if (options.pageRange?.firstPage) {
-        args.push(`-f ${options.pageRange.firstPage}`);
+        args.push('-f', String(options.pageRange.firstPage));
     }
     if (options.pageRange?.lastPage) {
-        args.push(`-l ${options.pageRange.lastPage}`);
+        args.push('-l', String(options.pageRange.lastPage));
     }
 
-    // 边距
     if (options.margins?.left !== undefined) {
-        args.push(`-marginl ${options.margins.left}`);
+        args.push('-marginl', String(options.margins.left));
     }
     if (options.margins?.right !== undefined) {
-        args.push(`-marginr ${options.margins.right}`);
+        args.push('-marginr', String(options.margins.right));
     }
     if (options.margins?.top !== undefined) {
-        args.push(`-margint ${options.margins.top}`);
+        args.push('-margint', String(options.margins.top));
     }
     if (options.margins?.bottom !== undefined) {
-        args.push(`-marginb ${options.margins.bottom}`);
+        args.push('-marginb', String(options.margins.bottom));
     }
 
-    // 布局参数
     if (options.fixed !== undefined) {
-        args.push(`-fixed ${options.fixed}`);
+        args.push('-fixed', String(options.fixed));
     }
     if (options.linespacing !== undefined) {
-        args.push(`-linespacing ${options.linespacing}`);
+        args.push('-linespacing', String(options.linespacing));
     }
 
-    // 其他选项
     if (options.nodiag) {
         args.push('-nodiag');
     }
 
-    // 构建完整命令
-    const pdfDir = path.dirname(pdfPath);
-    const pdfFileName = path.basename(pdfPath);
-    const outputFileName = path.basename(outputPath);
+    args.push(pdfPath, outputPath);
+    return args;
+}
 
+function quoteCommandArg(arg: string): string {
+    if (arg.length === 0 || /[\s"]/.test(arg)) {
+        return `"${arg.replace(/"/g, '\\"')}"`;
+    }
+    return arg;
+}
+
+function formatPdfToTextCommand(pdfToTextExe: string, args: string[]): string {
     const exe = CommandBuilder.formatExecutable(pdfToTextExe);
-    const baseCommand = `${exe} ${args.join(' ')} "${pdfFileName}" "${outputFileName}"`;
-    return CommandBuilder.buildCommand(pdfDir, baseCommand);
+    return [exe, ...args.map(quoteCommandArg)].join(' ');
 }
 
 /**
- * 收集用户选择的 pdftotext 参数
+ * 运行 pdftotext 并等待进程结束。取消时终止当前进程。
+ */
+function runPdfToText(
+    pdfToTextExe: string,
+    args: string[],
+    token?: vscode.CancellationToken
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (token?.isCancellationRequested) {
+            reject(new vscode.CancellationError());
+            return;
+        }
+
+        const child = spawn(pdfToTextExe, args, {
+            windowsHide: true,
+            stdio: ['ignore', 'ignore', 'pipe']
+        });
+
+        let stderr = '';
+        let settled = false;
+        let subscription: vscode.Disposable | undefined;
+        const finish = (handler: () => void) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            subscription?.dispose();
+            handler();
+        };
+
+        child.stderr?.on('data', (chunk: Buffer) => {
+            stderr += chunk.toString();
+            if (stderr.length > 16000) {
+                stderr = stderr.slice(-16000);
+            }
+        });
+
+        subscription = token?.onCancellationRequested(() => {
+            if (!child.killed) {
+                child.kill();
+            }
+        });
+
+        child.on('error', (error) => {
+            finish(() => reject(error));
+        });
+
+        child.on('close', (code) => {
+            finish(() => {
+                if (code === 0) {
+                    resolve();
+                    return;
+                }
+                if (token?.isCancellationRequested) {
+                    reject(new vscode.CancellationError());
+                    return;
+                }
+                const detail = stderr.trim();
+                reject(new Error(detail ? `pdftotext 退出码 ${code}：${detail}` : `pdftotext 退出码 ${code}`));
+            });
+        });
+    });
+}
+
+/**
+ * 收集用户选择的 pdftotext 参数。
+ * 多文件时只询问一次，同一套参数用于随后的每一份文件。
+ * @param fileCount 将要转换的文件数，大于 1 时在模式选择处注明适用范围
  * @returns 参数选项，如果用户取消则返回 undefined
  */
-export async function collectPdfToTextOptions(): Promise<PdfToTextOptions | undefined> {
+export async function collectPdfToTextOptions(fileCount = 1): Promise<PdfToTextOptions | undefined> {
+    const scopeHint = fileCount > 1 ? `（以下参数将用于全部 ${fileCount} 个文件）` : '';
     // 步骤1：选择预设模式或自定义
     const presetItems = [
         { label: PRESET_MODES.default.name, description: PRESET_MODES.default.description, value: 'default' },
@@ -270,7 +338,7 @@ export async function collectPdfToTextOptions(): Promise<PdfToTextOptions | unde
     ];
 
     const presetChoice = await vscode.window.showQuickPick(presetItems, {
-        placeHolder: '请选择转换模式',
+        placeHolder: `请选择转换模式${scopeHint}`,
         ignoreFocusOut: true
     });
 
@@ -552,16 +620,18 @@ export async function collectPdfToTextOptions(): Promise<PdfToTextOptions | unde
 }
 
 /**
- * 将PDF文件转换为markdown
+ * 将PDF文件转换为markdown，并等待 pdftotext 进程结束。
  * @param pdfPath PDF文件路径
  * @param outputPath 输出文件路径
  * @param options 参数选项（如果未提供，将使用默认选项）
+ * @param token 取消令牌；取消时终止当前这一份的转换
  * @returns 转换后的markdown文件路径
  */
 export async function convertPdfToMarkdown(
     pdfPath: string,
     outputPath?: string | undefined,
-    options?: PdfToTextOptions
+    options?: PdfToTextOptions,
+    token?: vscode.CancellationToken
 ): Promise<string> {
     if (!outputPath) {
         outputPath = FilePathUtils.getFilePath(pdfPath, '', '.md');
@@ -572,19 +642,33 @@ export async function convertPdfToMarkdown(
         options = { layoutMode: 'layout' };
     }
 
+    const channel = getPdfConvertOutput();
+    channel.show(true);
+    channel.appendLine(`--- ${path.basename(pdfPath)} ---`);
+
     try {
         const pdfToTextExe = await ensurePdfToTextAvailable();
+        const args = buildPdfToTextArgs(pdfPath, outputPath, options);
+        channel.appendLine(formatPdfToTextCommand(pdfToTextExe, args));
 
-        let terminal = vscode.window.terminals.find(t => t.name === 'PDF转换');
-        if (!terminal) {
-            terminal = vscode.window.createTerminal('PDF转换');
+        await runPdfToText(pdfToTextExe, args, token);
+
+        if (!fs.existsSync(outputPath)) {
+            throw new Error('pdftotext 已结束，但未生成输出文件');
         }
 
-        const command = buildPdfToTextCommand(pdfPath, outputPath, options, pdfToTextExe);
-        terminal.sendText(command);
-
+        channel.appendLine('完成');
+        channel.appendLine('');
         return outputPath;
     } catch (error) {
-        throw new Error(`转换PDF到markdown失败: ${error}`);
+        if (error instanceof vscode.CancellationError) {
+            channel.appendLine('已取消');
+            channel.appendLine('');
+            throw error;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        channel.appendLine(`失败: ${message}`);
+        channel.appendLine('');
+        throw new Error(`转换PDF到markdown失败: ${message}`);
     }
 }

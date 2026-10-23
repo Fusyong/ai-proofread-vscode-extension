@@ -988,7 +988,7 @@ export class WebviewManager {
                 <h3>📄 文档整理</h3>
                 <p class="hint">多数按钮作用于当前编辑窗口中打开的文档</p>
                 <div class="section-actions">
-                <button class="action-button" onclick="handleAction('convertPdfToMarkdown')" title="${commandHoverTitle('将 PDF 转为 Markdown', 'ai-proofread.convertPdfToMarkdown')}">PDF → Markdown</button>
+                <button class="action-button" onclick="handleAction('convertPdfToMarkdown')" title="${commandHoverTitle('将 PDF 转为 Markdown，可多选并以相同参数逐一转换', 'ai-proofread.convertPdfToMarkdown')}">PDF → Markdown</button>
                     <button class="action-button" onclick="handleAction('convertDocxToMarkdown')" title="${commandHoverTitle('将 Word 转为 Markdown', 'ai-proofread.convertDocxToMarkdown')}">docx → Markdown</button>
                     <button class="action-button" onclick="handleAction('convertMarkdownToDocx')" title="${commandHoverTitle('将 Markdown 转为 Word', 'ai-proofread.convertMarkdownToDocx')}">Markdown → docx</button>
                     ${sep}
