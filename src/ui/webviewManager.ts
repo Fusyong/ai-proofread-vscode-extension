@@ -660,6 +660,15 @@ export class WebviewManager {
                     }
                     break;
                 }
+                case 'extractFactClaims': {
+                    const jsonPath = this.getSplitJsonPath();
+                    if (!jsonPath) {
+                        vscode.window.showWarningMessage('请先完成切分，或未找到 JSON 文件。');
+                        break;
+                    }
+                    await vscode.commands.executeCommand('ai-proofread.factCheck.extract', jsonPath);
+                    break;
+                }
                 case 'referencePrepJson': {
                     const jsonPath = this.getSplitJsonPath();
                     if (!jsonPath) {
@@ -1115,6 +1124,7 @@ export class WebviewManager {
                     ${mainPath && jsonMdPath ? `<button class="action-button" onclick="handleAction('showSplitDiff')" title="${commandHoverTitle('主稿与切分 Markdown 的内置 diff（任意两文件亦可）', 'ai-proofread.diffItWithAnotherFile')}">比较前后差异</button>` : ''}
                     <button class="action-button" onclick="handleAction('mergeContext')" title="${commandHoverTitle('合并 JSON', 'ai-proofread.mergeTwoFiles')}">合并 JSON</button>
                     <button class="action-button" onclick="handleAction('referencePrepJson')" title="${commandHoverTitle('打开切分 JSON 并打开检索面板', 'ai-proofread.prepareReferencesJson')}">准备参考资料</button>
+                    <button class="action-button" onclick="handleAction('extractFactClaims')" title="${commandHoverTitle('从切分 JSON 抽出待核断言，供勾选后再联网检索', 'ai-proofread.factCheck.extract')}">抽取待核断言</button>
                     <button class="action-button" onclick="handleAction('proofreadJson')" title="${llmTitle}"${llmDisabled}>${llmLabel}</button>
                     <button class="action-button" onclick="handleAction('proofreadJsonOverlay')" title="${overlayTitle}"${overlayDisabled}>${overlayLabel}</button>
                 </div>

@@ -792,6 +792,93 @@
         "category": "%category%"
       },
       {
+        "command": "ai-proofread.factCheck.extract",
+        "title": "%cmd.factCheck.extract.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.factCheck.openView",
+        "title": "%cmd.factCheck.openView.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.factCheck.toggleView",
+        "title": "%cmd.factCheck.toggleView.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.factCheck.selectKey",
+        "title": "%cmd.factCheck.selectKey.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.factCheck.selectKey.shortTitle%"
+      },
+      {
+        "command": "ai-proofread.factCheck.selectCategory",
+        "title": "%cmd.factCheck.selectCategory.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.factCheck.selectCategory.shortTitle%"
+      },
+      {
+        "command": "ai-proofread.factCheck.selectUrgency",
+        "title": "%cmd.factCheck.selectUrgency.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.factCheck.selectUrgency.shortTitle%"
+      },
+      {
+        "command": "ai-proofread.factCheck.clearGeneral",
+        "title": "%cmd.factCheck.clearGeneral.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.factCheck.clearGeneral.shortTitle%"
+      },
+      {
+        "command": "ai-proofread.factCheck.copyChecklist",
+        "title": "%cmd.factCheck.copyChecklist.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.factCheck.copyChecklist.shortTitle%"
+      },
+      {
+        "command": "ai-proofread.factCheck.searchSelected",
+        "title": "%cmd.factCheck.searchSelected.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.factCheck.searchSelected.shortTitle%"
+      },
+      {
+        "command": "ai-proofread.factCheck.setSort",
+        "title": "%cmd.factCheck.setSort.title%",
+        "category": "%category%",
+        "shortTitle": "%cmd.factCheck.setSort.shortTitle%"
+      },
+      {
+        "command": "ai-proofread.factCheck.copyQuery",
+        "title": "%cmd.factCheck.copyQuery.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.factCheck.copyClaim",
+        "title": "%cmd.factCheck.copyClaim.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.factCheck.openShidianguji",
+        "title": "%cmd.factCheck.openShidianguji.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.factCheck.openAncientbooks",
+        "title": "%cmd.factCheck.openAncientbooks.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.factCheck.openWikipedia",
+        "title": "%cmd.factCheck.openWikipedia.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "ai-proofread.factCheck.searchReferences",
+        "title": "%cmd.factCheck.searchReferences.title%",
+        "category": "%category%"
+      },
+      {
         "command": "ai-proofread.proofreadItems.toggleView",
         "title": "%cmd.proofreadItems.toggleView.title%",
         "category": "%category%"
@@ -890,6 +977,50 @@
           "type": "string",
           "default": "http://localhost:11434",
           "description": "Ollama本地模型服务地址，如: http://localhost:11434"
+        },
+        "ai-proofread.apiKeys.iqs": {
+          "order": 18.5,
+          "type": "string",
+          "default": "",
+          "description": "阿里云信息查询服务（IQS）API Key，用于网页检索。与百炼 Key 不是同一把。"
+        },
+        "ai-proofread.factCheck.scope": {
+          "order": 18.6,
+          "type": "string",
+          "enum": ["key", "general"],
+          "enumDescriptions": [
+            "只抽关键事实（数字、年代、专名属性）",
+            "关键事实之外再抽一般问题"
+          ],
+          "default": "key",
+          "description": "待核断言的核查范围。一般问题包含关键事实，但默认不勾选。"
+        },
+        "ai-proofread.factCheck.defaultUrgencyMin": {
+          "order": 18.7,
+          "type": "number",
+          "default": 0.6,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "默认勾选的紧迫程度下限。只作用于关键事实。"
+        },
+        "ai-proofread.factCheck.searchProvider": {
+          "order": 18.8,
+          "type": "string",
+          "enum": ["auto", "deepseek", "iqs"],
+          "enumDescriptions": [
+            "跟随校对平台：DeepSeek 用 DeepSeek Search，阿里云用 IQS",
+            "DeepSeek Search（使用 DeepSeek API Key）",
+            "阿里云 IQS LiteAdvanced（使用 IQS API Key）"
+          ],
+          "default": "auto",
+          "description": "待核断言的联网检索提供者。"
+        },
+        "ai-proofread.factCheck.excludeSites": {
+          "order": 18.9,
+          "type": "array",
+          "default": ["baike.baidu.com"],
+          "items": { "type": "string" },
+          "description": "网页检索排除的站点主机名。默认排除百度百科。不向搜索接口发送自然语言信源偏好。"
         },
         "ai-proofread.proofread.models.ollama": {
           "order": 19,
@@ -2136,6 +2267,11 @@
           "when": "aiProofread.showProofreadItemsView"
         },
         {
+          "id": "ai-proofread.factCheckClaims",
+          "name": "%view.factCheckClaims%",
+          "when": "aiProofread.showFactCheckView"
+        },
+        {
           "id": "ai-proofread.translateReview",
           "name": "%view.translateReview%",
           "when": "aiProofread.showTranslateReviewView"
@@ -2245,6 +2381,41 @@
           "group": "2_filter"
         },
         {
+          "command": "ai-proofread.factCheck.selectKey",
+          "when": "view == ai-proofread.factCheckClaims",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ai-proofread.factCheck.selectCategory",
+          "when": "view == ai-proofread.factCheckClaims",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ai-proofread.factCheck.selectUrgency",
+          "when": "view == ai-proofread.factCheckClaims",
+          "group": "navigation@3"
+        },
+        {
+          "command": "ai-proofread.factCheck.clearGeneral",
+          "when": "view == ai-proofread.factCheckClaims",
+          "group": "navigation@4"
+        },
+        {
+          "command": "ai-proofread.factCheck.copyChecklist",
+          "when": "view == ai-proofread.factCheckClaims",
+          "group": "1_ops@1"
+        },
+        {
+          "command": "ai-proofread.factCheck.searchSelected",
+          "when": "view == ai-proofread.factCheckClaims",
+          "group": "1_ops@2"
+        },
+        {
+          "command": "ai-proofread.factCheck.setSort",
+          "when": "view == ai-proofread.factCheckClaims",
+          "group": "1_ops@3"
+        },
+        {
           "command": "ai-proofread.prompts.new",
           "when": "view == ai-proofread.prompts",
           "group": "navigation@1"
@@ -2280,6 +2451,36 @@
           "command": "ai-proofread.proofreadItems.diffItem",
           "when": "view == ai-proofread.proofreadItems && viewItem == proofreadItem",
           "group": "proofreadItems@1"
+        },
+        {
+          "command": "ai-proofread.factCheck.copyQuery",
+          "when": "view == ai-proofread.factCheckClaims && viewItem == factCheckClaim",
+          "group": "factCheck@1"
+        },
+        {
+          "command": "ai-proofread.factCheck.copyClaim",
+          "when": "view == ai-proofread.factCheckClaims && viewItem == factCheckClaim",
+          "group": "factCheck@2"
+        },
+        {
+          "command": "ai-proofread.factCheck.openShidianguji",
+          "when": "view == ai-proofread.factCheckClaims && viewItem == factCheckClaim",
+          "group": "factCheck@3"
+        },
+        {
+          "command": "ai-proofread.factCheck.openAncientbooks",
+          "when": "view == ai-proofread.factCheckClaims && viewItem == factCheckClaim",
+          "group": "factCheck@4"
+        },
+        {
+          "command": "ai-proofread.factCheck.openWikipedia",
+          "when": "view == ai-proofread.factCheckClaims && viewItem == factCheckClaim",
+          "group": "factCheck@5"
+        },
+        {
+          "command": "ai-proofread.factCheck.searchReferences",
+          "when": "view == ai-proofread.factCheckClaims && viewItem == factCheckClaim",
+          "group": "factCheck@6"
         },
         {
           "command": "ai-proofread.referencePrep.showDiff",

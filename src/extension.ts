@@ -62,6 +62,7 @@ import { registerPromptsView, type PromptTreeItem } from './promptsView';
 import { SourceTextCharacteristicManager } from './sourceTextCharacteristicManager';
 import { registerSourceTextCharacteristicsView, type SourceCharacteristicTreeItem } from './sourceTextCharacteristicsView';
 import { registerProofreadItemsView, WS_KEY_LAST_ITEM_JSON } from './proofreadItemsView';
+import { registerFactCheckClaimsView } from './factCheck/factCheckClaimsView';
 import {
     registerTranslateReviewView,
     openTranslateReviewUnit,
@@ -190,6 +191,7 @@ export async function activate(context: vscode.ExtensionContext) {
         sourceTextCharacteristicManager
     );
     registerProofreadItemsView(context);
+    registerFactCheckClaimsView(context);
     registerTranslateReviewView(context);
 
     // numbering / proofreadItems 由侧栏开关或相关命令控制显示

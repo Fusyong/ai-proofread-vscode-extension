@@ -1507,7 +1507,7 @@ body.mode-json .btn-json-only { display: inline-block; }
     <span class="cmd-sep" aria-hidden="true">|</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.search.wikipedia" title="${commandHoverTitle('仅维基百科（规划+精排）', 'ai-proofread.search.wikipedia')}">查维基</button>
     <span class="cmd-sep" aria-hidden="true">|</span>
-    <button type="button" class="link-button" data-cmd="ai-proofread.search.web" title="${commandHoverTitle('Web 搜索尚未实现', 'ai-proofread.search.web')}" disabled style="opacity:0.5;cursor:not-allowed;text-decoration:none;">Web（未实现）</button>
+    <button type="button" class="link-button" id="btnWebSearch" data-cmd="ai-proofread.search.web" title="请配置 DeepSeek 或 IQS API Key" disabled style="opacity:0.5;cursor:not-allowed;text-decoration:none;">Web（未配置）</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
     <button type="button" class="link-button" data-cmd="ai-proofread.llmGrepSearchReferences" title="${commandHoverTitle('用自然语言描述检索意图，LLM 规划后多源检索（默认词典+grep+BM25+向量）', 'ai-proofread.llmGrepSearchReferences')}">意图检索</button>
     <span class="cmd-sep cmd-sep--between-groups" aria-hidden="true">||</span>
@@ -1962,6 +1962,16 @@ window.addEventListener('message', (ev) => {
       targetModeEl.value = msg.isJson ? 'json' : 'selection';
     }
     updateExportBarMode();
+    const webBtn = document.getElementById('btnWebSearch');
+    if (webBtn) {
+      const on = !!msg.webConfigured;
+      webBtn.disabled = !on;
+      webBtn.style.opacity = on ? '' : '0.5';
+      webBtn.style.cursor = on ? '' : 'not-allowed';
+      webBtn.style.textDecoration = on ? '' : 'none';
+      webBtn.textContent = on ? 'Web' : 'Web（未配置）';
+      webBtn.title = on ? '通用网页搜索（DeepSeek Search 或 IQS）' : '请配置 DeepSeek 或 IQS API Key';
+    }
   } else if (msg.type === 'clearTimeline') {
     clearTimeline();
     planPanel.classList.remove('visible');

@@ -50,8 +50,7 @@ export const REFERENCE_SOURCE_OPTIONS: Array<{
     {
         id: 'web',
         label: 'Web 搜索',
-        description: '通用网页搜索（尚未配置适配器）',
-        stub: true,
+        description: '通用网页搜索（DeepSeek Search 或阿里云 IQS；需配置对应 API Key）',
     },
 ];
 

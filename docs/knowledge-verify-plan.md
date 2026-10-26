@@ -23,12 +23,12 @@
 | `Open Reference Search Panel（检索面板）` | Webview：配置多源、执行、展示规划过程与命中 | — | — |
 | `Open 资料检索 View` | 打开 TreeView | — | — |
 
-**正式资料来源**：本地词典、本地参考资料（grep / BM25 / 向量）、维基百科、Web（尚未实现）。  
+**正式资料来源**：本地词典、本地参考资料（grep / BM25 / 向量）、维基百科、Web（配置 DeepSeek 或 IQS API Key 后可用）。  
 **便捷工具（不进入 corpus）**：同名 PDF 搜索、识典古籍、中华经典古籍库。
 
 **核对选中引文 / 核对全文引文**（`Verify Selected Citation` / `Verify Citations`）走引文索引 + 相似度匹配 + 侧栏 **引文核查** 树，与上表不同。选中核对以选区为一条引文（去掉行首 `>`），不经 LLM 规划。详见 [citation-verification-plan.md](citation-verification-plan.md)。
 
-复合准备默认来源：**词典 + grep + BM25 + 向量**；**维基百科**需勾选；**Web** 不可用。
+复合准备默认来源：**词典 + grep + BM25 + 向量**；**维基百科**需勾选；**Web** 在已配置检索 Key 时可勾选，默认不启用。
 
 过程事件：`referencePrepRunner` 通过结构化 `PrepEvent`（phase / plan / query / hits / process）推送给检索面板 Webview；TreeView 仍经 `onProcessUpdated` 同步。
 

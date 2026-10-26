@@ -24,6 +24,7 @@ export type SidebarResultKey =
     | 'numbering'
     | 'numberingSegments'
     | 'proofreadItems'
+    | 'factCheck'
     | 'translateReview';
 
 export interface SidebarResultState {
@@ -34,6 +35,7 @@ export interface SidebarResultState {
     numbering: boolean;
     numberingSegments: boolean;
     proofreadItems: boolean;
+    factCheck: boolean;
     translateReview: boolean;
 }
 
@@ -52,6 +54,7 @@ const state: SidebarToggleState = {
     numbering: false,
     numberingSegments: false,
     proofreadItems: false,
+    factCheck: false,
     translateReview: false,
 };
 
@@ -123,6 +126,9 @@ async function hideOtherResultViews(keep: SidebarResultKey): Promise<void> {
     if (keep !== 'proofreadItems' && state.proofreadItems) {
         await setProofreadItemsVisible(false, hideOpts);
     }
+    if (keep !== 'factCheck' && state.factCheck) {
+        await setFactCheckVisible(false, hideOpts);
+    }
     if (keep !== 'translateReview' && state.translateReview) {
         await setTranslateReviewVisible(false, hideOpts);
     }
@@ -138,6 +144,7 @@ export async function hideAllResultViews(): Promise<void> {
     await setNumberingVisible(false, hideOpts);
     await setNumberingSegmentsVisible(false, hideOpts);
     await setProofreadItemsVisible(false, hideOpts);
+    await setFactCheckVisible(false, hideOpts);
     await setTranslateReviewVisible(false, hideOpts);
 }
 
@@ -363,6 +370,23 @@ export async function setProofreadItemsVisible(visible: boolean, options?: SetVi
 export async function toggleProofreadItemsVisible(): Promise<boolean> {
     await setProofreadItemsVisible(!state.proofreadItems);
     return state.proofreadItems;
+}
+
+export async function setFactCheckVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
+    if (visible && options?.exclusive !== false) {
+        await hideOtherResultViews('factCheck');
+    }
+    state.factCheck = visible;
+    await vscode.commands.executeCommand('setContext', 'aiProofread.showFactCheckView', visible);
+    if (visible) {
+        await tryFocus('ai-proofread.factCheckClaims.focus');
+    }
+    notify();
+}
+
+export async function toggleFactCheckVisible(): Promise<boolean> {
+    await setFactCheckVisible(!state.factCheck);
+    return state.factCheck;
 }
 
 export async function setTranslateReviewVisible(visible: boolean, options?: SetVisibleOptions): Promise<void> {
