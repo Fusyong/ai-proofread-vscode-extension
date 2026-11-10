@@ -1210,11 +1210,11 @@ export class WebviewManager {
         const selectionLinks = `
             <p class="header-commands-hint">选区处理（编辑/转换须匹配当前提示词）</p>
             <div class="header-actions">
-                <button type="button" class="link-button" onclick="handleAction('editSelection')" title="${commandHoverTitle('编辑选区', 'ai-proofread.editSelection')}">编辑选区</button>
+                <button type="button" class="link-button" onclick="handleAction('editSelection')" title="${commandHoverTitle('编辑选区（原：校对选区）', 'ai-proofread.editSelection')}">编辑选区</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('convertSelection')" title="${commandHoverTitle('转换选区', 'ai-proofread.convertSelection')}">转换选区</button>
                 ${sep}
-                <button type="button" class="link-button" onclick="handleAction('editSelectionWithMemory')" title="${commandHoverTitle('编辑选区（带记忆 · 实验）', 'ai-proofread.editSelectionWithMemory')}">编辑选区（带记忆 · 实验）</button>
+                <button type="button" class="link-button" onclick="handleAction('editSelectionWithMemory')" title="${commandHoverTitle('编辑选区（带记忆 · 实验，原：校对选区（带记忆））', 'ai-proofread.editSelectionWithMemory')}">编辑选区（带记忆 · 实验）</button>
                 ${sep}
                 <button type="button" class="link-button" onclick="handleAction('convertSelectionWithMemory')" title="${commandHoverTitle('转换选区（带记忆 · 实验）', 'ai-proofread.convertSelectionWithMemory')}">转换选区（带记忆 · 实验）</button>
             </div>`;

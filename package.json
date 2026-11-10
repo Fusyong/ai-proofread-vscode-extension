@@ -2,7 +2,7 @@
   "name": "ai-proofreader",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.12.1"
@@ -2657,16 +2657,6 @@
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
         },
         {
-          "command": "ai-proofread.proofreadSelection",
-          "group": "ai-proofread@11.07",
-          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
-        },
-        {
-          "command": "ai-proofread.proofreadSelectionWithMemory",
-          "group": "ai-proofread@11.08",
-          "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
-        },
-        {
           "command": "ai-proofread.translateSelectionWithMemory",
           "group": "ai-proofread@11.09",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
@@ -2855,6 +2845,16 @@
           "command": "ai-proofread.openccSelection",
           "group": "ai-proofread@40.1",
           "when": "editorHasSelection && (resourceLangId == markdown || resourceLangId == text || resourceLangId == plaintext || resourceLangId == context || resourceLangId == tex || resourceLangId == latex)"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "ai-proofread.proofreadSelection",
+          "when": "false"
+        },
+        {
+          "command": "ai-proofread.proofreadSelectionWithMemory",
+          "when": "false"
         }
       ]
     }

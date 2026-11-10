@@ -10,12 +10,14 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 
 ## 最近更新
 
-当前版本 v2.0.0
+当前版本 v2.0.1
 
+- 命令名称中扩注旧名
 - 新的架构与抽象：业务分为编辑和转换两类，前者处理前后变动小，可对齐diff，如编辑；后者处理前后变动大，不可对齐diff，如翻译）两类。流程分为并行（此前的主要形态）和串行（带memo history）两类；抽象、统一memo history业务逻辑，提供聚类以分析一致性的工具。串行和memo history相关功能均处于实验状态，有待验证和改进
 - 特性：翻译业务相关支持
 - 特性：增加校对词表
 - 优化：优化句子对齐报告UI和工作流
+- 兼容：选区命令标题括注 1.x 旧名。「编辑选区」原为「校对选区」，「编辑选区（带记忆 · 实验）」原为「校对选区（带记忆）」；旧命令 ID 仍可调用，但不再出现在命令面板和右键菜单
 
 完整更新日志见 [docs/changelog.md](docs/changelog.md)。
 
@@ -33,7 +35,7 @@ Additionally, you can set your own prompts for other text processing scenarios, 
 ### 2.1. 校对文档中的选段
 
 1. Ctrl+N新建文档，后缀设为`.md`（markdown文档），把你需要校对的文字粘贴到这里，选中其中的一段文字
-2. 在所选文字上打开右键菜单，使用其中的 `AI Proofreader: proofread selection` 校对选中文本
+2. 在所选文字上打开右键菜单，使用其中的「编辑选区（原：校对选区）」（英文界面为 Edit Selection (was Proofread Selection)）校对选中文本
 3. 弹出选项对话框时全部回车，即使用默认值
 4. 最后会自动展示校对前后的差异，效果如下，深红表示原文变动，深绿表示结果变动：
 
@@ -251,7 +253,7 @@ JSON 切分后若要检索参考资料，见 [3.2.3](#323-资料检索分支实�
 
 在批量校对或选段校对前，可先做资料准备：经资源范围解析（大库时 LLM 预筛词典/目录/标题）与多轮 LLM 规划，从本地词典、grep、BM25（应用层，非 FTS5）、轻量向量（字符 n-gram）、可选维基百科/Wikidata API 检索，经混合打分与 LLM 精排后写入过程文件与侧栏「资料检索」。日常操作优先用检索面板。
 
-推荐路径（选段）：检索面板「开始准备」→ 勾选命中 → **导出 md** → 打开**工作面板** → `proofread selection` → 选用预置提示词「知识核查（item）」并指定刚导出的参考文件。
+推荐路径（选段）：检索面板「开始准备」→ 勾选命中 → **导出 md** → 打开**工作面板** →「编辑选区（原：校对选区）」→ 选用预置提示词「知识核查（item）」并指定刚导出的参考文件。
 
 推荐路径（JSON）：可先「抽取待核断言」→ 在侧栏勾选 →「检索勾选」把网页摘录写入 `reference`；或走资料准备·JSON → 勾选命中 → **合并选中到源 JSON**。然后在工作面板校对 JSON，并选用「知识核查（item）」。
 
@@ -289,9 +291,9 @@ JSON 批量校对的按钮在 **切分 → (合并 →) 交 LLM 处理** 区块�
 
 1. 打开Markdown文档（其他纯文本文档可改为.md后缀，即为Markdown文档）
 2. 选中要校对的段落，不宜过长
-3. 从工作面板底部 **校对选中文本**，或右键菜单、命令面板中选择 Proofread Selection
+3. 从工作面板底部 **编辑选区**，或右键菜单、命令面板中选择「编辑选区（原：校对选区）」（英文界面为 Edit Selection (was Proofread Selection)）
 4. 可选择上下文范围、参考文件和温度。加入上下文是为大语言模型提供语境，以便参考，并保持一致性。参考文件可以是相关的词条、更权威的文献等。模型温度较低时，随机性、创造性、稳定性较低；反之则随机性、创造性、不稳定性变高。可以参考模型文档进行测试。**使用不同温度多遍校对，或许可以覆盖不同的问题，值得尝试。**
-5. 校对结束后会打开 diff；**关闭右侧校对结果文档时**可选择是否将结果**写回选区**。**普通 Proofread Selection** 不会读写编辑记忆 JSON。**Proofread Selection with Memory** 会在接受写回后更新 **`.proofread/editorial-memory.json`**：**全局**为结构化条目（`original` / `changedTo` / **`weight`**；可选 **`note`** 修改说明；超员时**低 weight**先入存档）；**最近 d 次（默认 3）**校对的**扁平合并稿**栈 `currentRounds`（轮次间归一化完全相同则去重，单轮内不限条数）。注入：`<editorial_memory_global>`、`<editorial_memory_current_rounds>`、`<editorial_proofread_context>`。写回时 LLM 产出 `global_ops` + `current_round_flat`（或由程序摘要压栈），详见 `mergeAfterAccept` 等 `ai-proofread.editorialMemory.*` 设置。
+5. 校对结束后会打开 diff；**关闭右侧校对结果文档时**可选择是否将结果**写回选区**。**普通「编辑选区」**不会读写编辑记忆 JSON。**「编辑选区（带记忆 · 实验）」（原「校对选区（带记忆）」）**会在接受写回后更新 **`.proofread/editorial-memory.json`**：**全局**为结构化条目（`original` / `changedTo` / **`weight`**；可选 **`note`** 修改说明；超员时**低 weight**先入存档）；**最近 d 次（默认 3）**校对的**扁平合并稿**栈 `currentRounds`（轮次间归一化完全相同则去重，单轮内不限条数）。注入：`<editorial_memory_global>`、`<editorial_memory_current_rounds>`、`<editorial_proofread_context>`。写回时 LLM 产出 `global_ops` + `current_round_flat`（或由程序摘要压栈），详见 `mergeAfterAccept` 等 `ai-proofread.editorialMemory.*` 设置。
 
 
 #### 3.3.2. 对切分好的JSON文档进行校对（批处理）
@@ -306,13 +308,13 @@ JSON 批量校对的按钮在 **切分 → (合并 →) 交 LLM 处理** 区块�
 
 #### 3.3.3. 对文档选段进行带记忆的校对，并自动维护项目级编辑记忆（实验功能）
 
-本功能是在`Proofread Selection`基础上增加收集、处理、使用校对记忆的工作流。
+本功能是在「编辑选区」（原「校对选区」）基础上增加收集、处理、使用校对记忆的工作流。
 
 !!! caution 费用警告
-    本工作模式比起Proofread Selection来，每次都要提交编辑记忆给大模型参考，并合并新的编辑记忆，因此会消耗多得多的token。
+    本工作模式比起「编辑选区」来，每次都要提交编辑记忆给大模型参考，并合并新的编辑记忆，因此会消耗多得多的token。
 
-1. 选中要校对的文本，运行 `Proofread Selection with Memory`命令面板：会把已有项目级编辑记忆注入请求供模型参考；接受写回后按设置更新记忆（普通 `Proofread Selection` 不读写记忆 JSON）
-2. 与普通 `Proofread Selection` 不同，本命令从工作区配置文件 `<工作区根>/.proofread/proofread-selection-with-memory.json` 读取设置。若文件不存在，扩展会生成一份默认模板
+1. 选中要校对的文本，运行「编辑选区（带记忆 · 实验，原：校对选区（带记忆））」：会把已有项目级编辑记忆注入请求供模型参考；接受写回后按设置更新记忆（普通「编辑选区」不读写记忆 JSON）
+2. 与普通「编辑选区」不同，本命令从工作区配置文件 `<工作区根>/.proofread/proofread-selection-with-memory.json` 读取设置。若文件不存在，扩展会生成一份默认模板
    - `contextMode`（字符串，三选一）
     - `"none"` — 不使用上下文
     - `"adjacentParagraphs"` — 按最小长度扩展前后文（合法切分点：空行或 Markdown 标题前），须配合以下参数：
